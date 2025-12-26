@@ -1,0 +1,31 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model RoomMessage {
+  id        String   @id @default(cuid())
+  roomId    String
+  senderId  String
+  text      String
+  createdAt DateTime @default(now())
+
+  @@index([roomId, createdAt])
+}
+
+model RoomActivity {
+  id        String   @id @default(cuid())
+  roomId    String
+  kind      String
+  action    String?
+  timestamp Float?
+  videoUrl  String?
+  senderId  String?
+  createdAt DateTime @default(now())
+
+  @@index([roomId, createdAt])
+}

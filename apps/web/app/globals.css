@@ -1,50 +1,35 @@
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@import "tailwindcss";
 
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: 15 23 42; /* Slate 900 */
+    --foreground: 248 250 252; /* Slate 50 */
+  }
+
+  body {
+    @apply bg-slate-950 text-slate-50 antialiased;
   }
 }
 
-html,
-body {
-  max-width: 100vw;
-  overflow-x: hidden;
-}
-
-body {
-  color: var(--foreground);
-  background: var(--background);
-}
-
-* {
-  box-sizing: border-box;
-  padding: 0;
-  margin: 0;
-}
-
-a {
-  color: inherit;
-  text-decoration: none;
-}
-
-.imgDark {
-  display: none;
-}
-
-@media (prefers-color-scheme: dark) {
-  html {
-    color-scheme: dark;
+@layer utilities {
+  .glass {
+    @apply bg-slate-900/70 backdrop-blur-md border border-white/10;
   }
 
-  .imgLight {
-    display: none;
+  .glass-panel {
+    @apply bg-slate-800/50 backdrop-blur-sm border border-white/5;
   }
-  .imgDark {
-    display: unset;
-  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-slate-700 rounded-full hover:bg-slate-600;
 }
