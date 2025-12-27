@@ -1,20 +1,25 @@
 {
   "$schema": "https://turborepo.com/schema.json",
   "ui": "tui",
+  "globalEnv": ["YOUTUBE_API_KEY"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
+      "env": ["YOUTUBE_API_KEY"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": [".next/**", "!.next/cache/**"]
     },
     "lint": {
-      "dependsOn": ["^lint"]
+      "dependsOn": ["^lint"],
+      "env": ["YOUTUBE_API_KEY"]
     },
     "check-types": {
-      "dependsOn": ["^check-types"]
+      "dependsOn": ["^check-types"],
+      "env": ["YOUTUBE_API_KEY"]
     },
     "dev": {
       "cache": false,
+      "env": ["YOUTUBE_API_KEY"],
       "persistent": true
     }
   }

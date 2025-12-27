@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import {
   useRoom,
   SyncData,
@@ -37,6 +38,7 @@ import {
 
 import { usePushToTalkBinding } from "./hooks/usePushToTalkBinding";
 import { useWebRTCPeers } from "./hooks/useWebRTCPeers";
+import { fetchVideoPreview, VideoPreview } from "./lib/video-preview";
 
 export default function RoomClient({ roomId }: { roomId: string }) {
   type LogEntry = {
@@ -98,6 +100,8 @@ export default function RoomClient({ roomId }: { roomId: string }) {
     "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4"
   );
   const [inputUrl, setInputUrl] = useState(url);
+  const [videoPreview, setVideoPreview] = useState<VideoPreview | null>(null);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [muted, setMuted] = useState(true);
   const [playerReady, setPlayerReady] = useState(false);
@@ -1128,25 +1132,41 @@ export default function RoomClient({ roomId }: { roomId: string }) {
     ]);
   };
 
-  const handleUrlChange = (e: React.FormEvent) => {
+  const handleUrlChange = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (inputUrl !== url) {
-      setPlayerReady(false);
-      setPlayerError(null);
-      const nextUrl = normalizeVideoUrl(inputUrl);
-      setUrl(nextUrl);
-      setInputUrl(nextUrl);
-      sendSyncEvent("change_url", 0, nextUrl);
-      const time = new Date().toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      });
-      setLogs((prev) => [
-        ...prev,
-        { msg: `changed video source`, type: "change_url", time, user: "You" },
-      ]);
+    if (inputUrl === url) return;
+
+    const normalized = normalizeVideoUrl(inputUrl);
+    if (!normalized) return;
+
+    // Fetch preview first
+    const preview = await fetchVideoPreview(normalized);
+
+    if (preview) {
+      setVideoPreview(preview);
+      setShowPreviewModal(true);
+    } else {
+      // If preview fails, load directly
+      loadVideoUrl(normalized);
     }
+  };
+
+  const loadVideoUrl = (nextUrl: string) => {
+    setPlayerReady(false);
+    setPlayerError(null);
+    setUrl(nextUrl);
+    setInputUrl(nextUrl);
+    sendSyncEvent("change_url", 0, nextUrl);
+    const time = new Date().toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+    setLogs((prev) => [
+      ...prev,
+      { msg: `changed video source`, type: "change_url", time, user: "You" },
+    ]);
+    setShowPreviewModal(false);
   };
 
   const handlePlayerError = (e: unknown) => {
@@ -1516,6 +1536,75 @@ export default function RoomClient({ roomId }: { roomId: string }) {
           handleSendChat={handleSendChat}
         />
       </main>
+
+      {/* Video Preview Modal */}
+      {showPreviewModal && videoPreview && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-6"
+          onClick={() => setShowPreviewModal(false)}
+        >
+          <div
+            className="max-w-2xl w-full rounded-2xl border border-white/20 bg-slate-900 overflow-hidden shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Thumbnail */}
+            {videoPreview.thumbnail && (
+              <div className="relative aspect-video bg-slate-950">
+                <Image
+                  src={videoPreview.thumbnail}
+                  alt={videoPreview.title}
+                  fill
+                  className="object-cover"
+                  unoptimized
+                />
+                <div className="absolute inset-0 bg-linear-to-t from-slate-900/90 to-transparent" />
+                {videoPreview.duration && (
+                  <div className="absolute bottom-3 right-3 bg-black/75 px-2 py-1 rounded text-xs font-semibold">
+                    {videoPreview.duration}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Content */}
+            <div className="p-6">
+              <div className="text-xl font-bold text-slate-50 mb-2">
+                {videoPreview.title}
+              </div>
+              <div className="text-sm text-slate-400 mb-1 font-medium uppercase tracking-wide">
+                {videoPreview.platform}
+              </div>
+              <div className="text-sm text-slate-400 mb-4">
+                Duration:{" "}
+                <span className="text-slate-300 font-semibold">
+                  {videoPreview.duration ?? "Unavailable"}
+                </span>
+              </div>
+              <div className="text-sm text-slate-500 font-mono break-all mb-6">
+                {videoPreview.url}
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    if (videoPreview) loadVideoUrl(videoPreview.url);
+                  }}
+                  className="flex-1 h-11 rounded-xl font-semibold text-sm transition-colors bg-indigo-600 text-white hover:bg-indigo-500"
+                >
+                  Load Video
+                </button>
+                <button
+                  onClick={() => setShowPreviewModal(false)}
+                  className="h-11 px-6 rounded-xl font-semibold text-sm transition-colors border border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
