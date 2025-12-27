@@ -20,7 +20,7 @@ export interface VideoPlayerHandle {
 
 const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
   (props, ref) => {
-    const playerRef = useRef<ReactPlayer>(null);
+    const playerRef = useRef<ReactPlayer | null>(null);
 
     useImperativeHandle(ref, () => ({
       getCurrentTime: () => {
