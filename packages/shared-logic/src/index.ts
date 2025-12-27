@@ -51,6 +51,53 @@ export interface ActivityHistoryData {
   events: ActivityEvent[];
 }
 
+export interface RoomUsersData {
+  roomId: string;
+  users: string[];
+  mediaStates?: Record<string, WebRTCMediaState>;
+  hostId?: string | null;
+}
+
+export interface RoomPasswordStatusData {
+  roomId: string;
+  hasPassword: boolean;
+}
+
+export interface RoomPasswordRequiredData {
+  roomId: string;
+  reason?: "required" | "invalid";
+}
+
+export interface WheelSpinData {
+  index: number;
+  result: string;
+  entryCount: number;
+  spunAt: number;
+  senderId?: string;
+}
+
+export interface WheelStateData {
+  roomId: string;
+  entries: string[];
+  lastSpin?: WheelSpinData | null;
+}
+
+export interface WheelSpunData {
+  roomId: string;
+  index: number;
+  result: string;
+  entryCount: number;
+  spunAt: number;
+  senderId?: string;
+  entries?: string[];
+}
+
+export interface WebRTCMediaState {
+  mic: boolean;
+  cam: boolean;
+  screen: boolean;
+}
+
 const SERVER_URL =
   // For Next.js client bundles, this is replaced at build-time.
   (process.env.NEXT_PUBLIC_SOCKET_SERVER_URL as string | undefined) ??
@@ -62,6 +109,15 @@ export const useRoom = (roomId: string, userId: string) => {
   const latestRoomStateRef = useRef<RoomStateData | null>(null);
   const latestChatHistoryRef = useRef<ChatHistoryData | null>(null);
   const latestActivityHistoryRef = useRef<ActivityHistoryData | null>(null);
+  const latestRoomUsersRef = useRef<RoomUsersData | null>(null);
+  const latestRoomPasswordStatusRef = useRef<RoomPasswordStatusData | null>(
+    null
+  );
+  const latestRoomPasswordRequiredRef = useRef<RoomPasswordRequiredData | null>(
+    null
+  );
+  const latestWheelStateRef = useRef<WheelStateData | null>(null);
+  const latestWheelSpunRef = useRef<WheelSpunData | null>(null);
   const pendingSyncEventsRef = useRef<
     Array<{ action: SyncAction; timestamp: number; videoUrl?: string }>
   >([]);
@@ -75,6 +131,17 @@ export const useRoom = (roomId: string, userId: string) => {
 
     const socket = socketRef.current;
 
+    const clearCachedRoomData = () => {
+      latestRoomStateRef.current = null;
+      latestChatHistoryRef.current = null;
+      latestActivityHistoryRef.current = null;
+      latestRoomUsersRef.current = null;
+      latestRoomPasswordStatusRef.current = null;
+      latestRoomPasswordRequiredRef.current = null;
+      latestWheelStateRef.current = null;
+      latestWheelSpunRef.current = null;
+    };
+
     const handleRoomState = (data: RoomStateData) => {
       latestRoomStateRef.current = data;
     };
@@ -87,16 +154,59 @@ export const useRoom = (roomId: string, userId: string) => {
       latestActivityHistoryRef.current = data;
     };
 
+    const handleRoomUsers = (data: RoomUsersData) => {
+      latestRoomUsersRef.current = data;
+      // If we received room users, join succeeded; any previous password-required is obsolete.
+      latestRoomPasswordRequiredRef.current = null;
+    };
+
+    const handleRoomPasswordStatus = (data: RoomPasswordStatusData) => {
+      latestRoomPasswordStatusRef.current = data;
+      // Status implies join succeeded; clear any previous required/invalid state.
+      latestRoomPasswordRequiredRef.current = null;
+    };
+
+    const handleRoomPasswordRequired = (data: RoomPasswordRequiredData) => {
+      latestRoomPasswordRequiredRef.current = data;
+    };
+
+    const handleWheelState = (data: WheelStateData) => {
+      latestWheelStateRef.current = data;
+    };
+
+    const handleWheelSpun = (data: WheelSpunData) => {
+      latestWheelSpunRef.current = data;
+    };
+
     // Always listen for room state so we don't miss the first push during join.
     socket.on("room_state", handleRoomState);
     socket.on("chat_history", handleChatHistory);
     socket.on("activity_history", handleActivityHistory);
+    socket.on("room_users", handleRoomUsers);
+    socket.on("room_password_status", handleRoomPasswordStatus);
+    socket.on("room_requires_password", handleRoomPasswordRequired);
+    socket.on("wheel_state", handleWheelState);
+    socket.on("wheel_spun", handleWheelSpun);
 
     socket.on("connect", () => {
       console.log("Connected to socket server");
       setIsConnected(true);
-      // Join the room immediately upon connection
-      socket.emit("join_room", roomId);
+      // New connection => drop any cached events from a previous socket id.
+      clearCachedRoomData();
+      // Join the room immediately upon connection (if password exists in session storage, include it).
+      let password;
+      try {
+        password =
+          typeof window !== "undefined"
+            ? window.sessionStorage.getItem(`huddle:roomPassword:${roomId}`)
+            : null;
+      } catch {
+        password = null;
+      }
+      socket.emit("join_room", {
+        roomId,
+        password: password || undefined,
+      });
 
       // Flush any events the user triggered before we connected.
       const pending = pendingSyncEventsRef.current;
@@ -116,6 +226,8 @@ export const useRoom = (roomId: string, userId: string) => {
     socket.on("disconnect", () => {
       console.log("Disconnected from socket server");
       setIsConnected(false);
+      // Avoid stale cached room/users/password data showing up while disconnected or on the next reconnect.
+      clearCachedRoomData();
     });
 
     socket.connect();
@@ -125,9 +237,34 @@ export const useRoom = (roomId: string, userId: string) => {
       socket.off("room_state", handleRoomState);
       socket.off("chat_history", handleChatHistory);
       socket.off("activity_history", handleActivityHistory);
+      socket.off("room_users", handleRoomUsers);
+      socket.off("room_password_status", handleRoomPasswordStatus);
+      socket.off("room_requires_password", handleRoomPasswordRequired);
+      socket.off("wheel_state", handleWheelState);
+      socket.off("wheel_spun", handleWheelSpun);
       socket.disconnect();
     };
   }, [roomId]);
+
+  const joinRoom = useCallback(
+    (password?: string) => {
+      const socket = socketRef.current;
+      if (!socket) return;
+      if (!socket.connected) return;
+      socket.emit("join_room", { roomId, password: password || undefined });
+    },
+    [roomId]
+  );
+
+  const setRoomPassword = useCallback(
+    (password: string) => {
+      const socket = socketRef.current;
+      if (!socket) return;
+      if (!socket.connected) return;
+      socket.emit("set_room_password", { roomId, password });
+    },
+    [roomId]
+  );
 
   // Function to send video sync events
   const sendSyncEvent = useCallback(
@@ -285,8 +422,322 @@ export const useRoom = (roomId: string, userId: string) => {
     socket.emit("request_activity_history", roomId);
   }, [roomId]);
 
+  const onRoomUsers = useCallback(
+    (callback: (data: RoomUsersData) => void) => {
+      if (socketRef.current) {
+        socketRef.current.on("room_users", callback);
+      }
+
+      const cached = latestRoomUsersRef.current;
+      if (cached && cached.roomId === roomId) {
+        callback(cached);
+      }
+
+      return () => {
+        if (socketRef.current) {
+          socketRef.current.off("room_users", callback);
+        }
+      };
+    },
+    [roomId]
+  );
+
+  const onRoomPasswordStatus = useCallback(
+    (callback: (data: RoomPasswordStatusData) => void) => {
+      if (socketRef.current) {
+        socketRef.current.on("room_password_status", callback);
+      }
+
+      const cached = latestRoomPasswordStatusRef.current;
+      if (cached && cached.roomId === roomId) {
+        callback(cached);
+      }
+
+      return () => {
+        if (socketRef.current) {
+          socketRef.current.off("room_password_status", callback);
+        }
+      };
+    },
+    [roomId]
+  );
+
+  const onRoomPasswordRequired = useCallback(
+    (callback: (data: RoomPasswordRequiredData) => void) => {
+      if (socketRef.current) {
+        socketRef.current.on("room_requires_password", callback);
+      }
+
+      const cached = latestRoomPasswordRequiredRef.current;
+      if (cached && cached.roomId === roomId) {
+        callback(cached);
+      }
+
+      return () => {
+        if (socketRef.current) {
+          socketRef.current.off("room_requires_password", callback);
+        }
+      };
+    },
+    [roomId]
+  );
+
+  const requestWheelState = useCallback(() => {
+    const socket = socketRef.current;
+    if (!socket) return;
+    if (!socket.connected) return;
+    socket.emit("wheel_get", { roomId });
+  }, [roomId]);
+
+  const addWheelEntry = useCallback(
+    (text: string) => {
+      const socket = socketRef.current;
+      if (!socket) return;
+      if (!socket.connected) return;
+      socket.emit("wheel_add_entry", { roomId, text });
+    },
+    [roomId]
+  );
+
+  const removeWheelEntry = useCallback(
+    (index: number) => {
+      const socket = socketRef.current;
+      if (!socket) return;
+      if (!socket.connected) return;
+      socket.emit("wheel_remove_entry", { roomId, index });
+    },
+    [roomId]
+  );
+
+  const clearWheelEntries = useCallback(() => {
+    const socket = socketRef.current;
+    if (!socket) return;
+    if (!socket.connected) return;
+    socket.emit("wheel_clear", { roomId });
+  }, [roomId]);
+
+  const spinWheel = useCallback(() => {
+    const socket = socketRef.current;
+    if (!socket) return;
+    if (!socket.connected) return;
+    socket.emit("wheel_spin", { roomId });
+  }, [roomId]);
+
+  const onWheelState = useCallback(
+    (callback: (data: WheelStateData) => void) => {
+      if (socketRef.current) {
+        socketRef.current.on("wheel_state", callback);
+      }
+
+      const cached = latestWheelStateRef.current;
+      if (cached && cached.roomId === roomId) {
+        callback(cached);
+      }
+
+      return () => {
+        if (socketRef.current) {
+          socketRef.current.off("wheel_state", callback);
+        }
+      };
+    },
+    [roomId]
+  );
+
+  const onWheelSpun = useCallback(
+    (callback: (data: WheelSpunData) => void) => {
+      if (socketRef.current) {
+        socketRef.current.on("wheel_spun", callback);
+      }
+
+      const cached = latestWheelSpunRef.current;
+      if (cached && cached.roomId === roomId) {
+        callback(cached);
+      }
+
+      return () => {
+        if (socketRef.current) {
+          socketRef.current.off("wheel_spun", callback);
+        }
+      };
+    },
+    [roomId]
+  );
+
+  const onUserJoined = useCallback((callback: (socketId: string) => void) => {
+    if (socketRef.current) {
+      socketRef.current.on("user_joined", callback);
+    }
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.off("user_joined", callback);
+      }
+    };
+  }, []);
+
+  const onUserLeft = useCallback((callback: (socketId: string) => void) => {
+    if (socketRef.current) {
+      socketRef.current.on("user_left", callback);
+    }
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.off("user_left", callback);
+      }
+    };
+  }, []);
+
+  const sendWebRTCOffer = useCallback(
+    (to: string, sdp: unknown) => {
+      const socket = socketRef.current;
+      if (!socket) return;
+      if (!socket.connected) return;
+      socket.emit("webrtc_offer", { roomId, to, sdp });
+    },
+    [roomId]
+  );
+
+  const sendWebRTCAnswer = useCallback(
+    (to: string, sdp: unknown) => {
+      const socket = socketRef.current;
+      if (!socket) return;
+      if (!socket.connected) return;
+      socket.emit("webrtc_answer", { roomId, to, sdp });
+    },
+    [roomId]
+  );
+
+  const sendWebRTCIce = useCallback(
+    (to: string, candidate: unknown) => {
+      const socket = socketRef.current;
+      if (!socket) return;
+      if (!socket.connected) return;
+      socket.emit("webrtc_ice", { roomId, to, candidate });
+    },
+    [roomId]
+  );
+
+  const onWebRTCOffer = useCallback(
+    (
+      callback: (data: { roomId: string; from: string; sdp: unknown }) => void
+    ) => {
+      if (socketRef.current) {
+        socketRef.current.on("webrtc_offer", callback);
+      }
+      return () => {
+        if (socketRef.current) {
+          socketRef.current.off("webrtc_offer", callback);
+        }
+      };
+    },
+    []
+  );
+
+  const onWebRTCAnswer = useCallback(
+    (
+      callback: (data: { roomId: string; from: string; sdp: unknown }) => void
+    ) => {
+      if (socketRef.current) {
+        socketRef.current.on("webrtc_answer", callback);
+      }
+      return () => {
+        if (socketRef.current) {
+          socketRef.current.off("webrtc_answer", callback);
+        }
+      };
+    },
+    []
+  );
+
+  const onWebRTCIce = useCallback(
+    (
+      callback: (data: {
+        roomId: string;
+        from: string;
+        candidate: unknown;
+      }) => void
+    ) => {
+      if (socketRef.current) {
+        socketRef.current.on("webrtc_ice", callback);
+      }
+      return () => {
+        if (socketRef.current) {
+          socketRef.current.off("webrtc_ice", callback);
+        }
+      };
+    },
+    []
+  );
+
+  const sendWebRTCMediaState = useCallback(
+    (state: WebRTCMediaState) => {
+      const socket = socketRef.current;
+      if (!socket) return;
+      if (!socket.connected) return;
+      socket.emit("webrtc_media_state", { roomId, state });
+    },
+    [roomId]
+  );
+
+  const onWebRTCMediaState = useCallback(
+    (
+      callback: (data: {
+        roomId: string;
+        from: string;
+        state: WebRTCMediaState;
+      }) => void
+    ) => {
+      if (socketRef.current) {
+        socketRef.current.on("webrtc_media_state", callback);
+      }
+      return () => {
+        if (socketRef.current) {
+          socketRef.current.off("webrtc_media_state", callback);
+        }
+      };
+    },
+    []
+  );
+
+  const sendWebRTCSpeaking = useCallback(
+    (speaking: boolean) => {
+      const socket = socketRef.current;
+      if (!socket) return;
+      if (!socket.connected) return;
+      socket.emit("webrtc_speaking", { roomId, speaking });
+    },
+    [roomId]
+  );
+
+  const onWebRTCSpeaking = useCallback(
+    (
+      callback: (data: {
+        roomId: string;
+        from: string;
+        speaking: boolean;
+      }) => void
+    ) => {
+      if (socketRef.current) {
+        socketRef.current.on("webrtc_speaking", callback);
+      }
+      return () => {
+        if (socketRef.current) {
+          socketRef.current.off("webrtc_speaking", callback);
+        }
+      };
+    },
+    []
+  );
+
   return {
     isConnected,
+    joinRoom,
+    setRoomPassword,
+    requestWheelState,
+    addWheelEntry,
+    removeWheelEntry,
+    clearWheelEntries,
+    spinWheel,
+    onWheelState,
+    onWheelSpun,
     sendSyncEvent,
     onSyncEvent,
     onRoomState,
@@ -298,6 +749,21 @@ export const useRoom = (roomId: string, userId: string) => {
     onActivityEvent,
     onActivityHistory,
     requestActivityHistory,
+    onRoomUsers,
+    onRoomPasswordStatus,
+    onRoomPasswordRequired,
+    onUserJoined,
+    onUserLeft,
+    sendWebRTCOffer,
+    sendWebRTCAnswer,
+    sendWebRTCIce,
+    onWebRTCOffer,
+    onWebRTCAnswer,
+    onWebRTCIce,
+    sendWebRTCMediaState,
+    onWebRTCMediaState,
+    sendWebRTCSpeaking,
+    onWebRTCSpeaking,
     socket: socketRef.current,
   };
 };

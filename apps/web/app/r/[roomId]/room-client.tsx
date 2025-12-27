@@ -9,8 +9,34 @@ import {
   ChatHistoryData,
   ActivityEvent,
   ActivityHistoryData,
+  WebRTCMediaState,
+  WheelSpunData,
 } from "shared-logic";
-import ReactPlayer from "react-player";
+import { CallSidebar } from "./components/CallSidebar";
+import { ActivitySidebar } from "./components/ActivitySidebar";
+import { PlayerSection } from "./components/PlayerSection";
+import { WheelPickerModal } from "./components/WheelPickerModal";
+import { DraggedTilePayload } from "./lib/dnd";
+
+import {
+  capitalize,
+  formatTime,
+  mapActivityEventToLog,
+  safeToTimeString,
+} from "./lib/activity";
+import {
+  getKickEmbedSrc,
+  getLoadTimeoutMs,
+  getPrimeVideoMessage,
+  getTimeoutErrorMessage,
+  getTwitchEmbedSrc,
+  isPrimeVideoUrl,
+  isProblematicYoutubeUrl,
+  normalizeVideoUrl,
+} from "./lib/video";
+
+import { usePushToTalkBinding } from "./hooks/usePushToTalkBinding";
+import { useWebRTCPeers } from "./hooks/useWebRTCPeers";
 
 export default function RoomClient({ roomId }: { roomId: string }) {
   type LogEntry = {
@@ -28,6 +54,15 @@ export default function RoomClient({ roomId }: { roomId: string }) {
 
   const {
     isConnected,
+    joinRoom,
+    setRoomPassword,
+    requestWheelState,
+    addWheelEntry,
+    removeWheelEntry,
+    clearWheelEntries,
+    spinWheel,
+    onWheelState,
+    onWheelSpun,
     sendSyncEvent,
     onSyncEvent,
     onRoomState,
@@ -39,6 +74,21 @@ export default function RoomClient({ roomId }: { roomId: string }) {
     onActivityEvent,
     onActivityHistory,
     requestActivityHistory,
+    onRoomUsers,
+    onRoomPasswordStatus,
+    onRoomPasswordRequired,
+    onUserJoined,
+    onUserLeft,
+    sendWebRTCOffer,
+    sendWebRTCAnswer,
+    sendWebRTCIce,
+    onWebRTCOffer,
+    onWebRTCAnswer,
+    onWebRTCIce,
+    sendWebRTCMediaState,
+    onWebRTCMediaState,
+    sendWebRTCSpeaking,
+    onWebRTCSpeaking,
     socket,
   } = useRoom(roomId, userId);
 
@@ -55,10 +105,380 @@ export default function RoomClient({ roomId }: { roomId: string }) {
   const [isBuffering, setIsBuffering] = useState(false);
   const [copied, setCopied] = useState(false);
   const [chatText, setChatText] = useState("");
+  const [hostId, setHostId] = useState<string | null>(null);
+  const [roomAccessError, setRoomAccessError] = useState<string | null>(null);
+  const [hasRoomPassword, setHasRoomPassword] = useState(false);
+  const [passwordRequired, setPasswordRequired] = useState(false);
+  const [passwordInput, setPasswordInput] = useState("");
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const lastSubmittedPasswordRef = useRef<string | null>(null);
+
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const localVideoRef = useRef<HTMLVideoElement | null>(null);
+  const micTrackRef = useRef<MediaStreamTrack | null>(null);
+  const camTrackRef = useRef<MediaStreamTrack | null>(null);
+  const screenTrackRef = useRef<MediaStreamTrack | null>(null);
+  const screenStreamRef = useRef<MediaStream | null>(null);
+
+  const peersRef = useRef<Map<string, RTCPeerConnection>>(new Map());
+  const remoteStreamsRef = useRef<Map<string, MediaStream>>(new Map());
+  const [remoteStreams, setRemoteStreams] = useState<
+    Array<{ id: string; stream: MediaStream }>
+  >([]);
+
+  const [micEnabled, setMicEnabled] = useState(false);
+  const [camEnabled, setCamEnabled] = useState(false);
+  const [screenEnabled, setScreenEnabled] = useState(false);
+  const [pushToTalkEnabled, setPushToTalkEnabled] = useState(false);
+  const {
+    bindingLabel: pushToTalkBindingLabel,
+    isRebinding: isRebindingPushToTalkKey,
+    setIsRebinding: setIsRebindingPushToTalkKey,
+    isDown: pushToTalkDown,
+    isDownRef: pushToTalkDownRef,
+    stopTransmit: stopPushToTalkTransmit,
+  } = usePushToTalkBinding({
+    isClient,
+    enabled: pushToTalkEnabled,
+    micEnabled,
+  });
+  const [echoCancellationEnabled, setEchoCancellationEnabled] = useState(true);
+  const [noiseSuppressionEnabled, setNoiseSuppressionEnabled] = useState(true);
+  const [autoGainControlEnabled, setAutoGainControlEnabled] = useState(true);
+  const [localSpeaking, setLocalSpeaking] = useState(false);
+  const [micTrackVersion, setMicTrackVersion] = useState(0);
+  const [, setCamTrackVersion] = useState(0);
+  const [remoteSpeaking, setRemoteSpeaking] = useState<Record<string, boolean>>(
+    {}
+  );
+  const [remoteMedia, setRemoteMedia] = useState<
+    Record<string, WebRTCMediaState>
+  >({});
+  const [participants, setParticipants] = useState<string[]>([]);
+
+  const [wheelEntries, setWheelEntries] = useState<string[]>([]);
+  const [wheelLastSpin, setWheelLastSpin] = useState<WheelSpunData | null>(
+    null
+  );
+  const [isWheelOpen, setIsWheelOpen] = useState(false);
+
+  const playerContainerRef = useRef<HTMLDivElement | null>(null);
+  const [isPlayerFullscreen, setIsPlayerFullscreen] = useState(false);
+  const [fullscreenChatOpen, setFullscreenChatOpen] = useState(false);
+
+  const screenStageContainerRef = useRef<HTMLDivElement | null>(null);
+  const [isScreenFullscreen, setIsScreenFullscreen] = useState(false);
+
+  const [pinnedStage, setPinnedStage] = useState<DraggedTilePayload | null>(
+    null
+  );
+  const [isStageDragOver, setIsStageDragOver] = useState(false);
+  const [isDraggingTile, setIsDraggingTile] = useState(false);
+
+  const [isCallCollapsed, setIsCallCollapsed] = useState(false);
+  const [isActivityCollapsed, setIsActivityCollapsed] = useState(false);
+
+  useEffect(() => {
+    if (!isClient) return;
+    const onFsChange = () => {
+      const fsEl = document.fullscreenElement;
+      setIsScreenFullscreen(
+        Boolean(fsEl && fsEl === screenStageContainerRef.current)
+      );
+      setIsPlayerFullscreen(
+        Boolean(fsEl && fsEl === playerContainerRef.current)
+      );
+    };
+    document.addEventListener("fullscreenchange", onFsChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", onFsChange);
+    };
+  }, [isClient]);
+
+  useEffect(() => {
+    if (!isPlayerFullscreen) {
+      setFullscreenChatOpen(false);
+    }
+  }, [isPlayerFullscreen]);
+
+  const toggleScreenFullscreen = async () => {
+    if (!isClient) return;
+    const el = screenStageContainerRef.current;
+    if (!el) return;
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else {
+        await el.requestFullscreen();
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const togglePlayerFullscreen = async () => {
+    if (!isClient) return;
+    const el = playerContainerRef.current;
+    if (!el) return;
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else {
+        await el.requestFullscreen();
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const vadRafRef = useRef<number | null>(null);
+  const lastVoiceAtRef = useRef<number>(0);
+  const lastSpeakingRef = useRef<boolean>(false);
 
   useEffect(() => {
     setIsClient(true);
   }, []);
+
+  // Track the room host (minimal moderation primitive).
+  useEffect(() => {
+    if (!onRoomUsers) return;
+    const cleanup = onRoomUsers((data) => {
+      if (data.roomId !== roomId) return;
+      const nextHost = (data as unknown as { hostId?: string | null }).hostId;
+      if (typeof nextHost !== "undefined") {
+        setHostId(nextHost ?? null);
+      }
+
+      if (Array.isArray(data.users)) {
+        setParticipants(
+          Array.from(new Set(data.users.filter((id) => id && id !== userId)))
+        );
+      }
+
+      // If we got room_users, we're successfully in the room.
+      setPasswordRequired(false);
+      setPasswordError(null);
+
+      // If the user just entered a password and join succeeded, cache it for this tab.
+      const submitted = lastSubmittedPasswordRef.current;
+      if (submitted) {
+        try {
+          window.sessionStorage.setItem(
+            `huddle:roomPassword:${roomId}`,
+            submitted
+          );
+        } catch {
+          // ignore
+        }
+        lastSubmittedPasswordRef.current = null;
+      }
+    });
+    return () => {
+      (cleanup as (() => void) | undefined)?.();
+    };
+  }, [onRoomUsers, roomId, userId]);
+
+  // Wheel picker state (shared among all participants).
+  useEffect(() => {
+    const cleanups: Array<() => void> = [];
+
+    if (onWheelState) {
+      const off = onWheelState((data) => {
+        if (!data || data.roomId !== roomId) return;
+        setWheelEntries(Array.isArray(data.entries) ? data.entries : []);
+
+        const last = (data as unknown as { lastSpin?: WheelSpunData | null })
+          .lastSpin;
+        if (last && typeof last === "object") {
+          setWheelLastSpin({ ...last, roomId });
+        }
+      });
+      if (typeof off === "function") cleanups.push(off);
+    }
+
+    if (onWheelSpun) {
+      const off = onWheelSpun((data) => {
+        if (!data || data.roomId !== roomId) return;
+        setWheelLastSpin(data);
+      });
+      if (typeof off === "function") cleanups.push(off);
+    }
+
+    // Best effort: ask for a snapshot (server also emits on join).
+    requestWheelState?.();
+
+    return () => {
+      cleanups.forEach((fn) => {
+        try {
+          fn();
+        } catch {
+          // ignore
+        }
+      });
+    };
+  }, [onWheelState, onWheelSpun, requestWheelState, roomId]);
+
+  // Password status + required events.
+  useEffect(() => {
+    const cleanupStatus = onRoomPasswordStatus?.((data) => {
+      if (data.roomId !== roomId) return;
+      setHasRoomPassword(!!data.hasPassword);
+      // If we received a status, join succeeded.
+      setPasswordRequired(false);
+      setPasswordError(null);
+    });
+
+    const cleanupRequired = onRoomPasswordRequired?.((data) => {
+      if (data.roomId !== roomId) return;
+      setPasswordRequired(true);
+      setPasswordError(
+        data.reason === "invalid"
+          ? "Wrong password. Try again."
+          : "This room requires a password."
+      );
+
+      // If the stored password is wrong, clear it so we don't auto-retry forever.
+      if (data.reason === "invalid") {
+        try {
+          window.sessionStorage.removeItem(`huddle:roomPassword:${roomId}`);
+        } catch {
+          // ignore
+        }
+      }
+    });
+
+    return () => {
+      (cleanupStatus as (() => void) | undefined)?.();
+      (cleanupRequired as (() => void) | undefined)?.();
+    };
+  }, [onRoomPasswordStatus, onRoomPasswordRequired, roomId]);
+
+  // Keep participant list updated after initial room_users.
+  useEffect(() => {
+    const cleanupJoined = onUserJoined?.((peerId) => {
+      if (!peerId) return;
+      if (peerId === userId) return;
+      setParticipants((prev) => Array.from(new Set([...prev, peerId])));
+    });
+    const cleanupLeft = onUserLeft?.((peerId) => {
+      if (!peerId) return;
+      setParticipants((prev) => prev.filter((id) => id !== peerId));
+    });
+    return () => {
+      (cleanupJoined as (() => void) | undefined)?.();
+      (cleanupLeft as (() => void) | undefined)?.();
+    };
+  }, [onUserJoined, onUserLeft, userId]);
+
+  useEffect(() => {
+    if (!socket) return;
+    const onHost = (data: { roomId: string; hostId?: string | null }) => {
+      if (data.roomId !== roomId) return;
+      setHostId(data.hostId ?? null);
+    };
+
+    const onBanned = (data: { roomId: string }) => {
+      if (data.roomId !== roomId) return;
+      setRoomAccessError("You no longer have access to this room.");
+      try {
+        socket.disconnect();
+      } catch {
+        // ignore
+      }
+    };
+
+    socket.on("room_host", onHost);
+    socket.on("room_banned", onBanned);
+
+    return () => {
+      socket.off("room_host", onHost);
+      socket.off("room_banned", onBanned);
+    };
+  }, [socket, roomId]);
+
+  const ensureLocalStream = () => {
+    if (localStreamRef.current) return localStreamRef.current;
+    if (typeof window === "undefined") return null;
+    if (typeof MediaStream === "undefined") return null;
+    localStreamRef.current = new MediaStream();
+    return localStreamRef.current;
+  };
+
+  const { closeAllPeers, renegotiateAllPeers } =
+    useWebRTCPeers<WebRTCMediaState>({
+      isConnected,
+      userId,
+      roomId,
+      ensureLocalStream,
+      peersRef,
+      remoteStreamsRef,
+      setRemoteStreams,
+      setRemoteMedia,
+      setRemoteSpeaking,
+      sendWebRTCIce,
+      sendWebRTCOffer,
+      sendWebRTCAnswer,
+      onRoomUsers,
+      onUserJoined,
+      onUserLeft,
+      onWebRTCOffer,
+      onWebRTCAnswer,
+      onWebRTCIce,
+      onWebRTCMediaState,
+      onWebRTCSpeaking,
+    });
+
+  const kickUser = (targetId: string) => {
+    if (!socket) return;
+    if (!socket.connected) return;
+    socket.emit("kick_user", { roomId, targetId });
+  };
+
+  // If the pinned remote user leaves, unpin.
+  useEffect(() => {
+    if (!pinnedStage) return;
+    if (pinnedStage.kind !== "remote") return;
+    const stillThere = remoteStreams.some((s) => s.id === pinnedStage.peerId);
+    if (!stillThere) setPinnedStage(null);
+  }, [pinnedStage, remoteStreams]);
+
+  const stageView = useMemo(() => {
+    if (pinnedStage) {
+      if (pinnedStage.kind === "local") {
+        const s = ensureLocalStream();
+        if (!s) return null;
+
+        return {
+          id: userId || "you",
+          stream: s,
+          isLocal: true as const,
+          pinned: true as const,
+        };
+      }
+
+      const found = remoteStreams.find((s) => s.id === pinnedStage.peerId);
+      if (found) {
+        return {
+          id: pinnedStage.peerId,
+          stream: found.stream,
+          isLocal: false as const,
+          pinned: true as const,
+        };
+      }
+    }
+    return null;
+  }, [pinnedStage, remoteStreams, userId]);
+
+  // Attach the local stream once; we mutate tracks on it.
+  useEffect(() => {
+    if (!isClient) return;
+    if (!localVideoRef.current) return;
+    const s = ensureLocalStream();
+    if (!s) return;
+    localVideoRef.current.srcObject = s;
+  }, [isClient]);
 
   useEffect(() => {
     try {
@@ -113,6 +533,315 @@ export default function RoomClient({ roomId }: { roomId: string }) {
     }
   }, [isConnected, socket]);
 
+  // Broadcast our media toggles so others can show status.
+  useEffect(() => {
+    if (!isConnected) return;
+    if (!userId) return;
+    sendWebRTCMediaState({
+      mic: micEnabled,
+      cam: camEnabled,
+      screen: screenEnabled,
+    });
+  }, [
+    isConnected,
+    userId,
+    micEnabled,
+    camEnabled,
+    screenEnabled,
+    sendWebRTCMediaState,
+  ]);
+
+  const ensureMicEnabled = async () => {
+    if (micTrackRef.current) return;
+    const local = ensureLocalStream();
+    if (!local) return;
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: echoCancellationEnabled,
+        noiseSuppression: noiseSuppressionEnabled,
+        autoGainControl: autoGainControlEnabled,
+      },
+    });
+    const track = stream.getAudioTracks()[0] ?? null;
+    if (!track) return;
+    micTrackRef.current = track;
+    local.addTrack(track);
+    setMicTrackVersion((v) => v + 1);
+  };
+
+  const disableMic = (skipStateUpdates = false) => {
+    const t = micTrackRef.current;
+    if (t) {
+      try {
+        localStreamRef.current?.removeTrack(t);
+      } catch {
+        // ignore
+      }
+      try {
+        t.stop();
+      } catch {
+        // ignore
+      }
+    }
+    micTrackRef.current = null;
+    if (!skipStateUpdates) {
+      setMicTrackVersion((v) => v + 1);
+      setLocalSpeaking(false);
+      sendWebRTCSpeaking(false);
+    }
+  };
+
+  const ensureCamEnabled = async () => {
+    if (camTrackRef.current) return;
+    const local = ensureLocalStream();
+    if (!local) return;
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    const track = stream.getVideoTracks()[0] ?? null;
+    if (!track) return;
+    camTrackRef.current = track;
+    setCamTrackVersion((v) => v + 1);
+    // Only publish cam if we aren't currently screen sharing.
+    if (!screenTrackRef.current) {
+      local.addTrack(track);
+    }
+  };
+
+  const disableCam = (skipStateUpdates = false) => {
+    const t = camTrackRef.current;
+    if (t) {
+      try {
+        localStreamRef.current?.removeTrack(t);
+      } catch {
+        // ignore
+      }
+      try {
+        t.stop();
+      } catch {
+        // ignore
+      }
+    }
+    camTrackRef.current = null;
+    if (!skipStateUpdates) setCamTrackVersion((v) => v + 1);
+  };
+
+  const ensureScreenEnabled = async () => {
+    if (screenTrackRef.current) return;
+    const local = ensureLocalStream();
+    if (!local) return;
+    const stream = await navigator.mediaDevices.getDisplayMedia({
+      video: true,
+      audio: false,
+    });
+    const track = stream.getVideoTracks()[0] ?? null;
+    if (!track) return;
+
+    screenStreamRef.current = stream;
+    screenTrackRef.current = track;
+
+    // Replace any current published video track.
+    for (const vt of local.getVideoTracks()) {
+      local.removeTrack(vt);
+    }
+    local.addTrack(track);
+
+    track.onended = () => {
+      setScreenEnabled(false);
+    };
+  };
+
+  const disableScreen = () => {
+    const t = screenTrackRef.current;
+    const s = screenStreamRef.current;
+
+    if (t) {
+      try {
+        localStreamRef.current?.removeTrack(t);
+      } catch {
+        // ignore
+      }
+      try {
+        t.stop();
+      } catch {
+        // ignore
+      }
+    }
+    if (s) {
+      try {
+        s.getTracks().forEach((tt) => tt.stop());
+      } catch {
+        // ignore
+      }
+    }
+
+    screenTrackRef.current = null;
+    screenStreamRef.current = null;
+
+    // Restore cam video if enabled.
+    const camTrack = camTrackRef.current;
+    if (camTrack) {
+      try {
+        localStreamRef.current?.addTrack(camTrack);
+      } catch {
+        // ignore
+      }
+    }
+  };
+
+  // When toggles change, (re)acquire tracks and renegotiate.
+  useEffect(() => {
+    if (!isClient) return;
+
+    (async () => {
+      try {
+        if (micEnabled) await ensureMicEnabled();
+        else disableMic();
+      } catch {
+        setMicEnabled(false);
+      }
+
+      try {
+        if (camEnabled) await ensureCamEnabled();
+        else disableCam();
+      } catch {
+        setCamEnabled(false);
+      }
+
+      try {
+        if (screenEnabled) await ensureScreenEnabled();
+        else disableScreen();
+      } catch {
+        setScreenEnabled(false);
+      }
+
+      if (isConnected) {
+        await renegotiateAllPeers();
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [micEnabled, camEnabled, screenEnabled, isClient, isConnected]);
+
+  // Re-acquire mic when audio processing settings change.
+  useEffect(() => {
+    if (!isClient) return;
+    if (!micEnabled) return;
+    if (!micTrackRef.current) return;
+
+    (async () => {
+      try {
+        disableMic(true);
+        await ensureMicEnabled();
+        if (isConnected) await renegotiateAllPeers();
+      } catch {
+        setMicEnabled(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    echoCancellationEnabled,
+    noiseSuppressionEnabled,
+    autoGainControlEnabled,
+  ]);
+
+  // If we connect after toggling tracks, negotiate once.
+  useEffect(() => {
+    if (!isConnected) return;
+    renegotiateAllPeers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isConnected]);
+
+  // Speaking indicator (simple VAD): marks speaking (no transmission gating).
+  useEffect(() => {
+    if (!isClient) return;
+    const track = micTrackRef.current;
+    if (!track) return;
+
+    const start = async () => {
+      const stream = new MediaStream([track]);
+      const audioContext = new AudioContext();
+      audioContextRef.current = audioContext;
+      const source = audioContext.createMediaStreamSource(stream);
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 1024;
+      analyserRef.current = analyser;
+      source.connect(analyser);
+      const data = new Uint8Array(analyser.fftSize);
+
+      const threshold = 0.03; // RMS-ish threshold
+      const hangMs = 450;
+
+      const tick = () => {
+        analyser.getByteTimeDomainData(data);
+        let sum = 0;
+        for (let i = 0; i < data.length; i++) {
+          const sample = data[i] ?? 128;
+          const v = (sample - 128) / 128;
+          sum += v * v;
+        }
+        const rms = Math.sqrt(sum / data.length);
+        const now = Date.now();
+        if (rms > threshold) lastVoiceAtRef.current = now;
+        const speakingRaw = now - lastVoiceAtRef.current < hangMs;
+
+        const pttOk = !pushToTalkEnabled || pushToTalkDownRef.current;
+        const speakingForTransmit = Boolean(speakingRaw && pttOk);
+
+        if (speakingForTransmit !== lastSpeakingRef.current) {
+          lastSpeakingRef.current = speakingForTransmit;
+          setLocalSpeaking(speakingForTransmit);
+          sendWebRTCSpeaking(speakingForTransmit);
+        }
+
+        track.enabled = Boolean(pttOk);
+
+        vadRafRef.current = window.requestAnimationFrame(tick);
+      };
+
+      vadRafRef.current = window.requestAnimationFrame(tick);
+    };
+
+    start();
+
+    return () => {
+      if (vadRafRef.current) {
+        window.cancelAnimationFrame(vadRafRef.current);
+        vadRafRef.current = null;
+      }
+      try {
+        analyserRef.current?.disconnect();
+      } catch {
+        // ignore
+      }
+      analyserRef.current = null;
+      const ctx = audioContextRef.current;
+      audioContextRef.current = null;
+      if (ctx) {
+        try {
+          ctx.close();
+        } catch {
+          // ignore
+        }
+      }
+    };
+  }, [
+    isClient,
+    micEnabled,
+    micTrackVersion,
+    pushToTalkEnabled,
+    pushToTalkDownRef,
+    sendWebRTCSpeaking,
+  ]);
+
+  // Cleanup on unmount.
+  useEffect(() => {
+    return () => {
+      closeAllPeers();
+      disableScreen();
+      disableCam(true);
+      disableMic(true);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [closeAllPeers]);
+
   // Auto-scroll logs
   useEffect(() => {
     logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -158,8 +887,13 @@ export default function RoomClient({ roomId }: { roomId: string }) {
         for (const m of data.messages) {
           if (!m?.id || existingChatIds.has(m.id)) continue;
           const t = safeToTimeString(m.createdAt);
+          const isSystem = m.senderId === "system";
           const isMe = m.senderId === userId;
-          const userDisplay = isMe ? "You" : m.senderId || "Unknown";
+          const userDisplay = isSystem
+            ? "System"
+            : isMe
+              ? "You"
+              : m.senderId || "Unknown";
           next.push({
             id: m.id,
             msg: m.text,
@@ -179,8 +913,13 @@ export default function RoomClient({ roomId }: { roomId: string }) {
       if (m.roomId !== roomId) return;
 
       const t = safeToTimeString(m.createdAt);
+      const isSystem = m.senderId === "system";
       const isMe = m.senderId === userId;
-      const userDisplay = isMe ? "You" : m.senderId || "Unknown";
+      const userDisplay = isSystem
+        ? "System"
+        : isMe
+          ? "You"
+          : m.senderId || "Unknown";
 
       setLogs((prev) => {
         const exists = prev.some((l) => l.id === m.id);
@@ -486,6 +1225,65 @@ export default function RoomClient({ roomId }: { roomId: string }) {
     }
   };
 
+  const submitRoomPassword = () => {
+    const pw = passwordInput.trim();
+    lastSubmittedPasswordRef.current = pw;
+    joinRoom(pw);
+  };
+
+  const stageViewForPlayer = useMemo(() => {
+    if (!stageView) return null;
+    return {
+      id: stageView.id,
+      isLocal: stageView.isLocal,
+      stream: stageView.stream,
+    };
+  }, [stageView]);
+
+  const remotesForPlayer = useMemo(() => {
+    return remoteStreams.map((s) => ({
+      id: s.id,
+      stream: s.stream,
+      media: remoteMedia[s.id],
+    }));
+  }, [remoteStreams, remoteMedia]);
+
+  const fullscreenChatMessages = useMemo(() => {
+    return logs.filter((l) => l.type === "chat").slice(-30);
+  }, [logs]);
+
+  if (roomAccessError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-100 p-6">
+        <div className="max-w-md w-full rounded-2xl border border-white/10 bg-white/5 p-6">
+          <div className="text-lg font-semibold">Room access</div>
+          <div className="text-sm text-slate-300 mt-2">{roomAccessError}</div>
+          <div className="mt-5 flex items-center gap-3">
+            <Link
+              href="/"
+              className="h-9 px-4 inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-100 text-sm font-medium hover:bg-white/10 transition-colors"
+            >
+              Go home
+            </Link>
+            <button
+              type="button"
+              onClick={() => {
+                try {
+                  window.location.reload();
+                } catch {
+                  // ignore
+                }
+              }}
+              className="h-9 px-4 inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-100 text-sm font-medium hover:bg-white/10 transition-colors"
+            >
+              Reload
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-linear-to-b from-slate-900 via-slate-950 to-black text-slate-200">
       <header className="h-16 flex items-center justify-between px-6 lg:px-8 border-b border-white/10 backdrop-blur-md bg-black/30 sticky top-0 z-50">
@@ -506,12 +1304,36 @@ export default function RoomClient({ roomId }: { roomId: string }) {
 
         <div className="flex items-center gap-3">
           <button
+            type="button"
+            onClick={() => setIsWheelOpen(true)}
+            disabled={passwordRequired}
+            className="h-8 px-3 rounded-lg border border-white/10 bg-white/5 text-slate-200 text-xs font-medium hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title={
+              passwordRequired
+                ? "Join with password first"
+                : "Open wheel picker"
+            }
+          >
+            Wheel
+          </button>
+
+          <button
             onClick={copyInvite}
             className="h-8 px-3 rounded-lg border border-white/10 bg-white/5 text-slate-200 text-xs font-medium hover:bg-white/10 transition-colors"
             title={inviteLink || ""}
           >
             {copied ? "Copied" : "Copy invite"}
           </button>
+
+          <span className="hidden sm:inline-flex items-center gap-2 text-xs font-medium bg-black/20 px-3 py-1 rounded-full border border-white/10">
+            <span className="text-slate-300">Password</span>
+            <span
+              className={hasRoomPassword ? "text-amber-200" : "text-slate-200"}
+            >
+              {hasRoomPassword ? "On" : "Off"}
+            </span>
+          </span>
+
           <div className="flex items-center gap-2 text-xs sm:text-sm font-medium bg-black/20 px-3 py-1 rounded-full border border-white/10">
             <div className="relative">
               <div
@@ -532,602 +1354,168 @@ export default function RoomClient({ roomId }: { roomId: string }) {
         </div>
       </header>
 
-      <main className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 lg:gap-8 p-6 lg:p-8 max-w-7xl mx-auto w-full">
-        <section className="flex flex-col gap-6">
-          <div className="backdrop-blur-md bg-white/5 rounded-2xl border border-white/10 p-4 sm:p-5">
-            <div className="flex flex-col gap-3">
-              <div className="flex items-baseline justify-between gap-4">
-                <div>
-                  <div className="font-semibold text-slate-50">
-                    Video source
-                  </div>
-                  <div className="text-xs text-slate-400 mt-1">
-                    Paste a link (Kick/Twitch/YouTube) or a direct file URL
-                    (MP4/WebM).
-                  </div>
-                </div>
-                <div className="hidden sm:flex items-center gap-2">
-                  <span className="px-2 py-1 rounded-full text-[11px] border border-white/10 bg-black/20 text-slate-300">
-                    YouTube
-                  </span>
-                  <span className="px-2 py-1 rounded-full text-[11px] border border-white/10 bg-black/20 text-slate-300">
-                    Twitch
-                  </span>
-                  <span className="px-2 py-1 rounded-full text-[11px] border border-white/10 bg-black/20 text-slate-300">
-                    Kick
-                  </span>
-                  <span className="px-2 py-1 rounded-full text-[11px] border border-white/10 bg-black/20 text-slate-300">
-                    Prime (link)
-                  </span>
-                </div>
-              </div>
+      {passwordRequired && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center px-6">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div className="relative w-full max-w-lg rounded-2xl border border-white/10 bg-black/40 p-6 shadow-xl">
+            <div className="text-xl font-semibold text-slate-50">
+              Room password
+            </div>
+            <div className="mt-2 text-sm text-slate-300">
+              {passwordError ?? "This room requires a password."}
+            </div>
 
-              <form onSubmit={handleUrlChange} className="flex gap-2 w-full">
-                <input
-                  type="text"
-                  value={inputUrl}
-                  onChange={(e) => setInputUrl(e.target.value)}
-                  placeholder="e.g. kick.com/elwind"
-                  className="flex-1 bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500/40 transition"
-                />
+            <div className="mt-5">
+              <input
+                value={passwordInput}
+                onChange={(e) => setPasswordInput(e.target.value)}
+                placeholder="Enter password"
+                type="password"
+                className="h-12 w-full rounded-xl border border-white/10 bg-white/5 px-4 text-base text-slate-100 placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-white/10"
+              />
+              <div className="mt-4 flex items-center gap-3">
                 <button
-                  type="submit"
-                  className="h-11 px-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-colors text-sm font-medium text-slate-50"
+                  type="button"
+                  onClick={submitRoomPassword}
+                  className="h-11 px-5 rounded-xl border border-white/10 bg-white/5 text-slate-100 text-sm font-medium hover:bg-white/10 transition-colors"
+                  disabled={!passwordInput.trim()}
                 >
-                  Load
+                  Join
                 </button>
-              </form>
+                <Link
+                  href="/"
+                  className="h-11 px-5 inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-100 text-sm font-medium hover:bg-white/10 transition-colors"
+                >
+                  Go home
+                </Link>
+              </div>
             </div>
           </div>
+        </div>
+      )}
 
-          <div className="w-full aspect-video bg-black/40 rounded-2xl relative overflow-hidden border border-white/10">
-            {isClient && (
-              <div className="absolute inset-0">
-                {isKick ? (
-                  <iframe
-                    key={kickEmbedSrc ?? normalizedUrl}
-                    src={kickEmbedSrc ?? undefined}
-                    className="absolute inset-0 w-full h-full"
-                    allow="autoplay; fullscreen; picture-in-picture"
-                    allowFullScreen
-                    referrerPolicy="origin"
-                    onLoad={() => {
-                      setPlayerReady(true);
-                      setPlayerError(null);
-                      setIsBuffering(false);
-                      if (loadTimeoutRef.current) {
-                        window.clearTimeout(loadTimeoutRef.current);
-                        loadTimeoutRef.current = null;
-                      }
-                    }}
-                  />
-                ) : isTwitch ? (
-                  <iframe
-                    key={twitchEmbedSrc ?? normalizedUrl}
-                    src={twitchEmbedSrc ?? undefined}
-                    className="absolute inset-0 w-full h-full"
-                    allow="autoplay; fullscreen; picture-in-picture"
-                    allowFullScreen
-                    referrerPolicy="origin"
-                    onLoad={() => {
-                      setPlayerReady(true);
-                      setPlayerError(null);
-                      setIsBuffering(false);
-                      if (loadTimeoutRef.current) {
-                        window.clearTimeout(loadTimeoutRef.current);
-                        loadTimeoutRef.current = null;
-                      }
-                    }}
-                  />
-                ) : isPrime ? (
-                  <div className="absolute inset-0" />
-                ) : (
-                  <ReactPlayer
-                    ref={playerRef}
-                    key={normalizedUrl}
-                    src={canPlay ? normalizedUrl : undefined}
-                    playing={videoState === "Playing"}
-                    muted={muted}
-                    width="100%"
-                    height="100%"
-                    controls
-                    playsInline
-                    onError={handlePlayerError}
-                    onReady={() => {
-                      setPlayerReady(true);
-                      setPlayerError(null);
-                      setIsBuffering(false);
-                      if (loadTimeoutRef.current) {
-                        window.clearTimeout(loadTimeoutRef.current);
-                        loadTimeoutRef.current = null;
-                      }
-                    }}
-                    onStart={() => {
-                      setPlayerReady(true);
-                      setIsBuffering(false);
-                      if (loadTimeoutRef.current) {
-                        window.clearTimeout(loadTimeoutRef.current);
-                        loadTimeoutRef.current = null;
-                      }
-                    }}
-                    onPlay={() => {
-                      setPlayerReady(true);
-                      setIsBuffering(false);
-                      if (loadTimeoutRef.current) {
-                        window.clearTimeout(loadTimeoutRef.current);
-                        loadTimeoutRef.current = null;
-                      }
-                    }}
-                    onPause={() => setIsBuffering(false)}
-                    onEnded={() => setIsBuffering(false)}
-                    style={{ position: "absolute", inset: 0 }}
-                  />
-                )}
-              </div>
-            )}
+      <WheelPickerModal
+        open={isWheelOpen && !passwordRequired}
+        onClose={() => setIsWheelOpen(false)}
+        isConnected={isConnected}
+        entries={wheelEntries}
+        lastSpin={wheelLastSpin}
+        onAddEntry={(text) => addWheelEntry?.(text)}
+        onRemoveEntry={(idx) => removeWheelEntry?.(idx)}
+        onClear={() => clearWheelEntries?.()}
+        onSpin={() => spinWheel?.()}
+      />
 
-            {(isKick || isTwitch || isPrime) && (
-              <div className="absolute top-3 left-3 z-10">
-                <span className="px-2.5 py-1 rounded-full text-[11px] font-medium border border-white/10 bg-black/40 text-slate-200">
-                  {isKick ? "Kick" : isTwitch ? "Twitch" : "Prime Video"}
-                </span>
-              </div>
-            )}
+      <main
+        className={`flex-1 grid grid-cols-1 ${
+          isActivityCollapsed
+            ? "lg:grid-cols-[280px_minmax(0,1fr)]"
+            : "lg:grid-cols-[280px_minmax(0,1fr)_320px]"
+        } gap-4 px-6 lg:px-8 2xl:px-12 py-6 max-w-screen-2xl 2xl:max-w-none mx-auto w-full`}
+      >
+        <PlayerSection
+          inputUrl={inputUrl}
+          setInputUrl={setInputUrl}
+          handleUrlChange={handleUrlChange}
+          playerContainerRef={playerContainerRef}
+          togglePlayerFullscreen={togglePlayerFullscreen}
+          isPlayerFullscreen={isPlayerFullscreen}
+          isDraggingTile={isDraggingTile}
+          setIsDraggingTile={setIsDraggingTile}
+          isStageDragOver={isStageDragOver}
+          setIsStageDragOver={setIsStageDragOver}
+          setPinnedStage={setPinnedStage}
+          stageView={stageViewForPlayer}
+          screenStageContainerRef={screenStageContainerRef}
+          toggleScreenFullscreen={toggleScreenFullscreen}
+          isScreenFullscreen={isScreenFullscreen}
+          onUnpinStage={() => setPinnedStage(null)}
+          localCamTrack={camTrackRef.current}
+          remotes={remotesForPlayer}
+          isClient={isClient}
+          isKick={isKick}
+          isTwitch={isTwitch}
+          isPrime={isPrime}
+          isBadYoutubeUrl={isBadYoutubeUrl}
+          normalizedUrl={normalizedUrl}
+          kickEmbedSrc={kickEmbedSrc}
+          twitchEmbedSrc={twitchEmbedSrc}
+          canPlay={canPlay}
+          playerReady={playerReady}
+          setPlayerReady={setPlayerReady}
+          playerError={playerError}
+          setPlayerError={setPlayerError}
+          isBuffering={isBuffering}
+          setIsBuffering={setIsBuffering}
+          loadTimeoutRef={loadTimeoutRef}
+          playerRef={playerRef}
+          handlePlayerError={handlePlayerError}
+          muted={muted}
+          setMuted={setMuted}
+          canControlPlayback={canControlPlayback}
+          isConnected={isConnected}
+          videoState={videoState}
+          handlePlay={handlePlay}
+          handlePause={handlePause}
+          handleSeek={handleSeek}
+          fullscreenChatOpen={fullscreenChatOpen}
+          setFullscreenChatOpen={setFullscreenChatOpen}
+          fullscreenChatMessages={fullscreenChatMessages}
+          chatText={chatText}
+          setChatText={setChatText}
+          handleSendChat={handleSendChat}
+        />
 
-            {isPrime && (
-              <div className="absolute inset-0 flex items-center justify-center text-center px-6 text-slate-200 bg-black/70">
-                <div>
-                  <div className="font-semibold">
-                    Prime Video can’t be embedded
-                  </div>
-                  <div className="text-sm text-slate-300 mt-1">
-                    Prime Video is DRM-protected, so it won’t play inside
-                    Huddle. Open it in a new tab and we can still sync the link.
-                  </div>
-                  <div className="text-xs text-slate-400 mt-3 break-all">
-                    URL: {normalizedUrl}
-                  </div>
-                  <div className="mt-3">
-                    <a
-                      href={normalizedUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-xs underline underline-offset-4 text-slate-200"
-                    >
-                      Open Prime Video in new tab
-                    </a>
-                  </div>
-                </div>
-              </div>
-            )}
+        <CallSidebar
+          userId={userId}
+          hostId={hostId}
+          onKickUser={kickUser}
+          participants={participants}
+          hasRoomPassword={hasRoomPassword}
+          onSetRoomPassword={setRoomPassword}
+          localSpeaking={localSpeaking}
+          isCallCollapsed={isCallCollapsed}
+          setIsCallCollapsed={setIsCallCollapsed}
+          micEnabled={micEnabled}
+          setMicEnabled={setMicEnabled}
+          camEnabled={camEnabled}
+          setCamEnabled={setCamEnabled}
+          screenEnabled={screenEnabled}
+          setScreenEnabled={setScreenEnabled}
+          pushToTalkEnabled={pushToTalkEnabled}
+          setPushToTalkEnabled={setPushToTalkEnabled}
+          pushToTalkDown={pushToTalkDown}
+          pushToTalkBindingLabel={pushToTalkBindingLabel}
+          stopPushToTalkTransmit={stopPushToTalkTransmit}
+          isRebindingPushToTalkKey={isRebindingPushToTalkKey}
+          setIsRebindingPushToTalkKey={setIsRebindingPushToTalkKey}
+          echoCancellationEnabled={echoCancellationEnabled}
+          setEchoCancellationEnabled={setEchoCancellationEnabled}
+          noiseSuppressionEnabled={noiseSuppressionEnabled}
+          setNoiseSuppressionEnabled={setNoiseSuppressionEnabled}
+          autoGainControlEnabled={autoGainControlEnabled}
+          setAutoGainControlEnabled={setAutoGainControlEnabled}
+          localVideoRef={localVideoRef}
+          remoteStreams={remoteStreams}
+          remoteSpeaking={remoteSpeaking}
+          remoteMedia={remoteMedia}
+          setIsDraggingTile={setIsDraggingTile}
+          setIsStageDragOver={setIsStageDragOver}
+        />
 
-            {isBadYoutubeUrl && (
-              <div className="absolute inset-0 flex items-center justify-center text-center px-6 text-slate-200 bg-black/70">
-                <div>
-                  <div className="font-semibold">
-                    This YouTube link won’t embed
-                  </div>
-                  <div className="text-sm text-slate-300 mt-1">
-                    “Radio / playlist” links often load forever at 0:00.
-                  </div>
-                  <div className="text-sm text-slate-300 mt-3">
-                    Use a normal watch URL like:
-                    <div className="font-mono text-xs mt-1 break-all">
-                      https://www.youtube.com/watch?v=jNQXAC9IVRw
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {canPlay && !playerReady && !playerError && (
-              <div className="absolute inset-0 flex items-center justify-center text-slate-300 bg-black/40">
-                {isBuffering ? "Buffering…" : "Loading video…"}
-              </div>
-            )}
-
-            {playerError && (
-              <div className="absolute inset-0 flex items-center justify-center text-center px-6 text-slate-200 bg-black/70">
-                <div>
-                  <div className="font-semibold">Player error</div>
-                  <div className="text-sm text-slate-300 mt-1 wrap-break-word">
-                    {playerError}
-                  </div>
-                  <div className="text-xs text-slate-400 mt-3 break-all">
-                    URL: {normalizedUrl}
-                  </div>
-                  <div className="mt-3">
-                    <a
-                      href={normalizedUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-xs underline underline-offset-4 text-slate-200"
-                    >
-                      Open URL in new tab
-                    </a>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="backdrop-blur-md bg-white/5 p-4 rounded-2xl border border-white/10 w-fit mx-auto">
-            <div className="flex flex-wrap items-center justify-center gap-3">
-              <button
-                className="h-11 px-4 rounded-xl font-semibold text-sm transition-colors bg-white/5 text-slate-50 border border-white/10 hover:bg-white/10 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                onClick={() => setMuted(!muted)}
-                disabled={!canControlPlayback}
-                title={
-                  canControlPlayback
-                    ? undefined
-                    : isPrime
-                      ? "Prime Video can’t be controlled inside Huddle"
-                      : isKick
-                        ? "Kick embeds can’t be muted programmatically"
-                        : "Twitch embeds can’t be muted programmatically"
-                }
-              >
-                {muted ? "🔇 Unmute" : "🔊 Mute"}
-              </button>
-
-              <button
-                className="h-11 px-6 rounded-xl font-semibold text-sm transition-colors bg-white/5 text-slate-50 border border-white/10 hover:bg-white/10 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                onClick={() => handleSeek(-10)}
-                disabled={!isConnected || !canControlPlayback}
-                title="-10 Seconds"
-              >
-                ⏪ -10s
-              </button>
-
-              <button
-                className="h-11 px-6 rounded-xl font-semibold text-sm transition-colors bg-slate-50 text-slate-950 hover:bg-slate-50/90 disabled:opacity-50 disabled:cursor-not-allowed min-w-30 justify-center"
-                onClick={videoState === "Playing" ? handlePause : handlePlay}
-                disabled={!isConnected || !canControlPlayback}
-                title={
-                  canControlPlayback
-                    ? undefined
-                    : isPrime
-                      ? "Prime Video can’t be controlled inside Huddle"
-                      : isKick
-                        ? "Kick embeds can’t be controlled programmatically"
-                        : "Twitch embeds can’t be controlled programmatically"
-                }
-              >
-                {videoState === "Playing" ? "PAUSE" : "PLAY"}
-              </button>
-
-              <button
-                className="h-11 px-6 rounded-xl font-semibold text-sm transition-colors bg-white/5 text-slate-50 border border-white/10 hover:bg-white/10 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                onClick={() => handleSeek(10)}
-                disabled={!isConnected || !canControlPlayback}
-                title="+10 Seconds"
-              >
-                +10s ⏩
-              </button>
-            </div>
-          </div>
-        </section>
-
-        <aside className="backdrop-blur-md bg-white/5 rounded-2xl border border-white/10 flex flex-col overflow-hidden min-h-105">
-          <div className="p-4 border-b border-white/10 bg-white/5">
-            <div className="font-semibold text-slate-50">Activity Feed</div>
-            <div className="text-xs text-slate-400 mt-1">
-              Room: <span className="font-mono text-slate-300">{roomId}</span>
-            </div>
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            {logs.length === 0 && (
-              <div className="text-center text-slate-500 mt-8 text-sm">
-                Waiting for activity...
-              </div>
-            )}
-            {logs.map((log, i) => (
-              <div
-                key={i}
-                className={`p-3 rounded-xl bg-black/20 border border-white/5 text-sm ${
-                  log.type === "play"
-                    ? "border-l-4 border-l-emerald-500"
-                    : log.type === "pause"
-                      ? "border-l-4 border-l-amber-500"
-                      : log.type === "seek"
-                        ? "border-l-4 border-l-indigo-500"
-                        : log.type === "change_url"
-                          ? "border-l-4 border-l-rose-500"
-                          : log.type === "chat"
-                            ? "border-l-4 border-l-sky-500"
-                            : log.type === "join" || log.type === "leave"
-                              ? "border-l-4 border-l-violet-500"
-                              : log.type === "error"
-                                ? "border-l-4 border-l-red-600"
-                                : ""
-                }`}
-              >
-                <div className="flex justify-between items-center mb-1 text-xs text-slate-500">
-                  <span className="uppercase tracking-wider font-bold text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-slate-400">
-                    {capitalize(log.type)}
-                  </span>
-                  <span>{log.time}</span>
-                </div>
-                <div className="text-slate-300 leading-relaxed">
-                  <strong className="text-slate-200">{log.user}</strong>{" "}
-                  {log.msg}
-                </div>
-              </div>
-            ))}
-            <div ref={logsEndRef} />
-          </div>
-
-          <form
-            onSubmit={handleSendChat}
-            className="p-3 border-t border-white/10 bg-black/20 flex gap-2"
-          >
-            <input
-              type="text"
-              value={chatText}
-              onChange={(e) => setChatText(e.target.value)}
-              placeholder={isConnected ? "Type a message…" : "Connecting…"}
-              disabled={!isConnected}
-              className="flex-1 bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500/25 focus:border-sky-500/30 transition disabled:opacity-60"
-            />
-            <button
-              type="submit"
-              disabled={!isConnected || !chatText.trim()}
-              className="h-9 px-4 rounded-xl border border-white/10 bg-white/5 text-slate-50 text-sm font-medium hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Send
-            </button>
-          </form>
-        </aside>
+        <ActivitySidebar
+          roomId={roomId}
+          isConnected={isConnected}
+          isActivityCollapsed={isActivityCollapsed}
+          setIsActivityCollapsed={setIsActivityCollapsed}
+          logs={logs}
+          logsEndRef={logsEndRef}
+          capitalize={capitalize}
+          chatText={chatText}
+          setChatText={setChatText}
+          handleSendChat={handleSendChat}
+        />
       </main>
     </div>
   );
-}
-
-function safeToTimeString(value: string | Date) {
-  try {
-    const d = value instanceof Date ? value : new Date(value);
-    if (Number.isNaN(d.getTime())) {
-      return new Date().toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      });
-    }
-    return d.toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
-  } catch {
-    return new Date().toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
-  }
-}
-
-function formatTime(seconds: number) {
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return `${mins}:${secs.toString().padStart(2, "0")}`;
-}
-
-function capitalize(s: string) {
-  if (s === "change_url") return "Change";
-  if (s === "chat") return "Chat";
-  if (s === "join") return "Join";
-  if (s === "leave") return "Leave";
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
-
-function mapActivityEventToLog(
-  e: ActivityEvent
-): { type: string; msg: string } | null {
-  if (!e) return null;
-
-  if (e.kind === "join") {
-    return { type: "join", msg: "joined the room" };
-  }
-
-  if (e.kind === "leave") {
-    return { type: "leave", msg: "left the room" };
-  }
-
-  if (e.kind === "sync") {
-    const action = e.action ?? undefined;
-    if (action === "play") return { type: "play", msg: "started playing" };
-    if (action === "pause") return { type: "pause", msg: "paused the video" };
-    if (action === "seek") {
-      const ts = typeof e.timestamp === "number" ? e.timestamp : 0;
-      return { type: "seek", msg: `jumped to ${formatTime(ts)}` };
-    }
-    if (action === "change_url") {
-      const url = typeof e.videoUrl === "string" ? e.videoUrl : "";
-      return {
-        type: "change_url",
-        msg: url ? `changed video source to ${url}` : "changed video source",
-      };
-    }
-  }
-
-  return null;
-}
-
-function isProblematicYoutubeUrl(rawUrl: string) {
-  // These commonly show a black player stuck at 0:00 in embeds.
-  // Example: list=RD...&start_radio=1
-  return (
-    /youtube\.com\/watch\?/.test(rawUrl) &&
-    /[?&](list=RD|start_radio=1)/.test(rawUrl)
-  );
-}
-
-function normalizeVideoUrl(rawUrl: string) {
-  const trimmed = rawUrl.trim();
-
-  // Accept inputs like `kick.com/elwind` / `twitch.tv/shroud` by adding https://
-  const withScheme = /^[a-zA-Z][a-zA-Z\d+.-]*:/.test(trimmed)
-    ? trimmed
-    : /^([\w-]+\.)+[\w-]+(\/|$)/.test(trimmed)
-      ? `https://${trimmed}`
-      : trimmed;
-
-  // If it's a normal YouTube watch URL, strip playlist/radio params that often break embeds.
-  try {
-    const url = new URL(withScheme);
-    const host = url.hostname.replace(/^www\./, "");
-    const isYoutube = host === "youtube.com" || host === "m.youtube.com";
-    const isWatch = isYoutube && url.pathname === "/watch";
-
-    if (!isWatch) return withScheme;
-
-    const videoId = url.searchParams.get("v");
-    if (!videoId) return withScheme;
-
-    // keep only `v`
-    return `https://www.youtube.com/watch?v=${videoId}`;
-  } catch {
-    return withScheme;
-  }
-}
-
-function getLoadTimeoutMs(rawUrl: string) {
-  const normalized = normalizeVideoUrl(rawUrl);
-  if (getKickEmbedSrc(normalized)) return 25000;
-  if (isTwitchUrl(normalized)) return 25000;
-  const isFile = /\.(mp4|webm|ogv|ogg)(\?|#|$)/i.test(normalized);
-  return isFile ? 25000 : 12000;
-}
-
-function getTimeoutErrorMessage(rawUrl: string) {
-  const normalized = normalizeVideoUrl(rawUrl);
-
-  if (isPrimeVideoUrl(normalized)) {
-    return getPrimeVideoMessage();
-  }
-
-  if (getKickEmbedSrc(normalized)) {
-    return "Timed out loading this Kick embed. If you use ad/privacy blockers, try disabling them for kick.com, then reload.";
-  }
-
-  if (isTwitchUrl(normalized)) {
-    return "Timed out loading this Twitch embed. Twitch requires an embed `parent` parameter; if you use ad/privacy blockers, try disabling them for twitch.tv, then reload.";
-  }
-
-  if (isProblematicYoutubeUrl(rawUrl)) {
-    return "Timed out loading this YouTube embed. Try a different YouTube watch URL (no playlist/radio), or disable ad/privacy extensions that block YouTube embeds.";
-  }
-
-  return "Timed out loading this video. If this is a YouTube link, use a normal watch URL (no playlist/radio). If you use ad/privacy blockers, try disabling them for this site.";
-}
-
-function getPrimeVideoMessage() {
-  return "Prime Video is DRM-protected and can’t be embedded/controlled inside Huddle. Open it in a new tab/app; Huddle can still sync the link for everyone.";
-}
-
-function isPrimeVideoUrl(rawUrl: string) {
-  try {
-    const url = new URL(rawUrl);
-    const host = url.hostname.replace(/^www\./, "").toLowerCase();
-    return host === "primevideo.com" || host.endsWith(".primevideo.com");
-  } catch {
-    return false;
-  }
-}
-
-function isTwitchUrl(rawUrl: string) {
-  try {
-    const url = new URL(rawUrl);
-    const host = url.hostname.replace(/^www\./, "").toLowerCase();
-    return host === "twitch.tv" || host === "clips.twitch.tv";
-  } catch {
-    return false;
-  }
-}
-
-function getTwitchEmbedSrc(rawUrl: string, parent: string): string | null {
-  // Twitch embeds require `parent=<your domain>` or the iframe shows blank.
-  // Supports:
-  // - https://www.twitch.tv/<channel>
-  // - https://www.twitch.tv/videos/<id>
-  try {
-    const url = new URL(rawUrl);
-    const host = url.hostname.replace(/^www\./, "").toLowerCase();
-
-    let channel: string | null = null;
-    let videoId: string | null = null;
-
-    if (host === "twitch.tv") {
-      const parts = url.pathname.split("/").filter(Boolean);
-      if (parts.length === 0) return null;
-
-      if (parts[0] === "videos" && parts[1]) {
-        videoId = parts[1];
-      } else {
-        // channel page
-        channel = parts[0] ?? null;
-      }
-    } else if (host === "clips.twitch.tv") {
-      // Clip embeds are different; skip for now.
-      return null;
-    } else {
-      return null;
-    }
-
-    const p = parent || "localhost";
-    const qs = new URLSearchParams();
-    qs.set("parent", p);
-    qs.set("autoplay", "false");
-    qs.set("muted", "true");
-
-    if (videoId) {
-      qs.set("video", videoId);
-      return `https://player.twitch.tv/?${qs.toString()}`;
-    }
-
-    if (channel) {
-      qs.set("channel", channel);
-      return `https://player.twitch.tv/?${qs.toString()}`;
-    }
-
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-function getKickEmbedSrc(rawUrl: string): string | null {
-  // Supports:
-  // - https://kick.com/<channel>
-  // - https://www.kick.com/<channel>
-  // - https://kick.com/video/<id>
-  // Uses Kick's player host: https://player.kick.com/...
-  try {
-    const url = new URL(rawUrl);
-    const host = url.hostname.replace(/^www\./, "").toLowerCase();
-    if (host !== "kick.com") return null;
-
-    const parts = url.pathname.split("/").filter(Boolean);
-    if (parts.length === 0) return null;
-
-    if (parts[0] === "video" && parts[1]) {
-      return `https://player.kick.com/video/${encodeURIComponent(parts[1])}`;
-    }
-
-    // Channel page: /<channel>
-    const channel = parts[0];
-    if (!channel) return null;
-    // Avoid embedding obvious non-channel paths
-    if (
-      ["categories", "clips", "settings", "terms", "privacy"].includes(channel)
-    ) {
-      return null;
-    }
-
-    return `https://player.kick.com/${encodeURIComponent(channel)}`;
-  } catch {
-    return null;
-  }
 }
