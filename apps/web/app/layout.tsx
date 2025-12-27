@@ -33,9 +33,6 @@ export const metadata: Metadata = {
     title: "WeHuddle",
     description: "Create or join a room and watch together in sync.",
   },
-  icons: {
-    icon: "/favicon.ico",
-  },
 };
 
 export default function RootLayout({
