@@ -5,7 +5,7 @@ export interface VideoPreview {
   title: string;
   thumbnail: string | null;
   duration: string | null;
-  platform: "youtube" | "vimeo" | "direct" | "unknown";
+  platform: "youtube" | "vimeo" | "direct" | "twitch" | "kick" | "unknown";
 }
 
 export async function fetchVideoPreview(
@@ -14,6 +14,24 @@ export async function fetchVideoPreview(
   try {
     const normalized = url.trim();
     if (!normalized) return null;
+
+    // Kick / Twitch (best-effort via server-side OpenGraph fetch)
+    const platformFromHost = detectPlatformFromUrl(normalized);
+    if (platformFromHost === "kick" || platformFromHost === "twitch") {
+      const og = await fetchOpenGraphPreview(normalized);
+      const fallbackTitle =
+        platformFromHost === "kick"
+          ? `Kick${extractKickChannel(normalized) ? ` • ${extractKickChannel(normalized)}` : ""}`
+          : `Twitch${extractTwitchChannel(normalized) ? ` • ${extractTwitchChannel(normalized)}` : ""}`;
+
+      return {
+        url: normalized,
+        title: og?.title ?? fallbackTitle,
+        thumbnail: og?.thumbnail ?? null,
+        duration: null,
+        platform: platformFromHost,
+      };
+    }
 
     // YouTube
     const ytMatch = normalized.match(
@@ -25,9 +43,10 @@ export async function fetchVideoPreview(
       // Best effort: ask our server for title + duration using YouTube Data API.
       // If quota is exceeded (or any other failure), we silently fall back.
       try {
-        const res = await fetch(
+        const res = await fetchWithTimeout(
           `/api/youtube-preview?url=${encodeURIComponent(normalized)}`,
-          { cache: "no-store" }
+          { cache: "no-store" },
+          2500
         );
         const data = await res.json().catch(() => null);
         if (data && data.ok) {
@@ -68,8 +87,10 @@ export async function fetchVideoPreview(
     if (vimeoMatch) {
       const videoId = vimeoMatch[1];
       try {
-        const res = await fetch(
-          `https://vimeo.com/api/v2/video/${videoId}.json`
+        const res = await fetchWithTimeout(
+          `https://vimeo.com/api/v2/video/${videoId}.json`,
+          undefined,
+          2500
         );
         if (res.ok) {
           const data = await res.json();
@@ -115,10 +136,11 @@ export async function fetchVideoPreview(
     }
 
     // Unknown/other
+    const og = await fetchOpenGraphPreview(normalized);
     return {
       url: normalized,
-      title: "Video",
-      thumbnail: null,
+      title: og?.title ?? "Video",
+      thumbnail: og?.thumbnail ?? null,
       duration: null,
       platform: "unknown",
     };
@@ -194,4 +216,84 @@ async function probeVideoDurationSeconds(url: string): Promise<number | null> {
       finish(null);
     }
   });
+}
+
+async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init: RequestInit | undefined,
+  timeoutMs: number
+): Promise<Response> {
+  if (typeof AbortController === "undefined") {
+    return fetch(input, init);
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+function detectPlatformFromUrl(rawUrl: string): "kick" | "twitch" | null {
+  try {
+    const u = new URL(rawUrl);
+    const host = u.hostname.replace(/^www\./, "").toLowerCase();
+    if (host === "kick.com") return "kick";
+    if (host === "twitch.tv" || host === "clips.twitch.tv") return "twitch";
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function extractKickChannel(rawUrl: string): string | null {
+  try {
+    const u = new URL(rawUrl);
+    const host = u.hostname.replace(/^www\./, "").toLowerCase();
+    if (host !== "kick.com") return null;
+    const parts = u.pathname.split("/").filter(Boolean);
+    if (!parts[0]) return null;
+    if (parts[0] === "video") return null;
+    return parts[0];
+  } catch {
+    return null;
+  }
+}
+
+function extractTwitchChannel(rawUrl: string): string | null {
+  try {
+    const u = new URL(rawUrl);
+    const host = u.hostname.replace(/^www\./, "").toLowerCase();
+    if (host !== "twitch.tv") return null;
+    const parts = u.pathname.split("/").filter(Boolean);
+    if (!parts[0]) return null;
+    // Skip known non-channel paths
+    if (parts[0] === "videos" || parts[0] === "directory") return null;
+    return parts[0];
+  } catch {
+    return null;
+  }
+}
+
+async function fetchOpenGraphPreview(
+  url: string
+): Promise<{ title: string | null; thumbnail: string | null } | null> {
+  try {
+    const res = await fetchWithTimeout(
+      `/api/url-preview?url=${encodeURIComponent(url)}`,
+      { cache: "no-store" },
+      2500
+    );
+    const data = await res.json().catch(() => null);
+    if (!data || data.ok !== true) return null;
+
+    return {
+      title: typeof data.title === "string" ? data.title : null,
+      thumbnail: typeof data.thumbnail === "string" ? data.thumbnail : null,
+    };
+  } catch {
+    return null;
+  }
 }

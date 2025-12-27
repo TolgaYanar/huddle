@@ -102,6 +102,8 @@ export default function RoomClient({ roomId }: { roomId: string }) {
   const [inputUrl, setInputUrl] = useState(url);
   const [videoPreview, setVideoPreview] = useState<VideoPreview | null>(null);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const previewRequestIdRef = useRef(0);
   const [isClient, setIsClient] = useState(false);
   const [muted, setMuted] = useState(true);
   const [playerReady, setPlayerReady] = useState(false);
@@ -1139,16 +1141,32 @@ export default function RoomClient({ roomId }: { roomId: string }) {
     const normalized = normalizeVideoUrl(inputUrl);
     if (!normalized) return;
 
-    // Fetch preview first
-    const preview = await fetchVideoPreview(normalized);
+    // Open the modal immediately so the user gets instant feedback,
+    // then hydrate it with metadata when/if it arrives.
+    const requestId = ++previewRequestIdRef.current;
+    setIsPreviewLoading(true);
+    setVideoPreview({
+      url: normalized,
+      title: "Loading preview…",
+      thumbnail: null,
+      duration: null,
+      platform: "unknown",
+    });
+    setShowPreviewModal(true);
 
-    if (preview) {
-      setVideoPreview(preview);
-      setShowPreviewModal(true);
-    } else {
-      // If preview fails, load directly
-      loadVideoUrl(normalized);
-    }
+    const preview = await fetchVideoPreview(normalized).catch(() => null);
+    if (previewRequestIdRef.current !== requestId) return;
+
+    setIsPreviewLoading(false);
+    setVideoPreview(
+      preview ?? {
+        url: normalized,
+        title: "Video",
+        thumbnail: null,
+        duration: null,
+        platform: "unknown",
+      }
+    );
   };
 
   const loadVideoUrl = (nextUrl: string) => {
@@ -1166,6 +1184,7 @@ export default function RoomClient({ roomId }: { roomId: string }) {
       ...prev,
       { msg: `changed video source`, type: "change_url", time, user: "You" },
     ]);
+    setIsPreviewLoading(false);
     setShowPreviewModal(false);
   };
 
@@ -1540,8 +1559,12 @@ export default function RoomClient({ roomId }: { roomId: string }) {
       {/* Video Preview Modal */}
       {showPreviewModal && videoPreview && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-6"
-          onClick={() => setShowPreviewModal(false)}
+          className="fixed inset-0 z-60 flex items-center justify-center bg-black/80 backdrop-blur-sm p-6"
+          onClick={() => {
+            previewRequestIdRef.current++;
+            setIsPreviewLoading(false);
+            setShowPreviewModal(false);
+          }}
         >
           <div
             className="max-w-2xl w-full rounded-2xl border border-white/20 bg-slate-900 overflow-hidden shadow-2xl"
@@ -1590,12 +1613,17 @@ export default function RoomClient({ roomId }: { roomId: string }) {
                   onClick={() => {
                     if (videoPreview) loadVideoUrl(videoPreview.url);
                   }}
-                  className="flex-1 h-11 rounded-xl font-semibold text-sm transition-colors bg-indigo-600 text-white hover:bg-indigo-500"
+                  className="flex-1 h-11 rounded-xl font-semibold text-sm transition-colors bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-50 disabled:hover:bg-indigo-600"
+                  disabled={isPreviewLoading}
                 >
                   Load Video
                 </button>
                 <button
-                  onClick={() => setShowPreviewModal(false)}
+                  onClick={() => {
+                    previewRequestIdRef.current++;
+                    setIsPreviewLoading(false);
+                    setShowPreviewModal(false);
+                  }}
                   className="h-11 px-6 rounded-xl font-semibold text-sm transition-colors border border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"
                 >
                   Cancel
