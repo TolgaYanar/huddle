@@ -5,6 +5,7 @@ import ReactPlayer from "react-player";
 
 import { PinnedStageOverlay } from "./PinnedStageOverlay";
 import { WebcamOverlay } from "./WebcamOverlay";
+import { VideoControls } from "./VideoControls";
 import {
   parseDraggedTilePayload,
   TILE_DND_MIME,
@@ -70,13 +71,21 @@ export function PlayerSection({
   handlePlayerError,
 
   muted,
-  setMuted,
+  volume,
+  playbackRate,
+  currentTime,
+  duration,
   canControlPlayback,
   isConnected,
   videoState,
   handlePlay,
   handlePause,
-  handleSeek,
+  handleSeekTo,
+  handleVolumeChange,
+  handlePlaybackRateChange,
+  toggleMute,
+  handleProgress,
+  handleDuration,
 
   fullscreenChatOpen,
   setFullscreenChatOpen,
@@ -132,13 +141,21 @@ export function PlayerSection({
   handlePlayerError: (e: unknown) => void;
 
   muted: boolean;
-  setMuted: React.Dispatch<React.SetStateAction<boolean>>;
+  volume: number;
+  playbackRate: number;
+  currentTime: number;
+  duration: number;
   canControlPlayback: boolean;
   isConnected: boolean;
   videoState: string;
   handlePlay: () => void;
   handlePause: () => void;
-  handleSeek: (deltaSeconds: number) => void;
+  handleSeekTo: (time: number) => void;
+  handleVolumeChange: (volume: number) => void;
+  handlePlaybackRateChange: (rate: number) => void;
+  toggleMute: () => void;
+  handleProgress: (time: number) => void;
+  handleDuration: (dur: number) => void;
 
   fullscreenChatOpen: boolean;
   setFullscreenChatOpen: React.Dispatch<React.SetStateAction<boolean>>;
@@ -638,74 +655,90 @@ export function PlayerSection({
             ) : isPrime ? (
               <div className="absolute inset-0" />
             ) : (
+              // @ts-expect-error - ReactPlayer types don't include onProgress and onDuration
               <ReactPlayer
-                ref={playerRef}
-                key={normalizedUrl}
-                src={canPlay ? normalizedUrl : undefined}
-                playing={videoState === "Playing"}
-                muted={muted}
-                width="100%"
-                height="100%"
-                controls
-                playsInline
-                config={playerConfig}
-                onError={handlePlayerError}
-                onReady={() => {
-                  setPlayerReady(true);
-                  setPlayerError(null);
-                  setIsBuffering(false);
+                {...{
+                  ref: playerRef,
+                  key: normalizedUrl,
+                  src: canPlay ? normalizedUrl : undefined,
+                  playing: videoState === "Playing",
+                  muted,
+                  volume,
+                  playbackRate,
+                  width: "100%",
+                  height: "100%",
+                  controls: true,
+                  playsInline: true,
+                  config: playerConfig,
+                  onError: handlePlayerError,
+                  onReady: () => {
+                    setPlayerReady(true);
+                    setPlayerError(null);
+                    setIsBuffering(false);
 
-                  try {
-                    const rp = playerRef.current as unknown as {
-                      getInternalPlayer?: () => unknown;
-                    };
-                    const internal = rp?.getInternalPlayer?.();
-                    if (typeof internal === "object" && internal !== null) {
-                      const maybe = internal as {
-                        setAttribute?: unknown;
-                        controlsList?: unknown;
+                    try {
+                      const rp = playerRef.current as unknown as {
+                        getInternalPlayer?: () => unknown;
                       };
+                      const internal = rp?.getInternalPlayer?.();
+                      if (typeof internal === "object" && internal !== null) {
+                        const maybe = internal as {
+                          setAttribute?: unknown;
+                          controlsList?: unknown;
+                        };
 
-                      // Chrome/Edge: prevents native fullscreen button on <video controls>
-                      if (typeof maybe.setAttribute === "function") {
-                        (
-                          maybe.setAttribute as (
-                            name: string,
-                            value: string
-                          ) => void
-                        )("controlsList", "nofullscreen");
-                      }
+                        // Chrome/Edge: prevents native fullscreen button on <video controls>
+                        if (typeof maybe.setAttribute === "function") {
+                          (
+                            maybe.setAttribute as (
+                              name: string,
+                              value: string
+                            ) => void
+                          )("controlsList", "nofullscreen");
+                        }
 
-                      const controlsList = maybe.controlsList;
-                      if (
-                        typeof controlsList === "object" &&
-                        controlsList !== null
-                      ) {
-                        const cl = controlsList as { add?: unknown };
-                        if (typeof cl.add === "function") {
-                          (cl.add as (token: string) => void)("nofullscreen");
+                        const controlsList = maybe.controlsList;
+                        if (
+                          typeof controlsList === "object" &&
+                          controlsList !== null
+                        ) {
+                          const cl = controlsList as { add?: unknown };
+                          if (typeof cl.add === "function") {
+                            (cl.add as (token: string) => void)("nofullscreen");
+                          }
                         }
                       }
+                    } catch {
+                      // ignore
                     }
-                  } catch {
-                    // ignore
-                  }
 
-                  clearLoadTimeout();
+                    clearLoadTimeout();
+                  },
+                  onStart: () => {
+                    setPlayerReady(true);
+                    setIsBuffering(false);
+                    clearLoadTimeout();
+                  },
+                  onPlay: () => {
+                    setPlayerReady(true);
+                    setIsBuffering(false);
+                    clearLoadTimeout();
+                  },
+                  onProgress: (state: { playedSeconds: number }) => {
+                    const time = state.playedSeconds;
+                    if (typeof time === "number" && !isNaN(time)) {
+                      handleProgress(time);
+                    }
+                  },
+                  onDuration: (dur: number) => {
+                    if (typeof dur === "number" && !isNaN(dur)) {
+                      handleDuration(dur);
+                    }
+                  },
+                  onPause: () => setIsBuffering(false),
+                  onEnded: () => setIsBuffering(false),
+                  style: { position: "absolute", inset: 0 } as const,
                 }}
-                onStart={() => {
-                  setPlayerReady(true);
-                  setIsBuffering(false);
-                  clearLoadTimeout();
-                }}
-                onPlay={() => {
-                  setPlayerReady(true);
-                  setIsBuffering(false);
-                  clearLoadTimeout();
-                }}
-                onPause={() => setIsBuffering(false)}
-                onEnded={() => setIsBuffering(false)}
-                style={{ position: "absolute", inset: 0 }}
               />
             )}
           </div>
@@ -792,61 +825,34 @@ export function PlayerSection({
         )}
       </div>
 
-      <div className="backdrop-blur-md bg-white/5 p-4 rounded-2xl border border-white/10 w-fit mx-auto">
-        <div className="flex flex-wrap items-center justify-center gap-3">
-          <button
-            className="h-11 px-4 rounded-xl font-semibold text-sm transition-colors bg-white/5 text-slate-50 border border-white/10 hover:bg-white/10 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            onClick={() => setMuted(!muted)}
-            disabled={!canControlPlayback}
-            title={
-              canControlPlayback
-                ? undefined
-                : isPrime
-                  ? "Prime Video can’t be controlled inside Huddle"
-                  : isKick
-                    ? "Kick embeds can’t be muted programmatically"
-                    : "Twitch embeds can’t be muted programmatically"
-            }
-          >
-            {muted ? "🔇 Unmute" : "🔊 Mute"}
-          </button>
-
-          <button
-            className="h-11 px-6 rounded-xl font-semibold text-sm transition-colors bg-white/5 text-slate-50 border border-white/10 hover:bg-white/10 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            onClick={() => handleSeek(-10)}
-            disabled={!isConnected || !canControlPlayback}
-            title="-10 Seconds"
-          >
-            ⏪ -10s
-          </button>
-
-          <button
-            className="h-11 px-6 rounded-xl font-semibold text-sm transition-colors bg-slate-50 text-slate-950 hover:bg-slate-50/90 disabled:opacity-50 disabled:cursor-not-allowed min-w-30 justify-center"
-            onClick={videoState === "Playing" ? handlePause : handlePlay}
-            disabled={!isConnected || !canControlPlayback}
-            title={
-              canControlPlayback
-                ? undefined
-                : isPrime
-                  ? "Prime Video can’t be controlled inside Huddle"
-                  : isKick
-                    ? "Kick embeds can’t be controlled programmatically"
-                    : "Twitch embeds can’t be controlled programmatically"
-            }
-          >
-            {videoState === "Playing" ? "PAUSE" : "PLAY"}
-          </button>
-
-          <button
-            className="h-11 px-6 rounded-xl font-semibold text-sm transition-colors bg-white/5 text-slate-50 border border-white/10 hover:bg-white/10 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            onClick={() => handleSeek(10)}
-            disabled={!isConnected || !canControlPlayback}
-            title="+10 Seconds"
-          >
-            +10s ⏩
-          </button>
-        </div>
-      </div>
+      <VideoControls
+        url={normalizedUrl}
+        isPlaying={videoState === "Playing"}
+        currentTime={currentTime}
+        duration={duration}
+        volume={volume}
+        muted={muted}
+        playbackRate={playbackRate}
+        isBuffering={isBuffering}
+        onPlay={handlePlay}
+        onPause={handlePause}
+        onSeek={handleSeekTo}
+        onVolumeChange={handleVolumeChange}
+        onMuteToggle={toggleMute}
+        onPlaybackRateChange={handlePlaybackRateChange}
+        onFullscreen={togglePlayerFullscreen}
+        isFullscreen={isPlayerFullscreen}
+        disabled={!isConnected || !canControlPlayback}
+        disabledReason={
+          isPrime
+            ? "Prime Video can't be controlled inside Huddle"
+            : isKick
+              ? "Kick embeds can't be controlled programmatically"
+              : isTwitch
+                ? "Twitch embeds can't be controlled programmatically"
+                : undefined
+        }
+      />
     </section>
   );
 }

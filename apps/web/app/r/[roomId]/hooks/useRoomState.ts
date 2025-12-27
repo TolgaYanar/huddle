@@ -1,0 +1,185 @@
+import { useEffect, useRef, useState } from "react";
+import type { Socket } from "socket.io-client";
+
+interface UseRoomStateProps {
+  roomId: string;
+  userId: string;
+  socket: Socket | null;
+  onRoomUsers?: (
+    callback: (data: {
+      roomId: string;
+      users: string[];
+      hostId?: string | null;
+    }) => void
+  ) => (() => void) | undefined;
+  onUserJoined?: (
+    callback: (peerId: string) => void
+  ) => (() => void) | undefined;
+  onUserLeft?: (callback: (peerId: string) => void) => (() => void) | undefined;
+  onRoomPasswordStatus?: (
+    callback: (data: { roomId: string; hasPassword: boolean }) => void
+  ) => (() => void) | undefined;
+  onRoomPasswordRequired?: (
+    callback: (data: { roomId: string; reason?: string }) => void
+  ) => (() => void) | undefined;
+  joinRoom: (password?: string) => void;
+}
+
+export function useRoomState({
+  roomId,
+  userId,
+  socket,
+  onRoomUsers,
+  onUserJoined,
+  onUserLeft,
+  onRoomPasswordStatus,
+  onRoomPasswordRequired,
+  joinRoom,
+}: UseRoomStateProps) {
+  const [hostId, setHostId] = useState<string | null>(null);
+  const [participants, setParticipants] = useState<string[]>([]);
+  const [roomAccessError, setRoomAccessError] = useState<string | null>(null);
+  const [hasRoomPassword, setHasRoomPassword] = useState(false);
+  const [passwordRequired, setPasswordRequired] = useState(false);
+  const [passwordInput, setPasswordInput] = useState("");
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const lastSubmittedPasswordRef = useRef<string | null>(null);
+
+  // Track the room host
+  useEffect(() => {
+    if (!onRoomUsers) return;
+    const cleanup = onRoomUsers((data) => {
+      if (data.roomId !== roomId) return;
+      const nextHost = data.hostId;
+      if (typeof nextHost !== "undefined") {
+        setHostId(nextHost ?? null);
+      }
+
+      if (Array.isArray(data.users)) {
+        setParticipants(
+          Array.from(new Set(data.users.filter((id) => id && id !== userId)))
+        );
+      }
+
+      setPasswordRequired(false);
+      setPasswordError(null);
+
+      const submitted = lastSubmittedPasswordRef.current;
+      if (submitted) {
+        try {
+          window.sessionStorage.setItem(
+            `huddle:roomPassword:${roomId}`,
+            submitted
+          );
+        } catch {
+          // ignore
+        }
+        lastSubmittedPasswordRef.current = null;
+      }
+    });
+    return () => {
+      cleanup?.();
+    };
+  }, [onRoomUsers, roomId, userId]);
+
+  // Password status + required events
+  useEffect(() => {
+    const cleanupStatus = onRoomPasswordStatus?.((data) => {
+      if (data.roomId !== roomId) return;
+      setHasRoomPassword(!!data.hasPassword);
+      setPasswordRequired(false);
+      setPasswordError(null);
+    });
+
+    const cleanupRequired = onRoomPasswordRequired?.((data) => {
+      if (data.roomId !== roomId) return;
+      setPasswordRequired(true);
+      setPasswordError(
+        data.reason === "invalid"
+          ? "Wrong password. Try again."
+          : "This room requires a password."
+      );
+
+      if (data.reason === "invalid") {
+        try {
+          window.sessionStorage.removeItem(`huddle:roomPassword:${roomId}`);
+        } catch {
+          // ignore
+        }
+      }
+    });
+
+    return () => {
+      cleanupStatus?.();
+      cleanupRequired?.();
+    };
+  }, [onRoomPasswordStatus, onRoomPasswordRequired, roomId]);
+
+  // Keep participant list updated
+  useEffect(() => {
+    const cleanupJoined = onUserJoined?.((peerId) => {
+      if (!peerId || peerId === userId) return;
+      setParticipants((prev) => Array.from(new Set([...prev, peerId])));
+    });
+    const cleanupLeft = onUserLeft?.((peerId) => {
+      if (!peerId) return;
+      setParticipants((prev) => prev.filter((id) => id !== peerId));
+    });
+    return () => {
+      cleanupJoined?.();
+      cleanupLeft?.();
+    };
+  }, [onUserJoined, onUserLeft, userId]);
+
+  // Socket events for host and banned
+  useEffect(() => {
+    if (!socket) return;
+    const onHost = (data: { roomId: string; hostId?: string | null }) => {
+      if (data.roomId !== roomId) return;
+      setHostId(data.hostId ?? null);
+    };
+
+    const onBanned = (data: { roomId: string }) => {
+      if (data.roomId !== roomId) return;
+      setRoomAccessError("You no longer have access to this room.");
+      try {
+        socket.disconnect();
+      } catch {
+        // ignore
+      }
+    };
+
+    socket.on("room_host", onHost);
+    socket.on("room_banned", onBanned);
+
+    return () => {
+      socket.off("room_host", onHost);
+      socket.off("room_banned", onBanned);
+    };
+  }, [socket, roomId]);
+
+  const submitRoomPassword = () => {
+    const pw = passwordInput.trim();
+    lastSubmittedPasswordRef.current = pw;
+    joinRoom(pw);
+  };
+
+  const kickUser = (targetId: string) => {
+    if (!socket?.connected) return;
+    socket.emit("kick_user", { roomId, targetId });
+  };
+
+  return {
+    hostId,
+    participants,
+    roomAccessError,
+    hasRoomPassword,
+    setHasRoomPassword,
+    passwordRequired,
+    passwordInput,
+    setPasswordInput,
+    passwordError,
+    submitRoomPassword,
+    kickUser,
+  };
+}
