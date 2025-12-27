@@ -32,10 +32,13 @@ export async function fetchVideoPreview(
         const data = await res.json().catch(() => null);
         if (data && data.ok) {
           const durationSeconds =
-            typeof data.durationSeconds === "number" ? data.durationSeconds : null;
+            typeof data.durationSeconds === "number"
+              ? data.durationSeconds
+              : null;
           return {
             url: normalized,
-            title: typeof data.title === "string" ? data.title : "YouTube Video",
+            title:
+              typeof data.title === "string" ? data.title : "YouTube Video",
             thumbnail:
               typeof data.thumbnail === "string" && data.thumbnail
                 ? data.thumbnail
@@ -75,9 +78,7 @@ export async function fetchVideoPreview(
             url: normalized,
             title: video?.title || "Vimeo Video",
             thumbnail: video?.thumbnail_large || null,
-            duration: video?.duration
-              ? formatDuration(video.duration)
-              : null,
+            duration: video?.duration ? formatDuration(video.duration) : null,
             platform: "vimeo",
           };
         }

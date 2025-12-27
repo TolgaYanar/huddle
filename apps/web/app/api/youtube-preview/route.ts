@@ -41,7 +41,10 @@ export async function GET(req: Request) {
   const apiKey = process.env.YOUTUBE_API_KEY;
   if (!apiKey) {
     // No key configured: don't error loudly; client will fall back.
-    return NextResponse.json({ ok: false, reason: "missing_key" }, { status: 200 });
+    return NextResponse.json(
+      { ok: false, reason: "missing_key" },
+      { status: 200 }
+    );
   }
 
   const { searchParams } = new URL(req.url);
@@ -49,7 +52,10 @@ export async function GET(req: Request) {
   const videoId = extractYouTubeVideoId(url);
 
   if (!videoId) {
-    return NextResponse.json({ ok: false, reason: "invalid_url" }, { status: 200 });
+    return NextResponse.json(
+      { ok: false, reason: "invalid_url" },
+      { status: 200 }
+    );
   }
 
   try {
@@ -73,7 +79,10 @@ export async function GET(req: Request) {
 
       // Quota exceeded: explicitly signal but keep it non-fatal.
       if (reason === "quotaExceeded" || reason === "dailyLimitExceeded") {
-        return NextResponse.json({ ok: false, reason: "quota" }, { status: 200 });
+        return NextResponse.json(
+          { ok: false, reason: "quota" },
+          { status: 200 }
+        );
       }
 
       return NextResponse.json({ ok: false, reason }, { status: 200 });
@@ -81,7 +90,10 @@ export async function GET(req: Request) {
 
     const item = body?.items?.[0];
     if (!item) {
-      return NextResponse.json({ ok: false, reason: "not_found" }, { status: 200 });
+      return NextResponse.json(
+        { ok: false, reason: "not_found" },
+        { status: 200 }
+      );
     }
 
     const title = item?.snippet?.title ?? "YouTube Video";
