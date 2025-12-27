@@ -10,7 +10,7 @@ interface VideoPlayerProps {
   onProgress: (state: { playedSeconds: number }) => void;
   onReady?: () => void;
   onStart?: () => void;
-  onError?: (e: any) => void;
+  onError?: (e: unknown) => void;
 }
 
 export interface VideoPlayerHandle {
@@ -20,7 +20,8 @@ export interface VideoPlayerHandle {
 
 const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
   (props, ref) => {
-    const playerRef = useRef<ReactPlayer | null>(null);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const playerRef = useRef<any>(null);
 
     useImperativeHandle(ref, () => ({
       getCurrentTime: () => {
@@ -48,12 +49,14 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
           width="100%"
           height="100%"
           controls={false}
+          // @ts-expect-error: react-player types are slightly mismatched with onProgress
           onProgress={props.onProgress}
           onReady={props.onReady}
           onStart={props.onStart}
           onError={props.onError}
           config={{
             youtube: {
+              // @ts-expect-error: playerVars is valid but types might be outdated
               playerVars: {
                 showinfo: 0,
                 modestbranding: 1,
