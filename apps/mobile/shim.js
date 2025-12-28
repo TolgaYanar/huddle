@@ -88,6 +88,16 @@
       };
     };
   }
+
+  // Ensure window/self have the same polyfills
+  if (typeof window !== "undefined") {
+    window.URL = global.URL;
+    window.URLSearchParams = global.URLSearchParams;
+  }
+  if (typeof self !== "undefined" && self !== global) {
+    self.URL = global.URL;
+    self.URLSearchParams = global.URLSearchParams;
+  }
 })(
   typeof globalThis !== "undefined"
     ? globalThis
