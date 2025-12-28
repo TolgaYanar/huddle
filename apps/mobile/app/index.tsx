@@ -3,7 +3,7 @@ import {
   View,
   Text,
   TextInput,
-  TouchableOpacity,
+  Pressable,
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
@@ -90,26 +90,40 @@ export default function HomeScreen() {
 
           <View style={styles.buttonGroup}>
             {lastRoomId && (
-              <TouchableOpacity
-                style={styles.secondaryButton}
+              <Pressable
+                style={({ pressed, focused }) => [
+                  styles.secondaryButton,
+                  pressed && { opacity: 0.7 },
+                  focused && {
+                    borderColor: "#38bdf8",
+                    borderWidth: 2,
+                    transform: [{ scale: 1.02 }],
+                  },
+                ]}
                 onPress={continueLastRoom}
-                activeOpacity={0.7}
               >
                 <Ionicons name="arrow-forward" size={18} color="#e2e8f0" />
                 <Text style={styles.secondaryButtonText}>
                   Continue last room
                 </Text>
-              </TouchableOpacity>
+              </Pressable>
             )}
 
-            <TouchableOpacity
-              style={styles.primaryButton}
+            <Pressable
+              style={({ pressed, focused }) => [
+                styles.primaryButton,
+                pressed && { opacity: 0.8 },
+                focused && {
+                  borderColor: "#38bdf8",
+                  borderWidth: 2,
+                  transform: [{ scale: 1.02 }],
+                },
+              ]}
               onPress={createRoom}
-              activeOpacity={0.8}
             >
               <Ionicons name="add-circle" size={20} color="#0f172a" />
               <Text style={styles.primaryButtonText}>Create a new room</Text>
-            </TouchableOpacity>
+            </Pressable>
 
             <View style={styles.joinRow}>
               <TextInput
@@ -123,17 +137,22 @@ export default function HomeScreen() {
                 returnKeyType="go"
                 onSubmitEditing={joinRoom}
               />
-              <TouchableOpacity
-                style={[
+              <Pressable
+                style={({ pressed, focused }) => [
                   styles.joinButton,
                   !normalizedJoin && styles.joinButtonDisabled,
+                  pressed && { opacity: 0.7 },
+                  focused && {
+                    borderColor: "#38bdf8",
+                    borderWidth: 2,
+                    transform: [{ scale: 1.02 }],
+                  },
                 ]}
                 onPress={joinRoom}
                 disabled={!normalizedJoin}
-                activeOpacity={0.7}
               >
                 <Text style={styles.joinButtonText}>Join</Text>
-              </TouchableOpacity>
+              </Pressable>
             </View>
 
             <Text style={styles.hint}>

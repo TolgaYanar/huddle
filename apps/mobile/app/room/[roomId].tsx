@@ -3,7 +3,7 @@ import {
   View,
   Text,
   TextInput,
-  TouchableOpacity,
+  Pressable,
   StyleSheet,
   ScrollView,
   Share,
@@ -12,6 +12,7 @@ import {
   Dimensions,
   KeyboardAvoidingView,
   Platform,
+  useWindowDimensions,
 } from "react-native";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -20,6 +21,10 @@ import YoutubePlayer from "react-native-youtube-iframe";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import io, { Socket } from "socket.io-client";
+
+import { PasswordModal } from "../components/PasswordModal";
+import { CallSidebar } from "../components/CallSidebar";
+import { useWebRTC } from "../hooks/useWebRTC";
 
 const SOCKET_URL =
   process.env.EXPO_PUBLIC_SOCKET_URL || "http://localhost:4000";
@@ -52,10 +57,18 @@ interface ActivityEvent {
 export default function RoomScreen() {
   const { roomId } = useLocalSearchParams<{ roomId: string }>();
   const router = useRouter();
+  const { width, height } = useWindowDimensions();
+  const isLandscape = width > height;
+  const isTV = width > 1000; // Simple TV detection
 
   const [isConnected, setIsConnected] = useState(false);
   const [userId, setUserId] = useState("");
   const [participants, setParticipants] = useState<string[]>([]);
+  const [hostId, setHostId] = useState<string | null>(null);
+
+  // Password state
+  const [passwordRequired, setPasswordRequired] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
 
   // Video state
   const [videoUrl, setVideoUrl] = useState("");
@@ -66,6 +79,40 @@ export default function RoomScreen() {
   const [duration, setDuration] = useState(0);
   const videoRef = useRef<Video>(null);
   const youtubeRef = useRef<any>(null);
+
+  // Chat state
+  const [messages, setMessages] = useState<(ChatMessage | ActivityEvent)[]>([]);
+  const [chatText, setChatText] = useState("");
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  // Call state
+  const [isCallCollapsed, setIsCallCollapsed] = useState(true);
+  const [callEnabled, setCallEnabled] = useState(false);
+
+  // Socket ref
+  const socketRef = useRef<Socket | null>(null);
+  const isRemoteActionRef = useRef(false);
+
+  // WebRTC hook
+  const {
+    localStream,
+    remoteStreams,
+    micEnabled,
+    camEnabled,
+    remoteSpeaking,
+    remoteMedia,
+    startLocalStream,
+    stopLocalStream,
+    toggleMic,
+    toggleCam,
+    closeAllPeers,
+  } = useWebRTC({
+    socket: socketRef.current,
+    roomId: roomId || "",
+    userId,
+    isConnected,
+  });
+
   // Helper: detect YouTube URL
   function getYoutubeId(url: string): string | null {
     if (!url) return null;
@@ -74,15 +121,6 @@ export default function RoomScreen() {
     );
     return match && typeof match[1] === "string" ? match[1] : null;
   }
-
-  // Chat state
-  const [messages, setMessages] = useState<(ChatMessage | ActivityEvent)[]>([]);
-  const [chatText, setChatText] = useState("");
-  const scrollViewRef = useRef<ScrollView>(null);
-
-  // Socket ref
-  const socketRef = useRef<Socket | null>(null);
-  const isRemoteActionRef = useRef(false);
 
   // Save last room
   useEffect(() => {
@@ -103,7 +141,11 @@ export default function RoomScreen() {
       console.log("Connected to server");
       setIsConnected(true);
       setUserId(socket.id || "");
-      socket.emit("join_room", roomId);
+
+      // Try to get saved password
+      AsyncStorage.getItem(`huddle:roomPassword:${roomId}`).then((password) => {
+        socket.emit("join_room", roomId, password || undefined);
+      });
     });
 
     socket.on("disconnect", () => {
@@ -112,15 +154,29 @@ export default function RoomScreen() {
     });
 
     socket.on("room_users", (data: { users: string[]; hostId?: string }) => {
-      setParticipants(data.users);
+      setParticipants(data.users.filter((id) => id !== socket.id));
+      if (data.hostId) setHostId(data.hostId);
+      setPasswordRequired(false);
+      setPasswordError(null);
     });
 
     socket.on("user_joined", (id: string) => {
-      setParticipants((prev) => [...prev.filter((p) => p !== id), id]);
+      if (id !== socket.id) {
+        setParticipants((prev) => [...prev.filter((p) => p !== id), id]);
+      }
     });
 
     socket.on("user_left", (id: string) => {
       setParticipants((prev) => prev.filter((p) => p !== id));
+    });
+
+    socket.on("room_requires_password", (data: { reason?: string }) => {
+      setPasswordRequired(true);
+      if (data.reason === "invalid") {
+        setPasswordError("Wrong password. Try again.");
+      } else {
+        setPasswordError(null);
+      }
     });
 
     socket.on(
@@ -293,6 +349,26 @@ export default function RoomScreen() {
     return "text" in item;
   };
 
+  const submitPassword = (password: string) => {
+    AsyncStorage.setItem(`huddle:roomPassword:${roomId}`, password);
+    socketRef.current?.emit("join_room", roomId, password);
+  };
+
+  const handleJoinCall = async () => {
+    setCallEnabled(true);
+    setIsCallCollapsed(false);
+    await startLocalStream(true, false);
+  };
+
+  const handleLeaveCall = () => {
+    setCallEnabled(false);
+    setIsCallCollapsed(true);
+    stopLocalStream();
+    closeAllPeers();
+  };
+
+  const VIDEO_HEIGHT = isLandscape ? height * 0.5 : (width * 9) / 16;
+
   return (
     <>
       <Stack.Screen
@@ -300,8 +376,6 @@ export default function RoomScreen() {
           headerShown: true,
           headerStyle: {
             backgroundColor: "rgba(0,0,0,0.3)",
-            borderBottomWidth: 1,
-            borderBottomColor: "rgba(255,255,255,0.1)",
           },
           headerTintColor: "#f8fafc",
           headerTitle: () => (
@@ -318,18 +392,29 @@ export default function RoomScreen() {
             </View>
           ),
           headerLeft: () => (
-            <TouchableOpacity
+            <Pressable
               onPress={() => router.back()}
-              style={styles.headerButton}
+              style={({ pressed, focused }) => [
+                styles.headerButton,
+                pressed && { opacity: 0.7 },
+                focused && { backgroundColor: "rgba(255,255,255,0.1)" },
+              ]}
             >
               <Ionicons name="chevron-back" size={24} color="#f8fafc" />
-            </TouchableOpacity>
+            </Pressable>
           ),
           headerRight: () => (
             <View style={styles.headerRight}>
-              <TouchableOpacity onPress={shareRoom} style={styles.headerButton}>
+              <Pressable
+                onPress={shareRoom}
+                style={({ pressed, focused }) => [
+                  styles.headerButton,
+                  pressed && { opacity: 0.7 },
+                  focused && { backgroundColor: "rgba(255,255,255,0.1)" },
+                ]}
+              >
                 <Ionicons name="share-outline" size={22} color="#f8fafc" />
-              </TouchableOpacity>
+              </Pressable>
               <View style={styles.participantBadge}>
                 <Ionicons name="people" size={14} color="#94a3b8" />
                 <Text style={styles.participantCount}>
@@ -341,195 +426,262 @@ export default function RoomScreen() {
         }}
       />
 
+      {/* Password Modal */}
+      <PasswordModal
+        visible={passwordRequired}
+        passwordError={passwordError}
+        onSubmit={submitPassword}
+        onCancel={() => router.replace("/")}
+      />
+
       <SafeAreaView style={styles.container} edges={["bottom"]}>
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
           style={styles.flex}
           keyboardVerticalOffset={90}
         >
-          {/* Video Section */}
-          <View style={styles.videoSection}>
-            {/* URL Input */}
-            <View style={styles.urlRow}>
-              <TextInput
-                style={styles.urlInput}
-                placeholder="Paste video URL (YouTube, etc.)"
-                placeholderTextColor="#64748b"
-                value={inputUrl}
-                onChangeText={setInputUrl}
-                autoCapitalize="none"
-                autoCorrect={false}
-                returnKeyType="go"
-                onSubmitEditing={handleLoadUrl}
-              />
-              <TouchableOpacity
-                style={styles.loadButton}
-                onPress={handleLoadUrl}
-              >
-                <Ionicons name="play-circle" size={24} color="#f8fafc" />
-              </TouchableOpacity>
-            </View>
+          {/* Main Content - Landscape layout for TV */}
+          <View style={[styles.mainContent, isLandscape && styles.landscapeContent]}>
+            {/* Video Section */}
+            <View style={[styles.videoSection, isLandscape && styles.landscapeVideo]}>
+              {/* URL Input */}
+              <View style={styles.urlRow}>
+                <TextInput
+                  style={styles.urlInput}
+                  placeholder="Paste video URL (YouTube, etc.)"
+                  placeholderTextColor="#64748b"
+                  value={inputUrl}
+                  onChangeText={setInputUrl}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  returnKeyType="go"
+                  onSubmitEditing={handleLoadUrl}
+                />
+                <Pressable
+                  style={({ pressed, focused }) => [
+                    styles.loadButton,
+                    pressed && { opacity: 0.8 },
+                    focused && {
+                      borderColor: "#38bdf8",
+                      borderWidth: 2,
+                      transform: [{ scale: 1.05 }],
+                    },
+                  ]}
+                  onPress={handleLoadUrl}
+                >
+                  <Ionicons name="play-circle" size={24} color="#f8fafc" />
+                </Pressable>
+              </View>
 
-            {/* Video Player */}
-            <View style={styles.videoContainer}>
-              {videoUrl ? (
-                getYoutubeId(videoUrl) ? (
-                  <YoutubePlayer
-                    ref={youtubeRef}
-                    height={VIDEO_HEIGHT}
-                    width={"100%"}
-                    videoId={getYoutubeId(videoUrl)!}
-                    play={isPlaying}
-                    onChangeState={(state: string) => {
-                      if (state === "playing" && !isPlaying) setIsPlaying(true);
-                      if (
-                        (state === "paused" || state === "ended") &&
-                        isPlaying
-                      )
-                        setIsPlaying(false);
-                    }}
-                    onReady={() => setIsBuffering(false)}
-                    onError={(_e: unknown) => setIsBuffering(false)}
-                    onPlaybackQualityChange={(_q: unknown) => {}}
-                    onPlaybackRateChange={(_r: unknown) => {}}
-                    forceAndroidAutoplay
-                  />
-                ) : (
-                  <>
-                    <Video
-                      ref={videoRef}
-                      source={{ uri: videoUrl }}
-                      style={styles.video}
-                      resizeMode={ResizeMode.CONTAIN}
-                      shouldPlay={isPlaying}
-                      isLooping={false}
-                      onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
-                      useNativeControls={false}
+              {/* Video Player */}
+              <View style={[styles.videoContainer, { height: VIDEO_HEIGHT }]}>
+                {videoUrl ? (
+                  getYoutubeId(videoUrl) ? (
+                    <YoutubePlayer
+                      ref={youtubeRef}
+                      height={VIDEO_HEIGHT}
+                      width={"100%"}
+                      videoId={getYoutubeId(videoUrl)!}
+                      play={isPlaying}
+                      onChangeState={(state: string) => {
+                        if (state === "playing" && !isPlaying) setIsPlaying(true);
+                        if ((state === "paused" || state === "ended") && isPlaying)
+                          setIsPlaying(false);
+                      }}
+                      onReady={() => setIsBuffering(false)}
+                      onError={(_e: unknown) => setIsBuffering(false)}
+                      onPlaybackQualityChange={(_q: unknown) => {}}
+                      onPlaybackRateChange={(_r: unknown) => {}}
+                      forceAndroidAutoplay
                     />
-                    {isBuffering && (
-                      <View style={styles.bufferingOverlay}>
-                        <ActivityIndicator size="large" color="#f8fafc" />
-                      </View>
-                    )}
-                  </>
-                )
-              ) : (
-                <View style={styles.videoPlaceholder}>
-                  <Ionicons name="videocam-outline" size={48} color="#475569" />
-                  <Text style={styles.placeholderText}>
-                    Paste a video URL above to start watching
-                  </Text>
+                  ) : (
+                    <>
+                      <Video
+                        ref={videoRef}
+                        source={{ uri: videoUrl }}
+                        style={styles.video}
+                        resizeMode={ResizeMode.CONTAIN}
+                        shouldPlay={isPlaying}
+                        isLooping={false}
+                        onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
+                        useNativeControls={false}
+                      />
+                      {isBuffering && (
+                        <View style={styles.bufferingOverlay}>
+                          <ActivityIndicator size="large" color="#f8fafc" />
+                        </View>
+                      )}
+                    </>
+                  )
+                ) : (
+                  <View style={styles.videoPlaceholder}>
+                    <Ionicons name="videocam-outline" size={48} color="#475569" />
+                    <Text style={styles.placeholderText}>
+                      Paste a video URL above to start watching
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              {/* Controls */}
+              {videoUrl && (
+                <View style={styles.controls}>
+                  <Text style={styles.timeText}>{formatTime(currentTime)}</Text>
+                  <View style={styles.controlButtons}>
+                    <Pressable
+                      onPress={() => handleSeek("back")}
+                      style={({ pressed, focused }) => [
+                        styles.controlButton,
+                        pressed && { opacity: 0.7 },
+                        focused && { backgroundColor: "rgba(255,255,255,0.1)" },
+                      ]}
+                    >
+                      <Ionicons name="play-back" size={24} color="#f8fafc" />
+                    </Pressable>
+                    <Pressable
+                      onPress={handlePlayPause}
+                      style={({ pressed, focused }) => [
+                        styles.playButton,
+                        pressed && { opacity: 0.8 },
+                        focused && {
+                          borderColor: "#38bdf8",
+                          borderWidth: 2,
+                          transform: [{ scale: 1.05 }],
+                        },
+                      ]}
+                    >
+                      <Ionicons
+                        name={isPlaying ? "pause" : "play"}
+                        size={28}
+                        color="#0f172a"
+                      />
+                    </Pressable>
+                    <Pressable
+                      onPress={() => handleSeek("forward")}
+                      style={({ pressed, focused }) => [
+                        styles.controlButton,
+                        pressed && { opacity: 0.7 },
+                        focused && { backgroundColor: "rgba(255,255,255,0.1)" },
+                      ]}
+                    >
+                      <Ionicons name="play-forward" size={24} color="#f8fafc" />
+                    </Pressable>
+                  </View>
+                  <Text style={styles.timeText}>{formatTime(duration)}</Text>
                 </View>
+              )}
+
+              {/* Join Call Button */}
+              {!callEnabled && (
+                <Pressable
+                  style={({ pressed, focused }) => [
+                    styles.joinCallButton,
+                    pressed && { opacity: 0.8 },
+                    focused && { borderColor: "#38bdf8", borderWidth: 2 },
+                  ]}
+                  onPress={handleJoinCall}
+                >
+                  <Ionicons name="call" size={20} color="#f8fafc" />
+                  <Text style={styles.joinCallText}>Join Voice Chat</Text>
+                </Pressable>
               )}
             </View>
 
-            {/* Controls */}
-            {videoUrl && (
-              <View style={styles.controls}>
-                <Text style={styles.timeText}>{formatTime(currentTime)}</Text>
-                <View style={styles.controlButtons}>
-                  <TouchableOpacity
-                    onPress={() => handleSeek("back")}
-                    style={styles.controlButton}
-                  >
-                    <Ionicons name="play-back" size={24} color="#f8fafc" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={handlePlayPause}
-                    style={styles.playButton}
-                  >
-                    <Ionicons
-                      name={isPlaying ? "pause" : "play"}
-                      size={28}
-                      color="#0f172a"
-                    />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => handleSeek("forward")}
-                    style={styles.controlButton}
-                  >
-                    <Ionicons name="play-forward" size={24} color="#f8fafc" />
-                  </TouchableOpacity>
-                </View>
-                <Text style={styles.timeText}>{formatTime(duration)}</Text>
+            {/* Chat Section */}
+            <View style={[styles.chatSection, isLandscape && styles.landscapeChat]}>
+              <View style={styles.chatHeader}>
+                <Ionicons name="chatbubbles" size={18} color="#94a3b8" />
+                <Text style={styles.chatHeaderText}>Activity & Chat</Text>
               </View>
-            )}
-          </View>
 
-          {/* Chat Section */}
-          <View style={styles.chatSection}>
-            <View style={styles.chatHeader}>
-              <Ionicons name="chatbubbles" size={18} color="#94a3b8" />
-              <Text style={styles.chatHeaderText}>Activity & Chat</Text>
-            </View>
-
-            <ScrollView
-              ref={scrollViewRef}
-              style={styles.chatMessages}
-              contentContainerStyle={styles.chatContent}
-            >
-              {messages.map((item, index) => (
-                <View
-                  key={item.id || index}
-                  style={[
-                    styles.messageRow,
-                    isChat(item)
-                      ? item.senderId === userId
-                        ? styles.myMessage
-                        : styles.otherMessage
-                      : styles.activityMessage,
-                  ]}
-                >
-                  {isChat(item) ? (
-                    <>
-                      <Text style={styles.messageSender}>
-                        {item.senderId === userId
-                          ? "You"
-                          : item.senderId?.slice(0, 6)}
-                      </Text>
-                      <Text style={styles.messageText}>{item.text}</Text>
-                    </>
-                  ) : (
-                    <Text style={styles.activityText}>
-                      {item.senderId?.slice(0, 6) || "Someone"} {item.kind}
-                      {item.action ? ` (${item.action})` : ""}
-                    </Text>
-                  )}
-                </View>
-              ))}
-            </ScrollView>
-
-            <View style={styles.chatInputRow}>
-              <TextInput
-                style={styles.chatInput}
-                placeholder="Send a message..."
-                placeholderTextColor="#64748b"
-                value={chatText}
-                onChangeText={setChatText}
-                returnKeyType="send"
-                onSubmitEditing={handleSendChat}
-              />
-              <TouchableOpacity
-                style={styles.sendButton}
-                onPress={handleSendChat}
-                disabled={!chatText.trim()}
+              <ScrollView
+                ref={scrollViewRef}
+                style={styles.chatMessages}
+                contentContainerStyle={styles.chatContent}
               >
-                <Ionicons
-                  name="send"
-                  size={20}
-                  color={chatText.trim() ? "#f8fafc" : "#475569"}
+                {messages.map((item, index) => (
+                  <View
+                    key={item.id || index}
+                    style={[
+                      styles.messageRow,
+                      isChat(item)
+                        ? item.senderId === userId
+                          ? styles.myMessage
+                          : styles.otherMessage
+                        : styles.activityMessage,
+                    ]}
+                  >
+                    {isChat(item) ? (
+                      <>
+                        <Text style={styles.messageSender}>
+                          {item.senderId === userId
+                            ? "You"
+                            : item.senderId?.slice(0, 6)}
+                        </Text>
+                        <Text style={styles.messageText}>{item.text}</Text>
+                      </>
+                    ) : (
+                      <Text style={styles.activityText}>
+                        {item.senderId?.slice(0, 6) || "Someone"} {item.kind}
+                        {item.action ? ` (${item.action})` : ""}
+                      </Text>
+                    )}
+                  </View>
+                ))}
+              </ScrollView>
+
+              <View style={styles.chatInputRow}>
+                <TextInput
+                  style={styles.chatInput}
+                  placeholder="Send a message..."
+                  placeholderTextColor="#64748b"
+                  value={chatText}
+                  onChangeText={setChatText}
+                  returnKeyType="send"
+                  onSubmitEditing={handleSendChat}
                 />
-              </TouchableOpacity>
+                <Pressable
+                  style={({ pressed, focused }) => [
+                    styles.sendButton,
+                    pressed && { opacity: 0.7 },
+                    focused && { backgroundColor: "rgba(255,255,255,0.1)" },
+                  ]}
+                  onPress={handleSendChat}
+                  disabled={!chatText.trim()}
+                >
+                  <Ionicons
+                    name="send"
+                    size={20}
+                    color={chatText.trim() ? "#f8fafc" : "#475569"}
+                  />
+                </Pressable>
+              </View>
             </View>
           </View>
+
+          {/* Call Sidebar */}
+          {callEnabled && (
+            <CallSidebar
+              isCollapsed={isCallCollapsed}
+              onToggleCollapse={() => setIsCallCollapsed(!isCallCollapsed)}
+              userId={userId}
+              participants={participants}
+              localStream={localStream}
+              remoteStreams={remoteStreams}
+              micEnabled={micEnabled}
+              camEnabled={camEnabled}
+              remoteSpeaking={remoteSpeaking}
+              remoteMedia={remoteMedia}
+              onToggleMic={toggleMic}
+              onToggleCam={toggleCam}
+              onLeaveCall={handleLeaveCall}
+            />
+          )}
         </KeyboardAvoidingView>
       </SafeAreaView>
     </>
   );
 }
-
-const { width } = Dimensions.get("window");
-const VIDEO_HEIGHT = (width * 9) / 16;
 
 const styles = StyleSheet.create({
   flex: {
@@ -538,6 +690,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#020617",
+  },
+  mainContent: {
+    flex: 1,
+  },
+  landscapeContent: {
+    flexDirection: "row",
   },
   headerTitle: {
     flexDirection: "row",
@@ -557,6 +715,7 @@ const styles = StyleSheet.create({
   },
   headerButton: {
     padding: 8,
+    borderRadius: 8,
   },
   headerRight: {
     flexDirection: "row",
@@ -580,6 +739,9 @@ const styles = StyleSheet.create({
   videoSection: {
     padding: 16,
     gap: 12,
+  },
+  landscapeVideo: {
+    flex: 2,
   },
   urlRow: {
     flexDirection: "row",
@@ -610,7 +772,6 @@ const styles = StyleSheet.create({
   },
   videoContainer: {
     width: "100%",
-    height: VIDEO_HEIGHT,
     backgroundColor: "#000",
     borderRadius: 12,
     overflow: "hidden",
@@ -656,6 +817,7 @@ const styles = StyleSheet.create({
   },
   controlButton: {
     padding: 8,
+    borderRadius: 8,
   },
   playButton: {
     backgroundColor: "#f1f5f9",
@@ -669,10 +831,31 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4,
   },
+  joinCallButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#22c55e",
+    height: 44,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  joinCallText: {
+    color: "#f8fafc",
+    fontSize: 14,
+    fontWeight: "600",
+  },
   chatSection: {
     flex: 1,
     borderTopWidth: 1,
     borderTopColor: "rgba(255,255,255,0.1)",
+  },
+  landscapeChat: {
+    flex: 1,
+    borderTopWidth: 0,
+    borderLeftWidth: 1,
+    borderLeftColor: "rgba(255,255,255,0.1)",
   },
   chatHeader: {
     flexDirection: "row",
@@ -754,5 +937,6 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: "center",
     alignItems: "center",
+    borderRadius: 20,
   },
 });

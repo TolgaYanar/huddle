@@ -4,7 +4,7 @@
     "slug": "huddle",
     "version": "1.0.0",
     "scheme": "huddle",
-    "orientation": "portrait",
+    "orientation": "default",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
