@@ -1,8 +1,6 @@
 // This file is loaded as a polyfill BEFORE any other code runs
 // It sets up SharedArrayBuffer and other globals needed by WebRTC
-
-// Import URL polyfills first
-require("react-native-url-polyfill/auto");
+// NOTE: Cannot use 'require' here as module system isn't loaded yet
 
 (function (global) {
   "use strict";
