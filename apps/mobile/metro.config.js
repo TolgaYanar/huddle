@@ -17,14 +17,22 @@ config.resolver.nodeModulesPaths = [
   path.resolve(workspaceRoot, "node_modules"),
 ];
 
-// 2b. Explicitly map hoisted React Native subpackages.
-// RN 0.81+ imports @react-native/virtualized-lists from inside react-native.
+// 2b. Explicitly map hoisted React Native subpackages and WebRTC dependencies
 config.resolver.extraNodeModules = {
   ...(config.resolver.extraNodeModules || {}),
   "@react-native/virtualized-lists": path.resolve(
     workspaceRoot,
     "node_modules/@react-native/virtualized-lists"
   ),
+  "event-target-shim": path.resolve(
+    workspaceRoot,
+    "node_modules/event-target-shim"
+  ),
+  "webidl-conversions": path.resolve(
+    workspaceRoot,
+    "node_modules/webidl-conversions"
+  ),
+  "base64-js": path.resolve(workspaceRoot, "node_modules/base64-js"),
 };
 
 // 3. Force Metro to resolve (sub)dependencies from the `nodeModulesPaths`

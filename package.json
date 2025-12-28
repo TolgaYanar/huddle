@@ -22,5 +22,10 @@
   "workspaces": [
     "apps/*",
     "packages/*"
-  ]
+  ],
+  "dependencies": {
+    "base64-js": "^1.5.1",
+    "event-target-shim": "^6.0.2",
+    "webidl-conversions": "^8.0.0"
+  }
 }
