@@ -6,7 +6,7 @@
     "scheme": "huddle",
     "orientation": "default",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.huddle.app"
