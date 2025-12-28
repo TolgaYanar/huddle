@@ -61,6 +61,33 @@
       globalThis.Atomics = global.Atomics;
     }
   }
+
+  // Minimal URL polyfill (for react-native-webrtc dependencies)
+  if (typeof global.URL === "undefined") {
+    global.URL = function URL(url, base) {
+      // Basic URL parsing - just store the string
+      this.href = base ? new URL(base).href + url : url;
+      this.toString = function () {
+        return this.href;
+      };
+    };
+    global.URL.createObjectURL = function () {
+      return "";
+    };
+    global.URL.revokeObjectURL = function () {};
+  }
+
+  if (typeof global.URLSearchParams === "undefined") {
+    global.URLSearchParams = function URLSearchParams() {
+      this.get = function () {
+        return null;
+      };
+      this.set = function () {};
+      this.toString = function () {
+        return "";
+      };
+    };
+  }
 })(
   typeof globalThis !== "undefined"
     ? globalThis
