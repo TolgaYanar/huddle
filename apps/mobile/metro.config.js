@@ -38,7 +38,7 @@ config.resolver.extraNodeModules = {
 // 3. Force Metro to resolve (sub)dependencies from the `nodeModulesPaths`
 config.resolver.disableHierarchicalLookup = true;
 
-// 4. Inject polyfills at the very beginning of the bundle
+// 4. Inject custom polyfills first, then React Native's defaults
 config.serializer.getPolyfills = () => {
   const defaultPolyfills = require("react-native/rn-get-polyfills")();
   return [path.resolve(projectRoot, "shim.js"), ...defaultPolyfills];

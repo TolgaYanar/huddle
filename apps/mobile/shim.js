@@ -1,5 +1,5 @@
 // This file is loaded as a polyfill BEFORE any other code runs
-// It sets up SharedArrayBuffer and other globals needed by WebRTC
+// It sets up SharedArrayBuffer, URL, URLSearchParams and other globals needed by WebRTC
 // NOTE: Cannot use 'require' here as module system isn't loaded yet
 
 (function (global) {
@@ -52,6 +52,56 @@
     };
   }
 
+  // Minimal URLSearchParams polyfill
+  if (typeof global.URLSearchParams === "undefined") {
+    global.URLSearchParams = function URLSearchParams(init) {
+      var params = {};
+      this.get = function (key) {
+        return params[key] || null;
+      };
+      this.set = function (key, val) {
+        params[key] = val;
+      };
+      this.has = function (key) {
+        return key in params;
+      };
+      this.toString = function () {
+        return "";
+      };
+    };
+  }
+
+  // Minimal URL polyfill - MUST be after URLSearchParams
+  if (typeof global.URL === "undefined") {
+    global.URL = function URL(url, base) {
+      this.href = url || "";
+      this.toString = function () {
+        return this.href;
+      };
+
+      // Create searchParams
+      var params = {};
+      this.searchParams = {
+        get: function (key) {
+          return params[key] || null;
+        },
+        set: function (key, val) {
+          params[key] = val;
+        },
+        has: function (key) {
+          return key in params;
+        },
+        toString: function () {
+          return "";
+        },
+      };
+    };
+    global.URL.createObjectURL = function () {
+      return "blob:";
+    };
+    global.URL.revokeObjectURL = function () {};
+  }
+
   // Also set on globalThis if available
   if (typeof globalThis !== "undefined") {
     if (typeof globalThis.SharedArrayBuffer === "undefined") {
@@ -60,33 +110,12 @@
     if (typeof globalThis.Atomics === "undefined") {
       globalThis.Atomics = global.Atomics;
     }
-  }
-
-  // Minimal URL polyfill (for react-native-webrtc dependencies)
-  if (typeof global.URL === "undefined") {
-    global.URL = function URL(url, base) {
-      // Basic URL parsing - just store the string
-      this.href = base ? new URL(base).href + url : url;
-      this.toString = function () {
-        return this.href;
-      };
-    };
-    global.URL.createObjectURL = function () {
-      return "";
-    };
-    global.URL.revokeObjectURL = function () {};
-  }
-
-  if (typeof global.URLSearchParams === "undefined") {
-    global.URLSearchParams = function URLSearchParams() {
-      this.get = function () {
-        return null;
-      };
-      this.set = function () {};
-      this.toString = function () {
-        return "";
-      };
-    };
+    if (typeof globalThis.URL === "undefined") {
+      globalThis.URL = global.URL;
+    }
+    if (typeof globalThis.URLSearchParams === "undefined") {
+      globalThis.URLSearchParams = global.URLSearchParams;
+    }
   }
 
   // Ensure window/self have the same polyfills
