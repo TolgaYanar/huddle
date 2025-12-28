@@ -38,15 +38,4 @@ config.resolver.extraNodeModules = {
 // 3. Force Metro to resolve (sub)dependencies from the `nodeModulesPaths`
 config.resolver.disableHierarchicalLookup = true;
 
-// 4. Serialize polyfills before the app code
-config.serializer = {
-  ...config.serializer,
-  getPolyfills: () => {
-    return [
-      path.resolve(projectRoot, "polyfills.js"),
-      ...require("react-native/rn-get-polyfills")(),
-    ];
-  },
-};
-
 module.exports = config;
