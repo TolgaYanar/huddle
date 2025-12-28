@@ -38,13 +38,4 @@ config.resolver.extraNodeModules = {
 // 3. Force Metro to resolve (sub)dependencies from the `nodeModulesPaths`
 config.resolver.disableHierarchicalLookup = true;
 
-// 4. Run polyfills before main module
-config.serializer = {
-  ...config.serializer,
-  getModulesRunBeforeMainModule: () => [
-    require.resolve("./polyfills.js"),
-    require.resolve("react-native/Libraries/Core/InitializeCore"),
-  ],
-};
-
 module.exports = config;
