@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Popcorn emoji representation -->
+    <group android:translateX="27" android:translateY="27">
+        <!-- Popcorn bucket -->
+        <path
+            android:fillColor="#E74C3C"
+            android:pathData="M10,54 L18,20 L36,20 L44,54 Z"/>
+        <!-- Popcorn bucket stripes -->
+        <path
+            android:fillColor="#C0392B"
+            android:pathData="M15,54 L20,20 M29,54 L29,20 M39,54 L34,20"
+            android:strokeWidth="2"
+            android:strokeColor="#C0392B"/>
+        <!-- Popcorn kernels -->
+        <path
+            android:fillColor="#F5DEB3"
+            android:pathData="M18,22 C18,18 14,14 18,10 C22,6 26,10 26,14 C26,18 30,14 34,14 C38,14 40,18 38,22 C36,26 32,24 28,22 C24,20 22,26 18,22 Z"/>
+        <path
+            android:fillColor="#FFEFD5"
+            android:pathData="M20,20 C20,16 17,13 20,10 C23,7 26,10 26,13 C26,16 28,14 31,14 C34,14 36,17 34,20 C32,23 29,22 26,20 C23,18 22,23 20,20 Z"/>
+        <path
+            android:fillColor="#F5DEB3"
+            android:pathData="M22,16 C22,12 20,9 23,6 C26,3 30,6 30,10 C30,14 34,10 38,12 C42,14 42,20 38,22 C34,24 30,20 26,18 C22,16 22,20 22,16 Z"/>
+    </group>
+</vector>

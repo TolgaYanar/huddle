@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Huddle</string>
+
+    <!-- Home Screen -->
+    <string name="create_or_join_room">Create or join a room</string>
+    <string name="rooms_description">Rooms are just URLs you can share with friends.</string>
+    <string name="continue_last_room">Continue last room</string>
+    <string name="create_new_room">Create a new room</string>
+    <string name="join_room_hint">Enter room name or paste invite link</string>
+    <string name="join">Join</string>
+
+    <!-- Room Screen -->
+    <string name="room_label">Room</string>
+    <string name="copy_invite">Copy invite</string>
+    <string name="copied">Copied</string>
+    <string name="wheel">Wheel</string>
+    <string name="connected">Connected</string>
+    <string name="reconnecting">Reconnecting…</string>
+    <string name="password">Password</string>
+    <string name="password_on">On</string>
+    <string name="password_off">Off</string>
+
+    <!-- Video Controls -->
+    <string name="play">Play</string>
+    <string name="pause">Pause</string>
+    <string name="mute">Mute</string>
+    <string name="unmute">Unmute</string>
+    <string name="seek_backward">Seek backward</string>
+    <string name="seek_forward">Seek forward</string>
+    <string name="fullscreen">Fullscreen</string>
+    <string name="exit_fullscreen">Exit fullscreen</string>
+    <string name="playback_speed">Playback speed</string>
+
+    <!-- Call Sidebar -->
+    <string name="call">Call</string>
+    <string name="call_description">Screen share, webcam, and mic between users.</string>
+    <string name="speaking">Speaking</string>
+    <string name="silent">Silent</string>
+    <string name="expand">Expand</string>
+    <string name="collapse">Collapse</string>
+    <string name="room_password">Room password</string>
+    <string name="set_password">Set</string>
+    <string name="change_password">Change</string>
+    <string name="clear_password">Clear</string>
+    <string name="new_password_hint">New password</string>
+    <string name="set_password_hint">Set a password</string>
+    <string name="save">Save</string>
+
+    <!-- Media Controls -->
+    <string name="mic">Mic</string>
+    <string name="mic_on">Mic On</string>
+    <string name="mic_off">Mic Off</string>
+    <string name="cam">Cam</string>
+    <string name="cam_on">Cam On</string>
+    <string name="cam_off">Cam Off</string>
+    <string name="screen">Screen</string>
+    <string name="screen_on">Screen On</string>
+    <string name="screen_off">Screen Off</string>
+
+    <!-- Activity Sidebar -->
+    <string name="activity">Activity</string>
+    <string name="activity_description">What\'s happening in the room and chat.</string>
+    <string name="chat_hint">Type a message…</string>
+    <string name="send">Send</string>
+
+    <!-- Player Section -->
+    <string name="video_url_hint">Paste video URL (YouTube, direct .mp4, etc.)</string>
+    <string name="load_video">Load</string>
+    <string name="no_video_loaded">No video loaded</string>
+    <string name="paste_url_instruction">Paste a URL above to start watching</string>
+
+    <!-- Password Modal -->
+    <string name="enter_room_password">Enter room password</string>
+    <string name="password_required_description">This room requires a password to join.</string>
+    <string name="password_hint">Password</string>
+    <string name="submit">Submit</string>
+    <string name="incorrect_password">Incorrect password. Please try again.</string>
+
+    <!-- Wheel Picker -->
+    <string name="wheel_picker">Wheel Picker</string>
+    <string name="add_entry">Add entry</string>
+    <string name="entry_hint">Enter item name</string>
+    <string name="spin">Spin</string>
+    <string name="clear_all">Clear all</string>
+    <string name="close">Close</string>
+
+    <!-- Errors -->
+    <string name="error_room_full">Room is full</string>
+    <string name="error_connection_failed">Connection failed</string>
+    <string name="error_video_load_failed">Failed to load video</string>
+    <string name="retry">Retry</string>
+
+    <!-- Permissions -->
+    <string name="camera_permission_title">Camera Permission</string>
+    <string name="camera_permission_rationale">Camera access is needed for video calls.</string>
+    <string name="microphone_permission_title">Microphone Permission</string>
+    <string name="microphone_permission_rationale">Microphone access is needed for voice calls.</string>
+    <string name="grant_permission">Grant Permission</string>
+</resources>

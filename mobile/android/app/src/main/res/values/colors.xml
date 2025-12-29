@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Huddle Color Palette - matching web app -->
+
+    <!-- Primary colors - Slate tones -->
+    <color name="slate_50">#FFF8FAFC</color>
+    <color name="slate_100">#FFF1F5F9</color>
+    <color name="slate_200">#FFE2E8F0</color>
+    <color name="slate_300">#FFCBD5E1</color>
+    <color name="slate_400">#FF94A3B8</color>
+    <color name="slate_500">#FF64748B</color>
+    <color name="slate_600">#FF475569</color>
+    <color name="slate_700">#FF334155</color>
+    <color name="slate_800">#FF1E293B</color>
+    <color name="slate_900">#FF0F172A</color>
+    <color name="slate_950">#FF020617</color>
+
+    <!-- Accent colors -->
+    <color name="indigo_400">#FF818CF8</color>
+    <color name="indigo_500">#FF6366F1</color>
+    <color name="indigo_600">#FF4F46E5</color>
+
+    <!-- Status colors -->
+    <color name="emerald_200">#FFA7F3D0</color>
+    <color name="emerald_500">#FF10B981</color>
+    <color name="rose_500">#FFF43F5E</color>
+    <color name="amber_200">#FFFDE68A</color>
+
+    <!-- Transparent overlays -->
+    <color name="white_5">#0DFFFFFF</color>
+    <color name="white_10">#1AFFFFFF</color>
+    <color name="white_20">#33FFFFFF</color>
+    <color name="black_20">#33000000</color>
+    <color name="black_30">#4D000000</color>
+
+    <!-- Theme colors -->
+    <color name="primary">@color/slate_50</color>
+    <color name="primary_variant">@color/slate_200</color>
+    <color name="on_primary">@color/slate_950</color>
+
+    <color name="secondary">@color/indigo_500</color>
+    <color name="secondary_variant">@color/indigo_600</color>
+    <color name="on_secondary">@color/slate_50</color>
+
+    <color name="background">@color/slate_950</color>
+    <color name="on_background">@color/slate_50</color>
+
+    <color name="surface">@color/slate_900</color>
+    <color name="on_surface">@color/slate_200</color>
+
+    <color name="error">@color/rose_500</color>
+    <color name="on_error">@color/slate_50</color>
+</resources>
