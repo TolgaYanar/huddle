@@ -18,7 +18,7 @@
     "typescript": "5.9.2"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20.19.4"
   },
   "packageManager": "npm@11.6.0",
   "workspaces": [
@@ -30,13 +30,13 @@
     "event-target-shim": "^6.0.2",
     "webidl-conversions": "^8.0.0",
     "expo": "~54.0.30",
-    "react": "19.0.0",
-    "react-dom": "19.0.0",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
     "react-native": "0.81.5"
   },
   "overrides": {
-    "react": "19.0.0",
-    "react-dom": "19.0.0"
+    "react": "19.2.3",
+    "react-dom": "19.2.3"
   },
   "version": "1.0.0"
 }
