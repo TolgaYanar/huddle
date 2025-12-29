@@ -11,6 +11,11 @@ import {
   TILE_DND_MIME,
   type DraggedTilePayload,
 } from "../lib/dnd";
+import {
+  getHtmlMediaElementFromRef,
+  pauseFromRef,
+  playFromRef,
+} from "../lib/player";
 import type { WebRTCMediaState } from "shared-logic";
 
 type StageView = {
@@ -137,7 +142,7 @@ export function PlayerSection({
   setIsBuffering: React.Dispatch<React.SetStateAction<boolean>>;
 
   loadTimeoutRef: React.MutableRefObject<number | null>;
-  playerRef: React.RefObject<HTMLVideoElement | null>;
+  playerRef: React.RefObject<unknown>;
   handlePlayerError: (e: unknown) => void;
 
   muted: boolean;
@@ -347,12 +352,15 @@ export function PlayerSection({
 
   type PlayerConfig = React.ComponentProps<typeof ReactPlayer>["config"];
   const playerConfig = React.useMemo(() => {
+    const origin =
+      typeof window !== "undefined" ? window.location.origin : undefined;
     return {
       youtube: {
-        // react-player forwards this to the YouTube iframe API.
-        playerVars: {
-          fs: 0,
-        },
+        // YouTube player parameters
+        fs: 0,
+        rel: 0,
+        enablejsapi: 1,
+        ...(origin ? { origin } : {}),
       },
     } as unknown as PlayerConfig;
   }, []);
@@ -363,6 +371,32 @@ export function PlayerSection({
       loadTimeoutRef.current = null;
     }
   };
+
+  const isDirectFile = React.useMemo(() => {
+    return /\.(mp4|webm|ogv|ogg)(\?|#|$)/i.test(normalizedUrl);
+  }, [normalizedUrl]);
+
+  React.useEffect(() => {
+    if (!isDirectFile) return;
+
+    const el = getHtmlMediaElementFromRef(playerRef);
+    if (el) {
+      try {
+        el.muted = muted;
+        // Keep volume in sync when unmuted.
+        if (!muted) el.volume = volume;
+        el.playbackRate = playbackRate;
+      } catch {
+        // ignore
+      }
+    }
+
+    if (videoState === "Playing") {
+      void playFromRef(playerRef);
+    } else {
+      pauseFromRef(playerRef);
+    }
+  }, [isDirectFile, playerRef, muted, volume, playbackRate, videoState]);
 
   const onEmbedLoad = () => {
     setPlayerReady(true);
@@ -654,12 +688,50 @@ export function PlayerSection({
               />
             ) : isPrime ? (
               <div className="absolute inset-0" />
+            ) : isDirectFile ? (
+              <video
+                ref={playerRef as React.RefObject<HTMLVideoElement | null>}
+                src={canPlay ? normalizedUrl : undefined}
+                className="absolute inset-0 w-full h-full"
+                controls
+                playsInline
+                preload="auto"
+                muted={muted}
+                onLoadedMetadata={(e) => {
+                  setPlayerReady(true);
+                  setPlayerError(null);
+                  setIsBuffering(false);
+                  const dur = (e.currentTarget as HTMLVideoElement).duration;
+                  if (typeof dur === "number" && !isNaN(dur)) {
+                    handleDuration(dur);
+                  }
+                  clearLoadTimeout();
+                }}
+                onCanPlay={() => {
+                  setPlayerReady(true);
+                  setPlayerError(null);
+                  setIsBuffering(false);
+                  clearLoadTimeout();
+                }}
+                onWaiting={() => setIsBuffering(true)}
+                onPlaying={() => {
+                  setPlayerReady(true);
+                  setIsBuffering(false);
+                  clearLoadTimeout();
+                }}
+                onTimeUpdate={(e) => {
+                  const time = (e.currentTarget as HTMLVideoElement)
+                    .currentTime;
+                  if (typeof time === "number" && !isNaN(time)) {
+                    handleProgress(time);
+                  }
+                }}
+                onError={handlePlayerError}
+              />
             ) : (
-              // @ts-expect-error - ReactPlayer types don't include onProgress and onDuration
               <ReactPlayer
                 {...{
-                  ref: playerRef,
-                  key: normalizedUrl,
+                  ref: playerRef as unknown as React.RefObject<HTMLVideoElement | null>,
                   src: canPlay ? normalizedUrl : undefined,
                   playing: videoState === "Playing",
                   muted,
@@ -724,15 +796,26 @@ export function PlayerSection({
                     setIsBuffering(false);
                     clearLoadTimeout();
                   },
-                  onProgress: (state: { playedSeconds: number }) => {
-                    const time = state.playedSeconds;
-                    if (typeof time === "number" && !isNaN(time)) {
-                      handleProgress(time);
+                  onPlaying: () => {
+                    setPlayerReady(true);
+                    setIsBuffering(false);
+                    clearLoadTimeout();
+                  },
+                  onWaiting: () => setIsBuffering(true),
+                  onTimeUpdate: (e: React.SyntheticEvent) => {
+                    const t = (
+                      e.currentTarget as unknown as { currentTime?: unknown }
+                    ).currentTime;
+                    if (typeof t === "number" && !isNaN(t)) {
+                      handleProgress(t);
                     }
                   },
-                  onDuration: (dur: number) => {
-                    if (typeof dur === "number" && !isNaN(dur)) {
-                      handleDuration(dur);
+                  onDurationChange: (e: React.SyntheticEvent) => {
+                    const d = (
+                      e.currentTarget as unknown as { duration?: unknown }
+                    ).duration;
+                    if (typeof d === "number" && !isNaN(d)) {
+                      handleDuration(d);
                     }
                   },
                   onPause: () => setIsBuffering(false),

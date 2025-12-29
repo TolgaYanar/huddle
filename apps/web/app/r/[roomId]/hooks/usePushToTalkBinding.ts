@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 export type PushToTalkBinding =
   | {
@@ -32,7 +32,7 @@ const isTypingTarget = (t: EventTarget | null) => {
   if (!el) return false;
   const tag = (el.tagName || "").toLowerCase();
   if (tag === "input" || tag === "textarea" || tag === "select") return true;
-  if ((el as any).isContentEditable) return true;
+  if (el.isContentEditable) return true;
   return false;
 };
 
@@ -85,10 +85,10 @@ export function usePushToTalkBinding(params: {
   const [isDown, setIsDown] = useState(false);
   const isDownRef = useRef(false);
 
-  const stopTransmit = () => {
+  const stopTransmit = useCallback(() => {
     isDownRef.current = false;
     setIsDown(false);
-  };
+  }, []);
 
   // Load/save binding.
   useEffect(() => {
@@ -177,8 +177,7 @@ export function usePushToTalkBinding(params: {
       window.removeEventListener("keydown", onKeyDown, true);
       window.removeEventListener("mousedown", onMouseDown, true);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isClient, isRebinding]);
+  }, [isClient, isRebinding, stopTransmit]);
 
   // Push-to-talk hold listeners.
   useEffect(() => {
@@ -276,7 +275,7 @@ export function usePushToTalkBinding(params: {
     micEnabled,
     binding,
     isRebinding,
-    // stopTransmit intentionally excluded (stable inline)
+    stopTransmit,
   ]);
 
   return {

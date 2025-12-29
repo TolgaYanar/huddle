@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { SyncAction } from "shared-logic";
 import { formatTime } from "../lib/activity";
+import { getCurrentTimeFromRef, seekToFromRef } from "../lib/player";
 import {
   getLoadTimeoutMs,
   getPrimeVideoMessage,
@@ -47,7 +48,7 @@ export function useVideoPlayer({
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const previewRequestIdRef = useRef(0);
 
-  const playerRef = useRef<HTMLVideoElement | null>(null);
+  const playerRef = useRef<unknown>(null);
   const loadTimeoutRef = useRef<number | null>(null);
 
   // Store roomId in localStorage
@@ -124,14 +125,14 @@ export function useVideoPlayer({
   }, [playbackRate]);
 
   const handlePlay = useCallback(() => {
-    const currentTime = playerRef.current?.currentTime ?? 0;
+    const currentTime = getCurrentTimeFromRef(playerRef);
     sendSyncEvent("play", currentTime, url);
     setVideoState("Playing");
     addLogEntry?.({ msg: `started playing`, type: "play", user: "You" });
   }, [url, sendSyncEvent, addLogEntry]);
 
   const handlePause = useCallback(() => {
-    const currentTime = playerRef.current?.currentTime ?? 0;
+    const currentTime = getCurrentTimeFromRef(playerRef);
     sendSyncEvent("pause", currentTime, url);
     setVideoState("Paused");
     addLogEntry?.({ msg: `paused the video`, type: "pause", user: "You" });
@@ -139,9 +140,9 @@ export function useVideoPlayer({
 
   const handleSeek = useCallback(
     (seconds: number) => {
-      const time = playerRef.current?.currentTime ?? 0;
+      const time = getCurrentTimeFromRef(playerRef);
       const newTime = Math.max(0, time + seconds);
-      if (playerRef.current) playerRef.current.currentTime = newTime;
+      seekToFromRef(playerRef, newTime);
       sendSyncEvent("seek", newTime, url);
       addLogEntry?.({
         msg: `jumped to ${formatTime(newTime)}`,
@@ -155,7 +156,7 @@ export function useVideoPlayer({
   const handleSeekTo = useCallback(
     (time: number) => {
       const newTime = Math.max(0, Math.min(time, duration || Infinity));
-      if (playerRef.current) playerRef.current.currentTime = newTime;
+      seekToFromRef(playerRef, newTime);
       setCurrentTime(newTime);
       sendSyncEvent("seek", newTime, url);
       addLogEntry?.({

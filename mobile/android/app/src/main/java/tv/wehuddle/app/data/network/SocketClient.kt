@@ -308,7 +308,9 @@ class SocketClient @Inject constructor() {
                 
                 val mediaStates = obj.optJSONObject("mediaStates")?.let { states ->
                     val map = mutableMapOf<String, WebRTCMediaState>()
-                    states.keys().forEach { key ->
+                    val keys = states.keys()
+                    while (keys.hasNext()) {
+                        val key = keys.next() as String
                         states.optJSONObject(key)?.let { stateObj ->
                             map[key] = WebRTCMediaState(
                                 mic = stateObj.optBoolean("mic", false),

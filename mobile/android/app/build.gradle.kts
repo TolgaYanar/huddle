@@ -27,8 +27,8 @@ android {
     buildTypes {
         debug {
             isDebuggable = true
-            buildConfigField("String", "SOCKET_URL", "\"http://10.0.2.2:3001\"")
-            buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:3002/api/\"")
+            buildConfigField("String", "SOCKET_URL", "\"http://10.0.2.2:4000\"")
+            buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:4000/api/\"")
         }
         release {
             isMinifyEnabled = true

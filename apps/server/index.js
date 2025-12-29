@@ -94,6 +94,12 @@ function verifyPassword(password, stored) {
 const CHAT_HISTORY_LIMIT = 50;
 const ACTIVITY_HISTORY_LIMIT = 100;
 
+function normalizeRoomId(raw) {
+  if (typeof raw === "string") return raw;
+  if (raw && typeof raw.roomId === "string") return raw.roomId;
+  return null;
+}
+
 async function emitActivityHistory(socket, roomId) {
   try {
     const recent = await prisma.roomActivity.findMany({
@@ -629,7 +635,9 @@ io.on("connection", (socket) => {
     });
   });
 
-  socket.on("request_chat_history", async (roomId) => {
+  socket.on("request_chat_history", async (rawRoom) => {
+    const roomId = normalizeRoomId(rawRoom);
+    if (!roomId) return;
     try {
       const recent = await prisma.roomMessage.findMany({
         where: { roomId },
@@ -691,7 +699,9 @@ io.on("connection", (socket) => {
     });
   });
 
-  socket.on("request_activity_history", async (roomId) => {
+  socket.on("request_activity_history", async (rawRoom) => {
+    const roomId = normalizeRoomId(rawRoom);
+    if (!roomId) return;
     await emitActivityHistory(socket, roomId);
   });
 

@@ -98,7 +98,7 @@ fun LocalVideoTile(
             .clip(RoundedCornerShape(12.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant)
     ) {
-        if (mediaState.cameraOn && stream != null) {
+        if (mediaState.cam && stream != null) {
             WebRTCVideoView(
                 modifier = Modifier.fillMaxSize(),
                 eglContext = eglContext,
@@ -146,7 +146,7 @@ fun LocalVideoTile(
                 modifier = Modifier
                     .size(36.dp)
                     .background(
-                        color = if (mediaState.micOn) 
+                        color = if (mediaState.mic) 
                             MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
                         else 
                             MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
@@ -154,8 +154,8 @@ fun LocalVideoTile(
                     )
             ) {
                 Icon(
-                    imageVector = if (mediaState.micOn) Icons.Default.Mic else Icons.Default.MicOff,
-                    contentDescription = if (mediaState.micOn) "Mute" else "Unmute",
+                    imageVector = if (mediaState.mic) Icons.Default.Mic else Icons.Default.MicOff,
+                    contentDescription = if (mediaState.mic) "Mute" else "Unmute",
                     modifier = Modifier.size(18.dp),
                     tint = Color.White
                 )
@@ -166,7 +166,7 @@ fun LocalVideoTile(
                 modifier = Modifier
                     .size(36.dp)
                     .background(
-                        color = if (mediaState.cameraOn) 
+                        color = if (mediaState.cam) 
                             MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
                         else 
                             MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
@@ -174,8 +174,8 @@ fun LocalVideoTile(
                     )
             ) {
                 Icon(
-                    imageVector = if (mediaState.cameraOn) Icons.Default.Videocam else Icons.Default.VideocamOff,
-                    contentDescription = if (mediaState.cameraOn) "Turn off camera" else "Turn on camera",
+                    imageVector = if (mediaState.cam) Icons.Default.Videocam else Icons.Default.VideocamOff,
+                    contentDescription = if (mediaState.cam) "Turn off camera" else "Turn on camera",
                     modifier = Modifier.size(18.dp),
                     tint = Color.White
                 )
@@ -217,7 +217,7 @@ fun RemoteVideoTile(
             .background(MaterialTheme.colorScheme.surfaceVariant)
     ) {
         val hasVideo = stream?.videoTracks?.firstOrNull()?.enabled() == true &&
-                       mediaState?.cameraOn != false
+                       mediaState?.cam != false
         
         if (hasVideo && stream != null) {
             WebRTCVideoView(
@@ -263,7 +263,7 @@ fun RemoteVideoTile(
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             mediaState?.let { state ->
-                if (!state.micOn) {
+                if (!state.mic) {
                     Surface(
                         color = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
                         shape = RoundedCornerShape(4.dp)

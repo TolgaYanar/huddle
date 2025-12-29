@@ -155,7 +155,7 @@ class WebRTCManager @Inject constructor(
             // Add sink for local preview
             localVideoSink?.let { localVideoTrack?.addSink(it) }
             
-            _localMediaState.value = _localMediaState.value.copy(cameraOn = true)
+            _localMediaState.value = _localMediaState.value.copy(cam = true)
             Log.d(TAG, "Camera started successfully")
             return true
         } catch (e: Exception) {
@@ -180,7 +180,7 @@ class WebRTCManager @Inject constructor(
             surfaceTextureHelper?.dispose()
             surfaceTextureHelper = null
             
-            _localMediaState.value = _localMediaState.value.copy(cameraOn = false)
+            _localMediaState.value = _localMediaState.value.copy(cam = false)
             Log.d(TAG, "Camera stopped")
         } catch (e: Exception) {
             Log.e(TAG, "Error stopping camera", e)
@@ -207,7 +207,7 @@ class WebRTCManager @Inject constructor(
             localAudioTrack = peerConnectionFactory!!.createAudioTrack("audio0", audioSource)
             localAudioTrack?.setEnabled(true)
             
-            _localMediaState.value = _localMediaState.value.copy(micOn = true)
+            _localMediaState.value = _localMediaState.value.copy(mic = true)
             Log.d(TAG, "Microphone started successfully")
             return true
         } catch (e: Exception) {
@@ -226,7 +226,7 @@ class WebRTCManager @Inject constructor(
             localAudioTrack?.dispose()
             localAudioTrack = null
             
-            _localMediaState.value = _localMediaState.value.copy(micOn = false)
+            _localMediaState.value = _localMediaState.value.copy(mic = false)
             Log.d(TAG, "Microphone stopped")
         } catch (e: Exception) {
             Log.e(TAG, "Error stopping microphone", e)
@@ -237,7 +237,7 @@ class WebRTCManager @Inject constructor(
      * Toggle microphone mute state
      */
     fun toggleMicrophone(): Boolean {
-        return if (_localMediaState.value.micOn) {
+        return if (_localMediaState.value.mic) {
             stopMicrophone()
             false
         } else {
@@ -249,7 +249,7 @@ class WebRTCManager @Inject constructor(
      * Toggle camera state
      */
     fun toggleCamera(localVideoSink: VideoSink? = null): Boolean {
-        return if (_localMediaState.value.cameraOn) {
+        return if (_localMediaState.value.cam) {
             stopCamera()
             false
         } else {
@@ -440,8 +440,8 @@ class WebRTCManager @Inject constructor(
      */
     fun handleIceCandidate(peerId: String, candidate: WebRTCIceCandidate) {
         val iceCandidate = IceCandidate(
-            candidate.sdpMid,
-            candidate.sdpMLineIndex,
+            candidate.sdpMid ?: "",
+            candidate.sdpMLineIndex ?: 0,
             candidate.candidate
         )
         

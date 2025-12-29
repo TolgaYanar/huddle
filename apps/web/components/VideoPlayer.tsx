@@ -43,33 +43,22 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
       <div className="absolute inset-0 bg-black">
         <ReactPlayer
           ref={playerRef}
-          url={props.url}
+          src={props.url}
           playing={props.playing}
           muted={props.muted}
           width="100%"
           height="100%"
           controls={false}
-          // @ts-expect-error: react-player types are slightly mismatched with onProgress
-          onProgress={props.onProgress}
+          onTimeUpdate={(e) => {
+            const t = (e.currentTarget as unknown as { currentTime?: unknown })
+              .currentTime;
+            if (typeof t === "number" && !isNaN(t)) {
+              props.onProgress({ playedSeconds: t });
+            }
+          }}
           onReady={props.onReady}
           onStart={props.onStart}
           onError={props.onError}
-          config={{
-            youtube: {
-              // @ts-expect-error: playerVars is valid but types might be outdated
-              playerVars: {
-                showinfo: 0,
-                modestbranding: 1,
-                rel: 0,
-              },
-            },
-            file: {
-              attributes: {
-                controlsList: "nodownload",
-                disablePictureInPicture: true,
-              },
-            },
-          }}
         />
       </div>
     );

@@ -13,12 +13,13 @@ import {
   safeToTimeString,
 } from "../lib/activity";
 import { normalizeVideoUrl } from "../lib/video";
+import { getCurrentTimeFromRef, seekToFromRef } from "../lib/player";
 
 interface UseActivityLogProps {
   roomId: string;
   userId: string;
   isConnected: boolean;
-  playerRef: React.RefObject<HTMLVideoElement | null>;
+  playerRef: React.RefObject<unknown>;
   setUrl: (url: string) => void;
   setInputUrl: (url: string) => void;
   setVideoState: (state: string) => void;
@@ -93,9 +94,9 @@ export function useActivityLog({
       }
 
       if (typeof state.timestamp === "number" && playerRef.current) {
-        const current = playerRef.current.currentTime ?? 0;
+        const current = getCurrentTimeFromRef(playerRef);
         if (Math.abs(current - state.timestamp) > 1) {
-          playerRef.current.currentTime = state.timestamp;
+          seekToFromRef(playerRef, state.timestamp);
         }
       }
 
@@ -251,9 +252,9 @@ export function useActivityLog({
       if (data.action === "play") setVideoState("Playing");
       if (data.action === "pause") setVideoState("Paused");
       if (data.action === "seek" || data.action === "play") {
-        const currentTime = playerRef.current?.currentTime ?? 0;
+        const currentTime = getCurrentTimeFromRef(playerRef);
         if (Math.abs(currentTime - data.timestamp) > 1) {
-          if (playerRef.current) playerRef.current.currentTime = data.timestamp;
+          seekToFromRef(playerRef, data.timestamp);
         }
       }
     });

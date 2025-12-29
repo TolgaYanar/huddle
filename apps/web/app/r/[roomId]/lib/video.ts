@@ -41,7 +41,7 @@ export function getLoadTimeoutMs(rawUrl: string) {
   if (getKickEmbedSrc(normalized)) return 25000;
   if (isTwitchUrl(normalized)) return 25000;
   const isFile = /\.(mp4|webm|ogv|ogg)(\?|#|$)/i.test(normalized);
-  return isFile ? 25000 : 12000;
+  return isFile ? 30000 : 20000;
 }
 
 export function getTimeoutErrorMessage(rawUrl: string) {
