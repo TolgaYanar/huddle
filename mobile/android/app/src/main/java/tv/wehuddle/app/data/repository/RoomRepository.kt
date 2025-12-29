@@ -38,9 +38,10 @@ class RoomRepository @Inject constructor(
     private val _wheelState = MutableStateFlow(WheelState("", emptyList(), null))
     val wheelState: StateFlow<WheelState> = _wheelState.asStateFlow()
     
-    // Expose socket connection state
+    // Expose socket connection state and events
     val connectionState: StateFlow<ConnectionState> = socketClient.connectionState
     val socketId: StateFlow<String?> = socketClient.socketId
+    val socketEvents: SharedFlow<SocketEvent> = socketClient.events
     
     init {
         observeSocketEvents()
@@ -126,7 +127,13 @@ class RoomRepository @Inject constructor(
                         videoState = current.videoState.copy(
                             url = event.data.videoUrl ?: current.videoState.url,
                             currentTime = event.data.timestamp,
-                            isPlaying = event.data.action == SyncAction.play
+                            // Preserve playing state on seek, change it only on play/pause
+                            isPlaying = when (event.data.action) {
+                                SyncAction.play -> true
+                                SyncAction.pause -> false
+                                SyncAction.seek -> current.videoState.isPlaying
+                                SyncAction.change_url -> false
+                            }
                         )
                     )
                 }
@@ -337,6 +344,15 @@ class RoomRepository @Inject constructor(
                     senderId = socketClient.socketId.value
                 )
             )
+            // Update local state immediately so the sender plays too
+            _roomState.update { current ->
+                current.copy(
+                    videoState = current.videoState.copy(
+                        isPlaying = true,
+                        currentTime = timestamp
+                    )
+                )
+            }
         }
     }
     
@@ -351,6 +367,15 @@ class RoomRepository @Inject constructor(
                     senderId = socketClient.socketId.value
                 )
             )
+            // Reflect pause locally for the sender
+            _roomState.update { current ->
+                current.copy(
+                    videoState = current.videoState.copy(
+                        isPlaying = false,
+                        currentTime = timestamp
+                    )
+                )
+            }
         }
     }
     
@@ -365,6 +390,14 @@ class RoomRepository @Inject constructor(
                     senderId = socketClient.socketId.value
                 )
             )
+            // Apply seek locally so UI updates instantly
+            _roomState.update { current ->
+                current.copy(
+                    videoState = current.videoState.copy(
+                        currentTime = timestamp
+                    )
+                )
+            }
         }
     }
     
@@ -384,7 +417,10 @@ class RoomRepository @Inject constructor(
                 it.copy(
                     videoState = it.videoState.copy(
                         url = url,
-                        platform = detectPlatform(url)
+                        platform = detectPlatform(url),
+                        // Reset playback state on URL change
+                        currentTime = 0.0,
+                        isPlaying = false
                     )
                 )
             }

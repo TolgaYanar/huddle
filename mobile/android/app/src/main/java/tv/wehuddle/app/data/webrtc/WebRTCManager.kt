@@ -64,6 +64,12 @@ class WebRTCManager @Inject constructor(
     private var localVideoTrack: VideoTrack? = null
     private var localScreenTrack: VideoTrack? = null
     private var localMediaStream: MediaStream? = null
+
+    private val _localStream = MutableStateFlow<MediaStream?>(null)
+    val localStream: StateFlow<MediaStream?> = _localStream.asStateFlow()
+
+    private val _eglContext = MutableStateFlow<EglBase.Context?>(null)
+    val eglContext: StateFlow<EglBase.Context?> = _eglContext.asStateFlow()
     
     private var videoCapturer: CameraVideoCapturer? = null
     private var surfaceTextureHelper: SurfaceTextureHelper? = null
@@ -95,6 +101,7 @@ class WebRTCManager @Inject constructor(
             
             // Create EGL context
             eglBase = EglBase.create()
+            _eglContext.value = eglBase?.eglBaseContext
             
             // Create factory
             val encoderFactory = DefaultVideoEncoderFactory(
@@ -156,6 +163,7 @@ class WebRTCManager @Inject constructor(
             localVideoSink?.let { localVideoTrack?.addSink(it) }
             
             _localMediaState.value = _localMediaState.value.copy(cam = true)
+            rebuildLocalStream()
             Log.d(TAG, "Camera started successfully")
             return true
         } catch (e: Exception) {
@@ -181,6 +189,7 @@ class WebRTCManager @Inject constructor(
             surfaceTextureHelper = null
             
             _localMediaState.value = _localMediaState.value.copy(cam = false)
+            rebuildLocalStream()
             Log.d(TAG, "Camera stopped")
         } catch (e: Exception) {
             Log.e(TAG, "Error stopping camera", e)
@@ -208,6 +217,7 @@ class WebRTCManager @Inject constructor(
             localAudioTrack?.setEnabled(true)
             
             _localMediaState.value = _localMediaState.value.copy(mic = true)
+            rebuildLocalStream()
             Log.d(TAG, "Microphone started successfully")
             return true
         } catch (e: Exception) {
@@ -227,6 +237,7 @@ class WebRTCManager @Inject constructor(
             localAudioTrack = null
             
             _localMediaState.value = _localMediaState.value.copy(mic = false)
+            rebuildLocalStream()
             Log.d(TAG, "Microphone stopped")
         } catch (e: Exception) {
             Log.e(TAG, "Error stopping microphone", e)
@@ -243,6 +254,17 @@ class WebRTCManager @Inject constructor(
         } else {
             startMicrophone()
         }
+    }
+
+    private fun rebuildLocalStream() {
+        localMediaStream?.dispose()
+
+        val newStream = peerConnectionFactory?.createLocalMediaStream("local-stream")
+        localAudioTrack?.let { newStream?.addTrack(it) }
+        localVideoTrack?.let { newStream?.addTrack(it) }
+
+        localMediaStream = newStream
+        _localStream.value = newStream
     }
     
     /**
@@ -305,6 +327,9 @@ class WebRTCManager @Inject constructor(
         localVideoTrack?.let { track ->
             peerConnection.addTrack(track, listOf("local-stream"))
         }
+
+        // Ensure local stream reflects current tracks
+        rebuildLocalStream()
         
         peerConnections[peerId] = peerConnection
         pendingIceCandidates[peerId] = mutableListOf()
@@ -492,12 +517,14 @@ class WebRTCManager @Inject constructor(
         
         localMediaStream?.dispose()
         localMediaStream = null
+        _localStream.value = null
         
         peerConnectionFactory?.dispose()
         peerConnectionFactory = null
         
         eglBase?.release()
         eglBase = null
+        _eglContext.value = null
         
         isInitialized = false
         Log.d(TAG, "WebRTC resources released")

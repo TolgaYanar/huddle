@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Allow cleartext traffic for local development and specific domains -->
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- Local development servers -->
+        <domain includeSubdomains="true">10.0.2.2</domain>
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+    </domain-config>
+    
+    <!-- Trust custom CAs for video streams -->
+    <domain-config>
+        <!-- Allow various video streaming services -->
+        <domain includeSubdomains="true">youtube.com</domain>
+        <domain includeSubdomains="true">youtu.be</domain>
+        <domain includeSubdomains="true">twitch.tv</domain>
+        <domain includeSubdomains="true">kick.com</domain>
+        <domain includeSubdomains="true">player.vimeo.com</domain>
+        <domain includeSubdomains="true">cdnjs.cloudflare.com</domain>
+        
+        <!-- Trust system certificates for HTTPS -->
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+    
+    <!-- Default configuration for all other domains -->
+    <trust-anchors>
+        <certificates src="system" />
+        <certificates src="user" />
+    </trust-anchors>
+</network-security-config>

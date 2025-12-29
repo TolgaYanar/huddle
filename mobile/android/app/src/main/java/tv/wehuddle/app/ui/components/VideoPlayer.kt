@@ -53,72 +53,118 @@ fun VideoPlayerView(
     val context = LocalContext.current
     val platform = remember(url) { detectPlatform(url) }
     
-    // ExoPlayer for direct video URLs
-    val exoPlayer = remember {
+    // ExoPlayer for direct video URLs - recreate when URL changes
+    val exoPlayer = remember(url) {
         ExoPlayer.Builder(context).build().apply {
             playWhenReady = false
         }
     }
     
+    // Cleanup on disposal
+    DisposableEffect(exoPlayer) {
+        onDispose {
+            exoPlayer.release()
+        }
+    }
+    
     // Update media item when URL changes
-    LaunchedEffect(url) {
+    LaunchedEffect(url, platform) {
         if (url.isNotBlank() && (platform == PlatformType.DIRECT || platform == PlatformType.UNKNOWN)) {
             try {
                 val mediaItem = MediaItem.fromUri(url)
+                exoPlayer.clearMediaItems()
                 exoPlayer.setMediaItem(mediaItem)
                 exoPlayer.prepare()
+            } catch (e: IllegalArgumentException) {
+                onError("Invalid video URL: ${e.message}")
             } catch (e: Exception) {
-                onError(e.message ?: "Failed to load video")
+                val errorMsg = e.message ?: "Failed to load video: ${e::class.simpleName}"
+                onError(errorMsg)
             }
         }
     }
     
     // Handle play/pause
     LaunchedEffect(isPlaying) {
-        exoPlayer.playWhenReady = isPlaying
+        try {
+            exoPlayer.playWhenReady = isPlaying
+        } catch (e: Exception) {
+            onError("Play error: ${e.message}")
+        }
+    }
+    
+    // Handle seek
+    LaunchedEffect(currentTime) {
+        if (currentTime >= 0) {
+            try {
+                val targetMs = (currentTime * 1000).toLong()
+                val diff = kotlin.math.abs(exoPlayer.currentPosition - targetMs)
+                if (diff > 500) { // Only seek if difference > 500ms
+                    exoPlayer.seekTo(targetMs)
+                }
+            } catch (e: Exception) {
+                // Ignore seek errors
+            }
+        }
     }
     
     // Handle volume
     LaunchedEffect(volume, isMuted) {
-        exoPlayer.volume = if (isMuted) 0f else volume
+        try {
+            exoPlayer.volume = if (isMuted) 0f else volume.coerceIn(0f, 1f)
+        } catch (e: Exception) {
+            // Ignore volume errors
+        }
     }
     
     // Handle playback speed
     LaunchedEffect(playbackSpeed) {
-        exoPlayer.setPlaybackSpeed(playbackSpeed)
+        try {
+            exoPlayer.setPlaybackSpeed(playbackSpeed.coerceIn(0.25f, 2f))
+        } catch (e: Exception) {
+            // Ignore speed errors
+        }
     }
     
     // Listen to player events
-    DisposableEffect(exoPlayer) {
+    LaunchedEffect(exoPlayer) {
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
                 when (state) {
-                    Player.STATE_READY -> onReady()
-                    Player.STATE_ENDED -> onPause()
+                    Player.STATE_READY -> {
+                        val duration = exoPlayer.duration / 1000.0
+                        if (duration > 0) {
+                            onProgress(exoPlayer.currentPosition / 1000.0, duration)
+                        }
+                        onReady()
+                    }
+                    Player.STATE_ENDED -> {
+                        onPause()
+                    }
                 }
             }
             
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                onError(error.message ?: "Playback error")
+                onError("Video error: ${error.message ?: error.errorCodeName}")
             }
         }
+        
         exoPlayer.addListener(listener)
         
-        onDispose {
-            exoPlayer.removeListener(listener)
-            exoPlayer.release()
-        }
-    }
-    
-    // Progress tracking
-    LaunchedEffect(exoPlayer) {
-        while (true) {
-            if (exoPlayer.isPlaying) {
-                val position = exoPlayer.currentPosition / 1000.0
-                val duration = exoPlayer.duration / 1000.0
-                onProgress(position, duration)
+        try {
+            // Report progress while playing
+            while (true) {
+                if (exoPlayer.playbackState == Player.STATE_READY && exoPlayer.isPlaying) {
+                    val position = exoPlayer.currentPosition / 1000.0
+                    val duration = exoPlayer.duration / 1000.0
+                    if (duration > 0) {
+                        onProgress(position, duration)
+                    }
+                }
+                kotlinx.coroutines.delay(500)
             }
-            kotlinx.coroutines.delay(500)
+        } finally {
+            exoPlayer.removeListener(listener)
         }
     }
     

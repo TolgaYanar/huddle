@@ -14,11 +14,13 @@ export function WebcamOverlay({
   localCamTrack,
   remotes,
   containerRef,
+  onCloseLocal,
 }: {
   active: boolean;
   localCamTrack: MediaStreamTrack | null;
   remotes: RemoteStream[];
   containerRef?: React.RefObject<HTMLElement | null>;
+  onCloseLocal?: () => void;
 }) {
   const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
   const overlayRef = useRef<HTMLDivElement | null>(null);
@@ -108,6 +110,23 @@ export function WebcamOverlay({
     () => remotes.filter((r) => Boolean(r.media?.cam)),
     [remotes]
   );
+
+  // Debug logging
+  useEffect(() => {
+    if (active) {
+      console.log("[WebcamOverlay] Active:", {
+        hasLocal,
+        remoteCamCount,
+        hasAny,
+        remotes: remotes.map((r) => ({
+          id: r.id,
+          hasCam: r.media?.cam,
+          hasStream: !!r.stream,
+        })),
+        localCamTrack: !!localCamTrack,
+      });
+    }
+  }, [active, hasLocal, remoteCamCount, hasAny, remotes, localCamTrack]);
 
   const thumbHeight = Math.round(thumbWidth * (2 / 3));
 
@@ -218,14 +237,26 @@ export function WebcamOverlay({
       <div className="backdrop-blur-md bg-black/30 border border-white/10 rounded-2xl p-2">
         <div className="flex items-center gap-2 overflow-x-auto max-w-[85vw]">
           {hasLocal && (
-            <video
-              ref={setVideoRef("local")}
-              autoPlay
-              playsInline
-              muted
-              className="rounded-xl object-cover border border-white/10 bg-black"
-              style={{ width: thumbWidth, height: thumbHeight }}
-            />
+            <div className="relative">
+              <video
+                ref={setVideoRef("local")}
+                autoPlay
+                playsInline
+                muted
+                className="rounded-xl object-cover border border-white/10 bg-black"
+                style={{ width: thumbWidth, height: thumbHeight }}
+              />
+              {onCloseLocal && (
+                <button
+                  type="button"
+                  onClick={onCloseLocal}
+                  className="absolute top-1 right-1 h-6 w-6 rounded-full bg-black/70 hover:bg-black/90 text-white text-xs inline-flex items-center justify-center border border-white/20"
+                  title="Turn off my camera"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
           )}
 
           {camRemotes.map((r) => (

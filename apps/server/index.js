@@ -10,7 +10,30 @@ require("dotenv").config();
 const app = express();
 app.use(cors());
 
-const prisma = new PrismaClient();
+// Initialize Prisma with better error handling
+let prisma;
+let dbConnected = false;
+
+try {
+  prisma = new PrismaClient({
+    errorFormat: "pretty",
+  });
+
+  // Test connection
+  prisma
+    .$connect()
+    .then(() => {
+      dbConnected = true;
+      console.log("✓ Database connected successfully");
+    })
+    .catch((err) => {
+      console.warn("⚠ Database connection failed:", err.message);
+      dbConnected = false;
+    });
+} catch (err) {
+  console.error("✗ Failed to initialize Prisma:", err.message);
+  dbConnected = false;
+}
 
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -102,6 +125,12 @@ function normalizeRoomId(raw) {
 
 async function emitActivityHistory(socket, roomId) {
   try {
+    // Skip if database is not connected
+    if (!dbConnected || !prisma) {
+      socket.emit("activity_history", { roomId, events: [] });
+      return;
+    }
+
     const recent = await prisma.roomActivity.findMany({
       where: { roomId },
       orderBy: { createdAt: "desc" },
@@ -122,7 +151,7 @@ async function emitActivityHistory(socket, roomId) {
       })),
     });
   } catch (err) {
-    console.error("Failed to load activity history", err);
+    console.error("Failed to load activity history:", err.message);
     socket.emit("activity_history", { roomId, events: [] });
   }
 }
@@ -272,26 +301,28 @@ io.on("connection", (socket) => {
 
     // Persist join as an activity event (optional but useful for moderation/audit).
     try {
-      const evt = await prisma.roomActivity.create({
-        data: {
-          roomId,
-          kind: "join",
-          senderId: socket.id,
-        },
-      });
+      if (dbConnected && prisma) {
+        const evt = await prisma.roomActivity.create({
+          data: {
+            roomId,
+            kind: "join",
+            senderId: socket.id,
+          },
+        });
 
-      socket.to(roomId).emit("activity_event", {
-        id: evt.id,
-        roomId: evt.roomId,
-        kind: evt.kind,
-        action: evt.action,
-        timestamp: evt.timestamp,
-        videoUrl: evt.videoUrl,
-        senderId: evt.senderId,
-        createdAt: evt.createdAt,
-      });
+        socket.to(roomId).emit("activity_event", {
+          id: evt.id,
+          roomId: evt.roomId,
+          kind: evt.kind,
+          action: evt.action,
+          timestamp: evt.timestamp,
+          videoUrl: evt.videoUrl,
+          senderId: evt.senderId,
+          createdAt: evt.createdAt,
+        });
+      }
     } catch (err) {
-      console.error("Failed to persist join activity", err);
+      console.error("Failed to persist join activity:", err.message);
     }
 
     // Send current room state to this new joiner.
@@ -303,24 +334,28 @@ io.on("connection", (socket) => {
 
     // Send recent chat history for this room.
     try {
-      const recent = await prisma.roomMessage.findMany({
-        where: { roomId },
-        orderBy: { createdAt: "desc" },
-        take: CHAT_HISTORY_LIMIT,
-      });
+      if (dbConnected && prisma) {
+        const recent = await prisma.roomMessage.findMany({
+          where: { roomId },
+          orderBy: { createdAt: "desc" },
+          take: CHAT_HISTORY_LIMIT,
+        });
 
-      socket.emit("chat_history", {
-        roomId,
-        messages: recent.reverse().map((m) => ({
-          id: m.id,
-          roomId: m.roomId,
-          senderId: m.senderId,
-          text: m.text,
-          createdAt: m.createdAt,
-        })),
-      });
+        socket.emit("chat_history", {
+          roomId,
+          messages: recent.reverse().map((m) => ({
+            id: m.id,
+            roomId: m.roomId,
+            senderId: m.senderId,
+            text: m.text,
+            createdAt: m.createdAt,
+          })),
+        });
+      } else {
+        socket.emit("chat_history", { roomId, messages: [] });
+      }
     } catch (err) {
-      console.error("Failed to load chat history", err);
+      console.error("Failed to load chat history:", err.message);
       socket.emit("chat_history", { roomId, messages: [] });
     }
 
@@ -430,25 +465,27 @@ io.on("connection", (socket) => {
 
     // Optional audit event.
     try {
-      const evt = await prisma.roomActivity.create({
-        data: {
-          roomId,
-          kind: "password",
-          senderId: socket.id,
-        },
-      });
-      io.to(roomId).emit("activity_event", {
-        id: evt.id,
-        roomId: evt.roomId,
-        kind: evt.kind,
-        action: evt.action,
-        timestamp: evt.timestamp,
-        videoUrl: evt.videoUrl,
-        senderId: evt.senderId,
-        createdAt: evt.createdAt,
-      });
+      if (dbConnected && prisma) {
+        const evt = await prisma.roomActivity.create({
+          data: {
+            roomId,
+            kind: "password",
+            senderId: socket.id,
+          },
+        });
+        io.to(roomId).emit("activity_event", {
+          id: evt.id,
+          roomId: evt.roomId,
+          kind: evt.kind,
+          action: evt.action,
+          timestamp: evt.timestamp,
+          videoUrl: evt.videoUrl,
+          senderId: evt.senderId,
+          createdAt: evt.createdAt,
+        });
+      }
     } catch (err) {
-      console.error("Failed to persist password activity", err);
+      console.error("Failed to persist password activity:", err.message);
     }
   });
 
@@ -469,25 +506,27 @@ io.on("connection", (socket) => {
 
     // Optional audit event.
     try {
-      const evt = await prisma.roomActivity.create({
-        data: {
-          roomId,
-          kind: "kick",
-          senderId: socket.id,
-        },
-      });
-      io.to(roomId).emit("activity_event", {
-        id: evt.id,
-        roomId: evt.roomId,
-        kind: evt.kind,
-        action: evt.action,
-        timestamp: evt.timestamp,
-        videoUrl: evt.videoUrl,
-        senderId: evt.senderId,
-        createdAt: evt.createdAt,
-      });
+      if (dbConnected && prisma) {
+        const evt = await prisma.roomActivity.create({
+          data: {
+            roomId,
+            kind: "kick",
+            senderId: socket.id,
+          },
+        });
+        io.to(roomId).emit("activity_event", {
+          id: evt.id,
+          roomId: evt.roomId,
+          kind: evt.kind,
+          action: evt.action,
+          timestamp: evt.timestamp,
+          videoUrl: evt.videoUrl,
+          senderId: evt.senderId,
+          createdAt: evt.createdAt,
+        });
+      }
     } catch (err) {
-      console.error("Failed to persist kick activity", err);
+      console.error("Failed to persist kick activity:", err.message);
     }
 
     // Notify + disconnect the target.
@@ -639,24 +678,28 @@ io.on("connection", (socket) => {
     const roomId = normalizeRoomId(rawRoom);
     if (!roomId) return;
     try {
-      const recent = await prisma.roomMessage.findMany({
-        where: { roomId },
-        orderBy: { createdAt: "desc" },
-        take: CHAT_HISTORY_LIMIT,
-      });
+      if (dbConnected && prisma) {
+        const recent = await prisma.roomMessage.findMany({
+          where: { roomId },
+          orderBy: { createdAt: "desc" },
+          take: CHAT_HISTORY_LIMIT,
+        });
 
-      socket.emit("chat_history", {
-        roomId,
-        messages: recent.reverse().map((m) => ({
-          id: m.id,
-          roomId: m.roomId,
-          senderId: m.senderId,
-          text: m.text,
-          createdAt: m.createdAt,
-        })),
-      });
+        socket.emit("chat_history", {
+          roomId,
+          messages: recent.reverse().map((m) => ({
+            id: m.id,
+            roomId: m.roomId,
+            senderId: m.senderId,
+            text: m.text,
+            createdAt: m.createdAt,
+          })),
+        });
+      } else {
+        socket.emit("chat_history", { roomId, messages: [] });
+      }
     } catch (err) {
-      console.error("Failed to load chat history", err);
+      console.error("Failed to load chat history:", err.message);
       socket.emit("chat_history", { roomId, messages: [] });
     }
   });
@@ -671,23 +714,25 @@ io.on("connection", (socket) => {
     if (trimmed.length > 2000) return;
 
     try {
-      const msg = await prisma.roomMessage.create({
-        data: {
-          roomId,
-          senderId: socket.id,
-          text: trimmed,
-        },
-      });
+      if (dbConnected && prisma) {
+        const msg = await prisma.roomMessage.create({
+          data: {
+            roomId,
+            senderId: socket.id,
+            text: trimmed,
+          },
+        });
 
-      io.to(roomId).emit("chat_message", {
-        id: msg.id,
-        roomId: msg.roomId,
-        senderId: msg.senderId,
-        text: msg.text,
-        createdAt: msg.createdAt,
-      });
+        io.to(roomId).emit("chat_message", {
+          id: msg.id,
+          roomId: msg.roomId,
+          senderId: msg.senderId,
+          text: msg.text,
+          createdAt: msg.createdAt,
+        });
+      }
     } catch (err) {
-      console.error("Failed to save chat message", err);
+      console.error("Failed to save chat message:", err.message);
     }
   });
 
@@ -801,27 +846,29 @@ io.on("connection", (socket) => {
     (async () => {
       for (const roomId of rooms) {
         try {
-          const evt = await prisma.roomActivity.create({
-            data: {
-              roomId,
-              kind: "leave",
-              senderId: socket.id,
-            },
-          });
+          if (dbConnected && prisma) {
+            const evt = await prisma.roomActivity.create({
+              data: {
+                roomId,
+                kind: "leave",
+                senderId: socket.id,
+              },
+            });
 
-          // Notify others (optional)
-          socket.to(roomId).emit("activity_event", {
-            id: evt.id,
-            roomId: evt.roomId,
-            kind: evt.kind,
-            action: evt.action,
-            timestamp: evt.timestamp,
-            videoUrl: evt.videoUrl,
-            senderId: evt.senderId,
-            createdAt: evt.createdAt,
-          });
+            // Notify others (optional)
+            socket.to(roomId).emit("activity_event", {
+              id: evt.id,
+              roomId: evt.roomId,
+              kind: evt.kind,
+              action: evt.action,
+              timestamp: evt.timestamp,
+              videoUrl: evt.videoUrl,
+              senderId: evt.senderId,
+              createdAt: evt.createdAt,
+            });
+          }
         } catch (err) {
-          console.error("Failed to persist leave activity", err);
+          console.error("Failed to persist leave activity:", err.message);
         }
       }
     })();
@@ -830,7 +877,10 @@ io.on("connection", (socket) => {
 
 const PORT = process.env.PORT || 4000;
 server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`✓ Server running on port ${PORT}`);
+  console.log(
+    `✓ Database status: ${dbConnected ? "Connected" : "Disconnected (running in memory-only mode)"}`
+  );
 });
 
 process.on("SIGINT", async () => {

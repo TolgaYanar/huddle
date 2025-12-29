@@ -60,6 +60,10 @@ export default function RoomClient({ roomId }: { roomId: string }) {
     Record<string, WebRTCMediaState>
   >({});
 
+  // Refs to break circular dependency between hooks
+  const ensureLocalStreamRef = useRef<(() => MediaStream | null) | null>(null);
+  const renegotiateAllPeersRef = useRef<(() => Promise<void>) | null>(null);
+
   useEffect(() => {
     setIsClient(true);
   }, []);
@@ -156,7 +160,7 @@ export default function RoomClient({ roomId }: { roomId: string }) {
       isConnected,
       userId,
       roomId,
-      ensureLocalStream: () => null, // Will be set properly after useMediaTracks
+      ensureLocalStream: () => ensureLocalStreamRef.current?.() ?? null,
       peersRef,
       remoteStreamsRef,
       setRemoteStreams,
@@ -174,6 +178,11 @@ export default function RoomClient({ roomId }: { roomId: string }) {
       onWebRTCMediaState,
       onWebRTCSpeaking,
     });
+
+  // Store in ref for use in useMediaTracks
+  useEffect(() => {
+    renegotiateAllPeersRef.current = renegotiateAllPeers;
+  }, [renegotiateAllPeers]);
 
   // Media tracks management
   const {
@@ -201,8 +210,14 @@ export default function RoomClient({ roomId }: { roomId: string }) {
     pushToTalkDownRef,
     sendWebRTCMediaState,
     sendWebRTCSpeaking,
-    renegotiateAllPeers,
+    renegotiateAllPeers: () =>
+      renegotiateAllPeersRef.current?.() ?? Promise.resolve(),
   });
+
+  // Store in ref for use in useWebRTCPeers
+  useEffect(() => {
+    ensureLocalStreamRef.current = ensureLocalStream;
+  }, [ensureLocalStream]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -442,6 +457,7 @@ export default function RoomClient({ roomId }: { roomId: string }) {
           onUnpinStage={onUnpinStage}
           localCamTrack={camTrackRef.current}
           remotes={remotesForPlayer}
+          setCamEnabled={setCamEnabled}
           isClient={isClient}
           isKick={isKick}
           isTwitch={isTwitch}

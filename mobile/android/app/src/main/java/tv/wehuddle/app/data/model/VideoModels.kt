@@ -111,13 +111,23 @@ object PlatformCapabilitiesRegistry {
 fun detectPlatform(url: String): PlatformType {
     if (url.isBlank()) return PlatformType.UNKNOWN
     
-    val lower = url.lowercase()
+    val trimmedUrl = url.trim()
+    if (trimmedUrl.isEmpty()) return PlatformType.UNKNOWN
+    
+    val lower = trimmedUrl.lowercase()
     return when {
         lower.contains("youtube.com") || lower.contains("youtu.be") -> PlatformType.YOUTUBE
         lower.contains("twitch.tv") -> PlatformType.TWITCH
         lower.contains("kick.com") -> PlatformType.KICK
         lower.contains("primevideo") || lower.contains("amazon.com/gp/video") -> PlatformType.PRIME
-        Regex("""\.(mp4|webm|ogg|m3u8|mkv|avi|mov)(\?|$)""", RegexOption.IGNORE_CASE).containsMatchIn(url) -> PlatformType.DIRECT
+        Regex("""\.(mp4|webm|ogg|m3u8|mkv|avi|mov)(\?|#|$)""", RegexOption.IGNORE_CASE).containsMatchIn(trimmedUrl) -> PlatformType.DIRECT
+        // Check if URL looks like a direct video file (try to parse as URI)
+        try {
+            val uri = android.net.Uri.parse(trimmedUrl)
+            uri.scheme != null && (uri.scheme == "http" || uri.scheme == "https" || uri.scheme == "file")
+        } catch (e: Exception) {
+            false
+        } -> PlatformType.DIRECT
         else -> PlatformType.UNKNOWN
     }
 }

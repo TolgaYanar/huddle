@@ -54,6 +54,8 @@ export function PlayerSection({
   localCamTrack,
   remotes,
 
+  setCamEnabled,
+
   isClient,
   isKick,
   isTwitch,
@@ -123,6 +125,8 @@ export function PlayerSection({
 
   localCamTrack: MediaStreamTrack | null;
   remotes: RemoteStream[];
+
+  setCamEnabled: (enabled: boolean) => void;
 
   isClient: boolean;
   isKick: boolean;
@@ -554,7 +558,9 @@ export function PlayerSection({
                   type="text"
                   value={chatText}
                   onChange={(e) => setChatText(e.target.value)}
-                  placeholder={isConnected ? "Type a message…" : "Connecting…"}
+                  placeholder={
+                    isConnected ? "Type a message���" : "Connecting���"
+                  }
                   disabled={!isConnected}
                   className="flex-1 h-10 bg-black/30 border border-white/10 rounded-xl px-3 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500/25 focus:border-sky-500/30 transition disabled:opacity-60"
                 />
@@ -664,6 +670,7 @@ export function PlayerSection({
           localCamTrack={localCamTrack}
           containerRef={playerContainerRef}
           remotes={remotes}
+          onCloseLocal={() => setCamEnabled(false)}
         />
 
         {isClient && (
@@ -838,9 +845,11 @@ export function PlayerSection({
         {isPrime && (
           <div className="absolute inset-0 flex items-center justify-center text-center px-6 text-slate-200 bg-black/70">
             <div>
-              <div className="font-semibold">Prime Video can’t be embedded</div>
+              <div className="font-semibold">
+                Prime Video can���t be embedded
+              </div>
               <div className="text-sm text-slate-300 mt-1">
-                Prime Video is DRM-protected, so it won’t play inside Huddle.
+                Prime Video is DRM-protected, so it won���t play inside Huddle.
                 Open it in a new tab and we can still sync the link.
               </div>
               <div className="text-xs text-slate-400 mt-3 break-all">
@@ -863,9 +872,11 @@ export function PlayerSection({
         {isBadYoutubeUrl && (
           <div className="absolute inset-0 flex items-center justify-center text-center px-6 text-slate-200 bg-black/70">
             <div>
-              <div className="font-semibold">This YouTube link won’t embed</div>
+              <div className="font-semibold">
+                This YouTube link won���t embed
+              </div>
               <div className="text-sm text-slate-300 mt-1">
-                “Radio / playlist” links often load forever at 0:00.
+                �ǣRadio / playlist��� links often load forever at 0:00.
               </div>
               <div className="text-sm text-slate-300 mt-3">
                 Use a normal watch URL like:
@@ -879,7 +890,7 @@ export function PlayerSection({
 
         {canPlay && !playerReady && !playerError && (
           <div className="absolute inset-0 flex items-center justify-center text-slate-300 bg-black/40">
-            {isBuffering ? "Buffering…" : "Loading video…"}
+            {isBuffering ? "Buffering���" : "Loading video���"}
           </div>
         )}
 

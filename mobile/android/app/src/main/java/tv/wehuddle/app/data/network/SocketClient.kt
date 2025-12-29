@@ -158,7 +158,8 @@ class SocketClient @Inject constructor() {
             syncData.videoUrl?.let { put("videoUrl", it) }
             syncData.senderId?.let { put("senderId", it) }
         }
-        socket?.emit("sync_event", data)
+        // Align with server/web naming: emit "sync_video"
+        socket?.emit("sync_video", data)
     }
     
     /**
@@ -352,10 +353,11 @@ class SocketClient @Inject constructor() {
             }
         }
         
-        on("sync_event") { args ->
+        // Server broadcasts peer syncs via "receive_sync" (without roomId)
+        on("receive_sync") { args ->
             parseJsonObject(args) { obj ->
                 val data = SyncData(
-                    roomId = obj.optString("roomId"),
+                    roomId = currentRoomId ?: obj.optString("roomId"),
                     action = SyncAction.valueOf(obj.optString("action", "play")),
                     timestamp = obj.optDouble("timestamp", 0.0),
                     videoUrl = obj.optString("videoUrl").takeIf { it.isNotEmpty() },

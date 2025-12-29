@@ -19,6 +19,9 @@
 
     <!-- Keep screen on during video playback -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    
+    <!-- File and storage permissions for video playback -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
 
     <!-- Camera feature declaration (optional) -->
     <uses-feature android:name="android.hardware.camera" android:required="false" />
@@ -36,6 +39,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Huddle"
         android:usesCleartextTraffic="true"
+        android:networkSecurityConfig="@xml/network_security_config"
         tools:targetApi="35">
 
         <activity

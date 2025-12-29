@@ -7,13 +7,16 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import tv.wehuddle.app.data.model.*
+import tv.wehuddle.app.data.network.SocketEvent
 import tv.wehuddle.app.data.repository.RoomRepository
+import tv.wehuddle.app.data.webrtc.WebRTCManager
 import javax.inject.Inject
 
 @HiltViewModel
 class RoomViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
-    private val roomRepository: RoomRepository
+    private val roomRepository: RoomRepository,
+    private val webRTCManager: WebRTCManager
 ) : ViewModel() {
     
     val roomId: String = savedStateHandle.get<String>("roomId") ?: ""
@@ -24,6 +27,11 @@ class RoomViewModel @Inject constructor(
     val chatMessages: StateFlow<List<ChatMessage>> = roomRepository.chatMessages
     val activityLog: StateFlow<List<ActivityLogEntry>> = roomRepository.activityLog
     val wheelState: StateFlow<WheelState> = roomRepository.wheelState
+    
+    // WebRTC streams and context
+    val localStream = webRTCManager.localStream
+    val remoteStreams = webRTCManager.remoteStreams
+    val eglContext = webRTCManager.eglContext
     
     // Local UI state
     private val _videoUrl = MutableStateFlow("")
@@ -46,6 +54,7 @@ class RoomViewModel @Inject constructor(
     
     init {
         connectToRoom()
+        initializeWebRTC()
     }
     
     private fun connectToRoom() {
@@ -75,9 +84,35 @@ class RoomViewModel @Inject constructor(
         }
     }
     
+    private fun initializeWebRTC() {
+        viewModelScope.launch {
+            webRTCManager.initialize()
+            
+            // Observe WebRTC signaling events from socket
+            roomRepository.socketEvents.collect { event ->
+                when (event) {
+                    is SocketEvent.WebRTCOfferReceived -> {
+                        webRTCManager.handleOffer(event.data.fromId, event.data)
+                    }
+                    is SocketEvent.WebRTCAnswerReceived -> {
+                        webRTCManager.handleAnswer(event.data.fromId, event.data)
+                    }
+                    is SocketEvent.WebRTCIceReceived -> {
+                        webRTCManager.handleIceCandidate(
+                            event.data.fromId,
+                            event.data
+                        )
+                    }
+                    else -> {}
+                }
+            }
+        }
+    }
+    
     override fun onCleared() {
         super.onCleared()
         roomRepository.leaveRoom()
+        webRTCManager.release()
     }
     
     // Video control actions
@@ -201,13 +236,30 @@ class RoomViewModel @Inject constructor(
     // Media state
     fun toggleMic() {
         val currentState = roomState.value.localMediaState
-        val newState = currentState.copy(mic = !currentState.mic)
+        val newMicState = !currentState.mic
+        val newState = currentState.copy(mic = newMicState)
+        
+        // Toggle microphone in WebRTC manager
+        webRTCManager.toggleMicrophone()
+        
         roomRepository.sendMediaState(newState)
     }
     
     fun toggleCam() {
         val currentState = roomState.value.localMediaState
-        val newState = currentState.copy(cam = !currentState.cam)
+        val newCamState = !currentState.cam
+        val newState = currentState.copy(cam = newCamState)
+        
+        viewModelScope.launch {
+            if (newCamState) {
+                // Start camera
+                webRTCManager.startCamera()
+            } else {
+                // Stop camera
+                webRTCManager.stopCamera()
+            }
+        }
+        
         roomRepository.sendMediaState(newState)
     }
     
@@ -215,6 +267,7 @@ class RoomViewModel @Inject constructor(
         val currentState = roomState.value.localMediaState
         val newState = currentState.copy(screen = !currentState.screen)
         roomRepository.sendMediaState(newState)
+        // Screen share requires different handling - placeholder for now
     }
     
     // Host actions
