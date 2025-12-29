@@ -78,7 +78,10 @@ export function usePushToTalkBinding(params: {
   const [binding, setBinding] = useState<PushToTalkBinding>(
     DEFAULT_PUSH_TO_TALK_BINDING
   );
-  const bindingLabel = useMemo(() => formatPushToTalkBinding(binding), [binding]);
+  const bindingLabel = useMemo(
+    () => formatPushToTalkBinding(binding),
+    [binding]
+  );
 
   const [isRebinding, setIsRebinding] = useState(false);
 
@@ -123,7 +126,10 @@ export function usePushToTalkBinding(params: {
   useEffect(() => {
     if (!isClient) return;
     try {
-      window.localStorage.setItem("huddle.pushToTalkBinding", JSON.stringify(binding));
+      window.localStorage.setItem(
+        "huddle.pushToTalkBinding",
+        JSON.stringify(binding)
+      );
     } catch {
       // ignore
     }
@@ -269,14 +275,7 @@ export function usePushToTalkBinding(params: {
       window.removeEventListener("mouseup", mouseUp, true);
       window.removeEventListener("blur", blur);
     };
-  }, [
-    isClient,
-    enabled,
-    micEnabled,
-    binding,
-    isRebinding,
-    stopTransmit,
-  ]);
+  }, [isClient, enabled, micEnabled, binding, isRebinding, stopTransmit]);
 
   return {
     binding,
