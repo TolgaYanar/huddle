@@ -360,11 +360,12 @@ export function PlayerSection({
       typeof window !== "undefined" ? window.location.origin : undefined;
     return {
       youtube: {
-        // YouTube player parameters
-        fs: 0,
-        rel: 0,
-        enablejsapi: 1,
-        ...(origin ? { origin } : {}),
+        playerVars: {
+          fs: 0,
+          rel: 0,
+          enablejsapi: 1,
+          ...(origin ? { origin } : {}),
+        },
       },
     } as unknown as PlayerConfig;
   }, []);
@@ -484,130 +485,136 @@ export function PlayerSection({
         </div>
 
         {isPlayerFullscreen && fullscreenChatOpen && (
-          <div
-            className="absolute z-50"
-            style={{
-              left: fullscreenChatPos?.x ?? 12,
-              top: fullscreenChatPos?.y ?? 12,
-              width: fullscreenChatSize?.w ?? 380,
-              height: fullscreenChatSize?.h ?? 320,
-            }}
-          >
-            <div
-              ref={fullscreenChatPanelRef}
-              className="rounded-2xl border border-white/10 bg-black/50 backdrop-blur-md overflow-hidden h-full flex flex-col"
-            >
+          <>
+            <div className="absolute z-50 fullscreenChatPanel">
               <div
-                className="px-4 py-3 border-b border-white/10 bg-black/20 flex items-center justify-between select-none cursor-move"
-                onPointerDown={(e) => {
-                  const container = playerContainerRef.current;
-                  const panel = fullscreenChatPanelRef.current;
-                  if (!container || !panel) return;
-                  if (e.button !== 0) return;
-
-                  // Compute offset from panel top-left.
-                  const rect = container.getBoundingClientRect();
-                  const current = fullscreenChatPos ?? { x: 12, y: 12 };
-                  const dx = e.clientX - rect.left - current.x;
-                  const dy = e.clientY - rect.top - current.y;
-                  dragOffsetRef.current = { dx, dy };
-                  isDraggingChatRef.current = true;
-                  try {
-                    (e.currentTarget as HTMLElement).setPointerCapture(
-                      e.pointerId
-                    );
-                  } catch {
-                    // ignore
-                  }
-                }}
+                ref={fullscreenChatPanelRef}
+                className="rounded-2xl border border-white/10 bg-black/50 backdrop-blur-md overflow-hidden h-full flex flex-col"
               >
-                <div className="text-sm font-semibold text-slate-50">Chat</div>
-                <button
-                  type="button"
-                  onClick={() => setFullscreenChatOpen(false)}
-                  className="h-8 px-3 rounded-xl border border-white/10 bg-white/5 text-slate-100 text-xs font-semibold hover:bg-white/10 transition-colors"
-                >
-                  Close
-                </button>
-              </div>
+                <div
+                  className="px-4 py-3 border-b border-white/10 bg-black/20 flex items-center justify-between select-none cursor-move"
+                  onPointerDown={(e) => {
+                    const container = playerContainerRef.current;
+                    const panel = fullscreenChatPanelRef.current;
+                    if (!container || !panel) return;
+                    if (e.button !== 0) return;
 
-              <div className="p-3 flex-1 min-h-0 overflow-y-auto space-y-2">
-                {fullscreenChatMessages.length === 0 ? (
-                  <div className="text-sm text-slate-500">No messages yet.</div>
-                ) : (
-                  fullscreenChatMessages.map((m, idx) => (
-                    <div
-                      key={`${idx}:${m.time}:${m.user}`}
-                      className="text-sm text-slate-200"
-                    >
-                      <span className="text-slate-400 text-xs mr-2">
-                        {m.time}
-                      </span>
-                      <strong className="text-slate-50">{m.user}</strong>{" "}
-                      <span className="text-slate-200">{m.msg}</span>
+                    // Compute offset from panel top-left.
+                    const rect = container.getBoundingClientRect();
+                    const current = fullscreenChatPos ?? { x: 12, y: 12 };
+                    const dx = e.clientX - rect.left - current.x;
+                    const dy = e.clientY - rect.top - current.y;
+                    dragOffsetRef.current = { dx, dy };
+                    isDraggingChatRef.current = true;
+                    try {
+                      (e.currentTarget as HTMLElement).setPointerCapture(
+                        e.pointerId
+                      );
+                    } catch {
+                      // ignore
+                    }
+                  }}
+                >
+                  <div className="text-sm font-semibold text-slate-50">
+                    Chat
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFullscreenChatOpen(false)}
+                    className="h-8 px-3 rounded-xl border border-white/10 bg-white/5 text-slate-100 text-xs font-semibold hover:bg-white/10 transition-colors"
+                  >
+                    Close
+                  </button>
+                </div>
+
+                <div className="p-3 flex-1 min-h-0 overflow-y-auto space-y-2">
+                  {fullscreenChatMessages.length === 0 ? (
+                    <div className="text-sm text-slate-500">
+                      No messages yet.
                     </div>
-                  ))
-                )}
-              </div>
+                  ) : (
+                    fullscreenChatMessages.map((m, idx) => (
+                      <div
+                        key={`${idx}:${m.time}:${m.user}`}
+                        className="text-sm text-slate-200"
+                      >
+                        <span className="text-slate-400 text-xs mr-2">
+                          {m.time}
+                        </span>
+                        <strong className="text-slate-50">{m.user}</strong>{" "}
+                        <span className="text-slate-200">{m.msg}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
 
-              <form
-                onSubmit={handleSendChat}
-                className="p-3 border-t border-white/10 bg-black/20 flex gap-2"
-              >
-                <input
-                  type="text"
-                  value={chatText}
-                  onChange={(e) => setChatText(e.target.value)}
-                  placeholder={
-                    isConnected ? "Type a message���" : "Connecting���"
-                  }
-                  disabled={!isConnected}
-                  className="flex-1 h-10 bg-black/30 border border-white/10 rounded-xl px-3 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500/25 focus:border-sky-500/30 transition disabled:opacity-60"
-                />
-                <button
-                  type="submit"
-                  disabled={!isConnected || !chatText.trim()}
-                  className="h-10 px-4 rounded-xl border border-white/10 bg-white/5 text-slate-50 text-sm font-semibold hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                <form
+                  onSubmit={handleSendChat}
+                  className="p-3 border-t border-white/10 bg-black/20 flex gap-2"
                 >
-                  Send
-                </button>
-              </form>
+                  <input
+                    type="text"
+                    value={chatText}
+                    onChange={(e) => setChatText(e.target.value)}
+                    placeholder={
+                      isConnected ? "Type a message���" : "Connecting���"
+                    }
+                    disabled={!isConnected}
+                    className="flex-1 h-10 bg-black/30 border border-white/10 rounded-xl px-3 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500/25 focus:border-sky-500/30 transition disabled:opacity-60"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!isConnected || !chatText.trim()}
+                    className="h-10 px-4 rounded-xl border border-white/10 bg-white/5 text-slate-50 text-sm font-semibold hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Send
+                  </button>
+                </form>
 
-              <div
-                className="absolute right-2 bottom-2 z-10 w-4 h-4 cursor-se-resize"
-                onPointerDown={(e) => {
-                  const container = playerContainerRef.current;
-                  if (!container) return;
-                  if (e.button !== 0) return;
-                  e.preventDefault();
-                  e.stopPropagation();
+                <div
+                  className="absolute right-2 bottom-2 z-10 w-4 h-4 cursor-se-resize"
+                  onPointerDown={(e) => {
+                    const container = playerContainerRef.current;
+                    if (!container) return;
+                    if (e.button !== 0) return;
+                    e.preventDefault();
+                    e.stopPropagation();
 
-                  const pos = fullscreenChatPos ?? { x: 12, y: 12 };
-                  const size = fullscreenChatSize ?? { w: 380, h: 320 };
+                    const pos = fullscreenChatPos ?? { x: 12, y: 12 };
+                    const size = fullscreenChatSize ?? { w: 380, h: 320 };
 
-                  isResizingChatRef.current = true;
-                  resizeStartRef.current = {
-                    startX: e.clientX,
-                    startY: e.clientY,
-                    startW: size.w,
-                    startH: size.h,
-                    posX: pos.x,
-                    posY: pos.y,
-                  };
-                  try {
-                    (e.currentTarget as HTMLElement).setPointerCapture(
-                      e.pointerId
-                    );
-                  } catch {
-                    // ignore
-                  }
-                }}
-                title="Resize"
-              >
-                <div className="w-full h-full rounded border border-white/20 bg-white/10" />
+                    isResizingChatRef.current = true;
+                    resizeStartRef.current = {
+                      startX: e.clientX,
+                      startY: e.clientY,
+                      startW: size.w,
+                      startH: size.h,
+                      posX: pos.x,
+                      posY: pos.y,
+                    };
+                    try {
+                      (e.currentTarget as HTMLElement).setPointerCapture(
+                        e.pointerId
+                      );
+                    } catch {
+                      // ignore
+                    }
+                  }}
+                  title="Resize"
+                >
+                  <div className="w-full h-full rounded border border-white/20 bg-white/10" />
+                </div>
               </div>
             </div>
-          </div>
+            <style jsx>{`
+              .fullscreenChatPanel {
+                left: ${fullscreenChatPos?.x ?? 12}px;
+                top: ${fullscreenChatPos?.y ?? 12}px;
+                width: ${fullscreenChatSize?.w ?? 380}px;
+                height: ${fullscreenChatSize?.h ?? 320}px;
+              }
+            `}</style>
+          </>
         )}
 
         {/*
@@ -679,6 +686,7 @@ export function PlayerSection({
               <iframe
                 key={kickEmbedSrc ?? normalizedUrl}
                 src={kickEmbedSrc ?? undefined}
+                title="Kick embed"
                 className="absolute inset-0 w-full h-full"
                 allow="autoplay; fullscreen; picture-in-picture"
                 referrerPolicy="origin"
@@ -688,6 +696,7 @@ export function PlayerSection({
               <iframe
                 key={twitchEmbedSrc ?? normalizedUrl}
                 src={twitchEmbedSrc ?? undefined}
+                title="Twitch embed"
                 className="absolute inset-0 w-full h-full"
                 allow="autoplay; fullscreen; picture-in-picture"
                 referrerPolicy="origin"
@@ -754,79 +763,14 @@ export function PlayerSection({
                     setPlayerReady(true);
                     setPlayerError(null);
                     setIsBuffering(false);
-
-                    try {
-                      const rp = playerRef.current as unknown as {
-                        getInternalPlayer?: () => unknown;
-                      };
-                      const internal = rp?.getInternalPlayer?.();
-                      if (typeof internal === "object" && internal !== null) {
-                        const maybe = internal as {
-                          setAttribute?: unknown;
-                          controlsList?: unknown;
-                        };
-
-                        // Chrome/Edge: prevents native fullscreen button on <video controls>
-                        if (typeof maybe.setAttribute === "function") {
-                          (
-                            maybe.setAttribute as (
-                              name: string,
-                              value: string
-                            ) => void
-                          )("controlsList", "nofullscreen");
-                        }
-
-                        const controlsList = maybe.controlsList;
-                        if (
-                          typeof controlsList === "object" &&
-                          controlsList !== null
-                        ) {
-                          const cl = controlsList as { add?: unknown };
-                          if (typeof cl.add === "function") {
-                            (cl.add as (token: string) => void)("nofullscreen");
-                          }
-                        }
-                      }
-                    } catch {
-                      // ignore
-                    }
-
                     clearLoadTimeout();
                   },
                   onStart: () => {
                     setPlayerReady(true);
+                    setPlayerError(null);
                     setIsBuffering(false);
                     clearLoadTimeout();
                   },
-                  onPlay: () => {
-                    setPlayerReady(true);
-                    setIsBuffering(false);
-                    clearLoadTimeout();
-                  },
-                  onPlaying: () => {
-                    setPlayerReady(true);
-                    setIsBuffering(false);
-                    clearLoadTimeout();
-                  },
-                  onWaiting: () => setIsBuffering(true),
-                  onTimeUpdate: (e: React.SyntheticEvent) => {
-                    const t = (
-                      e.currentTarget as unknown as { currentTime?: unknown }
-                    ).currentTime;
-                    if (typeof t === "number" && !isNaN(t)) {
-                      handleProgress(t);
-                    }
-                  },
-                  onDurationChange: (e: React.SyntheticEvent) => {
-                    const d = (
-                      e.currentTarget as unknown as { duration?: unknown }
-                    ).duration;
-                    if (typeof d === "number" && !isNaN(d)) {
-                      handleDuration(d);
-                    }
-                  },
-                  onPause: () => setIsBuffering(false),
-                  onEnded: () => setIsBuffering(false),
                   style: { position: "absolute", inset: 0 } as const,
                 }}
               />

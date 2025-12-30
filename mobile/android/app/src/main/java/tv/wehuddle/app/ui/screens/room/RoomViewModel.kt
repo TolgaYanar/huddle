@@ -34,7 +34,7 @@ class RoomViewModel @Inject constructor(
     val eglContext = webRTCManager.eglContext
     
     // Local UI state
-    private val _videoUrl = MutableStateFlow("")
+    private val _videoUrl = MutableStateFlow("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
     val videoUrl: StateFlow<String> = _videoUrl.asStateFlow()
     
     private val _chatInput = MutableStateFlow("")
@@ -137,6 +137,18 @@ class RoomViewModel @Inject constructor(
     
     fun onSeek(timestamp: Double) {
         roomRepository.sendSeekEvent(timestamp)
+    }
+
+    fun setMuted(isMuted: Boolean) {
+        roomRepository.sendMuteEvent(isMuted)
+    }
+
+    fun setPlaybackSpeed(speed: Float) {
+        roomRepository.sendPlaybackSpeedEvent(speed)
+    }
+
+    fun setVolume(volume: Float) {
+        roomRepository.sendVolumeEvent(volume)
     }
     
     fun updateVideoState(update: (VideoPlayerState) -> VideoPlayerState) {

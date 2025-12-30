@@ -2,13 +2,23 @@ import { useCallback, useEffect, useState, useRef } from "react";
 import { io, Socket } from "socket.io-client";
 
 // Define types for our sync events
-export type SyncAction = "play" | "pause" | "seek" | "change_url";
+export type SyncAction =
+  | "play"
+  | "pause"
+  | "seek"
+  | "change_url"
+  | "set_mute"
+  | "set_speed"
+  | "set_volume";
 
 export interface SyncData {
   roomId: string;
   action: SyncAction;
   timestamp: number;
   videoUrl?: string;
+  volume?: number;
+  isMuted?: boolean;
+  playbackSpeed?: number;
   senderId?: string;
 }
 
@@ -17,6 +27,10 @@ export interface RoomStateData {
   videoUrl?: string;
   timestamp?: number;
   action?: SyncAction;
+  isPlaying?: boolean;
+  volume?: number;
+  isMuted?: boolean;
+  playbackSpeed?: number;
   updatedAt?: number;
 }
 
@@ -98,10 +112,25 @@ export interface WebRTCMediaState {
   screen: boolean;
 }
 
-const SERVER_URL =
-  // For Next.js client bundles, this is replaced at build-time.
-  (process.env.NEXT_PUBLIC_SOCKET_SERVER_URL as string | undefined) ??
-  "http://localhost:4000";
+function getServerUrl(): string {
+  // For Next.js client bundles, env vars are replaced at build-time.
+  const fromEnv = process.env.NEXT_PUBLIC_SOCKET_SERVER_URL as
+    | string
+    | undefined;
+  if (fromEnv) return fromEnv;
+
+  // If the web app is opened from a phone/tablet, "localhost" points to that
+  // device, not the dev machine. Default to the current hostname instead.
+  if (typeof window !== "undefined") {
+    const protocol = window.location.protocol || "http:";
+    const hostname = window.location.hostname || "localhost";
+    return `${protocol}//${hostname}:4000`;
+  }
+
+  return "http://localhost:4000";
+}
+
+const SERVER_URL = getServerUrl();
 
 export const useRoom = (roomId: string, userId: string) => {
   const [isConnected, setIsConnected] = useState(false);
@@ -119,7 +148,14 @@ export const useRoom = (roomId: string, userId: string) => {
   const latestWheelStateRef = useRef<WheelStateData | null>(null);
   const latestWheelSpunRef = useRef<WheelSpunData | null>(null);
   const pendingSyncEventsRef = useRef<
-    Array<{ action: SyncAction; timestamp: number; videoUrl?: string }>
+    Array<{
+      action: SyncAction;
+      timestamp: number;
+      videoUrl?: string;
+      volume?: number;
+      isMuted?: boolean;
+      playbackSpeed?: number;
+    }>
   >([]);
 
   useEffect(() => {
@@ -217,6 +253,9 @@ export const useRoom = (roomId: string, userId: string) => {
             action: evt.action,
             timestamp: evt.timestamp,
             videoUrl: evt.videoUrl,
+            volume: evt.volume,
+            isMuted: evt.isMuted,
+            playbackSpeed: evt.playbackSpeed,
           });
         });
         pendingSyncEventsRef.current = [];
@@ -268,14 +307,19 @@ export const useRoom = (roomId: string, userId: string) => {
 
   // Function to send video sync events
   const sendSyncEvent = useCallback(
-    (action: SyncAction, timestamp: number, videoUrl?: string) => {
+    (
+      action: SyncAction,
+      timestamp: number,
+      videoUrl?: string,
+      extra?: Pick<SyncData, "volume" | "isMuted" | "playbackSpeed">
+    ) => {
       const socket = socketRef.current;
       if (!socket) return;
 
       if (!socket.connected) {
         // Queue a small backlog to avoid losing the initial change_url.
         const q = pendingSyncEventsRef.current;
-        q.push({ action, timestamp, videoUrl });
+        q.push({ action, timestamp, videoUrl, ...extra });
         if (q.length > 10) q.shift();
         return;
       }
@@ -285,6 +329,7 @@ export const useRoom = (roomId: string, userId: string) => {
         action,
         timestamp,
         videoUrl,
+        ...extra,
       });
     },
     [roomId]

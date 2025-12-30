@@ -225,17 +225,38 @@ private fun VideoTabContent(
             }
         }
 
-        // --- 2. Video Player (Same as before) ---
+        // --- 2. Video Player ---
         GlassCard {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(16f / 9f)
+                    .clip(RoundedCornerShape(12.dp))
                     .background(Color.Black),
                 contentAlignment = Alignment.Center
             ) {
                 if (roomState.videoState.url.isNotEmpty()) {
-                    Text("Playing: ${roomState.videoState.url}", color = Color.White, fontSize = 12.sp)
+                    VideoPlayerView(
+                        url = roomState.videoState.url,
+                        isPlaying = roomState.videoState.isPlaying,
+                        currentTime = roomState.videoState.currentTime,
+                        volume = roomState.videoState.volume,
+                        isMuted = roomState.videoState.isMuted,
+                        playbackSpeed = roomState.videoState.playbackSpeed,
+                        onPlay = { viewModel.onPlay(roomState.videoState.currentTime) },
+                        onPause = { viewModel.onPause(roomState.videoState.currentTime) },
+                        onSeek = { time -> viewModel.onSeek(time) },
+                        onProgress = { currentTime, duration ->
+                            viewModel.updateVideoState { it.copy(currentTime = currentTime, duration = duration) }
+                        },
+                        onReady = {
+                            viewModel.updateVideoState { it.copy(isReady = true) }
+                        },
+                        onError = { error ->
+                            viewModel.updateVideoState { it.copy(error = error) }
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
                 } else {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(Icons.Default.PlayCircleOutline, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(48.dp))
@@ -245,25 +266,31 @@ private fun VideoTabContent(
             }
         }
 
-        // --- 3. Playback Controls (Same as before) ---
+        // --- 3. Video Controls ---
         GlassCard {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                IconButton(onClick = { viewModel.onSeek(0.0) }) {
-                    Icon(Icons.Default.Replay, "Reset", tint = Color.White)
-                }
-                IconButton(
-                    onClick = { viewModel.onPause(roomState.videoState.currentTime) },
-                    modifier = Modifier.background(Color(0xFF3B82F6), CircleShape)
-                ) {
-                    Icon(Icons.Default.Pause, "Pause", tint = Color.White)
-                }
-                IconButton(onClick = { viewModel.onPlay(roomState.videoState.currentTime) }) {
-                    Icon(Icons.Default.PlayArrow, "Play", tint = Color.White)
-                }
-            }
+            VideoControlsBar(
+                url = roomState.videoState.url,
+                isPlaying = roomState.videoState.isPlaying,
+                currentTime = roomState.videoState.currentTime,
+                duration = roomState.videoState.duration,
+                volume = roomState.videoState.volume,
+                isMuted = roomState.videoState.isMuted,
+                playbackSpeed = roomState.videoState.playbackSpeed,
+                isBuffering = roomState.videoState.isBuffering,
+                onPlay = { viewModel.onPlay(roomState.videoState.currentTime) },
+                onPause = { viewModel.onPause(roomState.videoState.currentTime) },
+                onSeek = { time -> viewModel.onSeek(time) },
+                onMuteToggle = {
+                    viewModel.setMuted(!roomState.videoState.isMuted)
+                },
+                onVolumeChange = { newVolume ->
+                    viewModel.setVolume(newVolume.coerceIn(0f, 1f))
+                },
+                onPlaybackSpeedChange = { newSpeed ->
+                    viewModel.setPlaybackSpeed(newSpeed.coerceIn(0.25f, 2f))
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
         }
 
         // --- 4. NEW: Expandable Live Chat ---

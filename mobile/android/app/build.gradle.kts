@@ -27,8 +27,10 @@ android {
     buildTypes {
         debug {
             isDebuggable = true
-            buildConfigField("String", "SOCKET_URL", "\"http://10.0.2.2:4000\"")
-            buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:4000/api/\"")
+            // For emulator use: http://10.0.2.2:4000
+            // For real device: Replace with your computer's local IP (e.g., http://192.168.1.100:4000)
+            buildConfigField("String", "SOCKET_URL", "\"http://192.168.1.152:4000\"")
+            buildConfigField("String", "API_BASE_URL", "\"http://192.168.1.152:4000/api/\"")
         }
         release {
             isMinifyEnabled = true

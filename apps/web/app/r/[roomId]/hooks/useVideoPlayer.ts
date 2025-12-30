@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { SyncAction } from "shared-logic";
 import { formatTime } from "../lib/activity";
-import { getCurrentTimeFromRef, seekToFromRef } from "../lib/player";
+import {
+  getCurrentTimeFromRef,
+  getDurationFromRef,
+  seekToFromRef,
+} from "../lib/player";
 import {
   getLoadTimeoutMs,
   getPrimeVideoMessage,
@@ -18,7 +22,8 @@ interface UseVideoPlayerProps {
   sendSyncEvent: (
     action: SyncAction,
     timestamp: number,
-    videoUrl?: string
+    videoUrl?: string,
+    extra?: { volume?: number; isMuted?: boolean; playbackSpeed?: number }
   ) => void;
   addLogEntry?: (entry: Omit<LogEntry, "time">) => void;
 }
@@ -124,6 +129,34 @@ export function useVideoPlayer({
     }
   }, [playbackRate]);
 
+  // Keep currentTime/duration updated for players that don't reliably surface
+  // progress/duration callbacks (e.g. react-player v3 HtmlPlayer forwards props
+  // directly to <video>/<audio>, which causes React warnings for custom handlers).
+  useEffect(() => {
+    if (!isClient) return;
+
+    let cancelled = false;
+    const id = window.setInterval(() => {
+      if (cancelled) return;
+
+      const t = getCurrentTimeFromRef(playerRef);
+      setCurrentTime((prev) => (Math.abs(prev - t) > 0.25 ? t : prev));
+
+      const d = getDurationFromRef(playerRef);
+      if (d > 0) {
+        setDuration((prev) => (Math.abs(prev - d) > 0.25 ? d : prev));
+
+        // If we can read duration, the player is effectively ready.
+        setPlayerReady(true);
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [isClient, url]);
+
   const handlePlay = useCallback(() => {
     const currentTime = getCurrentTimeFromRef(playerRef);
     sendSyncEvent("play", currentTime, url);
@@ -168,23 +201,35 @@ export function useVideoPlayer({
     [url, duration, sendSyncEvent, addLogEntry]
   );
 
-  const handleVolumeChange = useCallback((newVolume: number) => {
-    const clamped = Math.max(0, Math.min(1, newVolume));
-    setVolume(clamped);
-    if (clamped > 0) setMuted(false);
-    else setMuted(true);
-  }, []);
+  const handleVolumeChange = useCallback(
+    (newVolume: number) => {
+      const clamped = Math.max(0, Math.min(1, newVolume));
+      const nextMuted = clamped <= 0;
+
+      setVolume(clamped);
+      setMuted(nextMuted);
+
+      const t = getCurrentTimeFromRef(playerRef);
+      sendSyncEvent("set_volume", t, url, {
+        volume: clamped,
+        isMuted: nextMuted,
+      });
+    },
+    [sendSyncEvent, url]
+  );
 
   const handlePlaybackRateChange = useCallback(
     (rate: number) => {
       setPlaybackRate(rate);
+      const t = getCurrentTimeFromRef(playerRef);
+      sendSyncEvent("set_speed", t, url, { playbackSpeed: rate });
       addLogEntry?.({
         msg: `changed playback speed to ${rate}x`,
         type: "seek",
         user: "You",
       });
     },
-    [addLogEntry]
+    [addLogEntry, sendSyncEvent, url]
   );
 
   const handleProgress = useCallback((time: number) => {
@@ -196,8 +241,13 @@ export function useVideoPlayer({
   }, []);
 
   const toggleMute = useCallback(() => {
-    setMuted((prev) => !prev);
-  }, []);
+    setMuted((prev) => {
+      const next = !prev;
+      const t = getCurrentTimeFromRef(playerRef);
+      sendSyncEvent("set_mute", t, url, { isMuted: next });
+      return next;
+    });
+  }, [sendSyncEvent, url]);
 
   const handleUrlChange = useCallback(
     async (e: React.FormEvent) => {

@@ -120,20 +120,38 @@ class RoomRepository @Inject constructor(
                     SyncAction.pause -> ActivityLogKind.PAUSE
                     SyncAction.seek -> ActivityLogKind.SEEK
                     SyncAction.change_url -> ActivityLogKind.URL_CHANGE
+                    SyncAction.set_mute, SyncAction.set_speed, SyncAction.set_volume -> ActivityLogKind.SYSTEM
                 }
                 
                 _roomState.update { current ->
+                    val nextUrl = event.data.videoUrl ?: current.videoState.url
+                    val nextCurrentTime = when (event.data.action) {
+                        SyncAction.play,
+                        SyncAction.pause,
+                        SyncAction.seek,
+                        SyncAction.change_url -> event.data.timestamp
+                        SyncAction.set_mute,
+                        SyncAction.set_speed,
+                        SyncAction.set_volume -> current.videoState.currentTime
+                    }
+
                     current.copy(
                         videoState = current.videoState.copy(
-                            url = event.data.videoUrl ?: current.videoState.url,
-                            currentTime = event.data.timestamp,
+                            url = nextUrl,
+                            currentTime = nextCurrentTime,
                             // Preserve playing state on seek, change it only on play/pause
                             isPlaying = when (event.data.action) {
                                 SyncAction.play -> true
                                 SyncAction.pause -> false
                                 SyncAction.seek -> current.videoState.isPlaying
                                 SyncAction.change_url -> false
-                            }
+                                SyncAction.set_mute,
+                                SyncAction.set_speed,
+                                SyncAction.set_volume -> current.videoState.isPlaying
+                            },
+                            volume = event.data.volume ?: current.videoState.volume,
+                            isMuted = event.data.isMuted ?: current.videoState.isMuted,
+                            playbackSpeed = event.data.playbackSpeed ?: current.videoState.playbackSpeed
                         )
                     )
                 }
@@ -145,6 +163,15 @@ class RoomRepository @Inject constructor(
                         SyncAction.pause -> "Paused video"
                         SyncAction.seek -> "Seeked to ${formatTime(event.data.timestamp)}"
                         SyncAction.change_url -> "Changed video"
+                        SyncAction.set_mute -> {
+                            val muted = event.data.isMuted
+                            if (muted == true) "Muted" else "Unmuted"
+                        }
+                        SyncAction.set_speed -> {
+                            val speed = event.data.playbackSpeed
+                            if (speed != null) "Speed set to ${speed}x" else "Changed speed"
+                        }
+                        SyncAction.set_volume -> "Changed volume"
                     },
                     senderId = event.data.senderId
                 )
@@ -156,7 +183,15 @@ class RoomRepository @Inject constructor(
                         videoState = current.videoState.copy(
                             url = event.data.videoUrl ?: "",
                             currentTime = event.data.timestamp ?: 0.0,
-                            isPlaying = event.data.action == SyncAction.play,
+                            isPlaying = event.data.isPlaying
+                                ?: when (event.data.action) {
+                                    SyncAction.play -> true
+                                    SyncAction.pause -> false
+                                    else -> current.videoState.isPlaying
+                                },
+                            volume = event.data.volume ?: current.videoState.volume,
+                            isMuted = event.data.isMuted ?: current.videoState.isMuted,
+                            playbackSpeed = event.data.playbackSpeed ?: current.videoState.playbackSpeed,
                             platform = detectPlatform(event.data.videoUrl ?: "")
                         )
                     )
@@ -423,6 +458,63 @@ class RoomRepository @Inject constructor(
                         isPlaying = false
                     )
                 )
+            }
+        }
+    }
+
+    fun sendMuteEvent(isMuted: Boolean) {
+        val roomId = _roomState.value.roomId
+        if (roomId.isNotEmpty()) {
+            val timestamp = _roomState.value.videoState.currentTime
+            socketClient.sendSyncEvent(
+                SyncData(
+                    roomId = roomId,
+                    action = SyncAction.set_mute,
+                    timestamp = timestamp,
+                    isMuted = isMuted,
+                    senderId = socketClient.socketId.value
+                )
+            )
+            _roomState.update { current ->
+                current.copy(videoState = current.videoState.copy(isMuted = isMuted))
+            }
+        }
+    }
+
+    fun sendPlaybackSpeedEvent(playbackSpeed: Float) {
+        val roomId = _roomState.value.roomId
+        if (roomId.isNotEmpty()) {
+            val timestamp = _roomState.value.videoState.currentTime
+            socketClient.sendSyncEvent(
+                SyncData(
+                    roomId = roomId,
+                    action = SyncAction.set_speed,
+                    timestamp = timestamp,
+                    playbackSpeed = playbackSpeed,
+                    senderId = socketClient.socketId.value
+                )
+            )
+            _roomState.update { current ->
+                current.copy(videoState = current.videoState.copy(playbackSpeed = playbackSpeed))
+            }
+        }
+    }
+
+    fun sendVolumeEvent(volume: Float) {
+        val roomId = _roomState.value.roomId
+        if (roomId.isNotEmpty()) {
+            val timestamp = _roomState.value.videoState.currentTime
+            socketClient.sendSyncEvent(
+                SyncData(
+                    roomId = roomId,
+                    action = SyncAction.set_volume,
+                    timestamp = timestamp,
+                    volume = volume,
+                    senderId = socketClient.socketId.value
+                )
+            )
+            _roomState.update { current ->
+                current.copy(videoState = current.videoState.copy(volume = volume))
             }
         }
     }

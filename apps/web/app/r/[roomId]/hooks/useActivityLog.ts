@@ -23,6 +23,9 @@ interface UseActivityLogProps {
   setUrl: (url: string) => void;
   setInputUrl: (url: string) => void;
   setVideoState: (state: string) => void;
+  setMuted: (muted: boolean) => void;
+  setVolume: (volume: number) => void;
+  setPlaybackRate: (rate: number) => void;
   setPlayerReady: (ready: boolean) => void;
   setPlayerError: (error: string | null) => void;
   onSyncEvent: (callback: (data: SyncData) => void) => () => void;
@@ -32,6 +35,10 @@ interface UseActivityLogProps {
       videoUrl?: string;
       timestamp?: number;
       action?: string;
+      isPlaying?: boolean;
+      volume?: number;
+      isMuted?: boolean;
+      playbackSpeed?: number;
     }) => void
   ) => (() => void) | undefined;
   onChatHistory?: (
@@ -60,6 +67,9 @@ export function useActivityLog({
   setUrl,
   setInputUrl,
   setVideoState,
+  setMuted,
+  setVolume,
+  setPlaybackRate,
   setPlayerReady,
   setPlayerError,
   onSyncEvent,
@@ -100,8 +110,25 @@ export function useActivityLog({
         }
       }
 
-      if (state.action === "play") setVideoState("Playing");
-      if (state.action === "pause") setVideoState("Paused");
+      if (typeof state.volume === "number" && Number.isFinite(state.volume)) {
+        setVolume(Math.max(0, Math.min(1, state.volume)));
+      }
+      if (typeof state.isMuted === "boolean") {
+        setMuted(state.isMuted);
+      }
+      if (
+        typeof state.playbackSpeed === "number" &&
+        Number.isFinite(state.playbackSpeed)
+      ) {
+        setPlaybackRate(state.playbackSpeed);
+      }
+
+      if (typeof state.isPlaying === "boolean") {
+        setVideoState(state.isPlaying ? "Playing" : "Paused");
+      } else {
+        if (state.action === "play") setVideoState("Playing");
+        if (state.action === "pause") setVideoState("Paused");
+      }
     });
 
     const cleanupChatHistory = onChatHistory?.((data: ChatHistoryData) => {
@@ -244,6 +271,38 @@ export function useActivityLog({
         }
       }
 
+      if (typeof data.volume === "number" && Number.isFinite(data.volume)) {
+        setVolume(Math.max(0, Math.min(1, data.volume)));
+      }
+      if (typeof data.isMuted === "boolean") {
+        setMuted(data.isMuted);
+      }
+      if (
+        typeof data.playbackSpeed === "number" &&
+        Number.isFinite(data.playbackSpeed)
+      ) {
+        setPlaybackRate(data.playbackSpeed);
+      }
+
+      if (data.action === "set_mute") {
+        logMsg =
+          typeof data.isMuted === "boolean"
+            ? `muted: ${data.isMuted}`
+            : "toggled mute";
+      }
+      if (data.action === "set_volume") {
+        logMsg =
+          typeof data.volume === "number"
+            ? `changed volume to ${Math.round(data.volume * 100)}%`
+            : "changed volume";
+      }
+      if (data.action === "set_speed") {
+        logMsg =
+          typeof data.playbackSpeed === "number"
+            ? `changed speed to ${data.playbackSpeed}x`
+            : "changed playback speed";
+      }
+
       setLogs((prev) => [
         ...prev,
         { msg: logMsg, type: data.action, time, user: userDisplay },
@@ -280,6 +339,9 @@ export function useActivityLog({
     setUrl,
     setInputUrl,
     setVideoState,
+    setMuted,
+    setVolume,
+    setPlaybackRate,
     setPlayerReady,
     setPlayerError,
   ]);

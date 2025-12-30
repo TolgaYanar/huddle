@@ -10,7 +10,10 @@ enum class SyncAction {
     play,
     pause,
     seek,
-    change_url
+    change_url,
+    set_mute,
+    set_speed,
+    set_volume
 }
 
 /**
@@ -22,6 +25,9 @@ data class SyncData(
     val action: SyncAction,
     val timestamp: Double,
     val videoUrl: String? = null,
+    val volume: Float? = null,
+    val isMuted: Boolean? = null,
+    val playbackSpeed: Float? = null,
     val senderId: String? = null
 )
 
@@ -34,6 +40,10 @@ data class RoomState(
     val videoUrl: String? = null,
     val timestamp: Double? = null,
     val action: SyncAction? = null,
+    val isPlaying: Boolean? = null,
+    val volume: Float? = null,
+    val isMuted: Boolean? = null,
+    val playbackSpeed: Float? = null,
     val updatedAt: Long? = null
 )
 

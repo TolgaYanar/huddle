@@ -73,6 +73,15 @@ class SocketClient @Inject constructor() {
     val socketId: StateFlow<String?> = _socketId.asStateFlow()
     
     private var currentRoomId: String? = null
+
+    private fun parseSyncAction(raw: String?, fallback: SyncAction = SyncAction.play): SyncAction {
+        val value = raw?.takeIf { it.isNotBlank() } ?: return fallback
+        return try {
+            SyncAction.valueOf(value)
+        } catch (_: Exception) {
+            fallback
+        }
+    }
     
     /**
      * Connect to the socket server
@@ -83,6 +92,8 @@ class SocketClient @Inject constructor() {
         _connectionState.value = ConnectionState.CONNECTING
         
         try {
+            android.util.Log.d("SocketClient", "Attempting to connect to: ${BuildConfig.SOCKET_URL}")
+            
             val options = IO.Options().apply {
                 transports = arrayOf("websocket")
                 reconnection = true
@@ -97,6 +108,7 @@ class SocketClient @Inject constructor() {
                 connect()
             }
         } catch (e: Exception) {
+            android.util.Log.e("SocketClient", "Connection failed: ${e.message}", e)
             _connectionState.value = ConnectionState.ERROR
             emitEvent(SocketEvent.Error(e.message ?: "Connection failed"))
         }
@@ -156,6 +168,9 @@ class SocketClient @Inject constructor() {
             put("action", syncData.action.name)
             put("timestamp", syncData.timestamp)
             syncData.videoUrl?.let { put("videoUrl", it) }
+            syncData.volume?.let { put("volume", it) }
+            syncData.isMuted?.let { put("isMuted", it) }
+            syncData.playbackSpeed?.let { put("playbackSpeed", it) }
             syncData.senderId?.let { put("senderId", it) }
         }
         // Align with server/web naming: emit "sync_video"
@@ -278,6 +293,7 @@ class SocketClient @Inject constructor() {
     
     private fun Socket.setupEventListeners() {
         on(Socket.EVENT_CONNECT) {
+            android.util.Log.d("SocketClient", "Connected successfully! Socket ID: ${id()}")
             _connectionState.value = ConnectionState.CONNECTED
             _socketId.value = id()
             emitEvent(SocketEvent.Connected)
@@ -287,17 +303,20 @@ class SocketClient @Inject constructor() {
         }
         
         on(Socket.EVENT_DISCONNECT) {
+            android.util.Log.w("SocketClient", "Disconnected from server")
             _connectionState.value = ConnectionState.DISCONNECTED
             emitEvent(SocketEvent.Disconnected)
         }
         
         on(Socket.EVENT_CONNECT_ERROR) { args ->
-            _connectionState.value = ConnectionState.ERROR
             val error = args.firstOrNull()?.toString() ?: "Connection error"
+            android.util.Log.e("SocketClient", "Connection error: $error")
+            _connectionState.value = ConnectionState.ERROR
             emitEvent(SocketEvent.Error(error))
         }
         
         on("reconnecting") {
+            android.util.Log.d("SocketClient", "Reconnecting...")
             _connectionState.value = ConnectionState.RECONNECTING
         }
         
@@ -356,11 +375,18 @@ class SocketClient @Inject constructor() {
         // Server broadcasts peer syncs via "receive_sync" (without roomId)
         on("receive_sync") { args ->
             parseJsonObject(args) { obj ->
+                val hasVolume = obj.has("volume")
+                val hasIsMuted = obj.has("isMuted")
+                val hasPlaybackSpeed = obj.has("playbackSpeed")
+
                 val data = SyncData(
                     roomId = currentRoomId ?: obj.optString("roomId"),
-                    action = SyncAction.valueOf(obj.optString("action", "play")),
+                    action = parseSyncAction(obj.optString("action", "play"), SyncAction.play),
                     timestamp = obj.optDouble("timestamp", 0.0),
                     videoUrl = obj.optString("videoUrl").takeIf { it.isNotEmpty() },
+                    volume = if (hasVolume) obj.optDouble("volume").toFloat() else null,
+                    isMuted = if (hasIsMuted) obj.optBoolean("isMuted") else null,
+                    playbackSpeed = if (hasPlaybackSpeed) obj.optDouble("playbackSpeed").toFloat() else null,
                     senderId = obj.optString("senderId").takeIf { it.isNotEmpty() }
                 )
                 emitEvent(SocketEvent.SyncEvent(data))
@@ -369,6 +395,11 @@ class SocketClient @Inject constructor() {
         
         on("room_state") { args ->
             parseJsonObject(args) { obj ->
+                val hasIsPlaying = obj.has("isPlaying")
+                val hasVolume = obj.has("volume")
+                val hasIsMuted = obj.has("isMuted")
+                val hasPlaybackSpeed = obj.has("playbackSpeed")
+
                 val data = RoomState(
                     roomId = obj.optString("roomId"),
                     videoUrl = obj.optString("videoUrl").takeIf { it.isNotEmpty() },
@@ -376,6 +407,10 @@ class SocketClient @Inject constructor() {
                     action = obj.optString("action").takeIf { it.isNotEmpty() }?.let { 
                         try { SyncAction.valueOf(it) } catch (e: Exception) { null }
                     },
+                    isPlaying = if (hasIsPlaying) obj.optBoolean("isPlaying") else null,
+                    volume = if (hasVolume) obj.optDouble("volume").toFloat() else null,
+                    isMuted = if (hasIsMuted) obj.optBoolean("isMuted") else null,
+                    playbackSpeed = if (hasPlaybackSpeed) obj.optDouble("playbackSpeed").toFloat() else null,
                     updatedAt = obj.optLong("updatedAt").takeIf { it > 0 }
                 )
                 emitEvent(SocketEvent.RoomState(data))

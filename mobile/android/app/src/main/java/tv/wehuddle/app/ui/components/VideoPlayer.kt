@@ -210,9 +210,20 @@ fun VideoPlayerView(
             }
             
             platform == PlatformType.YOUTUBE -> {
-                // YouTube placeholder - would need YouTube Android Player API
-                YouTubePlaceholder(
-                    videoId = extractYoutubeVideoId(url),
+                // YouTube player using WebView with IFrame API
+                YouTubePlayerView(
+                    url = url,
+                    isPlaying = isPlaying,
+                    currentTime = currentTime,
+                    volume = volume,
+                    isMuted = isMuted,
+                    playbackSpeed = playbackSpeed,
+                    onPlay = onPlay,
+                    onPause = onPause,
+                    onSeek = onSeek,
+                    onProgress = onProgress,
+                    onReady = onReady,
+                    onError = onError,
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -239,47 +250,6 @@ fun VideoPlayerView(
                         }
                     },
                     modifier = Modifier.fillMaxSize()
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun YouTubePlaceholder(
-    videoId: String?,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier.background(Slate900),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Icon(
-                imageVector = Icons.Default.PlayCircle,
-                contentDescription = null,
-                modifier = Modifier.size(64.dp),
-                tint = Rose500
-            )
-            Spacer(Modifier.height(16.dp))
-            Text(
-                text = "YouTube Video",
-                style = TextStyle(
-                    color = Slate200,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium
-                )
-            )
-            if (videoId != null) {
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = "ID: $videoId",
-                    style = TextStyle(
-                        color = Slate400,
-                        fontSize = 12.sp
-                    )
                 )
             }
         }
@@ -351,6 +321,8 @@ fun VideoControlsBar(
     val capabilities = remember(platform) { PlatformCapabilitiesRegistry.getCapabilities(platform) }
     
     var showSpeedMenu by remember { mutableStateOf(false) }
+    var isScrubbing by remember { mutableStateOf(false) }
+    var scrubFraction by remember { mutableFloatStateOf(0f) }
     
     Column(
         modifier = modifier
@@ -361,10 +333,21 @@ fun VideoControlsBar(
     ) {
         // Progress bar
         if (capabilities.canSeek && duration > 0) {
+            val liveFraction = (currentTime / duration).toFloat().coerceIn(0f, 1f)
+            val sliderValue = if (isScrubbing) scrubFraction else liveFraction
+            val shownTime = if (isScrubbing) (scrubFraction.toDouble() * duration) else currentTime
+
             Slider(
-                value = (currentTime / duration).toFloat().coerceIn(0f, 1f),
+                value = sliderValue,
                 onValueChange = { fraction ->
-                    onSeek(fraction.toDouble() * duration)
+                    isScrubbing = true
+                    scrubFraction = fraction.coerceIn(0f, 1f)
+                },
+                onValueChangeFinished = {
+                    if (duration > 0) {
+                        onSeek(scrubFraction.toDouble() * duration)
+                    }
+                    isScrubbing = false
                 },
                 modifier = Modifier.fillMaxWidth(),
                 colors = SliderDefaults.colors(
@@ -380,7 +363,7 @@ fun VideoControlsBar(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = formatTime(currentTime),
+                    text = formatTime(shownTime),
                     style = TextStyle(color = Slate300, fontSize = 12.sp)
                 )
                 Text(

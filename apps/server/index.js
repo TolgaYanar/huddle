@@ -736,7 +736,9 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("request_room_state", (roomId) => {
+  socket.on("request_room_state", (rawRoom) => {
+    const roomId = normalizeRoomId(rawRoom);
+    if (!roomId) return;
     const state = roomState.get(roomId);
     socket.emit("room_state", {
       roomId,
@@ -752,8 +754,12 @@ io.on("connection", (socket) => {
 
   // Handle video sync events
   socket.on("sync_video", async (data) => {
-    const { roomId, action, timestamp, videoUrl } = data;
-    // action can be 'play', 'pause', 'seek', 'change_url'
+    const roomId = normalizeRoomId(data);
+    if (!roomId) return;
+
+    const { action, timestamp, videoUrl, volume, isMuted, playbackSpeed } =
+      data || {};
+    // action can be 'play', 'pause', 'seek', 'change_url', 'set_mute', 'set_speed', 'set_volume'
 
     console.log(
       `Room ${roomId}: ${action} at ${timestamp} ${videoUrl ? `URL: ${videoUrl}` : ""}`
@@ -761,12 +767,31 @@ io.on("connection", (socket) => {
 
     // Update room state.
     const prev = roomState.get(roomId) || {};
-    roomState.set(roomId, {
-      videoUrl: videoUrl ?? prev.videoUrl,
+    const next = {
+      ...prev,
+      videoUrl: typeof videoUrl === "string" ? videoUrl : prev.videoUrl,
       timestamp: typeof timestamp === "number" ? timestamp : prev.timestamp,
-      action: action ?? prev.action,
+      action: typeof action === "string" ? action : prev.action,
       updatedAt: Date.now(),
-    });
+    };
+
+    if (typeof volume === "number" && Number.isFinite(volume)) {
+      next.volume = Math.max(0, Math.min(1, volume));
+    }
+    if (typeof isMuted === "boolean") {
+      next.isMuted = isMuted;
+    }
+    if (typeof playbackSpeed === "number" && Number.isFinite(playbackSpeed)) {
+      next.playbackSpeed = Math.max(0.25, Math.min(2, playbackSpeed));
+    }
+
+    // Track isPlaying independently so room_state stays accurate even if
+    // the last action is seek/mute/speed/volume.
+    if (action === "play") next.isPlaying = true;
+    if (action === "pause") next.isPlaying = false;
+    if (action === "change_url") next.isPlaying = false;
+
+    roomState.set(roomId, next);
 
     // Persist this event for activity feed/history.
     try {
@@ -789,6 +814,9 @@ io.on("connection", (socket) => {
       action,
       timestamp,
       videoUrl,
+      volume: next.volume,
+      isMuted: next.isMuted,
+      playbackSpeed: next.playbackSpeed,
       senderId: socket.id,
     });
   });
@@ -876,8 +904,9 @@ io.on("connection", (socket) => {
 });
 
 const PORT = process.env.PORT || 4000;
-server.listen(PORT, () => {
+server.listen(PORT, "0.0.0.0", () => {
   console.log(`✓ Server running on port ${PORT}`);
+  console.log(`✓ Server accessible at http://192.168.1.152:${PORT}`);
   console.log(
     `✓ Database status: ${dbConnected ? "Connected" : "Disconnected (running in memory-only mode)"}`
   );
