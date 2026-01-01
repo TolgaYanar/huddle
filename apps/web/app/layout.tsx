@@ -27,11 +27,20 @@ export const metadata: Metadata = {
     url: "https://wehuddle.tv",
     siteName: "WeHuddle",
     type: "website",
+    images: [
+      {
+        url: "/opengraph-image",
+        width: 1200,
+        height: 630,
+        alt: "WeHuddle",
+      },
+    ],
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: "WeHuddle",
     description: "Create or join a room and watch together in sync.",
+    images: ["/opengraph-image"],
   },
 };
 
