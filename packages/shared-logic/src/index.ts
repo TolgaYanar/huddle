@@ -163,7 +163,9 @@ export const useRoom = (roomId: string, userId: string) => {
   useEffect(() => {
     // Initialize socket connection
     socketRef.current = io(SERVER_URL, {
-      transports: ["websocket"], // Force websocket for better performance
+      // Prefer websocket, but allow polling fallback (some hosts/proxies/CDNs
+      // can intermittently block websocket-only connections).
+      transports: ["websocket", "polling"],
       autoConnect: false,
       withCredentials: true,
     });
@@ -227,6 +229,16 @@ export const useRoom = (roomId: string, userId: string) => {
     socket.on("wheel_state", handleWheelState);
     socket.on("wheel_spun", handleWheelSpun);
 
+    socket.on("connect_error", (err) => {
+      // This is the most useful signal when connections fail in production.
+      console.warn("Socket connect_error:", err?.message || err);
+    });
+
+    socket.on("disconnect", () => {
+      console.log("Disconnected from socket server");
+      setIsConnected(false);
+    });
+
     socket.on("connect", () => {
       console.log("Connected to socket server");
       setIsConnected(true);
@@ -242,9 +254,9 @@ export const useRoom = (roomId: string, userId: string) => {
       } catch {
         password = null;
       }
+
       socket.emit("join_room", {
         roomId,
-        password: password || undefined,
       });
 
       // Flush any events the user triggered before we connected.

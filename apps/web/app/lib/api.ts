@@ -21,14 +21,11 @@ function normalizeBaseUrl(value: string): string {
 }
 
 function getApiBaseUrl(): string {
-  // Keep in sync with packages/shared-logic socket URL default.
-  const fromEnvApi = process.env.NEXT_PUBLIC_API_BASE_URL as string | undefined;
-  if (fromEnvApi) return normalizeBaseUrl(fromEnvApi);
-
-  const fromEnvSocket = process.env.NEXT_PUBLIC_SOCKET_SERVER_URL as
-    | string
-    | undefined;
-  if (fromEnvSocket) return normalizeBaseUrl(fromEnvSocket);
+  // For API calls, we want to use same-origin requests in production
+  // so Vercel can proxy them to Railway. This avoids CORS issues.
+  //
+  // DO NOT use NEXT_PUBLIC_SOCKET_SERVER_URL here - that's for WebSocket
+  // connections which go direct to Railway. API calls go through Vercel proxy.
 
   if (typeof window !== "undefined") {
     const protocol = window.location.protocol || "http:";
@@ -40,10 +37,8 @@ function getApiBaseUrl(): string {
       hostname === "0.0.0.0";
 
     // Dev: backend runs on :4000.
-    // Prod (Vercel): prefer same-origin and rely on Next rewrites to proxy /api/*.
-    return isLocalhost
-      ? `${protocol}//${hostname}:4000`
-      : `${protocol}//${hostname}`;
+    // Prod (Vercel): use same-origin, Vercel rewrites proxy /api/* to Railway.
+    return isLocalhost ? `${protocol}//${hostname}:4000` : ""; // Empty string = same-origin (relative URL)
   }
 
   return "http://localhost:4000";
