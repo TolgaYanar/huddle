@@ -4,12 +4,31 @@ export type AuthUser = {
   createdAt: string;
 };
 
+function normalizeBaseUrl(value: string): string {
+  const raw = String(value || "").trim();
+  if (!raw) return raw;
+
+  // Accept ws/wss as input (common when sharing a socket URL) and map to http/https.
+  const mapped = raw.replace(/^ws:/i, "http:").replace(/^wss:/i, "https:");
+
+  try {
+    const u = new URL(mapped);
+    return `${u.protocol}//${u.host}`;
+  } catch {
+    // Fall back to raw string if it isn't a valid absolute URL.
+    return mapped;
+  }
+}
+
 function getApiBaseUrl(): string {
   // Keep in sync with packages/shared-logic socket URL default.
-  const fromEnv = process.env.NEXT_PUBLIC_SOCKET_SERVER_URL as
+  const fromEnvApi = process.env.NEXT_PUBLIC_API_BASE_URL as string | undefined;
+  if (fromEnvApi) return normalizeBaseUrl(fromEnvApi);
+
+  const fromEnvSocket = process.env.NEXT_PUBLIC_SOCKET_SERVER_URL as
     | string
     | undefined;
-  if (fromEnv) return fromEnv;
+  if (fromEnvSocket) return normalizeBaseUrl(fromEnvSocket);
 
   if (typeof window !== "undefined") {
     const protocol = window.location.protocol || "http:";
@@ -28,6 +47,10 @@ async function requestJson<T>(
 ): Promise<T> {
   const baseUrl = getApiBaseUrl();
 
+  const controller = new AbortController();
+  const timeoutMs = 15000;
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
   const headers = new Headers(init.headers);
   let body = init.body;
 
@@ -36,12 +59,29 @@ async function requestJson<T>(
     body = JSON.stringify(init.json);
   }
 
-  const res = await fetch(`${baseUrl}${path}`, {
-    ...init,
-    body,
-    headers,
-    credentials: "include",
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${baseUrl}${path}`, {
+      ...init,
+      body,
+      headers,
+      credentials: "include",
+      signal: controller.signal,
+    });
+  } catch (err) {
+    const apiErr: ApiError = new Error(
+      err instanceof DOMException && err.name === "AbortError"
+        ? "Request timed out. Please try again."
+        : "Network error. Please try again."
+    );
+    apiErr.code =
+      err instanceof DOMException && err.name === "AbortError"
+        ? "timeout"
+        : "network_error";
+    throw apiErr;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   const data = (await res.json().catch(() => null)) as Record<
     string,
