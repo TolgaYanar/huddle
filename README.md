@@ -1,38 +1,140 @@
-# Turborepo starter
+# Huddle 🍿
 
-This Turborepo starter is maintained by the Turborepo core team.
+A real-time video watching and chat application with synchronized playback, voice/video chat, and text messaging.
 
-## Using this example
+Watch videos together with friends, synchronized playback across all participants.
 
-Run the following command:
+## ✨ Key Features
 
-```sh
-npx create-turbo@latest
+- 🎬 **Synchronized video playback** - Watch YouTube, Twitch, Kick together
+- 📹 **Video & voice chat** - WebRTC-powered real-time communication
+- 💬 **Real-time messaging** - Instant chat with activity log
+- 🔐 **User accounts** - Secure authentication and saved rooms
+- 🎲 **Wheel picker** - Make group decisions together
+- 🔒 **Private rooms** - Password-protected rooms
+- 📱 **Responsive** - Works on desktop and mobile
+
+## 🚀 Quick Start (Local Development)
+
+### Prerequisites
+
+- Node.js 20+
+- PostgreSQL
+- npm 11+
+
+### Setup
+
+1. **Clone and install:**
+
+```bash
+git clone <repo-url>
+cd huddle
+npm install
 ```
 
-## What's inside?
+2. **Backend environment** (`apps/server/.env`):
 
-This Turborepo includes the following packages/apps:
+```env
+DATABASE_URL=postgresql://user:password@localhost:5432/huddle
+CORS_ORIGINS=
+NODE_ENV=development
+```
 
-### Apps and Packages
+3. **Database setup:**
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
+```bash
+cd apps/server
+npm run db:deploy  # Run migrations
+npm run build      # Generate Prisma client
+```
 
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
+4. **Frontend environment** (`apps/web/.env.local`):
 
-### Utilities
+```env
+API_PROXY_TARGET=http://localhost:4000
+```
 
-This Turborepo has some additional tools already setup for you:
+5. **Start everything:**
 
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
+```bash
+npm run dev
+```
 
-### Build
+- 🌐 Web: http://localhost:3002
+- 🔌 Backend: http://localhost:4000
+- 🔍 Diagnostics: http://localhost:3002/diagnostic
+
+## 🌐 Production Deployment
+
+**See [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) for complete instructions.**
+
+### Quick Deploy Checklist
+
+**Railway (Backend):**
+
+```env
+DATABASE_URL=<railway-postgres-url>
+CORS_ORIGINS=https://yourdomain.com
+NODE_ENV=production
+```
+
+**Vercel (Frontend):**
+
+```env
+API_PROXY_TARGET=https://your-backend.railway.app
+NEXT_PUBLIC_SOCKET_SERVER_URL=wss://your-backend.railway.app
+```
+
+🔴 **Important:** Redeploy Vercel after setting environment variables!
+
+## 📦 Project Structure
+
+```
+huddle/
+├── apps/
+│   ├── web/              # Next.js frontend
+│   ├── server/           # Express backend
+│   └── docs/             # Documentation
+├── packages/
+│   ├── shared-logic/     # Socket.IO & WebRTC hooks
+│   ├── ui/               # Shared components
+│   └── eslint-config/    # Shared configs
+└── mobile/               # React Native (WIP)
+```
+
+## 🛠️ Tech Stack
+
+- **Frontend:** Next.js 16, React 19, TypeScript, Tailwind
+- **Backend:** Express, Socket.IO, Prisma, PostgreSQL
+- **Real-time:** Socket.IO, WebRTC
+- **Hosting:** Vercel + Railway
+
+## 🐛 Troubleshooting
+
+### Login doesn't work
+
+- ✅ Set `API_PROXY_TARGET` in Vercel
+- ✅ Set `CORS_ORIGINS` in Railway
+- ✅ Redeploy Vercel after env changes
+
+### Socket disconnects immediately
+
+- ✅ Check Railway logs for CORS errors
+- ✅ Use `wss://` not `ws://` for production
+
+Visit `/diagnostic` page to test connectivity.
+
+## 📝 License
+
+MIT
+
+---
+
+## Turborepo Info
+
+This project uses Turborepo for monorepo management.
+
+### Commands
 
 To build all apps and packages, run the following command:
 
