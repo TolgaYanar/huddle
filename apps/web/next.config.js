@@ -16,13 +16,23 @@ const nextConfig = {
       .replace(/\/$/, "");
 
     // Proxy backend REST API under the web origin.
-    // Use afterFiles so any existing Next route handlers (e.g. /api/url-preview)
-    // continue to work.
+    // Use beforeFiles to ensure these routes are proxied BEFORE Next.js looks
+    // for local API route handlers. Only proxy specific backend routes.
     return {
-      afterFiles: [
+      beforeFiles: [
+        // Auth endpoints
         {
-          source: "/api/:path*",
-          destination: `${target}/api/:path*`,
+          source: "/api/auth/:path*",
+          destination: `${target}/api/auth/:path*`,
+        },
+        // Saved rooms endpoints
+        {
+          source: "/api/saved-rooms/:path*",
+          destination: `${target}/api/saved-rooms/:path*`,
+        },
+        {
+          source: "/api/saved-rooms",
+          destination: `${target}/api/saved-rooms`,
         },
       ],
     };
