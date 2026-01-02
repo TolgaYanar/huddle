@@ -27,6 +27,9 @@ class PreferencesManager @Inject constructor(
         private val USER_NICKNAME = stringPreferencesKey("user_nickname")
         private val PREFERRED_VOLUME = stringPreferencesKey("preferred_volume")
         private val PUSH_TO_TALK_KEY = stringPreferencesKey("push_to_talk_key")
+
+        private val AUTH_TOKEN = stringPreferencesKey("auth_token")
+        private val AUTH_USERNAME = stringPreferencesKey("auth_username")
     }
     
     /**
@@ -83,6 +86,44 @@ class PreferencesManager @Inject constructor(
     suspend fun savePreferredVolume(volume: Float) {
         context.dataStore.edit { preferences ->
             preferences[PREFERRED_VOLUME] = volume.toString()
+        }
+    }
+
+    /**
+     * Auth token for API requests (Bearer token)
+     */
+    val authToken: Flow<String?> = context.dataStore.data.map { preferences ->
+        preferences[AUTH_TOKEN]
+    }
+
+    suspend fun saveAuthToken(token: String) {
+        context.dataStore.edit { preferences ->
+            preferences[AUTH_TOKEN] = token
+        }
+    }
+
+    suspend fun clearAuthToken() {
+        context.dataStore.edit { preferences ->
+            preferences.remove(AUTH_TOKEN)
+        }
+    }
+
+    /**
+     * Convenience cached username (not security-sensitive)
+     */
+    val authUsername: Flow<String?> = context.dataStore.data.map { preferences ->
+        preferences[AUTH_USERNAME]
+    }
+
+    suspend fun saveAuthUsername(username: String) {
+        context.dataStore.edit { preferences ->
+            preferences[AUTH_USERNAME] = username
+        }
+    }
+
+    suspend fun clearAuthUsername() {
+        context.dataStore.edit { preferences ->
+            preferences.remove(AUTH_USERNAME)
         }
     }
 }

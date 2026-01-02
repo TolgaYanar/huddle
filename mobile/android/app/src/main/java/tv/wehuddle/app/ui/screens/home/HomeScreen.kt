@@ -20,6 +20,8 @@ import tv.wehuddle.app.ui.theme.*
 @Composable
 fun HomeScreen(
     onNavigateToRoom: (String) -> Unit,
+    onNavigateToLogin: (String?) -> Unit,
+    onNavigateToRegister: (String?) -> Unit,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -40,7 +42,12 @@ fun HomeScreen(
             modifier = Modifier.fillMaxSize()
         ) {
             // Header
-            HomeHeader()
+            HomeHeader(
+                authUsername = uiState.authUser?.username,
+                onLogin = { onNavigateToLogin(null) },
+                onRegister = { onNavigateToRegister(null) },
+                onLogout = viewModel::logout
+            )
             
             // Main content
             Box(
@@ -73,6 +80,67 @@ fun HomeScreen(
                     )
                     
                     Spacer(Modifier.height(20.dp))
+
+                    // Saved rooms (when logged in)
+                    if (uiState.authUser != null) {
+                        Text(
+                            text = "Saved rooms",
+                            style = TextStyle(
+                                color = Slate50,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        )
+                        Spacer(Modifier.height(10.dp))
+
+                        if (uiState.isLoading) {
+                            Text(
+                                text = "Loading...",
+                                style = TextStyle(
+                                    color = Slate400,
+                                    fontSize = 12.sp
+                                )
+                            )
+                            Spacer(Modifier.height(8.dp))
+                        }
+
+                        if (!uiState.error.isNullOrBlank()) {
+                            Text(
+                                text = uiState.error!!,
+                                style = TextStyle(
+                                    color = Slate400,
+                                    fontSize = 12.sp
+                                )
+                            )
+                            Spacer(Modifier.height(8.dp))
+                        }
+
+                        if (uiState.savedRooms.isEmpty() && !uiState.isLoading) {
+                            Text(
+                                text = "No saved rooms yet",
+                                style = TextStyle(
+                                    color = Slate400,
+                                    fontSize = 12.sp
+                                )
+                            )
+                            Spacer(Modifier.height(8.dp))
+                        } else {
+                            uiState.savedRooms.forEach { roomId ->
+                                HuddleSecondaryButton(
+                                    onClick = { onNavigateToRoom(roomId) },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = roomId,
+                                        style = TextStyle(fontWeight = FontWeight.Medium)
+                                    )
+                                }
+                                Spacer(Modifier.height(8.dp))
+                            }
+                        }
+
+                        Spacer(Modifier.height(12.dp))
+                    }
                     
                     // Continue last room button
                     if (uiState.lastRoomId != null) {
@@ -138,7 +206,12 @@ fun HomeScreen(
 }
 
 @Composable
-private fun HomeHeader() {
+private fun HomeHeader(
+    authUsername: String?,
+    onLogin: () -> Unit,
+    onRegister: () -> Unit,
+    onLogout: () -> Unit
+) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = Black30,
@@ -168,6 +241,26 @@ private fun HomeHeader() {
                         letterSpacing = (-0.5).sp
                     )
                 )
+            }
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (authUsername.isNullOrBlank()) {
+                    HuddleSecondaryButton(onClick = onLogin) { Text("Log in") }
+                    HuddleSecondaryButton(onClick = onRegister) { Text("Register") }
+                } else {
+                    Text(
+                        text = "@${authUsername}",
+                        style = TextStyle(
+                            color = Slate200,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    )
+                    HuddleSecondaryButton(onClick = onLogout) { Text("Logout") }
+                }
             }
         }
     }

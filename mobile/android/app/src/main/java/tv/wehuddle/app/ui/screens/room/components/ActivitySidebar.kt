@@ -189,6 +189,7 @@ private fun ActivityLogRow(
     val isOwn = log.senderId == userId
     val senderLabel = when {
         isOwn -> "You"
+        !log.senderName.isNullOrBlank() -> log.senderName
         log.senderId != null -> log.senderId.take(8)
         else -> "System"
     }
@@ -241,7 +242,11 @@ private fun ChatMessageRow(
     isOwn: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val senderLabel = if (isOwn) "You" else message.senderId.take(8)
+    val senderLabel = if (isOwn) {
+        "You"
+    } else {
+        message.senderUsername?.takeIf { it.isNotBlank() } ?: message.senderId.take(8)
+    }
     
     Column(
         modifier = modifier

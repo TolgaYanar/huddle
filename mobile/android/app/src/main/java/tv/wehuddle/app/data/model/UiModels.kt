@@ -78,6 +78,8 @@ data class RoomUiState(
 data class HomeUiState(
     val lastRoomId: String? = null,
     val joinInput: String = "",
+    val authUser: AuthUser? = null,
+    val savedRooms: List<String> = emptyList(),
     val isLoading: Boolean = false,
     val error: String? = null
 )

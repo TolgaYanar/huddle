@@ -55,6 +55,7 @@ data class ChatMessage(
     val id: String,
     val roomId: String,
     val senderId: String,
+    val senderUsername: String? = null,
     val text: String,
     val createdAt: String
 )
@@ -91,6 +92,7 @@ data class ActivityEvent(
     val timestamp: Double? = null,
     val videoUrl: String? = null,
     val senderId: String? = null,
+    val senderUsername: String? = null,
     val createdAt: String
 )
 

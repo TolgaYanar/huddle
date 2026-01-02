@@ -7,10 +7,46 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id           String      @id @default(cuid())
+  username     String      @unique
+  passwordHash String
+  createdAt    DateTime    @default(now())
+
+  sessions   Session[]
+  savedRooms SavedRoom[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model SavedRoom {
+  id        String   @id @default(cuid())
+  userId    String
+  roomId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roomId])
+  @@index([userId, createdAt])
+}
+
 model RoomMessage {
   id        String   @id @default(cuid())
   roomId    String
   senderId  String
+  senderUsername String?
   text      String
   createdAt DateTime @default(now())
 
@@ -25,6 +61,7 @@ model RoomActivity {
   timestamp Float?
   videoUrl  String?
   senderId  String?
+  senderUsername String?
   createdAt DateTime @default(now())
 
   @@index([roomId, createdAt])

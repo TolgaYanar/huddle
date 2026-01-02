@@ -8,7 +8,9 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import tv.wehuddle.app.data.model.*
 import tv.wehuddle.app.data.network.SocketEvent
+import tv.wehuddle.app.data.repository.AuthRepository
 import tv.wehuddle.app.data.repository.RoomRepository
+import tv.wehuddle.app.data.repository.SavedRoomsRepository
 import tv.wehuddle.app.data.webrtc.WebRTCManager
 import javax.inject.Inject
 
@@ -16,7 +18,9 @@ import javax.inject.Inject
 class RoomViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val roomRepository: RoomRepository,
-    private val webRTCManager: WebRTCManager
+    private val webRTCManager: WebRTCManager,
+    private val authRepository: AuthRepository,
+    private val savedRoomsRepository: SavedRoomsRepository
 ) : ViewModel() {
     
     val roomId: String = savedStateHandle.get<String>("roomId") ?: ""
@@ -27,6 +31,14 @@ class RoomViewModel @Inject constructor(
     val chatMessages: StateFlow<List<ChatMessage>> = roomRepository.chatMessages
     val activityLog: StateFlow<List<ActivityLogEntry>> = roomRepository.activityLog
     val wheelState: StateFlow<WheelState> = roomRepository.wheelState
+
+    val authUser: StateFlow<AuthUser?> = authRepository.user
+
+    private val _isRoomSaved = MutableStateFlow(false)
+    val isRoomSaved: StateFlow<Boolean> = _isRoomSaved.asStateFlow()
+
+    private val _saveBusy = MutableStateFlow(false)
+    val saveBusy: StateFlow<Boolean> = _saveBusy.asStateFlow()
     
     // WebRTC streams and context
     val localStream = webRTCManager.localStream
@@ -55,6 +67,50 @@ class RoomViewModel @Inject constructor(
     init {
         connectToRoom()
         initializeWebRTC()
+
+        viewModelScope.launch {
+            authRepository.user.collect { user ->
+                if (user == null) {
+                    _isRoomSaved.value = false
+                    return@collect
+                }
+                refreshSavedStatus()
+            }
+        }
+    }
+
+    private fun refreshSavedStatus() {
+        viewModelScope.launch {
+            try {
+                val rooms = savedRoomsRepository.list()
+                _isRoomSaved.value = rooms.contains(roomId)
+            } catch (_: Exception) {
+                // ignore
+            }
+        }
+    }
+
+    fun toggleSaveRoom() {
+        if (authRepository.user.value == null) return
+        if (_saveBusy.value) return
+
+        viewModelScope.launch {
+            _saveBusy.value = true
+            try {
+                val currentlySaved = _isRoomSaved.value
+                if (currentlySaved) {
+                    savedRoomsRepository.unsave(roomId)
+                    _isRoomSaved.value = false
+                } else {
+                    savedRoomsRepository.save(roomId)
+                    _isRoomSaved.value = true
+                }
+            } catch (_: Exception) {
+                // ignore
+            } finally {
+                _saveBusy.value = false
+            }
+        }
     }
     
     private fun connectToRoom() {

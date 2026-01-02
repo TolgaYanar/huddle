@@ -74,6 +74,27 @@ class SocketClient @Inject constructor() {
     
     private var currentRoomId: String? = null
 
+    private var authToken: String? = null
+
+    /**
+     * Provide a Bearer token for authenticating the socket handshake.
+     * If the socket is currently connected, it will reconnect to apply the token.
+     */
+    fun setAuthToken(token: String?) {
+        val normalized = token?.trim()?.takeIf { it.isNotBlank() }
+        val changed = normalized != authToken
+        authToken = normalized
+
+        if (changed && socket?.connected() == true) {
+            // Reconnect to apply updated auth.
+            val priorRoom = currentRoomId
+            disconnect()
+            currentRoomId = priorRoom
+            connect()
+            // Rejoin will happen on connect via currentRoomId.
+        }
+    }
+
     private fun parseSyncAction(raw: String?, fallback: SyncAction = SyncAction.play): SyncAction {
         val value = raw?.takeIf { it.isNotBlank() } ?: return fallback
         return try {
@@ -101,6 +122,22 @@ class SocketClient @Inject constructor() {
                 reconnectionDelay = 1000
                 reconnectionDelayMax = 5000
                 timeout = 20000
+
+                // Authenticate socket handshake so the server can resolve username.
+                authToken?.let { token ->
+                    try {
+                        auth = mapOf("token" to token)
+                    } catch (_: Exception) {
+                        // Some client versions may not support auth; fall back to headers.
+                    }
+                    try {
+                        extraHeaders = mapOf(
+                            "Authorization" to listOf("Bearer $token")
+                        )
+                    } catch (_: Exception) {
+                        // ignore
+                    }
+                }
             }
             
             socket = IO.socket(BuildConfig.SOCKET_URL, options).apply {
@@ -192,7 +229,8 @@ class SocketClient @Inject constructor() {
             put("roomId", roomId)
             put("text", text)
         }
-        socket?.emit("chat_message", data)
+        // Align with server/web naming.
+        socket?.emit("send_chat", data)
     }
     
     /**
@@ -423,6 +461,7 @@ class SocketClient @Inject constructor() {
                     id = obj.optString("id"),
                     roomId = obj.optString("roomId"),
                     senderId = obj.optString("senderId"),
+                    senderUsername = obj.optString("senderUsername").takeIf { it.isNotBlank() },
                     text = obj.optString("text"),
                     createdAt = obj.optString("createdAt")
                 )
@@ -439,6 +478,7 @@ class SocketClient @Inject constructor() {
                                 id = msgObj.optString("id"),
                                 roomId = msgObj.optString("roomId"),
                                 senderId = msgObj.optString("senderId"),
+                                senderUsername = msgObj.optString("senderUsername").takeIf { it.isNotBlank() },
                                 text = msgObj.optString("text"),
                                 createdAt = msgObj.optString("createdAt")
                             )
@@ -464,6 +504,7 @@ class SocketClient @Inject constructor() {
                     timestamp = obj.optDouble("timestamp").takeIf { !it.isNaN() },
                     videoUrl = obj.optString("videoUrl").takeIf { it.isNotEmpty() },
                     senderId = obj.optString("senderId").takeIf { it.isNotEmpty() },
+                    senderUsername = obj.optString("senderUsername").takeIf { it.isNotEmpty() },
                     createdAt = obj.optString("createdAt")
                 )
                 emitEvent(SocketEvent.ActivityEventReceived(data))
@@ -483,6 +524,7 @@ class SocketClient @Inject constructor() {
                                 timestamp = eventObj.optDouble("timestamp").takeIf { !it.isNaN() },
                                 videoUrl = eventObj.optString("videoUrl").takeIf { it.isNotEmpty() },
                                 senderId = eventObj.optString("senderId").takeIf { it.isNotEmpty() },
+                                senderUsername = eventObj.optString("senderUsername").takeIf { it.isNotEmpty() },
                                 createdAt = eventObj.optString("createdAt")
                             )
                         }

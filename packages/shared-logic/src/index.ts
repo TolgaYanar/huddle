@@ -38,6 +38,7 @@ export interface ChatMessage {
   id: string;
   roomId: string;
   senderId: string;
+  senderUsername?: string | null;
   text: string;
   createdAt: string | Date;
 }
@@ -57,6 +58,7 @@ export interface ActivityEvent {
   timestamp?: number | null;
   videoUrl?: string | null;
   senderId?: string | null;
+  senderUsername?: string | null;
   createdAt: string | Date;
 }
 
@@ -163,6 +165,7 @@ export const useRoom = (roomId: string, userId: string) => {
     socketRef.current = io(SERVER_URL, {
       transports: ["websocket"], // Force websocket for better performance
       autoConnect: false,
+      withCredentials: true,
     });
 
     const socket = socketRef.current;

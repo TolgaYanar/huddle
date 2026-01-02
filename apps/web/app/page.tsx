@@ -1,7 +1,15 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+
+import {
+  apiAuthMe,
+  apiListSavedRooms,
+  apiLogout,
+  type AuthUser,
+} from "./lib/api";
 
 function generateRoomId() {
   // Friendly, URL-safe, reasonably unique (no server round-trip needed)
@@ -31,6 +39,10 @@ export default function Home() {
   const router = useRouter();
   const [joinValue, setJoinValue] = useState("");
   const [lastRoomId, setLastRoomId] = useState<string | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [savedRooms, setSavedRooms] = useState<
+    Array<{ roomId: string; createdAt: string }>
+  >([]);
   const normalizedJoin = normalizeRoomId(joinValue);
 
   useEffect(() => {
@@ -42,6 +54,42 @@ export default function Home() {
     }
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    apiAuthMe()
+      .then((r) => {
+        if (cancelled) return;
+        setUser(r.user);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setUser(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!user) {
+      setSavedRooms([]);
+      return;
+    }
+    apiListSavedRooms()
+      .then((r) => {
+        if (cancelled) return;
+        setSavedRooms(r.rooms);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setSavedRooms([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
   return (
     <div className="min-h-screen flex flex-col bg-linear-to-b from-slate-900 via-slate-950 to-black text-slate-200">
       <header className="h-16 flex items-center justify-between px-6 lg:px-8 border-b border-white/10 backdrop-blur-md bg-black/30 sticky top-0 z-50">
@@ -50,6 +98,45 @@ export default function Home() {
             🍿
           </span>
           <span>Huddle</span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {user ? (
+            <>
+              <div className="hidden sm:flex items-center gap-2 text-xs border border-white/10 bg-black/20 rounded-full px-3 py-1 text-slate-300">
+                <span className="text-slate-400">@</span>
+                <span className="text-slate-200">{user.username}</span>
+              </div>
+              <button
+                className="h-8 px-3 rounded-lg border border-white/10 bg-white/5 text-slate-200 text-xs font-medium hover:bg-white/10 transition-colors"
+                onClick={async () => {
+                  try {
+                    await apiLogout();
+                  } finally {
+                    setUser(null);
+                    setSavedRooms([]);
+                  }
+                }}
+              >
+                Logout
+              </button>
+            </>
+          ) : (
+            <>
+              <Link
+                href="/login"
+                className="h-8 px-3 rounded-lg border border-white/10 bg-white/5 text-slate-200 text-xs font-medium hover:bg-white/10 transition-colors"
+              >
+                Log in
+              </Link>
+              <Link
+                href="/register"
+                className="h-8 px-3 rounded-lg border border-white/10 bg-white/5 text-slate-200 text-xs font-medium hover:bg-white/10 transition-colors"
+              >
+                Register
+              </Link>
+            </>
+          )}
         </div>
       </header>
 
@@ -64,6 +151,26 @@ export default function Home() {
             </div>
 
             <div className="mt-5 grid gap-3">
+              {user && savedRooms.length > 0 && (
+                <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+                  <div className="text-xs font-medium text-slate-300">
+                    Saved rooms
+                  </div>
+                  <div className="mt-2 grid gap-2">
+                    {savedRooms.slice(0, 5).map((r) => (
+                      <button
+                        key={r.roomId}
+                        className="h-10 w-full rounded-xl font-medium text-sm transition-colors bg-white/5 border border-white/10 hover:bg-white/10 text-slate-50 text-left px-4"
+                        onClick={() => router.push(`/r/${r.roomId}`)}
+                        title={r.roomId}
+                      >
+                        <span className="font-mono">{r.roomId}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {lastRoomId && (
                 <button
                   className="h-11 w-full rounded-xl font-semibold text-sm transition-colors bg-white/5 border border-white/10 hover:bg-white/10 text-slate-50"

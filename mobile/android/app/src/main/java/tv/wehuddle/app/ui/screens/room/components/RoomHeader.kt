@@ -11,19 +11,26 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import tv.wehuddle.app.ui.components.*
-// Assuming theme colors exist, otherwise replace with Color(0xFF...)
-import tv.wehuddle.app.ui.theme.* @Composable
+import tv.wehuddle.app.ui.theme.*
+
+@Composable
 fun RoomHeader(
     roomId: String,
     isConnected: Boolean,
     hasRoomPassword: Boolean,
     copied: Boolean,
+    authUsername: String?,
+    canSave: Boolean,
+    isSaved: Boolean,
+    saveBusy: Boolean,
+    onLogin: () -> Unit,
+    onRegister: () -> Unit,
+    onToggleSave: () -> Unit,
     onCopyInvite: () -> Unit,
     onOpenWheel: () -> Unit,
     onBack: () -> Unit,
@@ -31,13 +38,13 @@ fun RoomHeader(
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        color = Color(0xFF0F172A), // Slate 900/Background
+        color = Slate900,
         shadowElevation = 4.dp
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp), // Increased vertical padding
+                .padding(horizontal = 16.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -53,7 +60,7 @@ fun RoomHeader(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Back",
-                        tint = Color(0xFFE2E8F0), // Slate 200
+                        tint = Slate200,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -63,7 +70,7 @@ fun RoomHeader(
                 Text(
                     text = "Huddle",
                     style = TextStyle(
-                        color = Color.White,
+                        color = Slate50,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold
                     ),
@@ -74,14 +81,14 @@ fun RoomHeader(
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(16.dp))
-                        .background(Color(0xFF1E293B)) // Slate 800
-                        .border(1.dp, Color(0xFF334155), RoundedCornerShape(16.dp))
+                        .background(Slate800)
+                        .border(1.dp, Slate700, RoundedCornerShape(16.dp))
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
                     Text(
                         text = roomId,
                         style = TextStyle(
-                            color = Color(0xFF94A3B8), // Slate 400
+                            color = Slate400,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium,
                             letterSpacing = 0.5.sp
@@ -95,11 +102,43 @@ fun RoomHeader(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                if (authUsername.isNullOrBlank()) {
+                    HuddleSmallButton(
+                        onClick = onLogin,
+                        enabled = !saveBusy
+                    ) {
+                        Text("Log in", fontSize = 12.sp)
+                    }
+                    HuddleSmallButton(
+                        onClick = onRegister,
+                        enabled = !saveBusy
+                    ) {
+                        Text("Register", fontSize = 12.sp)
+                    }
+                } else {
+                    Text(
+                        text = "@${authUsername}",
+                        style = TextStyle(
+                            color = Slate200,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    )
+                }
+
+                HuddleSmallButton(
+                    onClick = if (canSave) onToggleSave else onLogin,
+                    enabled = canSave && !saveBusy,
+                    isActive = isSaved
+                ) {
+                    Text(if (isSaved) "Saved" else "Save", fontSize = 12.sp)
+                }
+
                 // Wheel Icon Button
                 FilledIconButton(
                     onClick = onOpenWheel,
                     modifier = Modifier.size(32.dp),
-                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = Color(0xFF1E293B))
+                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = Slate800)
                 ) {
                    Text("🎡", fontSize = 14.sp)
                 }
@@ -109,7 +148,7 @@ fun RoomHeader(
                     modifier = Modifier
                         .size(10.dp)
                         .background(
-                            if (isConnected) Color(0xFF22C55E) else Color(0xFFEF4444),
+                            if (isConnected) Emerald500 else Rose500,
                             shape = RoundedCornerShape(50)
                         )
                 )

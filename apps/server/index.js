@@ -4,11 +4,410 @@ const { Server } = require("socket.io");
 const cors = require("cors");
 const { PrismaClient } = require("@prisma/client");
 const crypto = require("crypto");
+const os = require("os");
 
 require("dotenv").config();
 
 const app = express();
-app.use(cors());
+
+function parseAllowedOrigins(value) {
+  return String(value || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+const ALLOWED_ORIGINS = parseAllowedOrigins(process.env.CORS_ORIGINS);
+const corsOptions = {
+  origin(origin, callback) {
+    // Allow non-browser clients (no Origin header) like curl/mobile.
+    if (!origin) return callback(null, true);
+    // If no allowlist provided, reflect-request-origin (dev-friendly).
+    if (ALLOWED_ORIGINS.length === 0) return callback(null, true);
+    return callback(null, ALLOWED_ORIGINS.includes(origin));
+  },
+  credentials: true,
+  methods: ["GET", "POST", "DELETE", "OPTIONS"],
+};
+
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
+app.use(express.json({ limit: "1mb" }));
+
+const SESSION_COOKIE_NAME = "huddle_session";
+const SESSION_TTL_DAYS = 30;
+
+function sha256Hex(value) {
+  return crypto.createHash("sha256").update(String(value)).digest("hex");
+}
+
+function parseCookies(headerValue) {
+  const out = {};
+  if (!headerValue) return out;
+
+  const parts = String(headerValue).split(";");
+  for (const part of parts) {
+    const idx = part.indexOf("=");
+    if (idx === -1) continue;
+    const key = part.slice(0, idx).trim();
+    const val = part.slice(idx + 1).trim();
+    if (!key) continue;
+    out[key] = decodeURIComponent(val);
+  }
+  return out;
+}
+
+function setSessionCookie(res, token) {
+  const maxAgeSeconds = SESSION_TTL_DAYS * 24 * 60 * 60;
+  const secure = process.env.NODE_ENV === "production";
+
+  // Minimal cookie implementation (no external deps).
+  const cookie = [
+    `${SESSION_COOKIE_NAME}=${encodeURIComponent(token)}`,
+    "Path=/",
+    `Max-Age=${maxAgeSeconds}`,
+    "HttpOnly",
+    "SameSite=Lax",
+  ];
+  if (secure) cookie.push("Secure");
+  res.setHeader("Set-Cookie", cookie.join("; "));
+}
+
+function clearSessionCookie(res) {
+  const secure = process.env.NODE_ENV === "production";
+  const cookie = [
+    `${SESSION_COOKIE_NAME}=`,
+    "Path=/",
+    "Max-Age=0",
+    "HttpOnly",
+    "SameSite=Lax",
+  ];
+  if (secure) cookie.push("Secure");
+  res.setHeader("Set-Cookie", cookie.join("; "));
+}
+
+async function getAuthUser(req) {
+  if (!dbConnected || !prisma) return null;
+
+  let token = null;
+
+  const authHeader = req.headers.authorization;
+  if (authHeader && typeof authHeader === "string") {
+    const match = authHeader.match(/^Bearer\s+(.+)$/i);
+    if (match && match[1]) token = match[1].trim();
+  }
+
+  if (!token) {
+    const cookies = parseCookies(req.headers.cookie);
+    token = cookies[SESSION_COOKIE_NAME] || null;
+  }
+
+  if (!token) return null;
+
+  const tokenHash = sha256Hex(token);
+  const now = new Date();
+
+  const session = await prisma.session.findFirst({
+    where: {
+      tokenHash,
+      expiresAt: { gt: now },
+    },
+    include: {
+      user: { select: { id: true, username: true, createdAt: true } },
+    },
+  });
+
+  return session?.user ?? null;
+}
+
+async function createSessionForUser(userId) {
+  const token = crypto.randomBytes(32).toString("hex");
+  const tokenHash = sha256Hex(token);
+  const expiresAt = new Date(
+    Date.now() + SESSION_TTL_DAYS * 24 * 60 * 60 * 1000
+  );
+
+  await prisma.session.create({
+    data: {
+      userId,
+      tokenHash,
+      expiresAt,
+    },
+  });
+
+  return { token, expiresAt };
+}
+
+function validateUsername(raw) {
+  const username = String(raw || "")
+    .trim()
+    .toLowerCase();
+  if (username.length < 3 || username.length > 20) return null;
+  if (!/^[a-z0-9_]+$/.test(username)) return null;
+  return username;
+}
+
+function validatePassword(raw) {
+  const password = String(raw || "");
+  if (password.length < 8 || password.length > 200) return null;
+  // Require at least one lowercase, one uppercase, and one digit
+  if (!/[a-z]/.test(password)) return null;
+  if (!/[A-Z]/.test(password)) return null;
+  if (!/\d/.test(password)) return null;
+  return password;
+}
+
+function validateRoomId(raw) {
+  const roomId = String(raw || "").trim();
+  if (!roomId) return null;
+  if (roomId.length > 200) return null;
+  return roomId;
+}
+
+async function requireAuth(req, res, next) {
+  try {
+    const user = await getAuthUser(req);
+    if (!user) return res.status(401).json({ error: "unauthorized" });
+    req.authUser = user;
+    return next();
+  } catch (err) {
+    console.error("Auth error:", err);
+    return res.status(500).json({ error: "auth_error" });
+  }
+}
+
+// --- Auth + Saved Rooms REST API ---
+app.get("/api/auth/me", async (req, res) => {
+  try {
+    const user = await getAuthUser(req);
+    return res.json({ user });
+  } catch (err) {
+    console.error("/api/auth/me failed:", err);
+    return res.status(500).json({ error: "server_error" });
+  }
+});
+
+app.post("/api/auth/register", async (req, res) => {
+  try {
+    if (!dbConnected || !prisma) {
+      return res.status(503).json({ error: "db_unavailable" });
+    }
+
+    const username = validateUsername(req.body?.username);
+    const password = validatePassword(req.body?.password);
+    if (!username) {
+      return res
+        .status(400)
+        .json({ error: "invalid_username", hint: "3-20 chars: a-z 0-9 _" });
+    }
+    if (!password) {
+      return res
+        .status(400)
+        .json({ error: "invalid_password", hint: "min 8 characters" });
+    }
+
+    const user = await prisma.user.create({
+      data: {
+        username,
+        passwordHash: hashPassword(password),
+      },
+      select: { id: true, username: true, createdAt: true },
+    });
+
+    const { token } = await createSessionForUser(user.id);
+
+    setSessionCookie(res, token);
+    return res.json({ user });
+  } catch (err) {
+    if (err && err.code === "P2002") {
+      return res.status(409).json({ error: "username_taken" });
+    }
+    console.error("/api/auth/register failed:", err);
+    return res.status(500).json({ error: "server_error" });
+  }
+});
+
+app.post("/api/auth/login", async (req, res) => {
+  try {
+    if (!dbConnected || !prisma) {
+      return res.status(503).json({ error: "db_unavailable" });
+    }
+
+    const username = validateUsername(req.body?.username);
+    const password = validatePassword(req.body?.password);
+    if (!username || !password) {
+      return res.status(400).json({ error: "invalid_credentials" });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { username },
+      select: { id: true, username: true, passwordHash: true, createdAt: true },
+    });
+
+    const ok = user ? verifyPassword(password, user.passwordHash) : false;
+    if (!ok) return res.status(401).json({ error: "invalid_credentials" });
+
+    const { token } = await createSessionForUser(user.id);
+
+    setSessionCookie(res, token);
+    return res.json({
+      user: { id: user.id, username: user.username, createdAt: user.createdAt },
+    });
+  } catch (err) {
+    console.error("/api/auth/login failed:", err);
+    return res.status(500).json({ error: "server_error" });
+  }
+});
+
+// Token-returning variants (recommended for mobile).
+app.post("/api/auth/register-token", async (req, res) => {
+  try {
+    if (!dbConnected || !prisma) {
+      return res.status(503).json({ error: "db_unavailable" });
+    }
+
+    const username = validateUsername(req.body?.username);
+    const password = validatePassword(req.body?.password);
+    if (!username) {
+      return res
+        .status(400)
+        .json({ error: "invalid_username", hint: "3-20 chars: a-z 0-9 _" });
+    }
+    if (!password) {
+      return res
+        .status(400)
+        .json({ error: "invalid_password", hint: "min 8 characters" });
+    }
+
+    const user = await prisma.user.create({
+      data: {
+        username,
+        passwordHash: hashPassword(password),
+      },
+      select: { id: true, username: true, createdAt: true },
+    });
+
+    const { token, expiresAt } = await createSessionForUser(user.id);
+    return res.json({ user, token, expiresAt });
+  } catch (err) {
+    if (err && err.code === "P2002") {
+      return res.status(409).json({ error: "username_taken" });
+    }
+    console.error("/api/auth/register-token failed:", err);
+    return res.status(500).json({ error: "server_error" });
+  }
+});
+
+app.post("/api/auth/login-token", async (req, res) => {
+  try {
+    if (!dbConnected || !prisma) {
+      return res.status(503).json({ error: "db_unavailable" });
+    }
+
+    const username = validateUsername(req.body?.username);
+    const password = validatePassword(req.body?.password);
+    if (!username || !password) {
+      return res.status(400).json({ error: "invalid_credentials" });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { username },
+      select: { id: true, username: true, passwordHash: true, createdAt: true },
+    });
+
+    const ok = user ? verifyPassword(password, user.passwordHash) : false;
+    if (!ok) return res.status(401).json({ error: "invalid_credentials" });
+
+    const { token, expiresAt } = await createSessionForUser(user.id);
+    return res.json({
+      user: { id: user.id, username: user.username, createdAt: user.createdAt },
+      token,
+      expiresAt,
+    });
+  } catch (err) {
+    console.error("/api/auth/login-token failed:", err);
+    return res.status(500).json({ error: "server_error" });
+  }
+});
+
+app.post("/api/auth/logout", async (req, res) => {
+  try {
+    if (dbConnected && prisma) {
+      let token = null;
+
+      const authHeader = req.headers.authorization;
+      if (authHeader && typeof authHeader === "string") {
+        const match = authHeader.match(/^Bearer\s+(.+)$/i);
+        if (match && match[1]) token = match[1].trim();
+      }
+
+      if (!token) {
+        const cookies = parseCookies(req.headers.cookie);
+        token = cookies[SESSION_COOKIE_NAME] || null;
+      }
+
+      if (token) {
+        const tokenHash = sha256Hex(token);
+        await prisma.session.deleteMany({ where: { tokenHash } });
+      }
+    }
+    clearSessionCookie(res);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("/api/auth/logout failed:", err);
+    clearSessionCookie(res);
+    return res.json({ ok: true });
+  }
+});
+
+app.get("/api/saved-rooms", requireAuth, async (req, res) => {
+  try {
+    const userId = req.authUser.id;
+    const saved = await prisma.savedRoom.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      select: { roomId: true, createdAt: true },
+    });
+    return res.json({ rooms: saved });
+  } catch (err) {
+    console.error("/api/saved-rooms failed:", err);
+    return res.status(500).json({ error: "server_error" });
+  }
+});
+
+app.post("/api/saved-rooms", requireAuth, async (req, res) => {
+  try {
+    const userId = req.authUser.id;
+    const roomId = validateRoomId(req.body?.roomId);
+    if (!roomId) return res.status(400).json({ error: "invalid_roomId" });
+
+    const saved = await prisma.savedRoom.upsert({
+      where: { userId_roomId: { userId, roomId } },
+      update: {},
+      create: { userId, roomId },
+      select: { roomId: true, createdAt: true },
+    });
+
+    return res.json({ room: saved });
+  } catch (err) {
+    console.error("POST /api/saved-rooms failed:", err);
+    return res.status(500).json({ error: "server_error" });
+  }
+});
+
+app.delete("/api/saved-rooms/:roomId", requireAuth, async (req, res) => {
+  try {
+    const userId = req.authUser.id;
+    const roomId = validateRoomId(req.params.roomId);
+    if (!roomId) return res.status(400).json({ error: "invalid_roomId" });
+
+    await prisma.savedRoom.deleteMany({ where: { userId, roomId } });
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("DELETE /api/saved-rooms failed:", err);
+    return res.status(500).json({ error: "server_error" });
+  }
+});
 
 // Initialize Prisma with better error handling
 let prisma;
@@ -38,9 +437,41 @@ try {
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "*", // Allow all origins for now (web + mobile)
+    origin(origin, callback) {
+      // Allow non-browser clients (no Origin header) like curl/mobile.
+      if (!origin) return callback(null, true);
+      if (ALLOWED_ORIGINS.length === 0) return callback(null, true);
+      return callback(null, ALLOWED_ORIGINS.includes(origin));
+    },
+    credentials: true,
     methods: ["GET", "POST"],
   },
+});
+
+// Map socket.id -> authenticated username (if available).
+const socketIdToUsername = new Map();
+
+// Attach auth user to socket at connection time (cookie or Bearer token).
+io.use(async (socket, next) => {
+  try {
+    const headers = { ...(socket.handshake?.headers || {}) };
+
+    // Mobile can pass a token via socket auth (or it can be provided as an Authorization header).
+    const token = socket.handshake?.auth?.token;
+    if (token && typeof token === "string" && token.trim()) {
+      headers.authorization = `Bearer ${token.trim()}`;
+    }
+
+    const user = await getAuthUser({ headers });
+    socket.data.authUser = user;
+
+    if (user?.username) {
+      socketIdToUsername.set(socket.id, user.username);
+    }
+  } catch {
+    // Best-effort only; chat still works without auth.
+  }
+  return next();
 });
 
 // Simple in-memory room state so late joiners can sync to the current URL/time.
@@ -147,6 +578,7 @@ async function emitActivityHistory(socket, roomId) {
         timestamp: e.timestamp,
         videoUrl: e.videoUrl,
         senderId: e.senderId,
+        senderUsername: e.senderUsername ?? null,
         createdAt: e.createdAt,
       })),
     });
@@ -158,6 +590,11 @@ async function emitActivityHistory(socket, roomId) {
 
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
+
+  // Ensure we don't leak stale mappings.
+  socket.on("disconnect", () => {
+    socketIdToUsername.delete(socket.id);
+  });
 
   const joinedRooms = new Set();
 
@@ -302,11 +739,16 @@ io.on("connection", (socket) => {
     // Persist join as an activity event (optional but useful for moderation/audit).
     try {
       if (dbConnected && prisma) {
+        const senderUsername =
+          socket.data?.authUser?.username ||
+          socketIdToUsername.get(socket.id) ||
+          null;
         const evt = await prisma.roomActivity.create({
           data: {
             roomId,
             kind: "join",
             senderId: socket.id,
+            senderUsername,
           },
         });
 
@@ -318,6 +760,7 @@ io.on("connection", (socket) => {
           timestamp: evt.timestamp,
           videoUrl: evt.videoUrl,
           senderId: evt.senderId,
+          senderUsername: evt.senderUsername ?? senderUsername,
           createdAt: evt.createdAt,
         });
       }
@@ -347,6 +790,7 @@ io.on("connection", (socket) => {
             id: m.id,
             roomId: m.roomId,
             senderId: m.senderId,
+            senderUsername: m.senderUsername ?? null,
             text: m.text,
             createdAt: m.createdAt,
           })),
@@ -360,6 +804,98 @@ io.on("connection", (socket) => {
     }
 
     await emitActivityHistory(socket, roomId);
+  });
+
+  // Handle explicitly leaving a room (Android emits this when navigating away).
+  socket.on("leave_room", async (payload) => {
+    const roomId =
+      typeof payload === "string"
+        ? payload
+        : payload && typeof payload === "object"
+          ? payload.roomId
+          : undefined;
+
+    if (!roomId || typeof roomId !== "string") return;
+    if (!socket.rooms.has(roomId)) return;
+
+    try {
+      socket.leave(roomId);
+    } catch {
+      // ignore
+    }
+    joinedRooms.delete(roomId);
+
+    // Clean up in-memory media state.
+    const map = roomMediaState.get(roomId);
+    if (map) {
+      map.delete(socket.id);
+      if (map.size === 0) roomMediaState.delete(roomId);
+    }
+
+    // Notify peers for WebRTC cleanup.
+    socket.to(roomId).emit("user_left", socket.id);
+    socket.to(roomId).emit("webrtc_speaking", {
+      roomId,
+      from: socket.id,
+      speaking: false,
+    });
+    socket.to(roomId).emit("webrtc_media_state", {
+      roomId,
+      from: socket.id,
+      state: { mic: false, cam: false, screen: false },
+    });
+
+    // Reassign host if needed.
+    if (roomHost.get(roomId) === socket.id) {
+      const room = io.sockets.adapter.rooms.get(roomId);
+      const remaining = room ? Array.from(room) : [];
+
+      if (remaining.length > 0) {
+        roomHost.set(roomId, remaining[0]);
+        io.to(roomId).emit("room_host", {
+          roomId,
+          hostId: roomHost.get(roomId),
+        });
+      } else {
+        roomHost.delete(roomId);
+        roomBans.delete(roomId);
+        roomPasswordHash.delete(roomId);
+        roomWheel.delete(roomId);
+      }
+    }
+
+    // Persist leave as an activity event.
+    try {
+      if (dbConnected && prisma) {
+        const senderUsername =
+          socket.data?.authUser?.username ||
+          socketIdToUsername.get(socket.id) ||
+          null;
+
+        const evt = await prisma.roomActivity.create({
+          data: {
+            roomId,
+            kind: "leave",
+            senderId: socket.id,
+            senderUsername,
+          },
+        });
+
+        io.to(roomId).emit("activity_event", {
+          id: evt.id,
+          roomId: evt.roomId,
+          kind: evt.kind,
+          action: evt.action,
+          timestamp: evt.timestamp,
+          videoUrl: evt.videoUrl,
+          senderId: evt.senderId,
+          senderUsername: evt.senderUsername ?? senderUsername,
+          createdAt: evt.createdAt,
+        });
+      }
+    } catch (err) {
+      console.error("Failed to persist explicit leave activity:", err.message);
+    }
   });
 
   // --- Wheel picker (shared random picker) ---
@@ -466,11 +1002,16 @@ io.on("connection", (socket) => {
     // Optional audit event.
     try {
       if (dbConnected && prisma) {
+        const senderUsername =
+          socket.data?.authUser?.username ||
+          socketIdToUsername.get(socket.id) ||
+          null;
         const evt = await prisma.roomActivity.create({
           data: {
             roomId,
             kind: "password",
             senderId: socket.id,
+            senderUsername,
           },
         });
         io.to(roomId).emit("activity_event", {
@@ -481,6 +1022,7 @@ io.on("connection", (socket) => {
           timestamp: evt.timestamp,
           videoUrl: evt.videoUrl,
           senderId: evt.senderId,
+          senderUsername: evt.senderUsername ?? senderUsername,
           createdAt: evt.createdAt,
         });
       }
@@ -507,11 +1049,16 @@ io.on("connection", (socket) => {
     // Optional audit event.
     try {
       if (dbConnected && prisma) {
+        const senderUsername =
+          socket.data?.authUser?.username ||
+          socketIdToUsername.get(socket.id) ||
+          null;
         const evt = await prisma.roomActivity.create({
           data: {
             roomId,
             kind: "kick",
             senderId: socket.id,
+            senderUsername,
           },
         });
         io.to(roomId).emit("activity_event", {
@@ -522,6 +1069,7 @@ io.on("connection", (socket) => {
           timestamp: evt.timestamp,
           videoUrl: evt.videoUrl,
           senderId: evt.senderId,
+          senderUsername: evt.senderUsername ?? senderUsername,
           createdAt: evt.createdAt,
         });
       }
@@ -691,6 +1239,7 @@ io.on("connection", (socket) => {
             id: m.id,
             roomId: m.roomId,
             senderId: m.senderId,
+            senderUsername: m.senderUsername ?? null,
             text: m.text,
             createdAt: m.createdAt,
           })),
@@ -704,7 +1253,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("send_chat", async (data) => {
+  async function handleChatSend(data) {
     const { roomId, text } = data || {};
     if (!roomId || typeof roomId !== "string") return;
     if (typeof text !== "string") return;
@@ -715,10 +1264,15 @@ io.on("connection", (socket) => {
 
     try {
       if (dbConnected && prisma) {
+        const senderUsername =
+          socket.data?.authUser?.username ||
+          socketIdToUsername.get(socket.id) ||
+          null;
         const msg = await prisma.roomMessage.create({
           data: {
             roomId,
             senderId: socket.id,
+            senderUsername,
             text: trimmed,
           },
         });
@@ -727,6 +1281,7 @@ io.on("connection", (socket) => {
           id: msg.id,
           roomId: msg.roomId,
           senderId: msg.senderId,
+          senderUsername: msg.senderUsername ?? senderUsername,
           text: msg.text,
           createdAt: msg.createdAt,
         });
@@ -734,7 +1289,11 @@ io.on("connection", (socket) => {
     } catch (err) {
       console.error("Failed to save chat message:", err.message);
     }
-  });
+  }
+
+  // Web uses send_chat; Android client historically used chat_message for sending.
+  socket.on("send_chat", handleChatSend);
+  socket.on("chat_message", handleChatSend);
 
   socket.on("request_room_state", (rawRoom) => {
     const roomId = normalizeRoomId(rawRoom);
@@ -795,6 +1354,10 @@ io.on("connection", (socket) => {
 
     // Persist this event for activity feed/history.
     try {
+      const senderUsername =
+        socket.data?.authUser?.username ||
+        socketIdToUsername.get(socket.id) ||
+        null;
       await prisma.roomActivity.create({
         data: {
           roomId,
@@ -803,6 +1366,7 @@ io.on("connection", (socket) => {
           timestamp: typeof timestamp === "number" ? timestamp : null,
           videoUrl: typeof videoUrl === "string" ? videoUrl : null,
           senderId: socket.id,
+          senderUsername,
         },
       });
     } catch (err) {
@@ -875,11 +1439,16 @@ io.on("connection", (socket) => {
       for (const roomId of rooms) {
         try {
           if (dbConnected && prisma) {
+            const senderUsername =
+              socket.data?.authUser?.username ||
+              socketIdToUsername.get(socket.id) ||
+              null;
             const evt = await prisma.roomActivity.create({
               data: {
                 roomId,
                 kind: "leave",
                 senderId: socket.id,
+                senderUsername,
               },
             });
 
@@ -892,6 +1461,7 @@ io.on("connection", (socket) => {
               timestamp: evt.timestamp,
               videoUrl: evt.videoUrl,
               senderId: evt.senderId,
+              senderUsername: evt.senderUsername ?? senderUsername,
               createdAt: evt.createdAt,
             });
           }
@@ -904,9 +1474,30 @@ io.on("connection", (socket) => {
 });
 
 const PORT = process.env.PORT || 4000;
+
+function getLanIPv4() {
+  try {
+    const ifaces = os.networkInterfaces();
+    for (const list of Object.values(ifaces)) {
+      for (const iface of list || []) {
+        if (iface && iface.family === "IPv4" && !iface.internal) {
+          return iface.address;
+        }
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
 server.listen(PORT, "0.0.0.0", () => {
+  const lanIp = getLanIPv4();
   console.log(`✓ Server running on port ${PORT}`);
-  console.log(`✓ Server accessible at http://192.168.1.152:${PORT}`);
+  console.log(`✓ Server accessible at http://localhost:${PORT}`);
+  if (lanIp) {
+    console.log(`✓ Server accessible on LAN at http://${lanIp}:${PORT}`);
+  }
   console.log(
     `✓ Database status: ${dbConnected ? "Connected" : "Disconnected (running in memory-only mode)"}`
   );

@@ -45,6 +45,13 @@ class RoomRepository @Inject constructor(
     
     init {
         observeSocketEvents()
+
+        // Keep socket auth in sync with login/logout.
+        scope.launch {
+            preferencesManager.authToken.collectLatest { token ->
+                socketClient.setAuthToken(token)
+            }
+        }
     }
     
     private fun observeSocketEvents() {
@@ -232,7 +239,8 @@ class RoomRepository @Inject constructor(
                     kind = kind,
                     message = buildActivityMessage(event.data),
                     timestamp = parseTimestamp(event.data.createdAt),
-                    senderId = event.data.senderId
+                    senderId = event.data.senderId,
+                    senderName = event.data.senderUsername
                 )
                 
                 _activityLog.update { current ->
@@ -262,7 +270,8 @@ class RoomRepository @Inject constructor(
                         kind = kind,
                         message = buildActivityMessage(activityEvent),
                         timestamp = parseTimestamp(activityEvent.createdAt),
-                        senderId = activityEvent.senderId
+                        senderId = activityEvent.senderId,
+                        senderName = activityEvent.senderUsername
                     )
                 }
                 _activityLog.value = entries

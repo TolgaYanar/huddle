@@ -7,11 +7,15 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import tv.wehuddle.app.data.local.PreferencesManager
 import tv.wehuddle.app.data.model.HomeUiState
+import tv.wehuddle.app.data.repository.AuthRepository
+import tv.wehuddle.app.data.repository.SavedRoomsRepository
 import javax.inject.Inject
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    private val preferencesManager: PreferencesManager
+    private val preferencesManager: PreferencesManager,
+    private val authRepository: AuthRepository,
+    private val savedRoomsRepository: SavedRoomsRepository
 ) : ViewModel() {
     
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -21,6 +25,50 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             preferencesManager.lastRoomId.collect { lastRoomId ->
                 _uiState.update { it.copy(lastRoomId = lastRoomId) }
+            }
+        }
+
+        // React to saved rooms changes (e.g., when saving/unsaving from Room screen)
+        viewModelScope.launch {
+            savedRoomsRepository.savedRooms.collect { rooms ->
+                val user = _uiState.value.authUser
+                if (user == null) {
+                    _uiState.update { it.copy(savedRooms = emptyList()) }
+                } else {
+                    _uiState.update { it.copy(savedRooms = rooms.take(5)) }
+                }
+            }
+        }
+
+        viewModelScope.launch {
+            authRepository.user.collect { user ->
+                _uiState.update { it.copy(authUser = user) }
+                refreshSavedRooms()
+            }
+        }
+    }
+
+    fun logout() {
+        viewModelScope.launch {
+            authRepository.logout()
+            _uiState.update { it.copy(savedRooms = emptyList()) }
+        }
+    }
+
+    fun refreshSavedRooms() {
+        val user = _uiState.value.authUser
+        if (user == null) {
+            _uiState.update { it.copy(savedRooms = emptyList(), isLoading = false, error = null) }
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, error = null) }
+            try {
+                savedRoomsRepository.refresh()
+                _uiState.update { it.copy(isLoading = false, error = null) }
+            } catch (_: Exception) {
+                _uiState.update { it.copy(isLoading = false, error = "Failed to load saved rooms") }
             }
         }
     }

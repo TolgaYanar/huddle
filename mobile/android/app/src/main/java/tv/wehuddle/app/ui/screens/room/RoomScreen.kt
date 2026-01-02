@@ -45,6 +45,8 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 fun RoomScreen(
     roomId: String,
     onNavigateBack: () -> Unit,
+    onNavigateToLogin: (String) -> Unit,
+    onNavigateToRegister: (String) -> Unit,
     viewModel: RoomViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
@@ -56,6 +58,9 @@ fun RoomScreen(
     val videoUrl by viewModel.videoUrl.collectAsStateWithLifecycle()
     val chatInput by viewModel.chatInput.collectAsStateWithLifecycle()
     val copied by viewModel.copied.collectAsStateWithLifecycle()
+    val authUser by viewModel.authUser.collectAsStateWithLifecycle()
+    val isRoomSaved by viewModel.isRoomSaved.collectAsStateWithLifecycle()
+    val saveBusy by viewModel.saveBusy.collectAsStateWithLifecycle()
     
     // Tab state
     var selectedTab by remember { mutableIntStateOf(0) }
@@ -81,6 +86,13 @@ fun RoomScreen(
             isConnected = connectionState == ConnectionState.CONNECTED,
             hasRoomPassword = roomState.hasRoomPassword,
             copied = copied,
+            authUsername = authUser?.username,
+            canSave = authUser != null,
+            isSaved = isRoomSaved,
+            saveBusy = saveBusy,
+            onLogin = { onNavigateToLogin("room/$roomId") },
+            onRegister = { onNavigateToRegister("room/$roomId") },
+            onToggleSave = viewModel::toggleSaveRoom,
             onCopyInvite = {
                 val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                 val clip = ClipData.newPlainText("Huddle Invite", viewModel.getInviteLink())
@@ -157,6 +169,7 @@ fun RoomScreen(
                     chatInput = chatInput,
                     onChatInputChange = viewModel::updateChatInput,
                     onSendChat = viewModel::sendChatMessage,
+                    localUserId = roomState.userId,
                     // No scroll modifier passed here, logic is inside to handle LazyColumn
                 )
             }
@@ -349,13 +362,19 @@ private fun VideoTabContent(
                             reverseLayout = true
                         ) {
                             items(chatMessages.reversed()) { msg ->
+                                val isOwn = msg.senderId == roomState.userId
+                                val senderLabel = if (isOwn) {
+                                    "You"
+                                } else {
+                                    msg.senderUsername?.takeIf { it.isNotBlank() } ?: msg.senderId.take(8)
+                                }
                                 // Compact Message Item
                                 Row(
                                     modifier = Modifier.padding(vertical = 4.dp),
                                     verticalAlignment = Alignment.Top
                                 ) {
                                     Text(
-                                        text = "${msg.senderId.take(8)}: ",
+                                        text = "$senderLabel: ",
                                         style = TextStyle(color = Color(0xFF3B82F6), fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                     )
                                     Text(
@@ -482,7 +501,8 @@ private fun ActivityTabContent(
     chatMessages: List<ChatMessage>,
     chatInput: String,
     onChatInputChange: (String) -> Unit,
-    onSendChat: () -> Unit
+    onSendChat: () -> Unit,
+    localUserId: String
 ) {
     // This column takes up the full 'Box' weight from the parent
     Column(
@@ -498,7 +518,7 @@ private fun ActivityTabContent(
             reverseLayout = true // Chat starts from bottom
         ) {
             items(chatMessages.reversed()) { msg ->
-                ChatMessageItem(msg)
+                ChatMessageItem(msg, localUserId = localUserId)
                 Spacer(modifier = Modifier.height(8.dp))
             }
             
@@ -568,7 +588,17 @@ private fun ActivityTabContent(
 // --- LIST ITEMS ---
 
 @Composable
-private fun ChatMessageItem(msg: ChatMessage) {
+private fun ChatMessageItem(
+    msg: ChatMessage,
+    localUserId: String
+) {
+    val isOwn = msg.senderId == localUserId
+    val senderLabel = if (isOwn) {
+        "You"
+    } else {
+        msg.senderUsername?.takeIf { it.isNotBlank() } ?: msg.senderId.take(10)
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -577,7 +607,7 @@ private fun ChatMessageItem(msg: ChatMessage) {
             .padding(12.dp)
     ) {
         Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-            Text(msg.senderId.take(10), color = Color(0xFF3B82F6), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            Text(senderLabel, color = Color(0xFF3B82F6), fontWeight = FontWeight.Bold, fontSize = 12.sp)
             Text(msg.createdAt, color = Color(0xFF64748B), fontSize = 10.sp)
         }
         Spacer(Modifier.height(4.dp))

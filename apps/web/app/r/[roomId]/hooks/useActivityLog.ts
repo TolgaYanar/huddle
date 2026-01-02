@@ -153,7 +153,7 @@ export function useActivityLog({
             ? "System"
             : isMe
               ? "You"
-              : m.senderId || "Unknown";
+              : m.senderUsername || m.senderId || "Unknown";
           next.push({
             id: m.id,
             msg: m.text,
@@ -176,7 +176,7 @@ export function useActivityLog({
         ? "System"
         : isMe
           ? "You"
-          : m.senderId || "Unknown";
+          : m.senderUsername || m.senderId || "Unknown";
 
       setLogs((prev) => {
         const exists = prev.some((l) => l.id === m.id);
@@ -201,7 +201,9 @@ export function useActivityLog({
             if (!e?.id || existingIds.has(e.id)) continue;
 
             const isMe = e.senderId === userId;
-            const userDisplay = isMe ? "You" : e.senderId || "Unknown";
+            const userDisplay = isMe
+              ? "You"
+              : e.senderUsername || e.senderId || "Unknown";
             const t = safeToTimeString(e.createdAt);
             const mapped = mapActivityEventToLog(e);
             if (!mapped) continue;
@@ -226,7 +228,9 @@ export function useActivityLog({
       if (!mapped) return;
 
       const isMe = e.senderId === userId;
-      const userDisplay = isMe ? "You" : e.senderId || "Unknown";
+      const userDisplay = isMe
+        ? "You"
+        : e.senderUsername || e.senderId || "Unknown";
       const t = safeToTimeString(e.createdAt);
 
       setLogs((prev) => {
