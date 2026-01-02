@@ -33,7 +33,17 @@ function getApiBaseUrl(): string {
   if (typeof window !== "undefined") {
     const protocol = window.location.protocol || "http:";
     const hostname = window.location.hostname || "localhost";
-    return `${protocol}//${hostname}:4000`;
+
+    const isLocalhost =
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "0.0.0.0";
+
+    // Dev: backend runs on :4000.
+    // Prod (Vercel): prefer same-origin and rely on Next rewrites to proxy /api/*.
+    return isLocalhost
+      ? `${protocol}//${hostname}:4000`
+      : `${protocol}//${hostname}`;
   }
 
   return "http://localhost:4000";
