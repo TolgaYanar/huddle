@@ -1333,12 +1333,18 @@ io.on("connection", (socket) => {
 
     // Update room state.
     const prev = roomState.get(roomId) || {};
+    const senderUsername =
+      socket.data?.authUser?.username ||
+      socketIdToUsername.get(socket.id) ||
+      null;
     const next = {
       ...prev,
       videoUrl: typeof videoUrl === "string" ? videoUrl : prev.videoUrl,
       timestamp: typeof timestamp === "number" ? timestamp : prev.timestamp,
       action: typeof action === "string" ? action : prev.action,
       updatedAt: Date.now(),
+      senderId: socket.id,
+      senderUsername,
     };
 
     if (typeof volume === "number" && Number.isFinite(volume)) {
@@ -1365,10 +1371,6 @@ io.on("connection", (socket) => {
 
     // Persist this event for activity feed/history.
     try {
-      const senderUsername =
-        socket.data?.authUser?.username ||
-        socketIdToUsername.get(socket.id) ||
-        null;
       await prisma.roomActivity.create({
         data: {
           roomId,
@@ -1394,6 +1396,7 @@ io.on("connection", (socket) => {
       playbackSpeed: next.playbackSpeed,
       audioSyncEnabled: next.audioSyncEnabled,
       senderId: socket.id,
+      senderUsername,
     });
   });
 
