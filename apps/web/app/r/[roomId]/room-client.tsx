@@ -169,6 +169,7 @@ export default function RoomClient({ roomId }: { roomId: string }) {
   const {
     hostId,
     participants,
+    usernamesById,
     roomAccessError,
     hasRoomPassword,
     passwordRequired,
@@ -586,6 +587,7 @@ export default function RoomClient({ roomId }: { roomId: string }) {
           hostId={hostId}
           onKickUser={kickUser}
           participants={participants}
+          usernamesById={usernamesById}
           hasRoomPassword={hasRoomPassword}
           onSetRoomPassword={setRoomPassword}
           localSpeaking={localSpeaking}

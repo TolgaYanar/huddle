@@ -9,6 +9,7 @@ export function CallSidebar(props: {
   hostId: string | null;
   onKickUser: (targetId: string) => void;
   participants: string[];
+  usernamesById?: Record<string, string | null>;
   hasRoomPassword: boolean;
   onSetRoomPassword: (password: string) => void;
 
@@ -53,6 +54,7 @@ export function CallSidebar(props: {
     hostId,
     onKickUser,
     participants,
+    usernamesById,
     hasRoomPassword,
     onSetRoomPassword,
     localSpeaking,
@@ -91,6 +93,11 @@ export function CallSidebar(props: {
   const remoteStreamIds = new Set(remoteStreams.map((s) => s.id));
   const participantsWithoutStream = participants.filter(
     (id) => id && id !== userId && !remoteStreamIds.has(id)
+  );
+
+  const getDisplayName = React.useCallback(
+    (id: string) => usernamesById?.[id] ?? id.slice(0, 6),
+    [usernamesById]
   );
 
   return (
@@ -397,10 +404,11 @@ export function CallSidebar(props: {
               {remoteStreams.map(({ id, stream }) => {
                 const speaking = !!remoteSpeaking[id];
                 const media = remoteMedia[id];
+                const displayName = getDisplayName(id);
                 const label =
                   hostId && id === hostId
-                    ? `${id.slice(0, 6)} • Host`
-                    : id.slice(0, 6);
+                    ? `${displayName} • Host`
+                    : displayName;
                 return (
                   <RemoteTile
                     key={id}
@@ -453,7 +461,7 @@ export function CallSidebar(props: {
                       >
                         <div className="min-w-0">
                           <div className="text-sm text-slate-100 truncate">
-                            {id.slice(0, 6)}
+                            {getDisplayName(id)}
                           </div>
                           <div className="text-[11px] text-slate-400 mt-0.5">
                             {hostId && id === hostId ? "Host" : ""}

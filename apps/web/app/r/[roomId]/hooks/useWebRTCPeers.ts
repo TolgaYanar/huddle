@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef } from "react";
+import type { UserPresenceData } from "shared-logic";
 
 type RemoteStreamsState = Array<{ id: string; stream: MediaStream }>;
 
@@ -86,11 +87,11 @@ export function useWebRTCPeers<MediaState>({
     | undefined;
   onUserJoined:
     | ((
-        handler: (peerId: string) => void | Promise<void>
+        handler: (peer: UserPresenceData) => void | Promise<void>
       ) => (() => void) | void)
     | undefined;
   onUserLeft:
-    | ((handler: (peerId: string) => void) => (() => void) | void)
+    | ((handler: (peer: UserPresenceData) => void) => (() => void) | void)
     | undefined;
 
   onWebRTCOffer:
@@ -429,7 +430,11 @@ export function useWebRTCPeers<MediaState>({
       }
     });
 
-    const cleanupJoined = _onUserJoined?.(async (peerId) => {
+    const toSocketId = (peer: UserPresenceData) =>
+      typeof peer === "string" ? peer : peer?.socketId;
+
+    const cleanupJoined = _onUserJoined?.(async (peer) => {
+      const peerId = toSocketId(peer);
       const { userId: currentUserId } = latestRef.current;
       if (!peerId || peerId === currentUserId) return;
       if (currentUserId < peerId) {
@@ -443,7 +448,8 @@ export function useWebRTCPeers<MediaState>({
       }
     });
 
-    const cleanupLeft = _onUserLeft?.((peerId) => {
+    const cleanupLeft = _onUserLeft?.((peer) => {
+      const peerId = toSocketId(peer);
       if (!peerId) return;
       latestRef.current.closePeer(peerId);
     });

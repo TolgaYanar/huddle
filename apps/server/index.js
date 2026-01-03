@@ -638,6 +638,11 @@ io.on("connection", (socket) => {
           ? Array.from(room).filter((id) => id !== socket.id)
           : [];
 
+        const usernames = {};
+        for (const id of users) {
+          usernames[id] = socketIdToUsername.get(id) || null;
+        }
+
         if (!roomHost.has(roomId)) {
           roomHost.set(roomId, socket.id);
         }
@@ -659,6 +664,7 @@ io.on("connection", (socket) => {
         socket.emit("room_users", {
           roomId,
           users,
+          usernames,
           mediaStates,
           hostId: roomHost.get(roomId),
         });
@@ -679,7 +685,13 @@ io.on("connection", (socket) => {
     joinedRooms.add(roomId);
     console.log(`User ${socket.id} joined room: ${roomId}`);
     // Notify others in the room (optional)
-    socket.to(roomId).emit("user_joined", socket.id);
+    {
+      const username =
+        socket.data?.authUser?.username ||
+        socketIdToUsername.get(socket.id) ||
+        null;
+      socket.to(roomId).emit("user_joined", { socketId: socket.id, username });
+    }
 
     // Provide the joiner a list of current users so they can establish WebRTC.
     try {
@@ -687,6 +699,11 @@ io.on("connection", (socket) => {
       const users = room
         ? Array.from(room).filter((id) => id !== socket.id)
         : [];
+
+      const usernames = {};
+      for (const id of users) {
+        usernames[id] = socketIdToUsername.get(id) || null;
+      }
 
       if (!roomHost.has(roomId)) {
         roomHost.set(roomId, socket.id);
@@ -709,6 +726,7 @@ io.on("connection", (socket) => {
       socket.emit("room_users", {
         roomId,
         users,
+        usernames,
         mediaStates,
         hostId: roomHost.get(roomId),
       });
@@ -724,6 +742,7 @@ io.on("connection", (socket) => {
       socket.emit("room_users", {
         roomId,
         users: [],
+        usernames: {},
         mediaStates: {},
         hostId: roomHost.get(roomId) || null,
       });
@@ -833,7 +852,13 @@ io.on("connection", (socket) => {
     }
 
     // Notify peers for WebRTC cleanup.
-    socket.to(roomId).emit("user_left", socket.id);
+    {
+      const username =
+        socket.data?.authUser?.username ||
+        socketIdToUsername.get(socket.id) ||
+        null;
+      socket.to(roomId).emit("user_left", { socketId: socket.id, username });
+    }
     socket.to(roomId).emit("webrtc_speaking", {
       roomId,
       from: socket.id,
@@ -1403,6 +1428,11 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => {
     console.log("User disconnected:", socket.id);
 
+    const username =
+      socket.data?.authUser?.username ||
+      socketIdToUsername.get(socket.id) ||
+      null;
+
     // Persist leave events for all rooms this socket joined.
     const rooms = Array.from(joinedRooms);
     if (rooms.length === 0) return;
@@ -1416,7 +1446,7 @@ io.on("connection", (socket) => {
         if (map.size === 0) roomMediaState.delete(roomId);
       }
 
-      socket.to(roomId).emit("user_left", socket.id);
+      socket.to(roomId).emit("user_left", { socketId: socket.id, username });
       socket.to(roomId).emit("webrtc_speaking", {
         roomId,
         from: socket.id,

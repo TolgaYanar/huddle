@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { Socket } from "socket.io-client";
+import type { UserPresenceData } from "shared-logic";
 
 interface UseRoomStateProps {
   roomId: string;
@@ -9,13 +10,16 @@ interface UseRoomStateProps {
     callback: (data: {
       roomId: string;
       users: string[];
+      usernames?: Record<string, string | null>;
       hostId?: string | null;
     }) => void
   ) => (() => void) | undefined;
   onUserJoined?: (
-    callback: (peerId: string) => void
+    callback: (peer: UserPresenceData) => void
   ) => (() => void) | undefined;
-  onUserLeft?: (callback: (peerId: string) => void) => (() => void) | undefined;
+  onUserLeft?: (
+    callback: (peer: UserPresenceData) => void
+  ) => (() => void) | undefined;
   onRoomPasswordStatus?: (
     callback: (data: { roomId: string; hasPassword: boolean }) => void
   ) => (() => void) | undefined;
@@ -38,6 +42,9 @@ export function useRoomState({
 }: UseRoomStateProps) {
   const [hostId, setHostId] = useState<string | null>(null);
   const [participants, setParticipants] = useState<string[]>([]);
+  const [usernamesById, setUsernamesById] = useState<
+    Record<string, string | null>
+  >({});
   const [roomAccessError, setRoomAccessError] = useState<string | null>(null);
   const [hasRoomPassword, setHasRoomPassword] = useState(false);
   const [passwordRequired, setPasswordRequired] = useState(false);
@@ -53,6 +60,13 @@ export function useRoomState({
       const nextHost = data.hostId;
       if (typeof nextHost !== "undefined") {
         setHostId(nextHost ?? null);
+      }
+
+      if (data.usernames && typeof data.usernames === "object") {
+        setUsernamesById((prev) => ({
+          ...prev,
+          ...data.usernames,
+        }));
       }
 
       if (Array.isArray(data.users)) {
@@ -117,13 +131,35 @@ export function useRoomState({
 
   // Keep participant list updated
   useEffect(() => {
-    const cleanupJoined = onUserJoined?.((peerId) => {
+    const toSocketId = (peer: UserPresenceData) =>
+      typeof peer === "string" ? peer : peer?.socketId;
+
+    const cleanupJoined = onUserJoined?.((peer) => {
+      const peerId = toSocketId(peer);
       if (!peerId || peerId === userId) return;
+
+      if (typeof peer === "object" && peer) {
+        const uname =
+          typeof peer.username === "string" && peer.username.trim()
+            ? peer.username
+            : null;
+        if (uname) {
+          setUsernamesById((prev) => ({ ...prev, [peerId]: uname }));
+        }
+      }
+
       setParticipants((prev) => Array.from(new Set([...prev, peerId])));
     });
-    const cleanupLeft = onUserLeft?.((peerId) => {
+    const cleanupLeft = onUserLeft?.((peer) => {
+      const peerId = toSocketId(peer);
       if (!peerId) return;
       setParticipants((prev) => prev.filter((id) => id !== peerId));
+      setUsernamesById((prev) => {
+        if (!prev[peerId]) return prev;
+        const next = { ...prev };
+        delete next[peerId];
+        return next;
+      });
     });
     return () => {
       cleanupJoined?.();
@@ -172,6 +208,7 @@ export function useRoomState({
   return {
     hostId,
     participants,
+    usernamesById,
     roomAccessError,
     hasRoomPassword,
     setHasRoomPassword,

@@ -76,6 +76,8 @@ export interface ActivityHistoryData {
 export interface RoomUsersData {
   roomId: string;
   users: string[];
+  // Optional map of socketId -> username (if available)
+  usernames?: Record<string, string | null>;
   mediaStates?: Record<string, WebRTCMediaState>;
   hostId?: string | null;
 }
@@ -89,6 +91,13 @@ export interface RoomPasswordRequiredData {
   roomId: string;
   reason?: "required" | "invalid";
 }
+
+export type UserPresenceData =
+  | string
+  | {
+      socketId: string;
+      username?: string | null;
+    };
 
 export interface WheelSpinData {
   index: number;
@@ -633,27 +642,33 @@ export const useRoom = (roomId: string, userId: string) => {
     [roomId]
   );
 
-  const onUserJoined = useCallback((callback: (socketId: string) => void) => {
-    if (socketRef.current) {
-      socketRef.current.on("user_joined", callback);
-    }
-    return () => {
+  const onUserJoined = useCallback(
+    (callback: (data: UserPresenceData) => void) => {
       if (socketRef.current) {
-        socketRef.current.off("user_joined", callback);
+        socketRef.current.on("user_joined", callback);
       }
-    };
-  }, []);
+      return () => {
+        if (socketRef.current) {
+          socketRef.current.off("user_joined", callback);
+        }
+      };
+    },
+    []
+  );
 
-  const onUserLeft = useCallback((callback: (socketId: string) => void) => {
-    if (socketRef.current) {
-      socketRef.current.on("user_left", callback);
-    }
-    return () => {
+  const onUserLeft = useCallback(
+    (callback: (data: UserPresenceData) => void) => {
       if (socketRef.current) {
-        socketRef.current.off("user_left", callback);
+        socketRef.current.on("user_left", callback);
       }
-    };
-  }, []);
+      return () => {
+        if (socketRef.current) {
+          socketRef.current.off("user_left", callback);
+        }
+      };
+    },
+    []
+  );
 
   const sendWebRTCOffer = useCallback(
     (to: string, sdp: unknown) => {
