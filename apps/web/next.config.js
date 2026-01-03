@@ -21,6 +21,13 @@ const nextConfig = {
     // for local API route handlers. Only proxy specific backend routes.
     return {
       beforeFiles: [
+        // Socket.IO (polling + websocket upgrade)
+        // Proxying through the web origin helps ensure the browser sends the
+        // HttpOnly session cookie during the Socket.IO handshake.
+        {
+          source: "/socket.io/:path*",
+          destination: `${target}/socket.io/:path*`,
+        },
         // Auth endpoints
         {
           source: "/api/auth/:path*",

@@ -134,14 +134,33 @@ function getServerUrl(): string {
   const fromEnv = process.env.NEXT_PUBLIC_SOCKET_SERVER_URL as
     | string
     | undefined;
-  if (fromEnv) return fromEnv;
+  if (typeof fromEnv === "string") {
+    const trimmed = fromEnv.trim();
+    if (trimmed) return trimmed;
+
+    // Allow setting an explicit empty value to mean "same origin".
+    if (typeof window !== "undefined") return window.location.origin;
+    return "";
+  }
 
   // If the web app is opened from a phone/tablet, "localhost" points to that
   // device, not the dev machine. Default to the current hostname instead.
   if (typeof window !== "undefined") {
-    const protocol = window.location.protocol || "http:";
-    const hostname = window.location.hostname || "localhost";
-    return `${protocol}//${hostname}:4000`;
+    const { protocol, hostname, origin } = window.location;
+    const safeProtocol = protocol || "http:";
+    const safeHostname = hostname || "localhost";
+
+    // Local dev convention: web on :3000, server on :4000.
+    const isLocalHost =
+      safeHostname === "localhost" ||
+      safeHostname === "127.0.0.1" ||
+      safeHostname === "0.0.0.0";
+
+    if (isLocalHost) return `${safeProtocol}//${safeHostname}:4000`;
+
+    // Production convention: connect to the same origin so the HttpOnly
+    // session cookie is automatically included in the Socket.IO handshake.
+    return origin;
   }
 
   return "http://localhost:4000";
