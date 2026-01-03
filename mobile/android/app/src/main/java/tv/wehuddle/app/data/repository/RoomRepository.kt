@@ -53,6 +53,26 @@ class RoomRepository @Inject constructor(
             }
         }
     }
+
+    private fun applyAudioSyncEnabled(current: RoomUiState, enabled: Boolean): RoomUiState {
+        return if (enabled) {
+            current.copy(
+                audioSyncEnabled = true,
+                videoState = current.videoState.copy(
+                    localVolumeOverride = null,
+                    localMutedOverride = null
+                )
+            )
+        } else {
+            current.copy(
+                audioSyncEnabled = false,
+                videoState = current.videoState.copy(
+                    localVolumeOverride = current.videoState.localVolumeOverride ?: current.videoState.volume,
+                    localMutedOverride = current.videoState.localMutedOverride ?: current.videoState.isMuted
+                )
+            )
+        }
+    }
     
     private fun observeSocketEvents() {
         scope.launch {
@@ -78,9 +98,11 @@ class RoomRepository @Inject constructor(
             
             is SocketEvent.RoomUsers -> {
                 val currentUserId = socketClient.socketId.value ?: ""
+                val usernamesById = event.data.usernames ?: emptyMap()
                 val participantsList = event.data.users.map { id ->
                     Participant(
                         id = id,
+                        username = usernamesById[id],
                         isLocal = id == currentUserId,
                         isHost = id == event.data.hostId,
                         mediaState = event.data.mediaStates?.get(id) ?: WebRTCMediaState()
@@ -97,7 +119,10 @@ class RoomRepository @Inject constructor(
             }
             
             is SocketEvent.UserJoined -> {
-                val newParticipant = Participant(id = event.data.socketId)
+                val newParticipant = Participant(
+                    id = event.data.socketId,
+                    username = event.data.username
+                )
                 _participants.update { current ->
                     if (current.none { it.id == event.data.socketId }) {
                         current + newParticipant
@@ -105,8 +130,9 @@ class RoomRepository @Inject constructor(
                 }
                 addActivityLogEntry(
                     kind = ActivityLogKind.JOIN,
-                    message = "User joined",
-                    senderId = event.data.socketId
+                    message = (event.data.username?.takeIf { it.isNotBlank() } ?: "User") + " joined",
+                    senderId = event.data.socketId,
+                    senderName = event.data.username
                 )
             }
             
@@ -116,8 +142,9 @@ class RoomRepository @Inject constructor(
                 }
                 addActivityLogEntry(
                     kind = ActivityLogKind.LEAVE,
-                    message = "User left",
-                    senderId = event.data.socketId
+                    message = (event.data.username?.takeIf { it.isNotBlank() } ?: "User") + " left",
+                    senderId = event.data.socketId,
+                    senderName = event.data.username
                 )
             }
             
@@ -127,10 +154,14 @@ class RoomRepository @Inject constructor(
                     SyncAction.pause -> ActivityLogKind.PAUSE
                     SyncAction.seek -> ActivityLogKind.SEEK
                     SyncAction.change_url -> ActivityLogKind.URL_CHANGE
-                    SyncAction.set_mute, SyncAction.set_speed, SyncAction.set_volume -> ActivityLogKind.SYSTEM
+                    SyncAction.set_mute, SyncAction.set_speed, SyncAction.set_volume, SyncAction.set_audio_sync -> ActivityLogKind.SYSTEM
                 }
                 
                 _roomState.update { current ->
+                    val nextWithAudioSync = event.data.audioSyncEnabled?.let { enabled ->
+                        applyAudioSyncEnabled(current, enabled)
+                    } ?: current
+
                     val nextUrl = event.data.videoUrl ?: current.videoState.url
                     val nextCurrentTime = when (event.data.action) {
                         SyncAction.play,
@@ -139,11 +170,12 @@ class RoomRepository @Inject constructor(
                         SyncAction.change_url -> event.data.timestamp
                         SyncAction.set_mute,
                         SyncAction.set_speed,
-                        SyncAction.set_volume -> current.videoState.currentTime
+                        SyncAction.set_volume,
+                        SyncAction.set_audio_sync -> current.videoState.currentTime
                     }
 
-                    current.copy(
-                        videoState = current.videoState.copy(
+                    nextWithAudioSync.copy(
+                        videoState = nextWithAudioSync.videoState.copy(
                             url = nextUrl,
                             currentTime = nextCurrentTime,
                             // Preserve playing state on seek, change it only on play/pause
@@ -154,7 +186,8 @@ class RoomRepository @Inject constructor(
                                 SyncAction.change_url -> false
                                 SyncAction.set_mute,
                                 SyncAction.set_speed,
-                                SyncAction.set_volume -> current.videoState.isPlaying
+                                SyncAction.set_volume,
+                                SyncAction.set_audio_sync -> current.videoState.isPlaying
                             },
                             volume = event.data.volume ?: current.videoState.volume,
                             isMuted = event.data.isMuted ?: current.videoState.isMuted,
@@ -179,14 +212,19 @@ class RoomRepository @Inject constructor(
                             if (speed != null) "Speed set to ${speed}x" else "Changed speed"
                         }
                         SyncAction.set_volume -> "Changed volume"
+                        SyncAction.set_audio_sync -> {
+                            val enabled = event.data.audioSyncEnabled
+                            if (enabled == false) "Audio sync disabled" else "Audio sync enabled"
+                        }
                     },
-                    senderId = event.data.senderId
+                    senderId = event.data.senderId,
+                    senderName = event.data.senderUsername
                 )
             }
             
             is SocketEvent.RoomState -> {
                 _roomState.update { current ->
-                    current.copy(
+                    val base = current.copy(
                         videoState = current.videoState.copy(
                             url = event.data.videoUrl ?: "",
                             currentTime = event.data.timestamp ?: 0.0,
@@ -202,6 +240,12 @@ class RoomRepository @Inject constructor(
                             platform = detectPlatform(event.data.videoUrl ?: "")
                         )
                     )
+
+                    if (event.data.audioSyncEnabled != null) {
+                        applyAudioSyncEnabled(base, event.data.audioSyncEnabled)
+                    } else {
+                        base
+                    }
                 }
             }
             
@@ -212,7 +256,8 @@ class RoomRepository @Inject constructor(
                 addActivityLogEntry(
                     kind = ActivityLogKind.CHAT,
                     message = event.data.text,
-                    senderId = event.data.senderId
+                    senderId = event.data.senderId,
+                    senderName = event.data.senderUsername
                 )
             }
             
@@ -474,18 +519,26 @@ class RoomRepository @Inject constructor(
     fun sendMuteEvent(isMuted: Boolean) {
         val roomId = _roomState.value.roomId
         if (roomId.isNotEmpty()) {
-            val timestamp = _roomState.value.videoState.currentTime
-            socketClient.sendSyncEvent(
-                SyncData(
-                    roomId = roomId,
-                    action = SyncAction.set_mute,
-                    timestamp = timestamp,
-                    isMuted = isMuted,
-                    senderId = socketClient.socketId.value
+            val current = _roomState.value
+            if (current.audioSyncEnabled) {
+                val timestamp = current.videoState.currentTime
+                socketClient.sendSyncEvent(
+                    SyncData(
+                        roomId = roomId,
+                        action = SyncAction.set_mute,
+                        timestamp = timestamp,
+                        isMuted = isMuted,
+                        senderId = socketClient.socketId.value
+                    )
                 )
-            )
-            _roomState.update { current ->
-                current.copy(videoState = current.videoState.copy(isMuted = isMuted))
+                _roomState.update { st ->
+                    st.copy(videoState = st.videoState.copy(isMuted = isMuted))
+                }
+            } else {
+                // Local-only mute while audio sync is disabled.
+                _roomState.update { st ->
+                    st.copy(videoState = st.videoState.copy(localMutedOverride = isMuted))
+                }
             }
         }
     }
@@ -512,19 +565,44 @@ class RoomRepository @Inject constructor(
     fun sendVolumeEvent(volume: Float) {
         val roomId = _roomState.value.roomId
         if (roomId.isNotEmpty()) {
+            val current = _roomState.value
+            if (current.audioSyncEnabled) {
+                val timestamp = current.videoState.currentTime
+                socketClient.sendSyncEvent(
+                    SyncData(
+                        roomId = roomId,
+                        action = SyncAction.set_volume,
+                        timestamp = timestamp,
+                        volume = volume,
+                        senderId = socketClient.socketId.value
+                    )
+                )
+                _roomState.update { st ->
+                    st.copy(videoState = st.videoState.copy(volume = volume))
+                }
+            } else {
+                // Local-only volume while audio sync is disabled.
+                _roomState.update { st ->
+                    st.copy(videoState = st.videoState.copy(localVolumeOverride = volume))
+                }
+            }
+        }
+    }
+
+    fun setAudioSyncEnabled(enabled: Boolean) {
+        val roomId = _roomState.value.roomId
+        if (roomId.isNotEmpty()) {
             val timestamp = _roomState.value.videoState.currentTime
             socketClient.sendSyncEvent(
                 SyncData(
                     roomId = roomId,
-                    action = SyncAction.set_volume,
+                    action = SyncAction.set_audio_sync,
                     timestamp = timestamp,
-                    volume = volume,
+                    audioSyncEnabled = enabled,
                     senderId = socketClient.socketId.value
                 )
             )
-            _roomState.update { current ->
-                current.copy(videoState = current.videoState.copy(volume = volume))
-            }
+            _roomState.update { st -> applyAudioSyncEnabled(st, enabled) }
         }
     }
     
@@ -646,14 +724,16 @@ class RoomRepository @Inject constructor(
     private fun addActivityLogEntry(
         kind: ActivityLogKind,
         message: String,
-        senderId: String?
+        senderId: String?,
+        senderName: String? = null
     ) {
         val entry = ActivityLogEntry(
             id = java.util.UUID.randomUUID().toString(),
             kind = kind,
             message = message,
             timestamp = System.currentTimeMillis(),
-            senderId = senderId
+            senderId = senderId,
+            senderName = senderName
         )
         _activityLog.update { current ->
             (current + entry).takeLast(100)

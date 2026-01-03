@@ -206,6 +206,10 @@ class RoomViewModel @Inject constructor(
     fun setVolume(volume: Float) {
         roomRepository.sendVolumeEvent(volume)
     }
+
+    fun setAudioSyncEnabled(enabled: Boolean) {
+        roomRepository.setAudioSyncEnabled(enabled)
+    }
     
     fun updateVideoState(update: (VideoPlayerState) -> VideoPlayerState) {
         roomRepository.updateVideoState(update)

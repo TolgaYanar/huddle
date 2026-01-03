@@ -1,5 +1,6 @@
 package tv.wehuddle.app.ui.components
 
+import android.annotation.SuppressLint
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.annotation.OptIn
@@ -29,6 +30,11 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import tv.wehuddle.app.data.model.*
 import tv.wehuddle.app.ui.theme.*
+import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
+import android.webkit.WebSettings
+import android.webkit.WebView
+import android.webkit.WebViewClient
 
 /**
  * Video player component using ExoPlayer
@@ -229,10 +235,12 @@ fun VideoPlayerView(
             }
             
             platform == PlatformType.TWITCH || platform == PlatformType.KICK -> {
-                // Embed not supported placeholder
-                EmbedNotSupportedPlaceholder(
+                // Minimal in-app embed playback (controls not supported via sync yet)
+                StreamEmbedPlayerView(
+                    url = url,
                     platform = platform,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
+                    onError = onError
                 )
             }
             
@@ -254,6 +262,121 @@ fun VideoPlayerView(
             }
         }
     }
+}
+
+@SuppressLint("SetJavaScriptEnabled")
+@Composable
+private fun StreamEmbedPlayerView(
+    url: String,
+    platform: PlatformType,
+    modifier: Modifier = Modifier,
+    onError: (String) -> Unit
+) {
+    val context = LocalContext.current
+
+    fun buildTwitchEmbedUrl(inputUrl: String): String? {
+        val videoId = extractTwitchVideoId(inputUrl)
+        if (videoId != null) {
+            return "https://player.twitch.tv/?video=v$videoId&parent=localhost&autoplay=true"
+        }
+
+        val clipId = extractTwitchClipId(inputUrl)
+        if (clipId != null) {
+            return "https://clips.twitch.tv/embed?clip=$clipId&parent=localhost&autoplay=true"
+        }
+
+        val channel = extractTwitchChannel(inputUrl)
+        if (channel != null) {
+            return "https://player.twitch.tv/?channel=$channel&parent=localhost&autoplay=true"
+        }
+
+        return null
+    }
+
+    fun buildKickEmbedUrl(inputUrl: String): String? {
+        val channel = extractKickChannel(inputUrl) ?: return null
+        // Prefer the lightweight player experience instead of rendering the full site.
+        // Kick supports a dedicated player host.
+        return "https://player.kick.com/$channel"
+    }
+
+    val resolvedUrl = remember(url, platform) {
+        when (platform) {
+            PlatformType.TWITCH -> buildTwitchEmbedUrl(url)
+            PlatformType.KICK -> buildKickEmbedUrl(url) ?: url
+            else -> null
+        }
+    }
+
+    if (resolvedUrl.isNullOrBlank()) {
+        EmbedNotSupportedPlaceholder(platform = platform, modifier = modifier)
+        return
+    }
+
+    AndroidView(
+        modifier = modifier,
+        factory = {
+            WebView(context).apply {
+                layoutParams = ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                )
+
+                settings.apply {
+                    javaScriptEnabled = true
+                    domStorageEnabled = true
+                    loadWithOverviewMode = true
+                    useWideViewPort = true
+                    cacheMode = WebSettings.LOAD_DEFAULT
+                    mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                    mediaPlaybackRequiresUserGesture = false
+                    allowFileAccess = false
+                    allowContentAccess = false
+                }
+
+                webChromeClient = object : WebChromeClient() {}
+
+                webViewClient = object : WebViewClient() {
+                    override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                        val target = request?.url?.toString() ?: return false
+                        val scheme = request?.url?.scheme
+                        if (
+                            target.startsWith("intent:", ignoreCase = true) ||
+                            target.startsWith("market:", ignoreCase = true) ||
+                            target.startsWith("mailto:", ignoreCase = true) ||
+                            target.startsWith("tel:", ignoreCase = true) ||
+                            target.startsWith("twitch:", ignoreCase = true) ||
+                            target.startsWith("kick:", ignoreCase = true) ||
+                            (scheme != null && scheme !in setOf("http", "https", "about", "javascript"))
+                        ) {
+                            return true
+                        }
+                        return false
+                    }
+
+                    override fun onReceivedError(
+                        view: WebView,
+                        request: WebResourceRequest,
+                        error: android.webkit.WebResourceError
+                    ) {
+                        super.onReceivedError(view, request, error)
+                        onError("Embed error: ${error.description}")
+                    }
+                }
+
+                loadUrl(resolvedUrl)
+            }
+        },
+        update = { webView ->
+            try {
+                if (webView.url != resolvedUrl) {
+                    webView.loadUrl(resolvedUrl)
+                }
+            } catch (e: Exception) {
+                onError("Embed load error: ${e.message}")
+            }
+        }
+    )
 }
 
 @Composable
@@ -308,12 +431,14 @@ fun VideoControlsBar(
     isMuted: Boolean,
     playbackSpeed: Float,
     isBuffering: Boolean,
+    audioSyncEnabled: Boolean,
     onPlay: () -> Unit,
     onPause: () -> Unit,
     onSeek: (Double) -> Unit,
     onMuteToggle: () -> Unit,
     onVolumeChange: (Float) -> Unit,
     onPlaybackSpeedChange: (Float) -> Unit,
+    onAudioSyncToggle: (Boolean) -> Unit,
     onFullscreen: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
@@ -428,6 +553,16 @@ fun VideoControlsBar(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                HuddleSmallButton(
+                    onClick = { onAudioSyncToggle(!audioSyncEnabled) },
+                    isActive = audioSyncEnabled
+                ) {
+                    Text(
+                        text = "Audio Sync",
+                        style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    )
+                }
+
                 // Mute button
                 if (capabilities.canMute) {
                     HuddleIconButton(

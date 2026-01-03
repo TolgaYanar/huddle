@@ -134,14 +134,51 @@ function getServerUrl(): string {
   const fromEnv = process.env.NEXT_PUBLIC_SOCKET_SERVER_URL as
     | string
     | undefined;
-  if (fromEnv) return fromEnv;
+  if (typeof fromEnv === "string") {
+    const trimmed = fromEnv.trim();
+
+    // Allow setting an explicit empty value to mean "same origin".
+    if (!trimmed) {
+      if (typeof window !== "undefined") return window.location.origin;
+      return "";
+    }
+
+    if (typeof window !== "undefined") {
+      const currentOrigin = window.location.origin;
+      const hostname = window.location.hostname || "localhost";
+      const isLocalHost =
+        hostname === "localhost" ||
+        hostname === "127.0.0.1" ||
+        hostname === "0.0.0.0";
+
+      // In production, we strongly prefer same-origin Socket.IO so the
+      // HttpOnly session cookie (set on the web origin) is included.
+      // If you *really* need a direct cross-origin socket URL, use localhost
+      // for dev or ensure auth is passed via Bearer token instead of cookies.
+      if (!isLocalHost) return currentOrigin;
+    }
+
+    return trimmed;
+  }
 
   // If the web app is opened from a phone/tablet, "localhost" points to that
   // device, not the dev machine. Default to the current hostname instead.
   if (typeof window !== "undefined") {
-    const protocol = window.location.protocol || "http:";
-    const hostname = window.location.hostname || "localhost";
-    return `${protocol}//${hostname}:4000`;
+    const { protocol, hostname, origin } = window.location;
+    const safeProtocol = protocol || "http:";
+    const safeHostname = hostname || "localhost";
+
+    // Local dev convention: web on :3000, server on :4000.
+    const isLocalHost =
+      safeHostname === "localhost" ||
+      safeHostname === "127.0.0.1" ||
+      safeHostname === "0.0.0.0";
+
+    if (isLocalHost) return `${safeProtocol}//${safeHostname}:4000`;
+
+    // Production convention: connect to the same origin so the HttpOnly
+    // session cookie is automatically included in the Socket.IO handshake.
+    return origin;
   }
 
   return "http://localhost:4000";
@@ -179,9 +216,10 @@ export const useRoom = (roomId: string, userId: string) => {
   useEffect(() => {
     // Initialize socket connection
     socketRef.current = io(SERVER_URL, {
-      // Prefer websocket, but allow polling fallback (some hosts/proxies/CDNs
-      // can intermittently block websocket-only connections).
-      transports: ["websocket", "polling"],
+      // Prefer starting with polling so we can connect even when WebSocket
+      // upgrades are blocked by proxies/CDNs. Socket.IO will still try to
+      // upgrade to WebSocket when possible.
+      transports: ["polling", "websocket"],
       autoConnect: false,
       withCredentials: true,
     });
