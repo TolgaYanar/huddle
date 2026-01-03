@@ -28,6 +28,7 @@ import {
 
 // Utils
 import { capitalize } from "./lib/activity";
+import { getCurrentTimeFromRef } from "./lib/player";
 import {
   getKickEmbedSrc,
   getTwitchEmbedSrc,
@@ -49,6 +50,7 @@ export default function RoomClient({ roomId }: { roomId: string }) {
   const [noiseSuppressionEnabled, setNoiseSuppressionEnabled] = useState(true);
   const [autoGainControlEnabled, setAutoGainControlEnabled] = useState(true);
   const [pushToTalkEnabled, setPushToTalkEnabled] = useState(false);
+  const [audioSyncEnabled, setAudioSyncEnabled] = useState(true);
 
   const peersRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const remoteStreamsRef = useRef<Map<string, MediaStream>>(new Map());
@@ -154,6 +156,11 @@ export default function RoomClient({ roomId }: { roomId: string }) {
     joinRoom,
   });
 
+  // When we apply a remote sync event, the underlying players often emit
+  // local play/pause/seek callbacks too. This guard prevents receivers from
+  // re-emitting those events back to the room (ping-pong loop).
+  const applyingRemoteSyncRef = useRef(false);
+
   // WebRTC peers
   const { closeAllPeers, renegotiateAllPeers } =
     useWebRTCPeers<WebRTCMediaState>({
@@ -249,6 +256,8 @@ export default function RoomClient({ roomId }: { roomId: string }) {
     setMuted,
     volume,
     setVolume,
+    effectiveMuted,
+    effectiveVolume,
     playbackRate,
     setPlaybackRate,
     currentTime,
@@ -268,11 +277,15 @@ export default function RoomClient({ roomId }: { roomId: string }) {
     handlePlay,
     handlePause,
     handleSeekTo,
+    handleSeekFromController,
     handleVolumeChange,
+    handleLocalVolumeChange,
+    handleVolumeFromController,
     handlePlaybackRateChange,
     handleProgress,
     handleDuration,
     toggleMute,
+    toggleLocalMute,
     handleUrlChange,
     loadVideoUrl,
     handlePlayerError,
@@ -281,8 +294,21 @@ export default function RoomClient({ roomId }: { roomId: string }) {
     isClient,
     roomId,
     sendSyncEvent,
+    audioSyncEnabled,
+    applyingRemoteSyncRef,
     // addLogEntry will be passed after useActivityLog initializes
   });
+
+  const handleAudioSyncEnabledChange = React.useCallback(
+    (nextEnabled: boolean) => {
+      setAudioSyncEnabled(nextEnabled);
+      const t = getCurrentTimeFromRef(playerRef);
+      sendSyncEvent("set_audio_sync", t, url, {
+        audioSyncEnabled: nextEnabled,
+      });
+    },
+    [playerRef, sendSyncEvent, url]
+  );
 
   // Activity log and chat
   const {
@@ -297,12 +323,14 @@ export default function RoomClient({ roomId }: { roomId: string }) {
     userId,
     isConnected,
     playerRef,
+    applyingRemoteSyncRef,
     setUrl,
     setInputUrl,
     setVideoState,
     setMuted,
     setVolume,
     setPlaybackRate,
+    setAudioSyncEnabled,
     setPlayerReady,
     setPlayerError,
     onSyncEvent,
@@ -482,8 +510,13 @@ export default function RoomClient({ roomId }: { roomId: string }) {
           loadTimeoutRef={loadTimeoutRef}
           playerRef={playerRef}
           handlePlayerError={handlePlayerError}
+          applyingRemoteSyncRef={applyingRemoteSyncRef}
           muted={muted}
           volume={volume}
+          effectiveMuted={effectiveMuted}
+          effectiveVolume={effectiveVolume}
+          audioSyncEnabled={audioSyncEnabled}
+          onAudioSyncEnabledChange={handleAudioSyncEnabledChange}
           playbackRate={playbackRate}
           currentTime={currentTime}
           duration={duration}
@@ -493,9 +526,13 @@ export default function RoomClient({ roomId }: { roomId: string }) {
           handlePlay={handlePlay}
           handlePause={handlePause}
           handleSeekTo={handleSeekTo}
+          handleSeekFromController={handleSeekFromController}
           handleVolumeChange={handleVolumeChange}
+          handleLocalVolumeChange={handleLocalVolumeChange}
+          handleVolumeFromController={handleVolumeFromController}
           handlePlaybackRateChange={handlePlaybackRateChange}
           toggleMute={toggleMute}
+          toggleLocalMute={toggleLocalMute}
           handleProgress={handleProgress}
           handleDuration={handleDuration}
           fullscreenChatOpen={fullscreenChatOpen}

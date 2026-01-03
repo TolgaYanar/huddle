@@ -177,7 +177,7 @@ function LoginPageInner() {
               </button>
 
               <div className="text-xs text-slate-500 text-center">
-                Don't have an account?{" "}
+                Don&apos;t have an account?{" "}
                 <Link
                   href={`/register?next=${encodeURIComponent(next)}`}
                   className="text-indigo-400 hover:text-indigo-300 underline underline-offset-2"

@@ -1316,9 +1316,16 @@ io.on("connection", (socket) => {
     const roomId = normalizeRoomId(data);
     if (!roomId) return;
 
-    const { action, timestamp, videoUrl, volume, isMuted, playbackSpeed } =
-      data || {};
-    // action can be 'play', 'pause', 'seek', 'change_url', 'set_mute', 'set_speed', 'set_volume'
+    const {
+      action,
+      timestamp,
+      videoUrl,
+      volume,
+      isMuted,
+      playbackSpeed,
+      audioSyncEnabled,
+    } = data || {};
+    // action can be 'play', 'pause', 'seek', 'change_url', 'set_mute', 'set_speed', 'set_volume', 'set_audio_sync'
 
     console.log(
       `Room ${roomId}: ${action} at ${timestamp} ${videoUrl ? `URL: ${videoUrl}` : ""}`
@@ -1342,6 +1349,10 @@ io.on("connection", (socket) => {
     }
     if (typeof playbackSpeed === "number" && Number.isFinite(playbackSpeed)) {
       next.playbackSpeed = Math.max(0.25, Math.min(2, playbackSpeed));
+    }
+
+    if (typeof audioSyncEnabled === "boolean") {
+      next.audioSyncEnabled = audioSyncEnabled;
     }
 
     // Track isPlaying independently so room_state stays accurate even if
@@ -1381,6 +1392,7 @@ io.on("connection", (socket) => {
       volume: next.volume,
       isMuted: next.isMuted,
       playbackSpeed: next.playbackSpeed,
+      audioSyncEnabled: next.audioSyncEnabled,
       senderId: socket.id,
     });
   });

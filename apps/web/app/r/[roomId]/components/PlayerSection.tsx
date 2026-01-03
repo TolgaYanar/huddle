@@ -76,9 +76,14 @@ export function PlayerSection({
   loadTimeoutRef,
   playerRef,
   handlePlayerError,
+  applyingRemoteSyncRef,
 
   muted,
   volume,
+  effectiveMuted,
+  effectiveVolume,
+  audioSyncEnabled,
+  onAudioSyncEnabledChange,
   playbackRate,
   currentTime,
   duration,
@@ -88,9 +93,13 @@ export function PlayerSection({
   handlePlay,
   handlePause,
   handleSeekTo,
+  handleSeekFromController,
   handleVolumeChange,
+  handleLocalVolumeChange,
+  handleVolumeFromController,
   handlePlaybackRateChange,
   toggleMute,
+  toggleLocalMute,
   handleProgress,
   handleDuration,
 
@@ -148,9 +157,14 @@ export function PlayerSection({
   loadTimeoutRef: React.MutableRefObject<number | null>;
   playerRef: React.RefObject<unknown>;
   handlePlayerError: (e: unknown) => void;
+  applyingRemoteSyncRef: React.MutableRefObject<boolean>;
 
   muted: boolean;
   volume: number;
+  effectiveMuted: boolean;
+  effectiveVolume: number;
+  audioSyncEnabled: boolean;
+  onAudioSyncEnabledChange: (enabled: boolean) => void;
   playbackRate: number;
   currentTime: number;
   duration: number;
@@ -160,9 +174,13 @@ export function PlayerSection({
   handlePlay: () => void;
   handlePause: () => void;
   handleSeekTo: (time: number) => void;
+  handleSeekFromController: (time: number) => void;
   handleVolumeChange: (volume: number) => void;
+  handleLocalVolumeChange: (volume: number) => void;
+  handleVolumeFromController: (volume: number, muted: boolean) => void;
   handlePlaybackRateChange: (rate: number) => void;
   toggleMute: () => void;
+  toggleLocalMute: () => void;
   handleProgress: (time: number) => void;
   handleDuration: (dur: number) => void;
 
@@ -361,6 +379,7 @@ export function PlayerSection({
     return {
       youtube: {
         playerVars: {
+          controls: 1,
           fs: 0,
           rel: 0,
           enablejsapi: 1,
@@ -606,6 +625,7 @@ export function PlayerSection({
                 </div>
               </div>
             </div>
+            {/* eslint-disable-next-line react/no-unknown-property */}
             <style jsx>{`
               .fullscreenChatPanel {
                 left: ${fullscreenChatPos?.x ?? 12}px;
@@ -712,7 +732,35 @@ export function PlayerSection({
                 controls
                 playsInline
                 preload="auto"
-                muted={muted}
+                muted={effectiveMuted}
+                onPlay={(e) => {
+                  if (applyingRemoteSyncRef.current) return;
+                  if (!(e.nativeEvent as Event).isTrusted) return;
+                  handlePlay();
+                }}
+                onPause={(e) => {
+                  if (applyingRemoteSyncRef.current) return;
+                  if (!(e.nativeEvent as Event).isTrusted) return;
+                  handlePause();
+                }}
+                onSeeked={(e) => {
+                  if (applyingRemoteSyncRef.current) return;
+                  if (!(e.nativeEvent as Event).isTrusted) return;
+                  const el = e.currentTarget as HTMLVideoElement;
+                  handleSeekFromController(el.currentTime);
+                }}
+                onVolumeChange={(e) => {
+                  if (applyingRemoteSyncRef.current) return;
+                  if (!(e.nativeEvent as Event).isTrusted) return;
+                  const el = e.currentTarget as HTMLVideoElement;
+                  handleVolumeFromController(el.volume, el.muted);
+                }}
+                onRateChange={(e) => {
+                  if (applyingRemoteSyncRef.current) return;
+                  if (!(e.nativeEvent as Event).isTrusted) return;
+                  const el = e.currentTarget as HTMLVideoElement;
+                  handlePlaybackRateChange(el.playbackRate);
+                }}
                 onLoadedMetadata={(e) => {
                   setPlayerReady(true);
                   setPlayerError(null);
@@ -750,14 +798,34 @@ export function PlayerSection({
                   ref: playerRef as unknown as React.RefObject<HTMLVideoElement | null>,
                   src: canPlay ? normalizedUrl : undefined,
                   playing: videoState === "Playing",
-                  muted,
-                  volume,
+                  muted: effectiveMuted,
+                  volume: effectiveVolume,
                   playbackRate,
                   width: "100%",
                   height: "100%",
                   controls: true,
                   playsInline: true,
                   config: playerConfig,
+                  onPlay: () => {
+                    if (applyingRemoteSyncRef.current) return;
+                    if (videoState !== "Playing") handlePlay();
+                  },
+                  onPause: () => {
+                    if (applyingRemoteSyncRef.current) return;
+                    if (videoState !== "Paused") handlePause();
+                  },
+                  onSeek: (seconds: number) => {
+                    if (applyingRemoteSyncRef.current) return;
+                    if (typeof seconds === "number" && !Number.isNaN(seconds)) {
+                      handleSeekFromController(seconds);
+                    }
+                  },
+                  onPlaybackRateChange: (rate: number) => {
+                    if (applyingRemoteSyncRef.current) return;
+                    if (typeof rate === "number" && !Number.isNaN(rate)) {
+                      handlePlaybackRateChange(rate);
+                    }
+                  },
                   onError: handlePlayerError,
                   onReady: () => {
                     setPlayerReady(true);
@@ -870,6 +938,8 @@ export function PlayerSection({
         duration={duration}
         volume={volume}
         muted={muted}
+        effectiveVolume={effectiveVolume}
+        effectiveMuted={effectiveMuted}
         playbackRate={playbackRate}
         isBuffering={isBuffering}
         onPlay={handlePlay}
@@ -877,6 +947,10 @@ export function PlayerSection({
         onSeek={handleSeekTo}
         onVolumeChange={handleVolumeChange}
         onMuteToggle={toggleMute}
+        audioSyncEnabled={audioSyncEnabled}
+        onAudioSyncEnabledChange={onAudioSyncEnabledChange}
+        onLocalVolumeChange={handleLocalVolumeChange}
+        onLocalMuteToggle={toggleLocalMute}
         onPlaybackRateChange={handlePlaybackRateChange}
         onFullscreen={togglePlayerFullscreen}
         isFullscreen={isPlayerFullscreen}

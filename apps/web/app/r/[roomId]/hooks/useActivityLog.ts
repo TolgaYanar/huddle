@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   SyncData,
+  RoomStateData,
   ChatMessage,
   ChatHistoryData,
   ActivityEvent,
@@ -20,26 +21,19 @@ interface UseActivityLogProps {
   userId: string;
   isConnected: boolean;
   playerRef: React.RefObject<unknown>;
+  applyingRemoteSyncRef: React.MutableRefObject<boolean>;
   setUrl: (url: string) => void;
   setInputUrl: (url: string) => void;
   setVideoState: (state: string) => void;
   setMuted: (muted: boolean) => void;
   setVolume: (volume: number) => void;
   setPlaybackRate: (rate: number) => void;
+  setAudioSyncEnabled: (enabled: boolean) => void;
   setPlayerReady: (ready: boolean) => void;
   setPlayerError: (error: string | null) => void;
   onSyncEvent: (callback: (data: SyncData) => void) => () => void;
   onRoomState?: (
-    callback: (state: {
-      roomId: string;
-      videoUrl?: string;
-      timestamp?: number;
-      action?: string;
-      isPlaying?: boolean;
-      volume?: number;
-      isMuted?: boolean;
-      playbackSpeed?: number;
-    }) => void
+    callback: (state: RoomStateData) => void
   ) => (() => void) | undefined;
   onChatHistory?: (
     callback: (data: ChatHistoryData) => void
@@ -64,12 +58,14 @@ export function useActivityLog({
   userId,
   isConnected,
   playerRef,
+  applyingRemoteSyncRef,
   setUrl,
   setInputUrl,
   setVideoState,
   setMuted,
   setVolume,
   setPlaybackRate,
+  setAudioSyncEnabled,
   setPlayerReady,
   setPlayerError,
   onSyncEvent,
@@ -86,6 +82,20 @@ export function useActivityLog({
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [chatText, setChatText] = useState("");
   const logsEndRef = useRef<HTMLDivElement>(null);
+  const remoteSyncResetTimeoutRef = useRef<number | null>(null);
+
+  const markApplyingRemoteSync = useCallback(() => {
+    applyingRemoteSyncRef.current = true;
+    if (remoteSyncResetTimeoutRef.current) {
+      window.clearTimeout(remoteSyncResetTimeoutRef.current);
+    }
+    // Give embedded players a moment to emit their own callbacks (onPlay/onSeek/etc)
+    // so receivers don't re-broadcast.
+    remoteSyncResetTimeoutRef.current = window.setTimeout(() => {
+      applyingRemoteSyncRef.current = false;
+      remoteSyncResetTimeoutRef.current = null;
+    }, 600);
+  }, [applyingRemoteSyncRef]);
 
   // Auto-scroll logs
   useEffect(() => {
@@ -96,6 +106,8 @@ export function useActivityLog({
   useEffect(() => {
     const cleanupRoomState = onRoomState?.((state) => {
       if (!state || state.roomId !== roomId) return;
+
+      markApplyingRemoteSync();
 
       if (state.videoUrl) {
         const nextUrl = normalizeVideoUrl(state.videoUrl);
@@ -115,6 +127,9 @@ export function useActivityLog({
       }
       if (typeof state.isMuted === "boolean") {
         setMuted(state.isMuted);
+      }
+      if (typeof state.audioSyncEnabled === "boolean") {
+        setAudioSyncEnabled(state.audioSyncEnabled);
       }
       if (
         typeof state.playbackSpeed === "number" &&
@@ -249,6 +264,8 @@ export function useActivityLog({
     });
 
     const cleanup = onSyncEvent((data: SyncData) => {
+      markApplyingRemoteSync();
+
       const time = new Date().toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",
@@ -281,11 +298,21 @@ export function useActivityLog({
       if (typeof data.isMuted === "boolean") {
         setMuted(data.isMuted);
       }
+      if (typeof data.audioSyncEnabled === "boolean") {
+        setAudioSyncEnabled(data.audioSyncEnabled);
+      }
       if (
         typeof data.playbackSpeed === "number" &&
         Number.isFinite(data.playbackSpeed)
       ) {
         setPlaybackRate(data.playbackSpeed);
+      }
+
+      if (data.action === "set_audio_sync") {
+        logMsg =
+          typeof data.audioSyncEnabled === "boolean"
+            ? `audio sync: ${data.audioSyncEnabled ? "on" : "off"}`
+            : "changed audio sync";
       }
 
       if (data.action === "set_mute") {
@@ -329,6 +356,12 @@ export function useActivityLog({
       cleanupChatMessage?.();
       cleanupActivityHistory?.();
       cleanupActivityEvent?.();
+
+      if (remoteSyncResetTimeoutRef.current) {
+        window.clearTimeout(remoteSyncResetTimeoutRef.current);
+        remoteSyncResetTimeoutRef.current = null;
+      }
+      applyingRemoteSyncRef.current = false;
     };
   }, [
     onSyncEvent,
@@ -337,15 +370,18 @@ export function useActivityLog({
     onChatMessage,
     onActivityHistory,
     onActivityEvent,
+    markApplyingRemoteSync,
     roomId,
     userId,
     playerRef,
+    applyingRemoteSyncRef,
     setUrl,
     setInputUrl,
     setVideoState,
     setMuted,
     setVolume,
     setPlaybackRate,
+    setAudioSyncEnabled,
     setPlayerReady,
     setPlayerError,
   ]);

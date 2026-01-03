@@ -19,11 +19,18 @@ import type { LogEntry } from "../types";
 interface UseVideoPlayerProps {
   isClient: boolean;
   roomId: string;
+  audioSyncEnabled: boolean;
+  applyingRemoteSyncRef: React.MutableRefObject<boolean>;
   sendSyncEvent: (
     action: SyncAction,
     timestamp: number,
     videoUrl?: string,
-    extra?: { volume?: number; isMuted?: boolean; playbackSpeed?: number }
+    extra?: {
+      volume?: number;
+      isMuted?: boolean;
+      playbackSpeed?: number;
+      audioSyncEnabled?: boolean;
+    }
   ) => void;
   addLogEntry?: (entry: Omit<LogEntry, "time">) => void;
 }
@@ -31,6 +38,8 @@ interface UseVideoPlayerProps {
 export function useVideoPlayer({
   isClient,
   roomId,
+  audioSyncEnabled,
+  applyingRemoteSyncRef,
   sendSyncEvent,
   addLogEntry,
 }: UseVideoPlayerProps) {
@@ -39,8 +48,18 @@ export function useVideoPlayer({
   );
   const [inputUrl, setInputUrl] = useState(url);
   const [videoState, setVideoState] = useState("Paused");
+  // "Room" volume/mute are controlled by our custom UI and are synced.
   const [muted, setMuted] = useState(true);
   const [volume, setVolume] = useState(1);
+  // Built-in player controls should be per-user and must not affect the room.
+  // If the user touches built-in volume/mute, we store a local override.
+  // When the override matches the room value again, we reset back to "follow room".
+  const [localVolumeOverride, setLocalVolumeOverride] = useState<number | null>(
+    null
+  );
+  const [localMutedOverride, setLocalMutedOverride] = useState<boolean | null>(
+    null
+  );
   const [playbackRate, setPlaybackRate] = useState(1);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -55,6 +74,66 @@ export function useVideoPlayer({
 
   const playerRef = useRef<unknown>(null);
   const loadTimeoutRef = useRef<number | null>(null);
+
+  const latestUrlRef = useRef(url);
+  const latestRoomVolumeRef = useRef(volume);
+  const latestRoomMutedRef = useRef(muted);
+  const lastRoomAVChangeAtRef = useRef(0);
+  const latestEffectiveVolumeRef = useRef(1);
+  const latestEffectiveMutedRef = useRef(true);
+  const lastYoutubeVolumeSyncAtRef = useRef(0);
+  const lastYoutubeRateSyncAtRef = useRef(0);
+  const latestPlaybackRateRef = useRef(playbackRate);
+  const lastVolumeEmitAtRef = useRef(0);
+  const pendingVolumeEmitRef = useRef<{
+    volume: number;
+    muted: boolean;
+  } | null>(null);
+  const volumeEmitTimeoutRef = useRef<number | null>(null);
+  const lastLocalSeekRef = useRef<{ time: number; at: number } | null>(null);
+
+  const effectiveVolume = useMemo(() => {
+    const v = localVolumeOverride ?? volume;
+    return Math.max(0, Math.min(1, v));
+  }, [volume, localVolumeOverride]);
+
+  const effectiveMuted = useMemo(() => {
+    return (localMutedOverride ?? muted) === true;
+  }, [muted, localMutedOverride]);
+
+  useEffect(() => {
+    latestUrlRef.current = url;
+  }, [url]);
+
+  useEffect(() => {
+    latestRoomVolumeRef.current = volume;
+    lastRoomAVChangeAtRef.current = Date.now();
+  }, [volume]);
+
+  useEffect(() => {
+    latestRoomMutedRef.current = muted;
+    lastRoomAVChangeAtRef.current = Date.now();
+  }, [muted]);
+
+  useEffect(() => {
+    latestEffectiveVolumeRef.current = effectiveVolume;
+  }, [effectiveVolume]);
+
+  useEffect(() => {
+    latestEffectiveMutedRef.current = effectiveMuted;
+  }, [effectiveMuted]);
+
+  useEffect(() => {
+    latestPlaybackRateRef.current = playbackRate;
+  }, [playbackRate]);
+
+  // When audio sync is enabled for the room, we must "follow room" so that
+  // built-in player controls and our custom UI reflect the same audio state.
+  useEffect(() => {
+    if (!audioSyncEnabled) return;
+    setLocalVolumeOverride(null);
+    setLocalMutedOverride(null);
+  }, [audioSyncEnabled]);
 
   // Store roomId in localStorage
   useEffect(() => {
@@ -96,6 +175,94 @@ export function useVideoPlayer({
     };
   }, [isClient, url]);
 
+  // Built-in player controls should be local-only (unique per user).
+  // Treat built-in volume/mute as a local override that does not sync.
+  const handleVolumeFromController = useCallback(
+    (nextVolume: number, nextMuted: boolean) => {
+      const clamped = Math.max(0, Math.min(1, nextVolume));
+      const roomVol = latestRoomVolumeRef.current;
+      const roomMuted = latestRoomMutedRef.current;
+
+      if (Math.abs(clamped - roomVol) < 0.01) {
+        setLocalVolumeOverride(null);
+      } else {
+        setLocalVolumeOverride(clamped);
+      }
+
+      if (Boolean(nextMuted) === roomMuted) {
+        setLocalMutedOverride(null);
+      } else {
+        setLocalMutedOverride(Boolean(nextMuted));
+      }
+    },
+    []
+  );
+
+  // Room-synced volume/mute (used by our custom controller).
+  // We also route YouTube's built-in slider changes through this when audio sync is enabled.
+  const handleVolumeChange = useCallback(
+    (newVolume: number, forcedMuted?: boolean) => {
+      const clamped = Math.max(0, Math.min(1, newVolume));
+      const nextMuted =
+        typeof forcedMuted === "boolean" ? forcedMuted : clamped <= 0;
+
+      setVolume(clamped);
+      setMuted(nextMuted);
+
+      // Rate-limit network sync to avoid spamming while dragging.
+      pendingVolumeEmitRef.current = { volume: clamped, muted: nextMuted };
+
+      const flush = () => {
+        const pending = pendingVolumeEmitRef.current;
+        if (!pending) return;
+        pendingVolumeEmitRef.current = null;
+        lastVolumeEmitAtRef.current = Date.now();
+        const t = getCurrentTimeFromRef(playerRef);
+        sendSyncEvent("set_volume", t, url, {
+          volume: pending.volume,
+          isMuted: pending.muted,
+        });
+      };
+
+      const now = Date.now();
+      const minIntervalMs = 120;
+      const sinceLast = now - lastVolumeEmitAtRef.current;
+
+      if (sinceLast >= minIntervalMs) {
+        if (volumeEmitTimeoutRef.current) {
+          window.clearTimeout(volumeEmitTimeoutRef.current);
+          volumeEmitTimeoutRef.current = null;
+        }
+        flush();
+        return;
+      }
+
+      if (volumeEmitTimeoutRef.current) return;
+      volumeEmitTimeoutRef.current = window.setTimeout(
+        () => {
+          volumeEmitTimeoutRef.current = null;
+          flush();
+        },
+        Math.max(0, minIntervalMs - sinceLast)
+      );
+    },
+    [sendSyncEvent, url]
+  );
+
+  const handlePlaybackRateChange = useCallback(
+    (rate: number) => {
+      setPlaybackRate(rate);
+      const t = getCurrentTimeFromRef(playerRef);
+      sendSyncEvent("set_speed", t, url, { playbackSpeed: rate });
+      addLogEntry?.({
+        msg: `changed playback speed to ${rate}x`,
+        type: "seek",
+        user: "You",
+      });
+    },
+    [addLogEntry, sendSyncEvent, url]
+  );
+
   // Sync volume with the internal video element
   useEffect(() => {
     if (!playerRef.current) return;
@@ -106,12 +273,12 @@ export function useVideoPlayer({
       };
       const videoElement = rp?.getInternalPlayer?.();
       if (videoElement && typeof videoElement.volume !== "undefined") {
-        videoElement.volume = volume;
+        videoElement.volume = effectiveVolume;
       }
     } catch {
       // ignore
     }
-  }, [volume]);
+  }, [effectiveVolume]);
 
   // Sync playbackRate with the internal video element
   useEffect(() => {
@@ -157,6 +324,123 @@ export function useVideoPlayer({
     };
   }, [isClient, url]);
 
+  // YouTube iframe controls can change volume/mute without going through our UI.
+  // Poll the internal YT player and route those changes through the same handlers
+  // our custom controller uses.
+  useEffect(() => {
+    if (!isClient) return;
+
+    const isYouTube = /youtube\.com|youtu\.be|youtube-nocookie\.com/i.test(url);
+    if (!isYouTube) return;
+
+    let cancelled = false;
+    const id = window.setInterval(() => {
+      if (cancelled) return;
+
+      const current = playerRef.current as {
+        getInternalPlayer?: () => unknown;
+      } | null;
+      const internal = current?.getInternalPlayer?.() as
+        | {
+            getVolume?: () => unknown;
+            isMuted?: () => unknown;
+            getPlaybackRate?: () => unknown;
+          }
+        | null
+        | undefined;
+
+      if (!internal) return;
+
+      const rawVol =
+        typeof internal.getVolume === "function" ? internal.getVolume() : null;
+      const rawMuted =
+        typeof internal.isMuted === "function" ? internal.isMuted() : null;
+      const rawRate =
+        typeof internal.getPlaybackRate === "function"
+          ? internal.getPlaybackRate()
+          : null;
+
+      const volNum =
+        typeof rawVol === "number" && isFinite(rawVol) ? rawVol : null;
+      const nextVol =
+        volNum === null ? null : Math.max(0, Math.min(1, volNum / 100));
+      const nextMuted = typeof rawMuted === "boolean" ? rawMuted : null;
+
+      const nextRate =
+        typeof rawRate === "number" && Number.isFinite(rawRate)
+          ? rawRate
+          : null;
+
+      if (nextVol === null && nextMuted === null && nextRate === null) return;
+
+      // Never re-broadcast while we're applying remote state.
+      if (applyingRemoteSyncRef.current) return;
+
+      const now = Date.now();
+      if (now - lastYoutubeVolumeSyncAtRef.current < 50) return;
+
+      const roomVol = latestRoomVolumeRef.current;
+      const roomMuted = latestRoomMutedRef.current;
+      const effectiveVol = latestEffectiveVolumeRef.current;
+      const effectiveMuted = latestEffectiveMutedRef.current;
+
+      // Volume/mute
+      if (nextVol !== null || nextMuted !== null) {
+        const appliedVol =
+          nextVol ?? (audioSyncEnabled ? roomVol : effectiveVol);
+        const appliedMuted =
+          nextMuted ?? (audioSyncEnabled ? roomMuted : effectiveMuted);
+
+        const changed = audioSyncEnabled
+          ? Math.abs(appliedVol - roomVol) >= 0.02 || appliedMuted !== roomMuted
+          : Math.abs(appliedVol - effectiveVol) >= 0.02 ||
+            appliedMuted !== effectiveMuted;
+
+        if (changed) {
+          lastYoutubeVolumeSyncAtRef.current = now;
+
+          if (audioSyncEnabled) {
+            // Same handler our custom volume control uses (room-synced).
+            handleVolumeChange(
+              Math.max(0, Math.min(1, appliedVol)),
+              Boolean(appliedMuted)
+            );
+          } else {
+            // Local-only mode: treat as a local override.
+            handleVolumeFromController(
+              Math.max(0, Math.min(1, appliedVol)),
+              Boolean(appliedMuted)
+            );
+          }
+        }
+      }
+
+      // Playback rate (YouTube UI doesn't always trigger ReactPlayer callbacks)
+      if (nextRate !== null) {
+        const currentRate = latestPlaybackRateRef.current;
+        if (Math.abs(nextRate - currentRate) >= 0.05) {
+          if (now - lastYoutubeRateSyncAtRef.current >= 200) {
+            lastYoutubeRateSyncAtRef.current = now;
+            handlePlaybackRateChange(nextRate);
+          }
+        }
+      }
+    }, 50);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [
+    isClient,
+    url,
+    audioSyncEnabled,
+    applyingRemoteSyncRef,
+    handleVolumeChange,
+    handleVolumeFromController,
+    handlePlaybackRateChange,
+  ]);
+
   const handlePlay = useCallback(() => {
     const currentTime = getCurrentTimeFromRef(playerRef);
     sendSyncEvent("play", currentTime, url);
@@ -177,6 +461,7 @@ export function useVideoPlayer({
       const newTime = Math.max(0, time + seconds);
       seekToFromRef(playerRef, newTime);
       sendSyncEvent("seek", newTime, url);
+      lastLocalSeekRef.current = { time: newTime, at: Date.now() };
       addLogEntry?.({
         msg: `jumped to ${formatTime(newTime)}`,
         type: "seek",
@@ -192,6 +477,7 @@ export function useVideoPlayer({
       seekToFromRef(playerRef, newTime);
       setCurrentTime(newTime);
       sendSyncEvent("seek", newTime, url);
+      lastLocalSeekRef.current = { time: newTime, at: Date.now() };
       addLogEntry?.({
         msg: `seeked to ${formatTime(newTime)}`,
         type: "seek",
@@ -201,36 +487,64 @@ export function useVideoPlayer({
     [url, duration, sendSyncEvent, addLogEntry]
   );
 
-  const handleVolumeChange = useCallback(
-    (newVolume: number) => {
-      const clamped = Math.max(0, Math.min(1, newVolume));
-      const nextMuted = clamped <= 0;
+  // Used when the user seeks via the built-in player controls.
+  // The player already performed the seek, so we only update state + broadcast.
+  const handleSeekFromController = useCallback(
+    (time: number) => {
+      const newTime = Math.max(0, Math.min(time, duration || Infinity));
 
-      setVolume(clamped);
-      setMuted(nextMuted);
+      const last = lastLocalSeekRef.current;
+      if (
+        last &&
+        Date.now() - last.at < 800 &&
+        Math.abs(last.time - newTime) < 0.5
+      ) {
+        // Likely a follow-up callback from a programmatic seek we already broadcast.
+        return;
+      }
 
-      const t = getCurrentTimeFromRef(playerRef);
-      sendSyncEvent("set_volume", t, url, {
-        volume: clamped,
-        isMuted: nextMuted,
-      });
-    },
-    [sendSyncEvent, url]
-  );
-
-  const handlePlaybackRateChange = useCallback(
-    (rate: number) => {
-      setPlaybackRate(rate);
-      const t = getCurrentTimeFromRef(playerRef);
-      sendSyncEvent("set_speed", t, url, { playbackSpeed: rate });
+      setCurrentTime(newTime);
+      sendSyncEvent("seek", newTime, url);
+      lastLocalSeekRef.current = { time: newTime, at: Date.now() };
       addLogEntry?.({
-        msg: `changed playback speed to ${rate}x`,
+        msg: `seeked to ${formatTime(newTime)}`,
         type: "seek",
         user: "You",
       });
     },
-    [addLogEntry, sendSyncEvent, url]
+    [url, duration, sendSyncEvent, addLogEntry]
   );
+
+  // Local-only volume/mute for the custom controller (does not sync to room).
+  const handleLocalVolumeChange = useCallback((newVolume: number) => {
+    const clamped = Math.max(0, Math.min(1, newVolume));
+    const roomVol = latestRoomVolumeRef.current;
+
+    if (Math.abs(clamped - roomVol) < 0.01) {
+      setLocalVolumeOverride(null);
+    } else {
+      setLocalVolumeOverride(clamped);
+    }
+
+    // If the user moves the volume slider, treat that as an intent to unmute.
+    // (This is key when the room is muted and the user wants local audio.)
+    if (clamped <= 0) {
+      setLocalMutedOverride(true);
+    } else {
+      setLocalMutedOverride(false);
+    }
+  }, []);
+
+  const toggleLocalMute = useCallback(() => {
+    const roomMuted = latestRoomMutedRef.current;
+    const nextMuted = !latestEffectiveMutedRef.current;
+
+    if (nextMuted === roomMuted) {
+      setLocalMutedOverride(null);
+    } else {
+      setLocalMutedOverride(nextMuted);
+    }
+  }, []);
 
   const handleProgress = useCallback((time: number) => {
     setCurrentTime(time);
@@ -366,6 +680,8 @@ export function useVideoPlayer({
     setVolume,
     playbackRate,
     setPlaybackRate,
+    effectiveMuted,
+    effectiveVolume,
     currentTime,
     setCurrentTime,
     duration,
@@ -392,11 +708,15 @@ export function useVideoPlayer({
     handlePause,
     handleSeek,
     handleSeekTo,
+    handleSeekFromController,
     handleVolumeChange,
+    handleLocalVolumeChange,
+    handleVolumeFromController,
     handlePlaybackRateChange,
     handleProgress,
     handleDuration,
     toggleMute,
+    toggleLocalMute,
     handleUrlChange,
     loadVideoUrl,
     handlePlayerError,

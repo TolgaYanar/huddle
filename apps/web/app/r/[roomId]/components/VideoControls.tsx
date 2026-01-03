@@ -115,6 +115,9 @@ interface VideoControlsProps {
   isPlaying: boolean;
   muted: boolean;
   volume: number;
+  // Optional: effective (per-user) audio, used when "audio sync" is disabled.
+  effectiveMuted?: boolean;
+  effectiveVolume?: number;
   currentTime: number;
   duration: number;
   playbackRate: number;
@@ -126,6 +129,12 @@ interface VideoControlsProps {
   onSeek: (time: number) => void;
   onMuteToggle: () => void;
   onVolumeChange: (volume: number) => void;
+  // Optional: local-only volume/mute for when audio shouldn't sync.
+  onLocalMuteToggle?: () => void;
+  onLocalVolumeChange?: (volume: number) => void;
+  // Room-wide setting
+  audioSyncEnabled?: boolean;
+  onAudioSyncEnabledChange?: (enabled: boolean) => void;
   onPlaybackRateChange: (rate: number) => void;
   onFullscreen?: () => void;
 
@@ -213,6 +222,8 @@ export function VideoControls({
   isPlaying,
   muted,
   volume,
+  effectiveMuted,
+  effectiveVolume,
   currentTime,
   duration,
   playbackRate,
@@ -222,6 +233,10 @@ export function VideoControls({
   onSeek,
   onMuteToggle,
   onVolumeChange,
+  onLocalMuteToggle,
+  onLocalVolumeChange,
+  audioSyncEnabled,
+  onAudioSyncEnabledChange,
   onPlaybackRateChange,
   onFullscreen,
   isFullscreen = false,
@@ -242,6 +257,8 @@ export function VideoControls({
   const volumeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const speedMenuRef = useRef<HTMLDivElement>(null);
   const settingsMenuRef = useRef<HTMLDivElement>(null);
+
+  const roomAudioSyncEnabled = audioSyncEnabled ?? true;
 
   // Close menus when clicking outside
   useEffect(() => {
@@ -312,10 +329,18 @@ export function VideoControls({
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
+  const usingLocalAudio =
+    !roomAudioSyncEnabled &&
+    typeof onLocalVolumeChange === "function" &&
+    typeof onLocalMuteToggle === "function";
+
+  const displayMuted = usingLocalAudio ? (effectiveMuted ?? muted) : muted;
+  const displayVolume = usingLocalAudio ? (effectiveVolume ?? volume) : volume;
+
   const VolumeIcon =
-    muted || volume === 0
+    displayMuted || displayVolume === 0
       ? VolumeMuteIcon
-      : volume < 0.5
+      : displayVolume < 0.5
         ? VolumeLowIcon
         : VolumeHighIcon;
 
@@ -439,10 +464,10 @@ export function VideoControls({
           onMouseLeave={handleVolumeMouseLeave}
         >
           <button
-            onClick={onMuteToggle}
+            onClick={usingLocalAudio ? onLocalMuteToggle : onMuteToggle}
             disabled={!capabilities.canMute}
             className="h-9 w-9 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            title={muted ? "Unmute" : "Mute"}
+            title={displayMuted ? "Unmute" : "Mute"}
           >
             <VolumeIcon />
           </button>
@@ -452,15 +477,20 @@ export function VideoControls({
             <div className="absolute left-full ml-2 flex items-center gap-2 px-3 py-2 bg-black/80 rounded-lg border border-white/10">
               <input
                 type="range"
+                aria-label="Volume"
                 min="0"
                 max="1"
                 step="0.05"
-                value={muted ? 0 : volume}
-                onChange={(e) => onVolumeChange(parseFloat(e.target.value))}
+                value={displayMuted ? 0 : displayVolume}
+                onChange={(e) => {
+                  const next = parseFloat(e.target.value);
+                  if (usingLocalAudio) onLocalVolumeChange?.(next);
+                  else onVolumeChange(next);
+                }}
                 className="w-20 h-1 accent-white bg-white/20 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow"
               />
               <span className="text-xs text-slate-300 w-8 text-right">
-                {Math.round((muted ? 0 : volume) * 100)}%
+                {Math.round((displayMuted ? 0 : displayVolume) * 100)}%
               </span>
             </div>
           )}
@@ -587,6 +617,28 @@ export function VideoControls({
                 >
                   ⏮ Restart
                 </button>
+
+                <div className="border-t border-white/10 my-2" />
+
+                <div className="px-3 py-1.5 text-xs text-slate-400 uppercase tracking-wider">
+                  Audio
+                </div>
+                <label className="px-3 py-2 flex items-center justify-between gap-3 text-sm text-slate-200 select-none">
+                  <span>Sync volume & mute</span>
+                  <input
+                    type="checkbox"
+                    checked={roomAudioSyncEnabled}
+                    onChange={(e) =>
+                      onAudioSyncEnabledChange?.(e.target.checked)
+                    }
+                    className="h-4 w-4 accent-indigo-500"
+                  />
+                </label>
+                {!roomAudioSyncEnabled && (
+                  <div className="px-3 pb-2 text-xs text-slate-400">
+                    Volume/mute are local. Speed still syncs.
+                  </div>
+                )}
 
                 <div className="border-t border-white/10 my-2" />
 

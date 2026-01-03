@@ -9,7 +9,8 @@ export type SyncAction =
   | "change_url"
   | "set_mute"
   | "set_speed"
-  | "set_volume";
+  | "set_volume"
+  | "set_audio_sync";
 
 export interface SyncData {
   roomId: string;
@@ -19,6 +20,7 @@ export interface SyncData {
   volume?: number;
   isMuted?: boolean;
   playbackSpeed?: number;
+  audioSyncEnabled?: boolean;
   senderId?: string;
 }
 
@@ -31,6 +33,7 @@ export interface RoomStateData {
   volume?: number;
   isMuted?: boolean;
   playbackSpeed?: number;
+  audioSyncEnabled?: boolean;
   updatedAt?: number;
 }
 
@@ -157,6 +160,7 @@ export const useRoom = (roomId: string, userId: string) => {
       volume?: number;
       isMuted?: boolean;
       playbackSpeed?: number;
+      audioSyncEnabled?: boolean;
     }>
   >([]);
 
@@ -326,7 +330,10 @@ export const useRoom = (roomId: string, userId: string) => {
       action: SyncAction,
       timestamp: number,
       videoUrl?: string,
-      extra?: Pick<SyncData, "volume" | "isMuted" | "playbackSpeed">
+      extra?: Pick<
+        SyncData,
+        "volume" | "isMuted" | "playbackSpeed" | "audioSyncEnabled"
+      >
     ) => {
       const socket = socketRef.current;
       if (!socket) return;

@@ -4,22 +4,6 @@ export type AuthUser = {
   createdAt: string;
 };
 
-function normalizeBaseUrl(value: string): string {
-  const raw = String(value || "").trim();
-  if (!raw) return raw;
-
-  // Accept ws/wss as input (common when sharing a socket URL) and map to http/https.
-  const mapped = raw.replace(/^ws:/i, "http:").replace(/^wss:/i, "https:");
-
-  try {
-    const u = new URL(mapped);
-    return `${u.protocol}//${u.host}`;
-  } catch {
-    // Fall back to raw string if it isn't a valid absolute URL.
-    return mapped;
-  }
-}
-
 function getApiBaseUrl(): string {
   // For API calls, we want to use same-origin requests in production
   // so Vercel can proxy them to Railway. This avoids CORS issues.
