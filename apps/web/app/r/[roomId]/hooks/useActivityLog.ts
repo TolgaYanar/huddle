@@ -282,7 +282,9 @@ export function useActivityLog({
         second: "2-digit",
       });
       const isMe = data.senderId === userId;
-      const userDisplay = isMe ? "You" : data.senderId || "Unknown";
+      const userDisplay = isMe
+        ? "You"
+        : data.senderUsername || data.senderId || "Unknown";
 
       let logMsg = "";
       if (data.action === "play") logMsg = `started playing`;

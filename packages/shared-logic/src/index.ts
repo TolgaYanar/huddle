@@ -22,6 +22,7 @@ export interface SyncData {
   playbackSpeed?: number;
   audioSyncEnabled?: boolean;
   senderId?: string;
+  senderUsername?: string | null;
 }
 
 export interface RoomStateData {
@@ -35,6 +36,8 @@ export interface RoomStateData {
   playbackSpeed?: number;
   audioSyncEnabled?: boolean;
   updatedAt?: number;
+  senderId?: string;
+  senderUsername?: string | null;
 }
 
 export interface ChatMessage {
