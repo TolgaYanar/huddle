@@ -282,6 +282,7 @@ export default function RoomClient({ roomId }: { roomId: string }) {
     handleLocalVolumeChange,
     handleVolumeFromController,
     handlePlaybackRateChange,
+    handlePlaybackRateFromController,
     handleProgress,
     handleDuration,
     toggleMute,
@@ -531,6 +532,7 @@ export default function RoomClient({ roomId }: { roomId: string }) {
           handleLocalVolumeChange={handleLocalVolumeChange}
           handleVolumeFromController={handleVolumeFromController}
           handlePlaybackRateChange={handlePlaybackRateChange}
+          handlePlaybackRateFromController={handlePlaybackRateFromController}
           toggleMute={toggleMute}
           toggleLocalMute={toggleLocalMute}
           handleProgress={handleProgress}

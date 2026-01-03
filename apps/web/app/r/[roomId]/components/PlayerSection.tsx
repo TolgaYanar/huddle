@@ -98,6 +98,7 @@ export function PlayerSection({
   handleLocalVolumeChange,
   handleVolumeFromController,
   handlePlaybackRateChange,
+  handlePlaybackRateFromController,
   toggleMute,
   toggleLocalMute,
   handleProgress,
@@ -179,6 +180,7 @@ export function PlayerSection({
   handleLocalVolumeChange: (volume: number) => void;
   handleVolumeFromController: (volume: number, muted: boolean) => void;
   handlePlaybackRateChange: (rate: number) => void;
+  handlePlaybackRateFromController: (rate: number) => void;
   toggleMute: () => void;
   toggleLocalMute: () => void;
   handleProgress: (time: number) => void;
@@ -406,9 +408,9 @@ export function PlayerSection({
     const el = getHtmlMediaElementFromRef(playerRef);
     if (el) {
       try {
-        el.muted = muted;
+        el.muted = effectiveMuted;
         // Keep volume in sync when unmuted.
-        if (!muted) el.volume = volume;
+        if (!effectiveMuted) el.volume = effectiveVolume;
         el.playbackRate = playbackRate;
       } catch {
         // ignore
@@ -420,7 +422,14 @@ export function PlayerSection({
     } else {
       pauseFromRef(playerRef);
     }
-  }, [isDirectFile, playerRef, muted, volume, playbackRate, videoState]);
+  }, [
+    isDirectFile,
+    playerRef,
+    effectiveMuted,
+    effectiveVolume,
+    playbackRate,
+    videoState,
+  ]);
 
   const onEmbedLoad = () => {
     setPlayerReady(true);
@@ -759,7 +768,7 @@ export function PlayerSection({
                   if (applyingRemoteSyncRef.current) return;
                   if (!(e.nativeEvent as Event).isTrusted) return;
                   const el = e.currentTarget as HTMLVideoElement;
-                  handlePlaybackRateChange(el.playbackRate);
+                  handlePlaybackRateFromController(el.playbackRate);
                 }}
                 onLoadedMetadata={(e) => {
                   setPlayerReady(true);
@@ -794,53 +803,53 @@ export function PlayerSection({
               />
             ) : (
               <ReactPlayer
-                {...{
-                  ref: playerRef as unknown as React.RefObject<HTMLVideoElement | null>,
-                  src: canPlay ? normalizedUrl : undefined,
-                  playing: videoState === "Playing",
-                  muted: effectiveMuted,
-                  volume: effectiveVolume,
-                  playbackRate,
-                  width: "100%",
-                  height: "100%",
-                  controls: true,
-                  playsInline: true,
-                  config: playerConfig,
-                  onPlay: () => {
-                    if (applyingRemoteSyncRef.current) return;
-                    if (videoState !== "Playing") handlePlay();
-                  },
-                  onPause: () => {
-                    if (applyingRemoteSyncRef.current) return;
-                    if (videoState !== "Paused") handlePause();
-                  },
-                  onSeek: (seconds: number) => {
-                    if (applyingRemoteSyncRef.current) return;
-                    if (typeof seconds === "number" && !Number.isNaN(seconds)) {
-                      handleSeekFromController(seconds);
-                    }
-                  },
-                  onPlaybackRateChange: (rate: number) => {
-                    if (applyingRemoteSyncRef.current) return;
-                    if (typeof rate === "number" && !Number.isNaN(rate)) {
-                      handlePlaybackRateChange(rate);
-                    }
-                  },
-                  onError: handlePlayerError,
-                  onReady: () => {
-                    setPlayerReady(true);
-                    setPlayerError(null);
-                    setIsBuffering(false);
-                    clearLoadTimeout();
-                  },
-                  onStart: () => {
-                    setPlayerReady(true);
-                    setPlayerError(null);
-                    setIsBuffering(false);
-                    clearLoadTimeout();
-                  },
-                  style: { position: "absolute", inset: 0 } as const,
+                ref={
+                  playerRef as unknown as React.RefObject<HTMLVideoElement | null>
+                }
+                src={canPlay ? normalizedUrl : undefined}
+                playing={videoState === "Playing"}
+                muted={effectiveMuted}
+                volume={effectiveVolume}
+                playbackRate={playbackRate}
+                width="100%"
+                height="100%"
+                controls={true}
+                playsInline={true}
+                config={playerConfig}
+                onPlay={() => {
+                  if (applyingRemoteSyncRef.current) return;
+                  if (videoState !== "Playing") handlePlay();
                 }}
+                onPause={() => {
+                  if (applyingRemoteSyncRef.current) return;
+                  if (videoState !== "Paused") handlePause();
+                }}
+                onSeek={(seconds: number) => {
+                  if (applyingRemoteSyncRef.current) return;
+                  if (typeof seconds === "number" && !Number.isNaN(seconds)) {
+                    handleSeekFromController(seconds);
+                  }
+                }}
+                onPlaybackRateChange={(rate: number) => {
+                  if (applyingRemoteSyncRef.current) return;
+                  if (typeof rate === "number" && !Number.isNaN(rate)) {
+                    handlePlaybackRateChange(rate);
+                  }
+                }}
+                onError={handlePlayerError}
+                onReady={() => {
+                  setPlayerReady(true);
+                  setPlayerError(null);
+                  setIsBuffering(false);
+                  clearLoadTimeout();
+                }}
+                onStart={() => {
+                  setPlayerReady(true);
+                  setPlayerError(null);
+                  setIsBuffering(false);
+                  clearLoadTimeout();
+                }}
+                style={{ position: "absolute", inset: 0 }}
               />
             )}
           </div>
