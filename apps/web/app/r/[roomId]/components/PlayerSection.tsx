@@ -824,20 +824,6 @@ export function PlayerSection({
                   if (applyingRemoteSyncRef.current) return;
                   if (videoState !== "Paused") handlePause();
                 }}
-                onProgress={({ playedSeconds }: { playedSeconds: number }) => {
-                  if (
-                    typeof playedSeconds === "number" &&
-                    !Number.isNaN(playedSeconds)
-                  ) {
-                    handleProgress(playedSeconds);
-                  }
-                }}
-                onPlaybackRateChange={(rate: number) => {
-                  if (applyingRemoteSyncRef.current) return;
-                  if (typeof rate === "number" && !Number.isNaN(rate)) {
-                    handlePlaybackRateChange(rate);
-                  }
-                }}
                 onError={handlePlayerError}
                 onReady={() => {
                   setPlayerReady(true);
