@@ -14,10 +14,11 @@ const geistMono = localFont({
 export const metadata: Metadata = {
   metadataBase: new URL("https://wehuddle.tv"),
   title: {
-    default: "WeHuddle",
+    default: "WeHuddle | Watch Videos Together with Friends",
     template: "%s | WeHuddle",
   },
-  description: "Create or join a room and watch together in sync.",
+  description:
+    "Join WeHuddle to create instant, private video rooms. Watch YouTube together and chat with friends—no account required.",
   alternates: {
     canonical: "/",
   },
@@ -39,7 +40,8 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "WeHuddle",
-    description: "Create or join a room and watch together in sync.",
+    description:
+      "Join WeHuddle to create instant, private video rooms. Watch YouTube together and chat with friends—no account required.",
     images: ["/opengraph-image"],
   },
 };
