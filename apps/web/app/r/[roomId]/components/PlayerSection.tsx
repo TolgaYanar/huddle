@@ -824,10 +824,12 @@ export function PlayerSection({
                   if (applyingRemoteSyncRef.current) return;
                   if (videoState !== "Paused") handlePause();
                 }}
-                onSeek={(seconds: number) => {
-                  if (applyingRemoteSyncRef.current) return;
-                  if (typeof seconds === "number" && !Number.isNaN(seconds)) {
-                    handleSeekFromController(seconds);
+                onProgress={({ playedSeconds }: { playedSeconds: number }) => {
+                  if (
+                    typeof playedSeconds === "number" &&
+                    !Number.isNaN(playedSeconds)
+                  ) {
+                    handleProgress(playedSeconds);
                   }
                 }}
                 onPlaybackRateChange={(rate: number) => {
