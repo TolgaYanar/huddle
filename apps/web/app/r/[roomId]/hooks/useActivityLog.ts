@@ -84,18 +84,21 @@ export function useActivityLog({
   const logsEndRef = useRef<HTMLDivElement>(null);
   const remoteSyncResetTimeoutRef = useRef<number | null>(null);
 
-  const markApplyingRemoteSync = useCallback(() => {
-    applyingRemoteSyncRef.current = true;
-    if (remoteSyncResetTimeoutRef.current) {
-      window.clearTimeout(remoteSyncResetTimeoutRef.current);
-    }
-    // Give embedded players a moment to emit their own callbacks (onPlay/onSeek/etc)
-    // so receivers don't re-broadcast.
-    remoteSyncResetTimeoutRef.current = window.setTimeout(() => {
-      applyingRemoteSyncRef.current = false;
-      remoteSyncResetTimeoutRef.current = null;
-    }, 600);
-  }, [applyingRemoteSyncRef]);
+  const markApplyingRemoteSync = useCallback(
+    (durationMs = 600) => {
+      applyingRemoteSyncRef.current = true;
+      if (remoteSyncResetTimeoutRef.current) {
+        window.clearTimeout(remoteSyncResetTimeoutRef.current);
+      }
+      // Give embedded players a moment to emit their own callbacks (onPlay/onSeek/etc)
+      // so receivers don't re-broadcast.
+      remoteSyncResetTimeoutRef.current = window.setTimeout(() => {
+        applyingRemoteSyncRef.current = false;
+        remoteSyncResetTimeoutRef.current = null;
+      }, durationMs);
+    },
+    [applyingRemoteSyncRef]
+  );
 
   // Auto-scroll logs
   useEffect(() => {
@@ -107,7 +110,8 @@ export function useActivityLog({
     const cleanupRoomState = onRoomState?.((state) => {
       if (!state || state.roomId !== roomId) return;
 
-      markApplyingRemoteSync();
+      // Room state application may include a seek; give embedded players longer.
+      markApplyingRemoteSync(1200);
 
       if (state.videoUrl) {
         const nextUrl = normalizeVideoUrl(state.videoUrl);
@@ -264,7 +268,13 @@ export function useActivityLog({
     });
 
     const cleanup = onSyncEvent((data: SyncData) => {
-      markApplyingRemoteSync();
+      const guardMs =
+        data.action === "seek"
+          ? 2000
+          : data.action === "change_url"
+            ? 1500
+            : 600;
+      markApplyingRemoteSync(guardMs);
 
       const time = new Date().toLocaleTimeString([], {
         hour: "2-digit",

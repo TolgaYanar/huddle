@@ -80,6 +80,8 @@ export function useVideoPlayer({
   const lastYoutubeVolumeSyncAtRef = useRef(0);
   const lastYoutubeRateSyncAtRef = useRef(0);
   const latestPlaybackRateRef = useRef(playbackRate);
+  const latestCurrentTimeRef = useRef(currentTime);
+  const latestVideoStateRef = useRef(videoState);
   const lastVolumeEmitAtRef = useRef(0);
   const lastAppliedYoutubeVolumeRef = useRef<{
     vol: number;
@@ -96,6 +98,9 @@ export function useVideoPlayer({
   } | null>(null);
   const volumeEmitTimeoutRef = useRef<number | null>(null);
   const lastLocalSeekRef = useRef<{ time: number; at: number } | null>(null);
+  const lastControllerSeekEmitRef = useRef<{ time: number; at: number } | null>(
+    null
+  );
 
   const effectiveVolume = useMemo(() => {
     const v = localVolumeOverride ?? volume;
@@ -136,6 +141,14 @@ export function useVideoPlayer({
   useEffect(() => {
     latestPlaybackRateRef.current = playbackRate;
   }, [playbackRate]);
+
+  useEffect(() => {
+    latestCurrentTimeRef.current = currentTime;
+  }, [currentTime]);
+
+  useEffect(() => {
+    latestVideoStateRef.current = videoState;
+  }, [videoState]);
 
   // When audio sync is enabled for the room, we must "follow room" so that
   // built-in player controls and our custom UI reflect the same audio state.
@@ -342,7 +355,6 @@ export function useVideoPlayer({
     if (!isYouTube) return;
 
     let cancelled = false;
-    let loggedPlayerStructure = false;
     const id = window.setInterval(() => {
       if (cancelled) return;
 
@@ -549,6 +561,15 @@ export function useVideoPlayer({
     (time: number) => {
       const newTime = Math.max(0, Math.min(time, duration || Infinity));
 
+      // Some embedded players (notably YouTube) can fire "seeked"-like events
+      // during normal playback/buffering. If we're currently playing and the
+      // delta is small, treat it as noise (not an intentional user seek).
+      const isPlaying = latestVideoStateRef.current === "Playing";
+      const approxNow = latestCurrentTimeRef.current;
+      if (isPlaying && Math.abs(approxNow - newTime) < 6) {
+        return;
+      }
+
       const last = lastLocalSeekRef.current;
       if (
         last &&
@@ -558,6 +579,18 @@ export function useVideoPlayer({
         // Likely a follow-up callback from a programmatic seek we already broadcast.
         return;
       }
+
+      // Some embedded players (notably Vimeo) can emit multiple seek events for
+      // a single user action. Debounce these to avoid spamming the room.
+      const lastController = lastControllerSeekEmitRef.current;
+      if (
+        lastController &&
+        Date.now() - lastController.at < 1200 &&
+        Math.abs(lastController.time - newTime) < 6
+      ) {
+        return;
+      }
+      lastControllerSeekEmitRef.current = { time: newTime, at: Date.now() };
 
       setCurrentTime(newTime);
       sendSyncEvent("seek", newTime, url);

@@ -30,6 +30,25 @@ type RemoteStream = {
   media?: WebRTCMediaState;
 };
 
+type YouTubeSearchItem = {
+  videoId: string;
+  title: string;
+  channelTitle: string | null;
+  thumbnail: string | null;
+};
+
+type YouTubeSearchResponse =
+  | { ok: true; items: YouTubeSearchItem[] }
+  | {
+      ok: false;
+      reason:
+        | "missing_key"
+        | "missing_query"
+        | "quota"
+        | "youtube_api_error"
+        | "network";
+    };
+
 export function PlayerSection({
   inputUrl,
   setInputUrl,
@@ -60,6 +79,7 @@ export function PlayerSection({
   isKick,
   isTwitch,
   isPrime,
+  isWebEmbed,
   isBadYoutubeUrl,
   normalizedUrl,
   kickEmbedSrc,
@@ -142,6 +162,7 @@ export function PlayerSection({
   isKick: boolean;
   isTwitch: boolean;
   isPrime: boolean;
+  isWebEmbed: boolean;
   isBadYoutubeUrl: boolean;
   normalizedUrl: string;
   kickEmbedSrc: string | null;
@@ -217,6 +238,86 @@ export function PlayerSection({
     posX: number;
     posY: number;
   } | null>(null);
+
+  const [youtubePickerOpen, setYoutubePickerOpen] = React.useState(false);
+  const [youtubeQuery, setYoutubeQuery] = React.useState("");
+  const [youtubeResults, setYoutubeResults] = React.useState<
+    YouTubeSearchItem[]
+  >([]);
+  const [youtubeLoading, setYoutubeLoading] = React.useState(false);
+  const [youtubeError, setYoutubeError] = React.useState<string | null>(null);
+  const [pendingYoutubeSelectUrl, setPendingYoutubeSelectUrl] = React.useState<
+    string | null
+  >(null);
+
+  React.useEffect(() => {
+    if (!pendingYoutubeSelectUrl) return;
+    if (inputUrl !== pendingYoutubeSelectUrl) return;
+
+    // Trigger the same logic as pressing the "Load" button.
+    // This opens the preview modal; sharing happens only after confirm.
+    handleUrlChange({ preventDefault() {} } as unknown as React.FormEvent);
+    setPendingYoutubeSelectUrl(null);
+  }, [pendingYoutubeSelectUrl, inputUrl, handleUrlChange]);
+
+  const runYouTubeSearch = React.useCallback(async () => {
+    const q = youtubeQuery.trim();
+    if (!q) {
+      setYoutubeError("Type something to search.");
+      setYoutubeResults([]);
+      return;
+    }
+
+    setYoutubeLoading(true);
+    setYoutubeError(null);
+
+    try {
+      const res = await fetch(
+        `/api/youtube-search?q=${encodeURIComponent(q)}&maxResults=12`,
+        {
+          cache: "no-store",
+        }
+      );
+
+      const data = (await res
+        .json()
+        .catch(() => null)) as YouTubeSearchResponse | null;
+
+      if (!data || typeof data !== "object") {
+        setYoutubeError("Search failed.");
+        setYoutubeResults([]);
+        return;
+      }
+
+      if (data.ok) {
+        setYoutubeResults(Array.isArray(data.items) ? data.items : []);
+        setYoutubeError(null);
+        return;
+      }
+
+      if (data.reason === "missing_key") {
+        setYoutubeError(
+          "YouTube browsing is not configured (missing YOUTUBE_API_KEY)."
+        );
+        setYoutubeResults([]);
+        return;
+      }
+
+      if (data.reason === "quota") {
+        setYoutubeError("YouTube API quota exceeded. Try again later.");
+        setYoutubeResults([]);
+        return;
+      }
+
+      setYoutubeError("Search failed.");
+      setYoutubeResults([]);
+    } catch {
+      setYoutubeError("Network error while searching.");
+      setYoutubeResults([]);
+    } finally {
+      setYoutubeLoading(false);
+    }
+  }, [youtubeQuery]);
 
   const clampChatPos = React.useCallback(
     (x: number, y: number) => {
@@ -475,12 +576,130 @@ export function PlayerSection({
               className="flex-1 bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500/40 transition"
             />
             <button
+              type="button"
+              onClick={() => {
+                setYoutubePickerOpen((v) => !v);
+                setYoutubeError(null);
+              }}
+              className="h-11 px-4 bg-black/20 hover:bg-black/30 border border-white/10 rounded-xl transition-colors text-sm font-medium text-slate-50"
+              title="Search YouTube and load into the room"
+            >
+              Browse YouTube
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                // YouTube blocks embedding the full site in iframes (X-Frame-Options/CSP).
+                // Opening in a new tab lets users log in and choose recommendations.
+                window.open(
+                  "https://www.youtube.com",
+                  "_blank",
+                  "noopener,noreferrer"
+                );
+              }}
+              className="h-11 px-4 bg-black/20 hover:bg-black/30 border border-white/10 rounded-xl transition-colors text-sm font-medium text-slate-50"
+              title="Open YouTube in a new tab to pick from your recommendations"
+            >
+              Open YouTube
+            </button>
+            <button
               type="submit"
               className="h-11 px-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-colors text-sm font-medium text-slate-50"
             >
               Load
             </button>
           </form>
+
+          {youtubePickerOpen && (
+            <div className="mt-2 rounded-2xl border border-white/10 bg-black/20 p-3">
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={youtubeQuery}
+                  onChange={(e) => setYoutubeQuery(e.target.value)}
+                  placeholder="Search YouTube..."
+                  className="flex-1 bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500/40 transition"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      void runYouTubeSearch();
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => void runYouTubeSearch()}
+                  disabled={youtubeLoading}
+                  className="h-11 px-4 bg-white/5 hover:bg-white/10 disabled:opacity-50 disabled:hover:bg-white/5 border border-white/10 rounded-xl transition-colors text-sm font-medium text-slate-50"
+                >
+                  {youtubeLoading ? "Searching..." : "Search"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setYoutubePickerOpen(false)}
+                  className="h-11 px-4 bg-black/20 hover:bg-black/30 border border-white/10 rounded-xl transition-colors text-sm font-medium text-slate-50"
+                >
+                  Close
+                </button>
+              </div>
+
+              {youtubeError && (
+                <div className="mt-2 text-xs text-rose-300">{youtubeError}</div>
+              )}
+
+              {youtubeResults.length > 0 && (
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                  {youtubeResults.map((it) => (
+                    <button
+                      key={it.videoId}
+                      type="button"
+                      onClick={() => {
+                        const next = `https://www.youtube.com/watch?v=${it.videoId}`;
+                        setPendingYoutubeSelectUrl(next);
+                        setInputUrl(next);
+                        setYoutubePickerOpen(false);
+                      }}
+                      className="text-left rounded-xl border border-white/10 bg-black/20 hover:bg-black/30 transition-colors overflow-hidden"
+                      title="Select this video"
+                    >
+                      <div className="aspect-video bg-black/30">
+                        {it.thumbnail ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={it.thumbnail}
+                            alt={it.title}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="w-full h-full" />
+                        )}
+                      </div>
+                      <div className="p-2">
+                        <div className="text-sm font-semibold text-slate-100 line-clamp-2">
+                          {it.title}
+                        </div>
+                        {it.channelTitle && (
+                          <div className="text-xs text-slate-400 mt-1 line-clamp-1">
+                            {it.channelTitle}
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {youtubeResults.length === 0 &&
+                !youtubeLoading &&
+                !youtubeError && (
+                  <div className="mt-2 text-xs text-slate-400">
+                    Search and click a video to open the preview. After you
+                    confirm, it becomes the room video.
+                  </div>
+                )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -718,6 +937,7 @@ export function PlayerSection({
                 title="Kick embed"
                 className="absolute inset-0 w-full h-full"
                 allow="autoplay; fullscreen; picture-in-picture"
+                allowFullScreen
                 referrerPolicy="origin"
                 onLoad={onEmbedLoad}
               />
@@ -728,11 +948,23 @@ export function PlayerSection({
                 title="Twitch embed"
                 className="absolute inset-0 w-full h-full"
                 allow="autoplay; fullscreen; picture-in-picture"
+                allowFullScreen
                 referrerPolicy="origin"
                 onLoad={onEmbedLoad}
               />
             ) : isPrime ? (
               <div className="absolute inset-0" />
+            ) : isWebEmbed ? (
+              <iframe
+                key={normalizedUrl}
+                src={canPlay ? normalizedUrl : undefined}
+                title="Embedded site"
+                className="absolute inset-0 w-full h-full"
+                allow="autoplay; fullscreen; picture-in-picture; xr-spatial-tracking; encrypted-media; clipboard-write"
+                allowFullScreen
+                referrerPolicy="origin"
+                onLoad={onEmbedLoad}
+              />
             ) : isDirectFile ? (
               <video
                 ref={playerRef as React.RefObject<HTMLVideoElement | null>}
@@ -754,21 +986,65 @@ export function PlayerSection({
                 }}
                 onSeeked={(e) => {
                   if (applyingRemoteSyncRef.current) return;
-                  if (!(e.nativeEvent as Event).isTrusted) return;
-                  const el = e.currentTarget as HTMLVideoElement;
-                  handleSeekFromController(el.currentTime);
+
+                  const currentTarget = (
+                    e as { currentTarget?: unknown } | null
+                  )?.currentTarget;
+                  const time =
+                    currentTarget &&
+                    typeof (currentTarget as { currentTime?: unknown })
+                      .currentTime === "number"
+                      ? ((currentTarget as { currentTime: number })
+                          .currentTime as number)
+                      : null;
+
+                  if (typeof time === "number" && !Number.isNaN(time)) {
+                    handleSeekFromController(time);
+                  }
                 }}
                 onVolumeChange={(e) => {
                   if (applyingRemoteSyncRef.current) return;
-                  if (!(e.nativeEvent as Event).isTrusted) return;
-                  const el = e.currentTarget as HTMLVideoElement;
-                  handleVolumeFromController(el.volume, el.muted);
+
+                  const currentTarget = (
+                    e as { currentTarget?: unknown } | null
+                  )?.currentTarget;
+                  const volume =
+                    currentTarget &&
+                    typeof (currentTarget as { volume?: unknown }).volume ===
+                      "number"
+                      ? (currentTarget as { volume: number }).volume
+                      : null;
+                  const muted =
+                    currentTarget &&
+                    typeof (currentTarget as { muted?: unknown }).muted ===
+                      "boolean"
+                      ? (currentTarget as { muted: boolean }).muted
+                      : null;
+
+                  if (
+                    typeof volume === "number" &&
+                    !Number.isNaN(volume) &&
+                    typeof muted === "boolean"
+                  ) {
+                    handleVolumeFromController(volume, muted);
+                  }
                 }}
                 onRateChange={(e) => {
                   if (applyingRemoteSyncRef.current) return;
-                  if (!(e.nativeEvent as Event).isTrusted) return;
-                  const el = e.currentTarget as HTMLVideoElement;
-                  handlePlaybackRateFromController(el.playbackRate);
+
+                  const currentTarget = (
+                    e as { currentTarget?: unknown } | null
+                  )?.currentTarget;
+                  const rate =
+                    currentTarget &&
+                    typeof (currentTarget as { playbackRate?: unknown })
+                      .playbackRate === "number"
+                      ? (currentTarget as { playbackRate: number }).playbackRate
+                      : null;
+
+                  if (typeof rate === "number" && !Number.isNaN(rate)) {
+                    handlePlaybackRateFromController(rate);
+                  }
                 }}
                 onLoadedMetadata={(e) => {
                   setPlayerReady(true);
@@ -824,6 +1100,67 @@ export function PlayerSection({
                   if (applyingRemoteSyncRef.current) return;
                   if (videoState !== "Paused") handlePause();
                 }}
+                onSeeked={(e) => {
+                  if (applyingRemoteSyncRef.current) return;
+
+                  const currentTarget = (
+                    e as { currentTarget?: unknown } | null
+                  )?.currentTarget;
+                  const time =
+                    currentTarget &&
+                    typeof (currentTarget as { currentTime?: unknown })
+                      .currentTime === "number"
+                      ? (currentTarget as { currentTime: number }).currentTime
+                      : null;
+
+                  if (typeof time === "number" && !Number.isNaN(time)) {
+                    handleSeekFromController(time);
+                  }
+                }}
+                onVolumeChange={(e) => {
+                  if (applyingRemoteSyncRef.current) return;
+
+                  const currentTarget = (
+                    e as { currentTarget?: unknown } | null
+                  )?.currentTarget;
+                  const volume =
+                    currentTarget &&
+                    typeof (currentTarget as { volume?: unknown }).volume ===
+                      "number"
+                      ? (currentTarget as { volume: number }).volume
+                      : null;
+                  const muted =
+                    currentTarget &&
+                    typeof (currentTarget as { muted?: unknown }).muted ===
+                      "boolean"
+                      ? (currentTarget as { muted: boolean }).muted
+                      : null;
+
+                  if (
+                    typeof volume === "number" &&
+                    !Number.isNaN(volume) &&
+                    typeof muted === "boolean"
+                  ) {
+                    handleVolumeFromController(volume, muted);
+                  }
+                }}
+                onRateChange={(e) => {
+                  if (applyingRemoteSyncRef.current) return;
+
+                  const currentTarget = (
+                    e as { currentTarget?: unknown } | null
+                  )?.currentTarget;
+                  const rate =
+                    currentTarget &&
+                    typeof (currentTarget as { playbackRate?: unknown })
+                      .playbackRate === "number"
+                      ? (currentTarget as { playbackRate: number }).playbackRate
+                      : null;
+
+                  if (typeof rate === "number" && !Number.isNaN(rate)) {
+                    handlePlaybackRateFromController(rate);
+                  }
+                }}
                 onError={handlePlayerError}
                 onReady={() => {
                   setPlayerReady(true);
@@ -837,17 +1174,71 @@ export function PlayerSection({
                   setIsBuffering(false);
                   clearLoadTimeout();
                 }}
+                onLoadedMetadata={(e) => {
+                  setPlayerReady(true);
+                  setPlayerError(null);
+                  setIsBuffering(false);
+                  const dur = (e.currentTarget as HTMLVideoElement).duration;
+                  if (typeof dur === "number" && !isNaN(dur)) {
+                    handleDuration(dur);
+                  }
+                  clearLoadTimeout();
+                }}
+                onCanPlay={() => {
+                  setPlayerReady(true);
+                  setPlayerError(null);
+                  setIsBuffering(false);
+                  clearLoadTimeout();
+                }}
+                onWaiting={() => setIsBuffering(true)}
+                onPlaying={() => {
+                  setPlayerReady(true);
+                  setIsBuffering(false);
+                  clearLoadTimeout();
+                }}
+                onTimeUpdate={(e) => {
+                  const time = (e.currentTarget as HTMLVideoElement)
+                    .currentTime;
+                  if (typeof time === "number" && !isNaN(time)) {
+                    handleProgress(time);
+                  }
+                }}
                 style={{ position: "absolute", inset: 0 }}
               />
             )}
           </div>
         )}
 
-        {(isKick || isTwitch || isPrime) && (
+        {(isKick || isTwitch || isPrime || isWebEmbed) && (
           <div className="absolute top-3 left-3 z-10">
             <span className="px-2.5 py-1 rounded-full text-[11px] font-medium border border-white/10 bg-black/40 text-slate-200">
-              {isKick ? "Kick" : isTwitch ? "Twitch" : "Prime Video"}
+              {isKick
+                ? "Kick"
+                : isTwitch
+                  ? "Twitch"
+                  : isPrime
+                    ? "Prime Video"
+                    : "Web embed"}
             </span>
+          </div>
+        )}
+
+        {isWebEmbed && (
+          <div className="absolute bottom-3 left-3 z-10 max-w-[75%] rounded-2xl border border-white/10 bg-black/50 backdrop-blur-md px-3 py-2">
+            <div className="text-xs text-slate-200">
+              This is an embedded website. Huddle can sync the link, but
+              can&apos;t sync play/pause/seek for most sites.
+            </div>
+            <div className="mt-1">
+              <a
+                href={normalizedUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs underline underline-offset-4 text-slate-200"
+              >
+                Open site in new tab
+              </a>
+            </div>
           </div>
         )}
 

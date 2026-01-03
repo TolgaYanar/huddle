@@ -10,6 +10,16 @@ export function isProblematicYoutubeUrl(rawUrl: string) {
 export function normalizeVideoUrl(rawUrl: string) {
   const trimmed = rawUrl.trim();
 
+  // If the user pasted an iframe snippet, extract src="...".
+  // Example:
+  // <iframe src="https://www.atv.com.tr/canli-yayin" ...></iframe>
+  if (trimmed.startsWith("<") && /<iframe\b/i.test(trimmed)) {
+    const m = trimmed.match(/\bsrc\s*=\s*["']([^"']+)["']/i);
+    if (m?.[1]) {
+      return normalizeVideoUrl(m[1]);
+    }
+  }
+
   // Accept inputs like `kick.com/elwind` / `twitch.tv/shroud` by adding https://
   const withScheme = /^[a-zA-Z][a-zA-Z\d+.-]*:/.test(trimmed)
     ? trimmed
@@ -40,7 +50,8 @@ export function getLoadTimeoutMs(rawUrl: string) {
   const normalized = normalizeVideoUrl(rawUrl);
   if (getKickEmbedSrc(normalized)) return 25000;
   if (isTwitchUrl(normalized)) return 25000;
-  const isFile = /\.(mp4|webm|ogv|ogg)(\?|#|$)/i.test(normalized);
+  if (shouldEmbedWebpage(normalized)) return 25000;
+  const isFile = /\.(mp4|webm|ogv|ogg|m3u8)(\?|#|$)/i.test(normalized);
   return isFile ? 30000 : 20000;
 }
 
@@ -63,7 +74,66 @@ export function getTimeoutErrorMessage(rawUrl: string) {
     return "Timed out loading this YouTube embed. Try a different YouTube watch URL (no playlist/radio), or disable ad/privacy extensions that block YouTube embeds.";
   }
 
+  if (shouldEmbedWebpage(normalized)) {
+    return "Timed out loading this site inside Huddle. Some sites block embedding in iframes. Try opening it in a new tab, or use a direct stream URL (e.g. .m3u8) if you have one.";
+  }
+
   return "Timed out loading this video. If this is a YouTube link, use a normal watch URL (no playlist/radio). If you use ad/privacy blockers, try disabling them for this site.";
+}
+
+export function isYouTubeUrl(rawUrl: string) {
+  try {
+    const url = new URL(rawUrl);
+    const host = url.hostname.replace(/^www\./, "").toLowerCase();
+    return (
+      host === "youtube.com" ||
+      host === "m.youtube.com" ||
+      host === "youtu.be" ||
+      host === "youtube-nocookie.com" ||
+      host.endsWith(".youtube-nocookie.com")
+    );
+  } catch {
+    return /youtube\.com|youtu\.be|youtube-nocookie\.com/i.test(rawUrl);
+  }
+}
+
+export function isVimeoUrl(rawUrl: string) {
+  try {
+    const url = new URL(rawUrl);
+    const host = url.hostname.replace(/^www\./, "").toLowerCase();
+    return host === "vimeo.com" || host === "player.vimeo.com";
+  } catch {
+    return /vimeo\.com/i.test(rawUrl);
+  }
+}
+
+export function isDirectMediaUrl(rawUrl: string) {
+  return /\.(mp4|webm|ogv|ogg|m3u8)(\?|#|$)/i.test(rawUrl);
+}
+
+export function shouldEmbedWebpage(rawUrl: string) {
+  const normalized = normalizeVideoUrl(rawUrl);
+
+  // Only attempt for valid http(s) URLs.
+  let url: URL;
+  try {
+    url = new URL(normalized);
+  } catch {
+    return false;
+  }
+
+  if (url.protocol !== "http:" && url.protocol !== "https:") return false;
+
+  // Known supported sources should use their dedicated players.
+  if (isPrimeVideoUrl(normalized)) return false;
+  if (isYouTubeUrl(normalized)) return false;
+  if (isVimeoUrl(normalized)) return false;
+  if (getKickEmbedSrc(normalized)) return false;
+  if (isTwitchUrl(normalized)) return false;
+  if (isDirectMediaUrl(normalized)) return false;
+
+  // For everything else, try embedding the webpage.
+  return true;
 }
 
 export function getPrimeVideoMessage() {

@@ -34,6 +34,7 @@ import {
   getTwitchEmbedSrc,
   isPrimeVideoUrl,
   isProblematicYoutubeUrl,
+  shouldEmbedWebpage,
 } from "./lib/video";
 
 // Types
@@ -68,6 +69,38 @@ export default function RoomClient({ roomId }: { roomId: string }) {
 
   useEffect(() => {
     setIsClient(true);
+  }, []);
+
+  // Some embedded players (notably Vimeo) can trigger an unhandled promise
+  // rejection when a play() call is immediately followed by pause(). This is
+  // generally harmless during sync, but Next.js dev overlay treats it as a
+  // runtime error.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const onUnhandledRejection = (event: PromiseRejectionEvent) => {
+      const reason = event.reason as
+        | { name?: unknown; message?: unknown }
+        | string
+        | null
+        | undefined;
+
+      const msg =
+        typeof reason === "string"
+          ? reason
+          : typeof reason?.message === "string"
+            ? reason.message
+            : "";
+
+      if (msg.includes("play() request was interrupted by a call to pause")) {
+        event.preventDefault();
+      }
+    };
+
+    window.addEventListener("unhandledrejection", onUnhandledRejection);
+    return () => {
+      window.removeEventListener("unhandledrejection", onUnhandledRejection);
+    };
   }, []);
 
   // Initialize the room socket connection
@@ -400,10 +433,12 @@ export default function RoomClient({ roomId }: { roomId: string }) {
   const isKick = kickEmbedSrc !== null;
   const isPrime = isPrimeVideoUrl(normalizedUrl);
   const isBadYoutubeUrl = isProblematicYoutubeUrl(url);
+  const isWebEmbed = shouldEmbedWebpage(normalizedUrl);
   const canPlay =
-    ((!isBadYoutubeUrl && normalizedUrl.length > 0) || isKick || isTwitch) &&
-    !isPrime;
-  const canControlPlayback = !isKick && !isTwitch && !isPrime;
+    (((!isBadYoutubeUrl && normalizedUrl.length > 0) || isKick || isTwitch) &&
+      !isPrime) ||
+    isWebEmbed;
+  const canControlPlayback = !isKick && !isTwitch && !isPrime && !isWebEmbed;
 
   const remotesForPlayer = useMemo(() => {
     return remoteStreams.map((s) => ({
@@ -497,6 +532,7 @@ export default function RoomClient({ roomId }: { roomId: string }) {
           isKick={isKick}
           isTwitch={isTwitch}
           isPrime={isPrime}
+          isWebEmbed={isWebEmbed}
           isBadYoutubeUrl={isBadYoutubeUrl}
           normalizedUrl={normalizedUrl}
           kickEmbedSrc={kickEmbedSrc}
