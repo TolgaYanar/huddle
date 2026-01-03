@@ -1,0 +1,23 @@
+#!/usr/bin/env sh
+
+DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+
+JAVA_EXE=""
+
+# Prefer JDK 17 for Android Gradle Plugin compatibility.
+for candidate in "$HOME/.jdk"/jdk-17*; do
+  if [ -x "$candidate/bin/java" ]; then
+    JAVA_EXE="$candidate/bin/java"
+    break
+  fi
+done
+
+if [ -z "$JAVA_EXE" ] && [ -n "$JAVA_HOME" ] && [ -x "$JAVA_HOME/bin/java" ]; then
+  JAVA_EXE="$JAVA_HOME/bin/java"
+fi
+
+if [ -z "$JAVA_EXE" ]; then
+  JAVA_EXE="java"
+fi
+
+exec "$JAVA_EXE" -classpath "$DIR/gradle/wrapper/gradle-wrapper.jar" org.gradle.wrapper.GradleWrapperMain "$@"

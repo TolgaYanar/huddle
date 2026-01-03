@@ -31,6 +31,7 @@ enum class ActivityLogKind {
  */
 data class Participant(
     val id: String,
+    val username: String? = null,
     val isLocal: Boolean = false,
     val isHost: Boolean = false,
     val isSpeaking: Boolean = false,
@@ -60,6 +61,7 @@ data class RoomUiState(
     val activityLog: List<ActivityLogEntry> = emptyList(),
     val chatMessages: List<ChatMessage> = emptyList(),
     val videoState: VideoPlayerState = VideoPlayerState(),
+    val audioSyncEnabled: Boolean = true,
     val hasRoomPassword: Boolean = false,
     val passwordRequired: Boolean = false,
     val passwordError: String? = null,

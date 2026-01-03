@@ -208,6 +208,7 @@ class SocketClient @Inject constructor() {
             syncData.volume?.let { put("volume", it) }
             syncData.isMuted?.let { put("isMuted", it) }
             syncData.playbackSpeed?.let { put("playbackSpeed", it) }
+            syncData.audioSyncEnabled?.let { put("audioSyncEnabled", it) }
             syncData.senderId?.let { put("senderId", it) }
         }
         // Align with server/web naming: emit "sync_video"
@@ -360,8 +361,34 @@ class SocketClient @Inject constructor() {
         
         on("room_users") { args ->
             parseJsonObject(args) { obj ->
+                val usernamesMap = mutableMapOf<String, String?>()
+                obj.optJSONObject("usernames")?.let { unames ->
+                    val keys = unames.keys()
+                    while (keys.hasNext()) {
+                        val key = keys.next() as String
+                        // optString returns "" when key missing; treat blanks as null.
+                        usernamesMap[key] = unames.optString(key).takeIf { it.isNotBlank() }
+                    }
+                }
+
                 val users = obj.optJSONArray("users")?.let { arr ->
-                    (0 until arr.length()).map { arr.getString(it) }
+                    val ids = mutableListOf<String>()
+                    for (i in 0 until arr.length()) {
+                        val item = arr.opt(i)
+                        when (item) {
+                            is String -> {
+                                if (item.isNotBlank()) ids.add(item)
+                            }
+                            is JSONObject -> {
+                                val socketId = item.optString("socketId").takeIf { it.isNotBlank() }
+                                if (socketId != null) {
+                                    ids.add(socketId)
+                                    usernamesMap[socketId] = item.optString("username").takeIf { it.isNotBlank() }
+                                }
+                            }
+                        }
+                    }
+                    ids
                 } ?: emptyList()
                 
                 val mediaStates = obj.optJSONObject("mediaStates")?.let { states ->
@@ -383,6 +410,7 @@ class SocketClient @Inject constructor() {
                 val data = RoomUsersData(
                     roomId = obj.optString("roomId"),
                     users = users,
+                    usernames = usernamesMap.ifEmpty { null },
                     mediaStates = mediaStates,
                     hostId = obj.optString("hostId").takeIf { it.isNotEmpty() }
                 )
@@ -394,7 +422,8 @@ class SocketClient @Inject constructor() {
             parseJsonObject(args) { obj ->
                 val data = UserJoinedEvent(
                     roomId = obj.optString("roomId"),
-                    socketId = obj.optString("socketId")
+                    socketId = obj.optString("socketId"),
+                    username = obj.optString("username").takeIf { it.isNotBlank() }
                 )
                 emitEvent(SocketEvent.UserJoined(data))
             }
@@ -404,7 +433,8 @@ class SocketClient @Inject constructor() {
             parseJsonObject(args) { obj ->
                 val data = UserLeftEvent(
                     roomId = obj.optString("roomId"),
-                    socketId = obj.optString("socketId")
+                    socketId = obj.optString("socketId"),
+                    username = obj.optString("username").takeIf { it.isNotBlank() }
                 )
                 emitEvent(SocketEvent.UserLeft(data))
             }
@@ -416,6 +446,7 @@ class SocketClient @Inject constructor() {
                 val hasVolume = obj.has("volume")
                 val hasIsMuted = obj.has("isMuted")
                 val hasPlaybackSpeed = obj.has("playbackSpeed")
+                val hasAudioSyncEnabled = obj.has("audioSyncEnabled")
 
                 val data = SyncData(
                     roomId = currentRoomId ?: obj.optString("roomId"),
@@ -425,7 +456,9 @@ class SocketClient @Inject constructor() {
                     volume = if (hasVolume) obj.optDouble("volume").toFloat() else null,
                     isMuted = if (hasIsMuted) obj.optBoolean("isMuted") else null,
                     playbackSpeed = if (hasPlaybackSpeed) obj.optDouble("playbackSpeed").toFloat() else null,
-                    senderId = obj.optString("senderId").takeIf { it.isNotEmpty() }
+                    audioSyncEnabled = if (hasAudioSyncEnabled) obj.optBoolean("audioSyncEnabled") else null,
+                    senderId = obj.optString("senderId").takeIf { it.isNotEmpty() },
+                    senderUsername = obj.optString("senderUsername").takeIf { it.isNotEmpty() }
                 )
                 emitEvent(SocketEvent.SyncEvent(data))
             }
@@ -437,6 +470,7 @@ class SocketClient @Inject constructor() {
                 val hasVolume = obj.has("volume")
                 val hasIsMuted = obj.has("isMuted")
                 val hasPlaybackSpeed = obj.has("playbackSpeed")
+                val hasAudioSyncEnabled = obj.has("audioSyncEnabled")
 
                 val data = RoomState(
                     roomId = obj.optString("roomId"),
@@ -449,7 +483,10 @@ class SocketClient @Inject constructor() {
                     volume = if (hasVolume) obj.optDouble("volume").toFloat() else null,
                     isMuted = if (hasIsMuted) obj.optBoolean("isMuted") else null,
                     playbackSpeed = if (hasPlaybackSpeed) obj.optDouble("playbackSpeed").toFloat() else null,
-                    updatedAt = obj.optLong("updatedAt").takeIf { it > 0 }
+                    audioSyncEnabled = if (hasAudioSyncEnabled) obj.optBoolean("audioSyncEnabled") else null,
+                    updatedAt = obj.optLong("updatedAt").takeIf { it > 0 },
+                    senderId = obj.optString("senderId").takeIf { it.isNotEmpty() },
+                    senderUsername = obj.optString("senderUsername").takeIf { it.isNotEmpty() }
                 )
                 emitEvent(SocketEvent.RoomState(data))
             }

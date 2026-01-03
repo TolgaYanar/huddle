@@ -201,6 +201,9 @@ private fun VideoTabContent(
     modifier: Modifier = Modifier
 ) {
     var isChatExpanded by remember { mutableStateOf(false) }
+    var showYouTubeBrowser by remember { mutableStateOf(false) }
+    var browseSource by remember { mutableStateOf(InAppVideoSource.YOUTUBE) }
+    var showSourceMenu by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier.padding(16.dp),
@@ -236,6 +239,51 @@ private fun VideoTabContent(
             ) {
                 Text("Load")
             }
+
+            Box {
+                OutlinedButton(
+                    onClick = { showSourceMenu = true },
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = null
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Browse ${browseSource.displayName} (in-app)")
+                }
+
+                DropdownMenu(
+                    expanded = showSourceMenu,
+                    onDismissRequest = { showSourceMenu = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("YouTube") },
+                        onClick = {
+                            browseSource = InAppVideoSource.YOUTUBE
+                            showSourceMenu = false
+                            showYouTubeBrowser = true
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Twitch") },
+                        onClick = {
+                            browseSource = InAppVideoSource.TWITCH
+                            showSourceMenu = false
+                            showYouTubeBrowser = true
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Kick") },
+                        onClick = {
+                            browseSource = InAppVideoSource.KICK
+                            showSourceMenu = false
+                            showYouTubeBrowser = true
+                        }
+                    )
+                }
+            }
         }
 
         // --- 2. Video Player ---
@@ -248,13 +296,28 @@ private fun VideoTabContent(
                     .background(Color.Black),
                 contentAlignment = Alignment.Center
             ) {
+                if (showYouTubeBrowser) {
+                    InAppVideoBrowserDialog(
+                        source = browseSource,
+                        onDismiss = { showYouTubeBrowser = false },
+                        onSelectUrl = { url ->
+                            onVideoUrlChange(url)
+                            onLoadVideo()
+                            showYouTubeBrowser = false
+                        }
+                    )
+                }
+
+                val effectiveVolume = roomState.videoState.localVolumeOverride ?: roomState.videoState.volume
+                val effectiveMuted = roomState.videoState.localMutedOverride ?: roomState.videoState.isMuted
+
                 if (roomState.videoState.url.isNotEmpty()) {
                     VideoPlayerView(
                         url = roomState.videoState.url,
                         isPlaying = roomState.videoState.isPlaying,
                         currentTime = roomState.videoState.currentTime,
-                        volume = roomState.videoState.volume,
-                        isMuted = roomState.videoState.isMuted,
+                        volume = effectiveVolume,
+                        isMuted = effectiveMuted,
                         playbackSpeed = roomState.videoState.playbackSpeed,
                         onPlay = { viewModel.onPlay(roomState.videoState.currentTime) },
                         onPause = { viewModel.onPause(roomState.videoState.currentTime) },
@@ -281,26 +344,33 @@ private fun VideoTabContent(
 
         // --- 3. Video Controls ---
         GlassCard {
+            val effectiveVolume = roomState.videoState.localVolumeOverride ?: roomState.videoState.volume
+            val effectiveMuted = roomState.videoState.localMutedOverride ?: roomState.videoState.isMuted
+
             VideoControlsBar(
                 url = roomState.videoState.url,
                 isPlaying = roomState.videoState.isPlaying,
                 currentTime = roomState.videoState.currentTime,
                 duration = roomState.videoState.duration,
-                volume = roomState.videoState.volume,
-                isMuted = roomState.videoState.isMuted,
+                volume = effectiveVolume,
+                isMuted = effectiveMuted,
                 playbackSpeed = roomState.videoState.playbackSpeed,
                 isBuffering = roomState.videoState.isBuffering,
+                audioSyncEnabled = roomState.audioSyncEnabled,
                 onPlay = { viewModel.onPlay(roomState.videoState.currentTime) },
                 onPause = { viewModel.onPause(roomState.videoState.currentTime) },
                 onSeek = { time -> viewModel.onSeek(time) },
                 onMuteToggle = {
-                    viewModel.setMuted(!roomState.videoState.isMuted)
+                    viewModel.setMuted(!effectiveMuted)
                 },
                 onVolumeChange = { newVolume ->
                     viewModel.setVolume(newVolume.coerceIn(0f, 1f))
                 },
                 onPlaybackSpeedChange = { newSpeed ->
                     viewModel.setPlaybackSpeed(newSpeed.coerceIn(0.25f, 2f))
+                },
+                onAudioSyncToggle = { enabled ->
+                    viewModel.setAudioSyncEnabled(enabled)
                 },
                 modifier = Modifier.fillMaxWidth()
             )

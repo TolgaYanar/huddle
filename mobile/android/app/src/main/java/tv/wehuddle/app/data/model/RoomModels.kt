@@ -13,7 +13,8 @@ enum class SyncAction {
     change_url,
     set_mute,
     set_speed,
-    set_volume
+    set_volume,
+    set_audio_sync
 }
 
 /**
@@ -28,7 +29,9 @@ data class SyncData(
     val volume: Float? = null,
     val isMuted: Boolean? = null,
     val playbackSpeed: Float? = null,
-    val senderId: String? = null
+    val audioSyncEnabled: Boolean? = null,
+    val senderId: String? = null,
+    val senderUsername: String? = null
 )
 
 /**
@@ -44,7 +47,10 @@ data class RoomState(
     val volume: Float? = null,
     val isMuted: Boolean? = null,
     val playbackSpeed: Float? = null,
-    val updatedAt: Long? = null
+    val audioSyncEnabled: Boolean? = null,
+    val updatedAt: Long? = null,
+    val senderId: String? = null,
+    val senderUsername: String? = null
 )
 
 /**
@@ -112,6 +118,7 @@ data class ActivityHistory(
 data class RoomUsersData(
     val roomId: String,
     val users: List<String>,
+    val usernames: Map<String, String?>? = null,
     val mediaStates: Map<String, WebRTCMediaState>? = null,
     val hostId: String? = null
 )
@@ -218,7 +225,8 @@ data class WebRTCIceCandidate(
 @Serializable
 data class UserJoinedEvent(
     val roomId: String,
-    val socketId: String
+    val socketId: String,
+    val username: String? = null
 )
 
 /**
@@ -227,5 +235,6 @@ data class UserJoinedEvent(
 @Serializable
 data class UserLeftEvent(
     val roomId: String,
-    val socketId: String
+    val socketId: String,
+    val username: String? = null
 )

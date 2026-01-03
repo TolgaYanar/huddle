@@ -317,14 +317,25 @@ private fun ParticipantTile(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    val displayName = participant.username?.takeIf { it.isNotBlank() } ?: participant.id.take(8)
                     Text(
-                        text = if (isCurrentUser) "You" else participant.id.take(8),
+                        text = displayName,
                         style = TextStyle(
                             color = Slate100,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Medium
                         )
                     )
+                    if (isCurrentUser) {
+                        Text(
+                            text = "You",
+                            style = TextStyle(
+                                color = Slate300,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        )
+                    }
                     if (participant.isHost) {
                         Text(
                             text = "Host",

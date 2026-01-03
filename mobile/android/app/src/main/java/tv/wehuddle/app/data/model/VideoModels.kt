@@ -139,7 +139,9 @@ fun extractYoutubeVideoId(url: String): String? {
     val patterns = listOf(
         Regex("""(?:youtube\.com/watch\?v=|youtu\.be/)([a-zA-Z0-9_-]{11})"""),
         Regex("""youtube\.com/embed/([a-zA-Z0-9_-]{11})"""),
-        Regex("""youtube\.com/v/([a-zA-Z0-9_-]{11})""")
+        Regex("""youtube\.com/v/([a-zA-Z0-9_-]{11})"""),
+        Regex("""youtube\.com/shorts/([a-zA-Z0-9_-]{11})"""),
+        Regex("""youtube\.com/live/([a-zA-Z0-9_-]{11})""")
     )
     
     for (pattern in patterns) {
@@ -148,6 +150,102 @@ fun extractYoutubeVideoId(url: String): String? {
             return match.groupValues[1]
         }
     }
+    return null
+}
+
+/**
+ * Extract Twitch channel name from URL (e.g. https://twitch.tv/<channel>).
+ */
+fun extractTwitchChannel(url: String): String? {
+    val patterns = listOf(
+        Regex("""twitch\.tv/([a-zA-Z0-9_]{3,25})(?:\?|/|#|$)""", RegexOption.IGNORE_CASE),
+        Regex("""m\.twitch\.tv/([a-zA-Z0-9_]{3,25})(?:\?|/|#|$)""", RegexOption.IGNORE_CASE)
+    )
+    for (pattern in patterns) {
+        val match = pattern.find(url)
+        if (match != null) {
+            val candidate = match.groupValues[1]
+            // Exclude common non-channel paths.
+            if (candidate.lowercase() !in setOf("videos", "directory", "p", "settings", "subscriptions")) {
+                return candidate
+            }
+        }
+    }
+    return null
+}
+
+/**
+ * Extract Twitch video id from URL (e.g. https://twitch.tv/videos/123456789).
+ */
+fun extractTwitchVideoId(url: String): String? {
+    val patterns = listOf(
+        Regex("""twitch\.tv/videos/(\d+)(?:\?|/|#|$)""", RegexOption.IGNORE_CASE),
+        Regex("""m\.twitch\.tv/videos/(\d+)(?:\?|/|#|$)""", RegexOption.IGNORE_CASE)
+    )
+    for (pattern in patterns) {
+        val match = pattern.find(url)
+        if (match != null) return match.groupValues[1]
+    }
+    return null
+}
+
+/**
+ * Extract Twitch clip id from URL (e.g. https://clips.twitch.tv/<clipId>).
+ */
+fun extractTwitchClipId(url: String): String? {
+    val patterns = listOf(
+        Regex("""clips\.twitch\.tv/([a-zA-Z0-9_-]+)(?:\?|/|#|$)""", RegexOption.IGNORE_CASE),
+        Regex("""twitch\.tv/\w+/clip/([a-zA-Z0-9_-]+)(?:\?|/|#|$)""", RegexOption.IGNORE_CASE)
+    )
+    for (pattern in patterns) {
+        val match = pattern.find(url)
+        if (match != null) return match.groupValues[1]
+    }
+    return null
+}
+
+/**
+ * Return a canonical Twitch URL if this looks like a playable Twitch target.
+ */
+fun canonicalizeTwitchUrl(url: String): String? {
+    val videoId = extractTwitchVideoId(url)
+    if (videoId != null) return "https://www.twitch.tv/videos/$videoId"
+
+    val clipId = extractTwitchClipId(url)
+    if (clipId != null) return "https://clips.twitch.tv/$clipId"
+
+    val channel = extractTwitchChannel(url)
+    if (channel != null) return "https://www.twitch.tv/$channel"
+
+    return null
+}
+
+/**
+ * Extract Kick channel name from URL (e.g. https://kick.com/<channel>).
+ */
+fun extractKickChannel(url: String): String? {
+    val patterns = listOf(
+        Regex("""kick\.com/([a-zA-Z0-9_\-]{2,50})(?:\?|/|#|$)""", RegexOption.IGNORE_CASE)
+    )
+    for (pattern in patterns) {
+        val match = pattern.find(url)
+        if (match != null) {
+            val candidate = match.groupValues[1]
+            // Exclude obvious non-channel paths.
+            if (candidate.lowercase() !in setOf("categories", "discover", "search", "settings")) {
+                return candidate
+            }
+        }
+    }
+    return null
+}
+
+/**
+ * Return a canonical Kick URL if this looks like a Kick target.
+ */
+fun canonicalizeKickUrl(url: String): String? {
+    val channel = extractKickChannel(url)
+    if (channel != null) return "https://kick.com/$channel"
     return null
 }
 
@@ -165,5 +263,9 @@ data class VideoPlayerState(
     val isBuffering: Boolean = false,
     val isReady: Boolean = false,
     val error: String? = null,
-    val platform: PlatformType = PlatformType.UNKNOWN
+    val platform: PlatformType = PlatformType.UNKNOWN,
+    // When room audio sync is disabled, these overrides control only the local device.
+    // When null, fall back to the synced room values above.
+    val localVolumeOverride: Float? = null,
+    val localMutedOverride: Boolean? = null
 )
