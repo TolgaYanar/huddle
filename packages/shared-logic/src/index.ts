@@ -216,9 +216,10 @@ export const useRoom = (roomId: string, userId: string) => {
   useEffect(() => {
     // Initialize socket connection
     socketRef.current = io(SERVER_URL, {
-      // Prefer websocket, but allow polling fallback (some hosts/proxies/CDNs
-      // can intermittently block websocket-only connections).
-      transports: ["websocket", "polling"],
+      // Prefer starting with polling so we can connect even when WebSocket
+      // upgrades are blocked by proxies/CDNs. Socket.IO will still try to
+      // upgrade to WebSocket when possible.
+      transports: ["polling", "websocket"],
       autoConnect: false,
       withCredentials: true,
     });

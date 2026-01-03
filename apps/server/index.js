@@ -14,17 +14,22 @@ function parseAllowedOrigins(value) {
   return String(value || "")
     .split(",")
     .map((s) => s.trim())
-    .filter(Boolean);
+    .filter(Boolean)
+    .map((origin) => String(origin).toLowerCase().replace(/\/+$/, ""));
 }
 
 const ALLOWED_ORIGINS = parseAllowedOrigins(process.env.CORS_ORIGINS);
 const corsOptions = {
   origin(origin, callback) {
+    const normalizedOrigin = String(origin || "")
+      .toLowerCase()
+      .replace(/\/+$/, "");
+
     // Allow non-browser clients (no Origin header) like curl/mobile.
     if (!origin) return callback(null, true);
     // If no allowlist provided, reflect-request-origin (dev-friendly).
     if (ALLOWED_ORIGINS.length === 0) return callback(null, true);
-    return callback(null, ALLOWED_ORIGINS.includes(origin));
+    return callback(null, ALLOWED_ORIGINS.includes(normalizedOrigin));
   },
   credentials: true,
   methods: ["GET", "POST", "DELETE", "OPTIONS"],
@@ -438,10 +443,14 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin(origin, callback) {
+      const normalizedOrigin = String(origin || "")
+        .toLowerCase()
+        .replace(/\/+$/, "");
+
       // Allow non-browser clients (no Origin header) like curl/mobile.
       if (!origin) return callback(null, true);
       if (ALLOWED_ORIGINS.length === 0) return callback(null, true);
-      return callback(null, ALLOWED_ORIGINS.includes(origin));
+      return callback(null, ALLOWED_ORIGINS.includes(normalizedOrigin));
     },
     credentials: true,
     methods: ["GET", "POST"],
