@@ -1367,16 +1367,51 @@ io.on("connection", (socket) => {
 
     // Update room state.
     const prev = roomState.get(roomId) || {};
+
+    const now = Date.now();
+    const prevTimestamp = typeof prev.timestamp === "number" ? prev.timestamp : 0;
+    const prevUpdatedAt = typeof prev.updatedAt === "number" ? prev.updatedAt : now;
+    const prevSpeed =
+      typeof prev.playbackSpeed === "number" && Number.isFinite(prev.playbackSpeed)
+        ? prev.playbackSpeed
+        : 1;
+    const prevIsPlaying = prev.isPlaying === true;
+    const estimatedNowTimestamp = prevIsPlaying
+      ? prevTimestamp + Math.max(0, (now - prevUpdatedAt) / 1000) * prevSpeed
+      : prevTimestamp;
     const senderUsername =
       socket.data?.authUser?.username ||
       socketIdToUsername.get(socket.id) ||
       null;
+
+    const shouldAnchorPlaybackPosition =
+      action === "play" ||
+      action === "pause" ||
+      action === "seek" ||
+      action === "change_url" ||
+      // Speed changes affect extrapolation; anchor to a known timestamp.
+      action === "set_speed";
+
+    const hasIncomingTimestamp = typeof timestamp === "number";
+    const nextTimestamp = hasIncomingTimestamp
+      ? timestamp
+      : action === "change_url"
+        ? 0
+        : shouldAnchorPlaybackPosition
+          ? estimatedNowTimestamp
+          : prevTimestamp;
+
+    const nextUpdatedAt = shouldAnchorPlaybackPosition
+      ? now
+      : typeof prev.updatedAt === "number"
+        ? prev.updatedAt
+        : now;
     const next = {
       ...prev,
       videoUrl: typeof videoUrl === "string" ? videoUrl : prev.videoUrl,
-      timestamp: typeof timestamp === "number" ? timestamp : prev.timestamp,
+      timestamp: nextTimestamp,
       action: typeof action === "string" ? action : prev.action,
-      updatedAt: Date.now(),
+      updatedAt: nextUpdatedAt,
       senderId: socket.id,
       senderUsername,
     };
@@ -1423,8 +1458,9 @@ io.on("connection", (socket) => {
     // Broadcast to everyone else in the room
     socket.to(roomId).emit("receive_sync", {
       action,
-      timestamp,
-      videoUrl,
+      timestamp: next.timestamp,
+      videoUrl: next.videoUrl,
+      updatedAt: next.updatedAt,
       volume: next.volume,
       isMuted: next.isMuted,
       playbackSpeed: next.playbackSpeed,

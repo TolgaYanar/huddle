@@ -22,6 +22,13 @@ interface UseActivityLogProps {
   isConnected: boolean;
   playerRef: React.RefObject<unknown>;
   applyingRemoteSyncRef: React.MutableRefObject<boolean>;
+  roomPlaybackAnchorRef?: React.MutableRefObject<{
+    url: string;
+    isPlaying: boolean;
+    anchorTime: number;
+    anchorAt: number;
+    playbackRate: number;
+  } | null>;
   setUrl: (url: string) => void;
   setInputUrl: (url: string) => void;
   setVideoState: (state: string) => void;
@@ -59,6 +66,7 @@ export function useActivityLog({
   isConnected,
   playerRef,
   applyingRemoteSyncRef,
+  roomPlaybackAnchorRef,
   setUrl,
   setInputUrl,
   setVideoState,
@@ -100,6 +108,20 @@ export function useActivityLog({
     [applyingRemoteSyncRef]
   );
 
+  const setRoomPlaybackAnchor = useCallback(
+    (next: {
+      url: string;
+      isPlaying: boolean;
+      anchorTime: number;
+      anchorAt: number;
+      playbackRate: number;
+    }) => {
+      if (!roomPlaybackAnchorRef) return;
+      roomPlaybackAnchorRef.current = next;
+    },
+    [roomPlaybackAnchorRef]
+  );
+
   // Auto-scroll logs
   useEffect(() => {
     logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -117,12 +139,50 @@ export function useActivityLog({
         const nextUrl = normalizeVideoUrl(state.videoUrl);
         setUrl(nextUrl);
         setInputUrl(nextUrl);
+
+        const t = typeof state.timestamp === "number" ? state.timestamp : 0;
+        const rate =
+          typeof state.playbackSpeed === "number" &&
+          Number.isFinite(state.playbackSpeed)
+            ? state.playbackSpeed
+            : 1;
+        const playing = state.isPlaying === true || state.action === "play";
+
+        const updatedAt =
+          typeof state.updatedAt === "number" && Number.isFinite(state.updatedAt)
+            ? state.updatedAt
+            : Date.now();
+        setRoomPlaybackAnchor({
+          url: nextUrl,
+          isPlaying: playing,
+          anchorTime: t,
+          anchorAt: updatedAt,
+          playbackRate: rate,
+        });
       }
 
       if (typeof state.timestamp === "number" && playerRef.current) {
         const current = getCurrentTimeFromRef(playerRef);
-        if (Math.abs(current - state.timestamp) > 1) {
-          seekToFromRef(playerRef, state.timestamp);
+
+        const rate =
+          typeof state.playbackSpeed === "number" &&
+          Number.isFinite(state.playbackSpeed)
+            ? state.playbackSpeed
+            : 1;
+
+        let target = state.timestamp;
+        if (state.isPlaying === true) {
+          const updatedAt =
+            typeof state.updatedAt === "number" &&
+            Number.isFinite(state.updatedAt)
+              ? state.updatedAt
+              : Date.now();
+          const elapsed = Math.max(0, (Date.now() - updatedAt) / 1000);
+          target = state.timestamp + elapsed * rate;
+        }
+
+        if (Math.abs(current - target) > 1) {
+          seekToFromRef(playerRef, target);
         }
       }
 
@@ -301,7 +361,27 @@ export function useActivityLog({
           setPlayerError(null);
           setUrl(nextUrl);
           setInputUrl(nextUrl);
+
+          // New media source: anchor starts at 0 (play state comes next).
+          const prev = roomPlaybackAnchorRef?.current;
+          setRoomPlaybackAnchor({
+            url: nextUrl,
+            isPlaying: false,
+            anchorTime: 0,
+            anchorAt: Date.now(),
+            playbackRate: prev?.playbackRate ?? 1,
+          });
         }
+      }
+
+      // Some senders include the URL on play events (e.g. change_url + immediate play).
+      // Applying it here makes receivers resilient to event ordering.
+      if (data.action === "play" && data.videoUrl) {
+        const nextUrl = normalizeVideoUrl(data.videoUrl);
+        setPlayerReady(false);
+        setPlayerError(null);
+        setUrl(nextUrl);
+        setInputUrl(nextUrl);
       }
 
       if (typeof data.volume === "number" && Number.isFinite(data.volume)) {
@@ -318,6 +398,21 @@ export function useActivityLog({
         Number.isFinite(data.playbackSpeed)
       ) {
         setPlaybackRate(data.playbackSpeed);
+
+        const prev = roomPlaybackAnchorRef?.current;
+        if (prev) {
+          const nextAnchor = {
+            ...prev,
+            playbackRate: data.playbackSpeed,
+          };
+          if (typeof data.timestamp === "number") {
+            nextAnchor.anchorTime = data.timestamp;
+          }
+          if (typeof data.updatedAt === "number" && Number.isFinite(data.updatedAt)) {
+            nextAnchor.anchorAt = data.updatedAt;
+          }
+          setRoomPlaybackAnchor(nextAnchor);
+        }
       }
 
       if (data.action === "set_audio_sync") {
@@ -351,12 +446,71 @@ export function useActivityLog({
         { msg: logMsg, type: data.action, time, user: userDisplay },
       ]);
 
+      // Update expected-time anchor for gesture-required resumes.
+      {
+        const now = Date.now();
+        const prev = roomPlaybackAnchorRef?.current;
+
+        const updatedAt =
+          typeof data.updatedAt === "number" && Number.isFinite(data.updatedAt)
+            ? data.updatedAt
+            : now;
+
+        const nextUrl =
+          typeof data.videoUrl === "string" && data.videoUrl
+            ? normalizeVideoUrl(data.videoUrl)
+            : prev?.url;
+
+        if (data.action === "play" && nextUrl) {
+          setRoomPlaybackAnchor({
+            url: nextUrl,
+            isPlaying: true,
+            anchorTime: typeof data.timestamp === "number" ? data.timestamp : 0,
+            anchorAt: updatedAt,
+            playbackRate: prev?.playbackRate ?? 1,
+          });
+        }
+
+        if (data.action === "pause" && prev) {
+          setRoomPlaybackAnchor({
+            ...prev,
+            isPlaying: false,
+            anchorTime:
+              typeof data.timestamp === "number" ? data.timestamp : prev.anchorTime,
+            anchorAt: updatedAt,
+          });
+        }
+
+        if (data.action === "seek" && prev && prev.isPlaying) {
+          setRoomPlaybackAnchor({
+            ...prev,
+            anchorTime:
+              typeof data.timestamp === "number" ? data.timestamp : prev.anchorTime,
+            anchorAt: updatedAt,
+          });
+        }
+      }
+
       if (data.action === "play") setVideoState("Playing");
       if (data.action === "pause") setVideoState("Paused");
       if (data.action === "seek" || data.action === "play") {
         const currentTime = getCurrentTimeFromRef(playerRef);
-        if (Math.abs(currentTime - data.timestamp) > 1) {
-          seekToFromRef(playerRef, data.timestamp);
+
+        let target = data.timestamp;
+        const rate = roomPlaybackAnchorRef?.current?.playbackRate ?? 1;
+        const isPlayingNow =
+          data.action === "play" || roomPlaybackAnchorRef?.current?.isPlaying === true;
+        if (
+          isPlayingNow &&
+          typeof data.updatedAt === "number" &&
+          Number.isFinite(data.updatedAt)
+        ) {
+          const elapsed = Math.max(0, (Date.now() - data.updatedAt) / 1000);
+          target = data.timestamp + elapsed * rate;
+        }
+
+        if (Math.abs(currentTime - target) > 1) {
+          seekToFromRef(playerRef, target);
         }
       }
     });
@@ -383,10 +537,12 @@ export function useActivityLog({
     onActivityHistory,
     onActivityEvent,
     markApplyingRemoteSync,
+    setRoomPlaybackAnchor,
     roomId,
     userId,
     playerRef,
     applyingRemoteSyncRef,
+    roomPlaybackAnchorRef,
     setUrl,
     setInputUrl,
     setVideoState,

@@ -13,8 +13,10 @@ import {
 } from "../lib/dnd";
 import {
   getHtmlMediaElementFromRef,
+  getCurrentTimeFromRef,
   pauseFromRef,
   playFromRef,
+  seekToFromRef,
 } from "../lib/player";
 import type { WebRTCMediaState } from "shared-logic";
 
@@ -97,6 +99,7 @@ export function PlayerSection({
   playerRef,
   handlePlayerError,
   applyingRemoteSyncRef,
+  roomPlaybackAnchorRef,
 
   muted,
   volume,
@@ -180,6 +183,13 @@ export function PlayerSection({
   playerRef: React.RefObject<unknown>;
   handlePlayerError: (e: unknown) => void;
   applyingRemoteSyncRef: React.MutableRefObject<boolean>;
+  roomPlaybackAnchorRef: React.MutableRefObject<{
+    url: string;
+    isPlaying: boolean;
+    anchorTime: number;
+    anchorAt: number;
+    playbackRate: number;
+  } | null>;
 
   muted: boolean;
   volume: number;
@@ -221,6 +231,7 @@ export function PlayerSection({
   const fullscreenChatPanelRef = React.useRef<HTMLDivElement | null>(null);
   const isDraggingChatRef = React.useRef(false);
   const dragOffsetRef = React.useRef<{ dx: number; dy: number } | null>(null);
+  const resumeAttemptIdRef = React.useRef(0);
   const [fullscreenChatPos, setFullscreenChatPos] = React.useState<{
     x: number;
     y: number;
@@ -502,6 +513,59 @@ export function PlayerSection({
   const isDirectFile = React.useMemo(() => {
     return /\.(mp4|webm|ogv|ogg)(\?|#|$)/i.test(normalizedUrl);
   }, [normalizedUrl]);
+
+  const resumeToRoomTimeIfNeeded = React.useCallback(() => {
+    const anchor = roomPlaybackAnchorRef.current;
+    if (!anchor || !anchor.isPlaying) return;
+
+    // Only try to resume if we're on the same media URL.
+    if (anchor.url !== normalizedUrl) return;
+
+    const elapsedSeconds = Math.max(0, (Date.now() - anchor.anchorAt) / 1000);
+    const expected = anchor.anchorTime + elapsedSeconds * (anchor.playbackRate || 1);
+    const target = Math.max(0, Math.min(expected, duration || Infinity));
+
+    // Guard against re-broadcasting seek/play events while we align.
+    const wasApplying = applyingRemoteSyncRef.current;
+    applyingRemoteSyncRef.current = true;
+    resumeAttemptIdRef.current += 1;
+    const attemptId = resumeAttemptIdRef.current;
+
+    const maxAttempts = 8;
+    const intervalMs = 250;
+    let attempts = 0;
+
+    const trySeek = () => {
+      if (resumeAttemptIdRef.current !== attemptId) return;
+      seekToFromRef(playerRef, target);
+
+      window.setTimeout(() => {
+        if (resumeAttemptIdRef.current !== attemptId) return;
+
+        const current = getCurrentTimeFromRef(playerRef);
+        const isCloseEnough =
+          typeof current === "number" &&
+          Number.isFinite(current) &&
+          Math.abs(current - target) <= 1;
+
+        if (isCloseEnough || attempts >= maxAttempts) {
+          if (!wasApplying) {
+            window.setTimeout(() => {
+              if (resumeAttemptIdRef.current === attemptId) {
+                applyingRemoteSyncRef.current = false;
+              }
+            }, 400);
+          }
+          return;
+        }
+
+        attempts += 1;
+        trySeek();
+      }, intervalMs);
+    };
+
+    trySeek();
+  }, [applyingRemoteSyncRef, duration, normalizedUrl, playerRef, roomPlaybackAnchorRef]);
 
   React.useEffect(() => {
     if (!isDirectFile) return;
@@ -977,7 +1041,16 @@ export function PlayerSection({
                 onPlay={(e) => {
                   if (applyingRemoteSyncRef.current) return;
                   if (!(e.nativeEvent as Event).isTrusted) return;
-                  handlePlay();
+
+                  const shouldResume =
+                    roomPlaybackAnchorRef.current?.isPlaying === true &&
+                    roomPlaybackAnchorRef.current?.url === normalizedUrl;
+
+                  if (shouldResume) {
+                    resumeToRoomTimeIfNeeded();
+                  } else {
+                    handlePlay();
+                  }
                 }}
                 onPause={(e) => {
                   if (applyingRemoteSyncRef.current) return;
@@ -1094,7 +1167,16 @@ export function PlayerSection({
                 config={playerConfig}
                 onPlay={() => {
                   if (applyingRemoteSyncRef.current) return;
-                  if (videoState !== "Playing") handlePlay();
+
+                  const shouldResume =
+                    roomPlaybackAnchorRef.current?.isPlaying === true &&
+                    roomPlaybackAnchorRef.current?.url === normalizedUrl;
+
+                  if (shouldResume) {
+                    resumeToRoomTimeIfNeeded();
+                  } else {
+                    handlePlay();
+                  }
                 }}
                 onPause={() => {
                   if (applyingRemoteSyncRef.current) return;
@@ -1167,12 +1249,18 @@ export function PlayerSection({
                   setPlayerError(null);
                   setIsBuffering(false);
                   clearLoadTimeout();
+
+                  // If the room is already playing, align playhead ASAP.
+                  resumeToRoomTimeIfNeeded();
                 }}
                 onStart={() => {
                   setPlayerReady(true);
                   setPlayerError(null);
                   setIsBuffering(false);
                   clearLoadTimeout();
+
+                  // YouTube sometimes becomes seekable only after start.
+                  resumeToRoomTimeIfNeeded();
                 }}
                 onLoadedMetadata={(e) => {
                   setPlayerReady(true);

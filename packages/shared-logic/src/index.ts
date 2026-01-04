@@ -17,6 +17,7 @@ export interface SyncData {
   action: SyncAction;
   timestamp: number;
   videoUrl?: string;
+  updatedAt?: number;
   volume?: number;
   isMuted?: boolean;
   playbackSpeed?: number;

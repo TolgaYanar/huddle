@@ -195,6 +195,16 @@ export default function RoomClient({ roomId }: { roomId: string }) {
   // re-emitting those events back to the room (ping-pong loop).
   const applyingRemoteSyncRef = useRef(false);
 
+  // Anchor for expected room playback position (used when autoplay is blocked
+  // and a user must click to start; we want to resume to the room time).
+  const roomPlaybackAnchorRef = useRef<{
+    url: string;
+    isPlaying: boolean;
+    anchorTime: number;
+    anchorAt: number;
+    playbackRate: number;
+  } | null>(null);
+
   // WebRTC peers
   const { closeAllPeers, renegotiateAllPeers } =
     useWebRTCPeers<WebRTCMediaState>({
@@ -359,6 +369,7 @@ export default function RoomClient({ roomId }: { roomId: string }) {
     isConnected,
     playerRef,
     applyingRemoteSyncRef,
+    roomPlaybackAnchorRef,
     setUrl,
     setInputUrl,
     setVideoState,
@@ -549,6 +560,7 @@ export default function RoomClient({ roomId }: { roomId: string }) {
           playerRef={playerRef}
           handlePlayerError={handlePlayerError}
           applyingRemoteSyncRef={applyingRemoteSyncRef}
+          roomPlaybackAnchorRef={roomPlaybackAnchorRef}
           muted={muted}
           volume={volume}
           effectiveMuted={effectiveMuted}

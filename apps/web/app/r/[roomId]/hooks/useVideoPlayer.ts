@@ -690,11 +690,22 @@ export function useVideoPlayer({
 
   const loadVideoUrl = useCallback(
     (nextUrl: string) => {
+      const wasPlaying = latestVideoStateRef.current === "Playing";
       setPlayerReady(false);
       setPlayerError(null);
       setUrl(nextUrl);
       setInputUrl(nextUrl);
       sendSyncEvent("change_url", 0, nextUrl);
+
+      // If the room was already playing, keep it playing after changing the URL.
+      // This prevents late receivers from needing to press play (which would
+      // otherwise broadcast a fresh play@0 and reset everyone).
+      if (wasPlaying) {
+        setVideoState("Playing");
+        sendSyncEvent("play", 0, nextUrl);
+      } else {
+        setVideoState("Paused");
+      }
       addLogEntry?.({
         msg: `changed video source`,
         type: "change_url",
