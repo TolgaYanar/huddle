@@ -1369,16 +1369,38 @@ io.on("connection", (socket) => {
     const prev = roomState.get(roomId) || {};
 
     const now = Date.now();
-    const prevTimestamp = typeof prev.timestamp === "number" ? prev.timestamp : 0;
-    const prevUpdatedAt = typeof prev.updatedAt === "number" ? prev.updatedAt : now;
+    const prevTimestamp =
+      typeof prev.timestamp === "number" ? prev.timestamp : 0;
+    const prevUpdatedAt =
+      typeof prev.updatedAt === "number" ? prev.updatedAt : now;
     const prevSpeed =
-      typeof prev.playbackSpeed === "number" && Number.isFinite(prev.playbackSpeed)
+      typeof prev.playbackSpeed === "number" &&
+      Number.isFinite(prev.playbackSpeed)
         ? prev.playbackSpeed
         : 1;
     const prevIsPlaying = prev.isPlaying === true;
     const estimatedNowTimestamp = prevIsPlaying
       ? prevTimestamp + Math.max(0, (now - prevUpdatedAt) / 1000) * prevSpeed
       : prevTimestamp;
+
+    // GUARD: Reject play/pause events that would regress playback significantly.
+    // This prevents new joiners from accidentally resetting the room position
+    // if their client sends a play event before receiving room state.
+    if (
+      (action === "play" || action === "pause") &&
+      typeof timestamp === "number"
+    ) {
+      const regression = estimatedNowTimestamp - timestamp;
+      // If this would jump backwards more than 10 seconds, and we're already
+      // past 15 seconds in the video, reject it (likely a new joiner's stale event)
+      if (regression > 10 && estimatedNowTimestamp > 15) {
+        console.log(
+          `Room ${roomId}: Rejecting ${action} at ${timestamp} - would regress from ~${estimatedNowTimestamp.toFixed(1)}s`
+        );
+        return;
+      }
+    }
+
     const senderUsername =
       socket.data?.authUser?.username ||
       socketIdToUsername.get(socket.id) ||

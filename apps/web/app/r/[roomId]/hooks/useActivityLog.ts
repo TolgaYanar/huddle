@@ -22,6 +22,7 @@ interface UseActivityLogProps {
   isConnected: boolean;
   playerRef: React.RefObject<unknown>;
   applyingRemoteSyncRef: React.MutableRefObject<boolean>;
+  hasInitialSyncRef?: React.MutableRefObject<boolean>;
   roomPlaybackAnchorRef?: React.MutableRefObject<{
     url: string;
     isPlaying: boolean;
@@ -66,6 +67,7 @@ export function useActivityLog({
   isConnected,
   playerRef,
   applyingRemoteSyncRef,
+  hasInitialSyncRef,
   roomPlaybackAnchorRef,
   setUrl,
   setInputUrl,
@@ -93,7 +95,7 @@ export function useActivityLog({
   const remoteSyncResetTimeoutRef = useRef<number | null>(null);
 
   const markApplyingRemoteSync = useCallback(
-    (durationMs = 600) => {
+    (durationMs = 200) => {
       applyingRemoteSyncRef.current = true;
       if (remoteSyncResetTimeoutRef.current) {
         window.clearTimeout(remoteSyncResetTimeoutRef.current);
@@ -133,7 +135,7 @@ export function useActivityLog({
       if (!state || state.roomId !== roomId) return;
 
       // Room state application may include a seek; give embedded players longer.
-      markApplyingRemoteSync(1200);
+      markApplyingRemoteSync(400);
 
       if (state.videoUrl) {
         const nextUrl = normalizeVideoUrl(state.videoUrl);
@@ -149,7 +151,8 @@ export function useActivityLog({
         const playing = state.isPlaying === true || state.action === "play";
 
         const updatedAt =
-          typeof state.updatedAt === "number" && Number.isFinite(state.updatedAt)
+          typeof state.updatedAt === "number" &&
+          Number.isFinite(state.updatedAt)
             ? state.updatedAt
             : Date.now();
         setRoomPlaybackAnchor({
@@ -171,19 +174,32 @@ export function useActivityLog({
             : 1;
 
         let target = state.timestamp;
+        // Only calculate elapsed time for actively playing content
+        // Don't fast-forward if video is paused
         if (state.isPlaying === true) {
           const updatedAt =
             typeof state.updatedAt === "number" &&
             Number.isFinite(state.updatedAt)
               ? state.updatedAt
               : Date.now();
+          // Advance by the actual elapsed time since the room state was updated
+          // so late joiners land at the live position.
           const elapsed = Math.max(0, (Date.now() - updatedAt) / 1000);
           target = state.timestamp + elapsed * rate;
         }
 
-        if (Math.abs(current - target) > 1) {
+        // Only seek if significantly out of sync
+        if (Math.abs(current - target) > 2) {
           seekToFromRef(playerRef, target);
         }
+      }
+
+      // Mark initial sync complete after room state is received.
+      // Delay slightly to let any seek finish.
+      if (hasInitialSyncRef && !hasInitialSyncRef.current) {
+        window.setTimeout(() => {
+          hasInitialSyncRef.current = true;
+        }, 600);
       }
 
       if (typeof state.volume === "number" && Number.isFinite(state.volume)) {
@@ -329,11 +345,7 @@ export function useActivityLog({
 
     const cleanup = onSyncEvent((data: SyncData) => {
       const guardMs =
-        data.action === "seek"
-          ? 2000
-          : data.action === "change_url"
-            ? 1500
-            : 600;
+        data.action === "seek" ? 500 : data.action === "change_url" ? 400 : 200;
       markApplyingRemoteSync(guardMs);
 
       const time = new Date().toLocaleTimeString([], {
@@ -408,7 +420,10 @@ export function useActivityLog({
           if (typeof data.timestamp === "number") {
             nextAnchor.anchorTime = data.timestamp;
           }
-          if (typeof data.updatedAt === "number" && Number.isFinite(data.updatedAt)) {
+          if (
+            typeof data.updatedAt === "number" &&
+            Number.isFinite(data.updatedAt)
+          ) {
             nextAnchor.anchorAt = data.updatedAt;
           }
           setRoomPlaybackAnchor(nextAnchor);
@@ -476,7 +491,9 @@ export function useActivityLog({
             ...prev,
             isPlaying: false,
             anchorTime:
-              typeof data.timestamp === "number" ? data.timestamp : prev.anchorTime,
+              typeof data.timestamp === "number"
+                ? data.timestamp
+                : prev.anchorTime,
             anchorAt: updatedAt,
           });
         }
@@ -485,7 +502,9 @@ export function useActivityLog({
           setRoomPlaybackAnchor({
             ...prev,
             anchorTime:
-              typeof data.timestamp === "number" ? data.timestamp : prev.anchorTime,
+              typeof data.timestamp === "number"
+                ? data.timestamp
+                : prev.anchorTime,
             anchorAt: updatedAt,
           });
         }
@@ -493,23 +512,14 @@ export function useActivityLog({
 
       if (data.action === "play") setVideoState("Playing");
       if (data.action === "pause") setVideoState("Paused");
-      if (data.action === "seek" || data.action === "play") {
+
+      // ONLY seek on explicit seek actions, not on play/pause
+      if (data.action === "seek") {
         const currentTime = getCurrentTimeFromRef(playerRef);
+        const target = data.timestamp;
 
-        let target = data.timestamp;
-        const rate = roomPlaybackAnchorRef?.current?.playbackRate ?? 1;
-        const isPlayingNow =
-          data.action === "play" || roomPlaybackAnchorRef?.current?.isPlaying === true;
-        if (
-          isPlayingNow &&
-          typeof data.updatedAt === "number" &&
-          Number.isFinite(data.updatedAt)
-        ) {
-          const elapsed = Math.max(0, (Date.now() - data.updatedAt) / 1000);
-          target = data.timestamp + elapsed * rate;
-        }
-
-        if (Math.abs(currentTime - target) > 1) {
+        // Only seek if significantly out of sync (>2 seconds)
+        if (Math.abs(currentTime - target) > 2) {
           seekToFromRef(playerRef, target);
         }
       }

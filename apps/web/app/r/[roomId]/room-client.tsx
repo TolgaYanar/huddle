@@ -66,9 +66,18 @@ export default function RoomClient({ roomId }: { roomId: string }) {
   // Refs to break circular dependency between hooks
   const ensureLocalStreamRef = useRef<(() => MediaStream | null) | null>(null);
   const renegotiateAllPeersRef = useRef<(() => Promise<void>) | null>(null);
+  const lastManualSeekRef = useRef<number>(0);
+  // Track when user has received initial room state and synced
+  // Prevents new joiners from broadcasting play events that reset room position
+  const hasInitialSyncRef = useRef<boolean>(false);
+  // Track component mount time to block early sync events
+  const mountTimeRef = useRef<number>(Date.now());
 
   useEffect(() => {
     setIsClient(true);
+    // Reset mount time on each mount
+    mountTimeRef.current = Date.now();
+    hasInitialSyncRef.current = false;
   }, []);
 
   // Some embedded players (notably Vimeo) can trigger an unhandled promise
@@ -115,7 +124,7 @@ export default function RoomClient({ roomId }: { roomId: string }) {
     spinWheel,
     onWheelState,
     onWheelSpun,
-    sendSyncEvent,
+    sendSyncEvent: rawSendSyncEvent,
     onSyncEvent,
     onRoomState,
     requestRoomState,
@@ -143,6 +152,33 @@ export default function RoomClient({ roomId }: { roomId: string }) {
     onWebRTCSpeaking,
     socket,
   } = useRoom(roomId, userId);
+
+  // Guarded sendSyncEvent - blocks play/pause/seek events until initial sync is complete
+  // This prevents new joiners from broadcasting their initial position and resetting the room
+  const sendSyncEvent = React.useCallback(
+    (
+      action: Parameters<typeof rawSendSyncEvent>[0],
+      timestamp: Parameters<typeof rawSendSyncEvent>[1],
+      videoUrl?: Parameters<typeof rawSendSyncEvent>[2],
+      extra?: Parameters<typeof rawSendSyncEvent>[3]
+    ) => {
+      // Block playback-affecting events until initial sync is complete
+      const playbackActions = ["play", "pause", "seek"];
+      if (playbackActions.includes(action)) {
+        // Must have received initial room state
+        if (!hasInitialSyncRef.current) {
+          return;
+        }
+        // Also require minimum 1 second since mount to handle race conditions
+        if (Date.now() - mountTimeRef.current < 1000) {
+          return;
+        }
+      }
+
+      rawSendSyncEvent(action, timestamp, videoUrl, extra);
+    },
+    [rawSendSyncEvent]
+  );
 
   // Sync userId with socket.id when connected
   useEffect(() => {
@@ -341,6 +377,8 @@ export default function RoomClient({ roomId }: { roomId: string }) {
     sendSyncEvent,
     audioSyncEnabled,
     applyingRemoteSyncRef,
+    lastManualSeekRef,
+    hasInitialSyncRef,
     // addLogEntry will be passed after useActivityLog initializes
   });
 
@@ -369,6 +407,7 @@ export default function RoomClient({ roomId }: { roomId: string }) {
     isConnected,
     playerRef,
     applyingRemoteSyncRef,
+    hasInitialSyncRef,
     roomPlaybackAnchorRef,
     setUrl,
     setInputUrl,
@@ -561,6 +600,7 @@ export default function RoomClient({ roomId }: { roomId: string }) {
           handlePlayerError={handlePlayerError}
           applyingRemoteSyncRef={applyingRemoteSyncRef}
           roomPlaybackAnchorRef={roomPlaybackAnchorRef}
+          lastManualSeekRef={lastManualSeekRef}
           muted={muted}
           volume={volume}
           effectiveMuted={effectiveMuted}

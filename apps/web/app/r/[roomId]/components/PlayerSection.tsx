@@ -100,6 +100,7 @@ export function PlayerSection({
   handlePlayerError,
   applyingRemoteSyncRef,
   roomPlaybackAnchorRef,
+  lastManualSeekRef,
 
   muted,
   volume,
@@ -190,6 +191,7 @@ export function PlayerSection({
     anchorAt: number;
     playbackRate: number;
   } | null>;
+  lastManualSeekRef: React.MutableRefObject<number>;
 
   muted: boolean;
   volume: number;
@@ -231,7 +233,6 @@ export function PlayerSection({
   const fullscreenChatPanelRef = React.useRef<HTMLDivElement | null>(null);
   const isDraggingChatRef = React.useRef(false);
   const dragOffsetRef = React.useRef<{ dx: number; dy: number } | null>(null);
-  const resumeAttemptIdRef = React.useRef(0);
   const [fullscreenChatPos, setFullscreenChatPos] = React.useState<{
     x: number;
     y: number;
@@ -521,51 +522,57 @@ export function PlayerSection({
     // Only try to resume if we're on the same media URL.
     if (anchor.url !== normalizedUrl) return;
 
+    // Don't override user's manual seek for 5 seconds
+    const timeSinceManualSeek = Date.now() - lastManualSeekRef.current;
+    if (timeSinceManualSeek < 5000) return;
+
+    const current = getCurrentTimeFromRef(playerRef);
+
+    // Calculate expected position based on anchor - use full elapsed time for proper sync
     const elapsedSeconds = Math.max(0, (Date.now() - anchor.anchorAt) / 1000);
-    const expected = anchor.anchorTime + elapsedSeconds * (anchor.playbackRate || 1);
+    const expected =
+      anchor.anchorTime + elapsedSeconds * (anchor.playbackRate || 1);
     const target = Math.max(0, Math.min(expected, duration || Infinity));
 
-    // Guard against re-broadcasting seek/play events while we align.
-    const wasApplying = applyingRemoteSyncRef.current;
-    applyingRemoteSyncRef.current = true;
-    resumeAttemptIdRef.current += 1;
-    const attemptId = resumeAttemptIdRef.current;
+    const drift = Math.abs(current - target);
 
-    const maxAttempts = 8;
-    const intervalMs = 250;
-    let attempts = 0;
+    // ALWAYS sync if we're at the beginning (< 3 sec) but should be much further (> 5 sec ahead)
+    // This handles the case where player loads after room state arrived
+    const atBeginning = current < 3;
+    const shouldBeFarAhead = target > 5;
 
-    const trySeek = () => {
-      if (resumeAttemptIdRef.current !== attemptId) return;
-      seekToFromRef(playerRef, target);
-
+    if (atBeginning && shouldBeFarAhead) {
+      // Initial load - player wasn't ready when room state arrived, sync now
+      applyingRemoteSyncRef.current = true;
       window.setTimeout(() => {
-        if (resumeAttemptIdRef.current !== attemptId) return;
+        applyingRemoteSyncRef.current = false;
+      }, 300);
 
-        const current = getCurrentTimeFromRef(playerRef);
-        const isCloseEnough =
-          typeof current === "number" &&
-          Number.isFinite(current) &&
-          Math.abs(current - target) <= 1;
+      seekToFromRef(playerRef, target);
+      return;
+    }
 
-        if (isCloseEnough || attempts >= maxAttempts) {
-          if (!wasApplying) {
-            window.setTimeout(() => {
-              if (resumeAttemptIdRef.current === attemptId) {
-                applyingRemoteSyncRef.current = false;
-              }
-            }, 400);
-          }
-          return;
-        }
+    // For normal cases, only sync if drift is significant
+    if (drift <= 3) return;
 
-        attempts += 1;
-        trySeek();
-      }, intervalMs);
-    };
+    // Avoid redundant seeks if we just synced
+    const timeSinceAnchor = Date.now() - anchor.anchorAt;
+    if (timeSinceAnchor < 1000 && drift < 5) return;
 
-    trySeek();
-  }, [applyingRemoteSyncRef, duration, normalizedUrl, playerRef, roomPlaybackAnchorRef]);
+    applyingRemoteSyncRef.current = true;
+    window.setTimeout(() => {
+      applyingRemoteSyncRef.current = false;
+    }, 300);
+
+    seekToFromRef(playerRef, target);
+  }, [
+    applyingRemoteSyncRef,
+    duration,
+    lastManualSeekRef,
+    normalizedUrl,
+    playerRef,
+    roomPlaybackAnchorRef,
+  ]);
 
   React.useEffect(() => {
     if (!isDirectFile) return;
@@ -1041,16 +1048,7 @@ export function PlayerSection({
                 onPlay={(e) => {
                   if (applyingRemoteSyncRef.current) return;
                   if (!(e.nativeEvent as Event).isTrusted) return;
-
-                  const shouldResume =
-                    roomPlaybackAnchorRef.current?.isPlaying === true &&
-                    roomPlaybackAnchorRef.current?.url === normalizedUrl;
-
-                  if (shouldResume) {
-                    resumeToRoomTimeIfNeeded();
-                  } else {
-                    handlePlay();
-                  }
+                  handlePlay();
                 }}
                 onPause={(e) => {
                   if (applyingRemoteSyncRef.current) return;
@@ -1059,6 +1057,8 @@ export function PlayerSection({
                 }}
                 onSeeked={(e) => {
                   if (applyingRemoteSyncRef.current) return;
+
+                  lastManualSeekRef.current = Date.now();
 
                   const currentTarget = (
                     e as { currentTarget?: unknown } | null
@@ -1167,16 +1167,7 @@ export function PlayerSection({
                 config={playerConfig}
                 onPlay={() => {
                   if (applyingRemoteSyncRef.current) return;
-
-                  const shouldResume =
-                    roomPlaybackAnchorRef.current?.isPlaying === true &&
-                    roomPlaybackAnchorRef.current?.url === normalizedUrl;
-
-                  if (shouldResume) {
-                    resumeToRoomTimeIfNeeded();
-                  } else {
-                    handlePlay();
-                  }
+                  handlePlay();
                 }}
                 onPause={() => {
                   if (applyingRemoteSyncRef.current) return;
@@ -1184,6 +1175,8 @@ export function PlayerSection({
                 }}
                 onSeeked={(e) => {
                   if (applyingRemoteSyncRef.current) return;
+
+                  lastManualSeekRef.current = Date.now();
 
                   const currentTarget = (
                     e as { currentTarget?: unknown } | null
@@ -1258,9 +1251,6 @@ export function PlayerSection({
                   setPlayerError(null);
                   setIsBuffering(false);
                   clearLoadTimeout();
-
-                  // YouTube sometimes becomes seekable only after start.
-                  resumeToRoomTimeIfNeeded();
                 }}
                 onLoadedMetadata={(e) => {
                   setPlayerReady(true);

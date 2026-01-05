@@ -21,6 +21,8 @@ interface UseVideoPlayerProps {
   roomId: string;
   audioSyncEnabled: boolean;
   applyingRemoteSyncRef: React.MutableRefObject<boolean>;
+  lastManualSeekRef?: React.MutableRefObject<number>;
+  hasInitialSyncRef?: React.MutableRefObject<boolean>;
   sendSyncEvent: (
     action: SyncAction,
     timestamp: number,
@@ -40,6 +42,8 @@ export function useVideoPlayer({
   roomId,
   audioSyncEnabled,
   applyingRemoteSyncRef,
+  lastManualSeekRef,
+  hasInitialSyncRef,
   sendSyncEvent,
   addLogEntry,
 }: UseVideoPlayerProps) {
@@ -510,21 +514,40 @@ export function useVideoPlayer({
   ]);
 
   const handlePlay = useCallback(() => {
+    // Don't broadcast play events until user has received initial room state.
+    // Otherwise new joiners can broadcast their cached/default position and
+    // reset the room for everyone.
+    if (hasInitialSyncRef && !hasInitialSyncRef.current) {
+      setVideoState("Playing");
+      return;
+    }
+
     const currentTime = getCurrentTimeFromRef(playerRef);
     sendSyncEvent("play", currentTime, url);
     setVideoState("Playing");
     addLogEntry?.({ msg: `started playing`, type: "play", user: "You" });
-  }, [url, sendSyncEvent, addLogEntry]);
+  }, [url, sendSyncEvent, addLogEntry, hasInitialSyncRef]);
 
   const handlePause = useCallback(() => {
+    // Don't broadcast pause events until user has received initial room state.
+    if (hasInitialSyncRef && !hasInitialSyncRef.current) {
+      setVideoState("Paused");
+      return;
+    }
+
     const currentTime = getCurrentTimeFromRef(playerRef);
     sendSyncEvent("pause", currentTime, url);
     setVideoState("Paused");
     addLogEntry?.({ msg: `paused the video`, type: "pause", user: "You" });
-  }, [url, sendSyncEvent, addLogEntry]);
+  }, [url, sendSyncEvent, addLogEntry, hasInitialSyncRef]);
 
   const handleSeek = useCallback(
     (seconds: number) => {
+      // Don't broadcast seeks until initial sync complete
+      if (hasInitialSyncRef && !hasInitialSyncRef.current) {
+        return;
+      }
+
       const time = getCurrentTimeFromRef(playerRef);
       const newTime = Math.max(0, time + seconds);
       seekToFromRef(playerRef, newTime);
@@ -536,29 +559,49 @@ export function useVideoPlayer({
         user: "You",
       });
     },
-    [url, sendSyncEvent, addLogEntry]
+    [url, sendSyncEvent, addLogEntry, hasInitialSyncRef]
   );
 
   const handleSeekTo = useCallback(
     (time: number) => {
+      // Don't broadcast seeks until initial sync complete
+      if (hasInitialSyncRef && !hasInitialSyncRef.current) {
+        return;
+      }
+
       const newTime = Math.max(0, Math.min(time, duration || Infinity));
       seekToFromRef(playerRef, newTime);
       setCurrentTime(newTime);
       sendSyncEvent("seek", newTime, url);
       lastLocalSeekRef.current = { time: newTime, at: Date.now() };
+      if (lastManualSeekRef) {
+        lastManualSeekRef.current = Date.now();
+      }
       addLogEntry?.({
         msg: `seeked to ${formatTime(newTime)}`,
         type: "seek",
         user: "You",
       });
     },
-    [url, duration, sendSyncEvent, addLogEntry]
+    [
+      url,
+      duration,
+      sendSyncEvent,
+      addLogEntry,
+      lastManualSeekRef,
+      hasInitialSyncRef,
+    ]
   );
 
   // Used when the user seeks via the built-in player controls.
   // The player already performed the seek, so we only update state + broadcast.
   const handleSeekFromController = useCallback(
     (time: number) => {
+      // Don't broadcast seeks until initial sync complete
+      if (hasInitialSyncRef && !hasInitialSyncRef.current) {
+        return;
+      }
+
       const newTime = Math.max(0, Math.min(time, duration || Infinity));
 
       // Some embedded players (notably YouTube) can fire "seeked"-like events
@@ -601,7 +644,7 @@ export function useVideoPlayer({
         user: "You",
       });
     },
-    [url, duration, sendSyncEvent, addLogEntry]
+    [url, duration, sendSyncEvent, addLogEntry, hasInitialSyncRef]
   );
 
   // Local-only volume/mute for the custom controller (does not sync to room).
