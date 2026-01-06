@@ -62,6 +62,15 @@ fun RoomScreen(
     val isRoomSaved by viewModel.isRoomSaved.collectAsStateWithLifecycle()
     val saveBusy by viewModel.saveBusy.collectAsStateWithLifecycle()
     
+    // Wheel picker state
+    val showWheelPicker by viewModel.showWheelPicker.collectAsStateWithLifecycle()
+    val wheelState by viewModel.wheelState.collectAsStateWithLifecycle()
+    val wheelEntryInput by viewModel.wheelEntryInput.collectAsStateWithLifecycle()
+    
+    // Playlist state
+    val showPlaylistPanel by viewModel.showPlaylistPanel.collectAsStateWithLifecycle()
+    val playlistState by viewModel.playlistState.collectAsStateWithLifecycle()
+    
     // Tab state
     var selectedTab by remember { mutableIntStateOf(0) }
     val tabs = listOf("Video", "Controls", "Activity")
@@ -100,6 +109,7 @@ fun RoomScreen(
                 viewModel.setCopied(true)
             },
             onOpenWheel = viewModel::toggleWheelPicker,
+            onOpenPlaylist = viewModel::openPlaylistPanel,
             onBack = onNavigateBack
         )
 
@@ -182,6 +192,55 @@ fun RoomScreen(
             participants = participants
         )
     }
+
+    // Animated Wheel Picker Modal
+    if (showWheelPicker) {
+        AnimatedWheelPickerModal(
+            entries = wheelState.entries,
+            entryInput = wheelEntryInput,
+            lastSpin = wheelState.lastSpin?.let { spin ->
+                tv.wehuddle.app.data.model.WheelSpunData(
+                    roomId = roomId,
+                    index = spin.index,
+                    result = spin.result,
+                    entryCount = spin.entryCount,
+                    spunAt = spin.spunAt,
+                    senderId = spin.senderId,
+                    entries = wheelState.entries
+                )
+            },
+            isConnected = connectionState == ConnectionState.CONNECTED,
+            onEntryInputChange = { text -> viewModel.updateWheelEntryInput(text) },
+            onAddEntry = { viewModel.addWheelEntry() },
+            onRemoveEntry = { index -> viewModel.removeWheelEntry(index) },
+            onClearAll = { viewModel.clearWheelEntries() },
+            onSpin = { viewModel.spinWheel() },
+            onDismiss = { viewModel.closeWheelPicker() }
+        )
+    }
+    
+    // Playlist Panel
+    PlaylistPanel(
+        playlists = playlistState.playlists,
+        activePlaylistId = playlistState.activePlaylistId,
+        currentItemIndex = playlistState.currentItemIndex,
+        currentVideoUrl = videoUrl,
+        isOpen = showPlaylistPanel,
+        onClose = { viewModel.closePlaylistPanel() },
+        onCreatePlaylist = { name, description -> viewModel.createPlaylist(name, description) },
+        onUpdatePlaylist = { playlistId, name, description, settings -> 
+            viewModel.updatePlaylist(playlistId, name, description, settings) 
+        },
+        onDeletePlaylist = { playlistId -> viewModel.deletePlaylist(playlistId) },
+        onAddItem = { playlistId, videoUrl, title, duration, thumbnail -> 
+            viewModel.addPlaylistItem(playlistId, videoUrl, title, duration, thumbnail) 
+        },
+        onRemoveItem = { playlistId, itemId -> viewModel.removePlaylistItem(playlistId, itemId) },
+        onSetActive = { playlistId -> viewModel.setActivePlaylist(playlistId) },
+        onPlayItem = { playlistId, itemId -> viewModel.playPlaylistItem(playlistId, itemId) },
+        onPlayNext = { viewModel.playNextInPlaylist() },
+        onPlayPrevious = { viewModel.playPreviousInPlaylist() }
+    )
 }
 
 // --- TAB CONTENTS ---

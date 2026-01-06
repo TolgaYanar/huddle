@@ -33,6 +33,7 @@ fun RoomHeader(
     onToggleSave: () -> Unit,
     onCopyInvite: () -> Unit,
     onOpenWheel: () -> Unit,
+    onOpenPlaylist: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -141,6 +142,15 @@ fun RoomHeader(
                     colors = IconButtonDefaults.filledIconButtonColors(containerColor = Slate800)
                 ) {
                    Text("🎡", fontSize = 14.sp)
+                }
+                
+                // Playlist Icon Button
+                FilledIconButton(
+                    onClick = onOpenPlaylist,
+                    modifier = Modifier.size(32.dp),
+                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = Slate800)
+                ) {
+                   Text("📋", fontSize = 14.sp)
                 }
 
                 // Connection Dot

@@ -1,5 +1,6 @@
 package tv.wehuddle.app.data.network
 
+import android.util.Log
 import io.socket.client.IO
 import io.socket.client.Socket
 import io.socket.emitter.Emitter
@@ -47,6 +48,9 @@ sealed class SocketEvent {
     data class WebRTCIceReceived(val data: WebRTCIceCandidate) : SocketEvent()
     data class MediaStateReceived(val userId: String, val state: WebRTCMediaState) : SocketEvent()
     data class SpeakingStateReceived(val userId: String, val speaking: Boolean) : SocketEvent()
+    // Playlist events
+    data class PlaylistStateReceived(val data: PlaylistStateData) : SocketEvent()
+    data class PlaylistItemPlayed(val data: PlaylistItemPlayedData) : SocketEvent()
 }
 
 /**
@@ -211,6 +215,7 @@ class SocketClient @Inject constructor() {
             syncData.audioSyncEnabled?.let { put("audioSyncEnabled", it) }
             syncData.senderId?.let { put("senderId", it) }
         }
+        Log.d("Sync", "Sending sync event: action=${syncData.action.name}, timestamp=${syncData.timestamp}, roomId=${syncData.roomId}")
         // Align with server/web naming: emit "sync_video"
         socket?.emit("sync_video", data)
     }
@@ -250,31 +255,143 @@ class SocketClient @Inject constructor() {
     
     // Wheel picker methods
     fun requestWheelState(roomId: String) {
-        socket?.emit("request_wheel_state", JSONObject().put("roomId", roomId))
+        Log.d("WheelPicker", "requestWheelState: roomId=$roomId, socket connected=${socket?.connected()}")
+        socket?.emit("wheel_get", JSONObject().put("roomId", roomId))
     }
     
     fun addWheelEntry(roomId: String, entry: String) {
+        Log.d("WheelPicker", "addWheelEntry: roomId=$roomId, entry=$entry, socket connected=${socket?.connected()}")
         val data = JSONObject().apply {
             put("roomId", roomId)
-            put("entry", entry)
+            put("text", entry)  // Server expects "text" not "entry"
         }
-        socket?.emit("add_wheel_entry", data)
+        socket?.emit("wheel_add_entry", data)
+        Log.d("WheelPicker", "wheel_add_entry emitted")
     }
     
     fun removeWheelEntry(roomId: String, index: Int) {
+        Log.d("WheelPicker", "removeWheelEntry: roomId=$roomId, index=$index")
         val data = JSONObject().apply {
             put("roomId", roomId)
             put("index", index)
         }
-        socket?.emit("remove_wheel_entry", data)
+        socket?.emit("wheel_remove_entry", data)
     }
     
     fun clearWheelEntries(roomId: String) {
-        socket?.emit("clear_wheel_entries", JSONObject().put("roomId", roomId))
+        Log.d("WheelPicker", "clearWheelEntries: roomId=$roomId")
+        socket?.emit("wheel_clear", JSONObject().put("roomId", roomId))
     }
     
     fun spinWheel(roomId: String) {
-        socket?.emit("spin_wheel", JSONObject().put("roomId", roomId))
+        Log.d("WheelPicker", "spinWheel: roomId=$roomId, socket connected=${socket?.connected()}")
+        socket?.emit("wheel_spin", JSONObject().put("roomId", roomId))
+        Log.d("WheelPicker", "wheel_spin emitted")
+    }
+    
+    // Playlist methods
+    fun requestPlaylistState(roomId: String) {
+        socket?.emit("playlist_get", JSONObject().put("roomId", roomId))
+    }
+    
+    fun createPlaylist(roomId: String, name: String, description: String?, settings: PlaylistSettings?) {
+        val data = JSONObject().apply {
+            put("roomId", roomId)
+            put("name", name)
+            description?.let { put("description", it) }
+            settings?.let { s ->
+                put("settings", JSONObject().apply {
+                    put("loop", s.loop)
+                    put("shuffle", s.shuffle)
+                    put("autoPlay", s.autoPlay)
+                })
+            }
+        }
+        socket?.emit("playlist_create", data)
+    }
+    
+    fun updatePlaylist(roomId: String, playlistId: String, name: String?, description: String?, settings: PlaylistSettings?) {
+        val data = JSONObject().apply {
+            put("roomId", roomId)
+            put("playlistId", playlistId)
+            name?.let { put("name", it) }
+            description?.let { put("description", it) }
+            settings?.let { s ->
+                put("settings", JSONObject().apply {
+                    put("loop", s.loop)
+                    put("shuffle", s.shuffle)
+                    put("autoPlay", s.autoPlay)
+                })
+            }
+        }
+        socket?.emit("playlist_update", data)
+    }
+    
+    fun deletePlaylist(roomId: String, playlistId: String) {
+        val data = JSONObject().apply {
+            put("roomId", roomId)
+            put("playlistId", playlistId)
+        }
+        socket?.emit("playlist_delete", data)
+    }
+    
+    fun addPlaylistItem(roomId: String, playlistId: String, videoUrl: String, title: String?, duration: Double?, thumbnail: String?) {
+        val data = JSONObject().apply {
+            put("roomId", roomId)
+            put("playlistId", playlistId)
+            put("videoUrl", videoUrl)
+            title?.let { put("title", it) }
+            duration?.let { put("duration", it) }
+            thumbnail?.let { put("thumbnail", it) }
+        }
+        socket?.emit("playlist_add_item", data)
+    }
+    
+    fun removePlaylistItem(roomId: String, playlistId: String, itemId: String) {
+        val data = JSONObject().apply {
+            put("roomId", roomId)
+            put("playlistId", playlistId)
+            put("itemId", itemId)
+        }
+        socket?.emit("playlist_remove_item", data)
+    }
+    
+    fun reorderPlaylistItems(roomId: String, playlistId: String, itemIds: List<String>) {
+        val data = JSONObject().apply {
+            put("roomId", roomId)
+            put("playlistId", playlistId)
+            put("itemIds", JSONArray(itemIds))
+        }
+        socket?.emit("playlist_reorder_items", data)
+    }
+    
+    fun setActivePlaylist(roomId: String, playlistId: String?) {
+        val data = JSONObject().apply {
+            put("roomId", roomId)
+            playlistId?.let { put("playlistId", it) }
+        }
+        Log.d("Playlist", "Emitting playlist_set_active: roomId=$roomId, playlistId=$playlistId")
+        socket?.emit("playlist_set_active", data)
+    }
+    
+    fun playPlaylistItem(roomId: String, playlistId: String, itemId: String) {
+        val data = JSONObject().apply {
+            put("roomId", roomId)
+            put("playlistId", playlistId)
+            put("itemId", itemId)
+        }
+        Log.d("Playlist", "Emitting playlist_play_item: roomId=$roomId, playlistId=$playlistId, itemId=$itemId")
+        socket?.emit("playlist_play_item", data)
+    }
+    
+    fun playNextInPlaylist(roomId: String) {
+        Log.d("Playlist", "Emitting playlist_next: roomId=$roomId")
+        socket?.emit("playlist_next", JSONObject().put("roomId", roomId))
+    }
+    
+    fun playPreviousInPlaylist(roomId: String) {
+        Log.d("Playlist", "Emitting playlist_previous: roomId=$roomId")
+        socket?.emit("playlist_previous", JSONObject().put("roomId", roomId))
     }
     
     // WebRTC signaling methods
@@ -597,10 +714,12 @@ class SocketClient @Inject constructor() {
         }
         
         on("wheel_state") { args ->
+            Log.d("WheelPicker", "wheel_state received: ${args.firstOrNull()}")
             parseJsonObject(args) { obj ->
                 val entries = obj.optJSONArray("entries")?.let { arr ->
                     (0 until arr.length()).map { arr.getString(it) }
                 } ?: emptyList()
+                Log.d("WheelPicker", "Parsed entries: $entries")
                 
                 val lastSpin = obj.optJSONObject("lastSpin")?.let { spinObj ->
                     WheelSpinData(
@@ -617,11 +736,13 @@ class SocketClient @Inject constructor() {
                     entries = entries,
                     lastSpin = lastSpin
                 )
+                Log.d("WheelPicker", "Emitting WheelStateReceived with ${entries.size} entries")
                 emitEvent(SocketEvent.WheelStateReceived(data))
             }
         }
         
         on("wheel_spun") { args ->
+            Log.d("WheelPicker", "wheel_spun received: ${args.firstOrNull()}")
             parseJsonObject(args) { obj ->
                 val entries = obj.optJSONArray("entries")?.let { arr ->
                     (0 until arr.length()).map { arr.getString(it) }
@@ -636,7 +757,51 @@ class SocketClient @Inject constructor() {
                     senderId = obj.optString("senderId").takeIf { it.isNotEmpty() },
                     entries = entries
                 )
+                Log.d("WheelPicker", "Emitting WheelSpun with result: ${data.result}")
                 emitEvent(SocketEvent.WheelSpun(data))
+            }
+        }
+        
+        // Playlist event listeners
+        on("playlist_state") { args ->
+            parseJsonObject(args) { obj ->
+                val playlists = obj.optJSONArray("playlists")?.let { arr ->
+                    (0 until arr.length()).mapNotNull { i ->
+                        val pObj = arr.optJSONObject(i) ?: return@mapNotNull null
+                        parsePlaylist(pObj)
+                    }
+                } ?: emptyList()
+                
+                val activePlaylistId = obj.optString("activePlaylistId").takeIf { it.isNotEmpty() }
+                val currentItemIndex = obj.optInt("currentItemIndex", 0)
+                
+                Log.d("Playlist", "Received playlist_state: activePlaylistId=$activePlaylistId, currentItemIndex=$currentItemIndex, playlists=${playlists.size}")
+                
+                val data = PlaylistStateData(
+                    roomId = obj.optString("roomId"),
+                    playlists = playlists,
+                    activePlaylistId = activePlaylistId,
+                    currentItemIndex = currentItemIndex
+                )
+                emitEvent(SocketEvent.PlaylistStateReceived(data))
+            }
+        }
+        
+        on("playlist_item_played") { args ->
+            parseJsonObject(args) { obj ->
+                val videoUrl = obj.optString("videoUrl")
+                val title = obj.optString("title")
+                Log.d("Playlist", "Received playlist_item_played: videoUrl=$videoUrl, title=$title")
+                
+                val data = PlaylistItemPlayedData(
+                    roomId = obj.optString("roomId"),
+                    playlistId = obj.optString("playlistId"),
+                    itemId = obj.optString("itemId"),
+                    itemIndex = obj.optInt("itemIndex"),
+                    videoUrl = videoUrl,
+                    title = title
+                )
+                emitEvent(SocketEvent.PlaylistItemPlayed(data))
             }
         }
         
@@ -694,6 +859,45 @@ class SocketClient @Inject constructor() {
                 emitEvent(SocketEvent.SpeakingStateReceived(userId, speaking))
             }
         }
+    }
+    
+    private fun parsePlaylist(obj: JSONObject): Playlist {
+        val settingsObj = obj.optJSONObject("settings")
+        val settings = PlaylistSettings(
+            loop = settingsObj?.optBoolean("loop", false) ?: false,
+            shuffle = settingsObj?.optBoolean("shuffle", false) ?: false,
+            autoPlay = settingsObj?.optBoolean("autoPlay", true) ?: true
+        )
+        
+        val items = obj.optJSONArray("items")?.let { arr ->
+            (0 until arr.length()).mapNotNull { i ->
+                val itemObj = arr.optJSONObject(i) ?: return@mapNotNull null
+                PlaylistItem(
+                    id = itemObj.optString("id"),
+                    videoUrl = itemObj.optString("videoUrl"),
+                    title = itemObj.optString("title"),
+                    addedBy = itemObj.optString("addedBy"),
+                    addedByUsername = itemObj.optString("addedByUsername").takeIf { it.isNotEmpty() },
+                    addedAt = itemObj.optLong("addedAt"),
+                    duration = itemObj.optDouble("duration").takeIf { it.isFinite() },
+                    thumbnail = itemObj.optString("thumbnail").takeIf { it.isNotEmpty() }
+                )
+            }
+        } ?: emptyList()
+        
+        return Playlist(
+            id = obj.optString("id"),
+            roomId = obj.optString("roomId"),
+            name = obj.optString("name"),
+            description = obj.optString("description").takeIf { it.isNotEmpty() },
+            items = items,
+            createdBy = obj.optString("createdBy"),
+            createdByUsername = obj.optString("createdByUsername").takeIf { it.isNotEmpty() },
+            createdAt = obj.optLong("createdAt"),
+            updatedAt = obj.optLong("updatedAt"),
+            isDefault = obj.optBoolean("isDefault", false),
+            settings = settings
+        )
     }
     
     private inline fun parseJsonObject(args: Array<Any>, block: (JSONObject) -> Unit) {

@@ -1,5 +1,6 @@
 package tv.wehuddle.app.ui.screens.room
 
+import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -31,6 +32,7 @@ class RoomViewModel @Inject constructor(
     val chatMessages: StateFlow<List<ChatMessage>> = roomRepository.chatMessages
     val activityLog: StateFlow<List<ActivityLogEntry>> = roomRepository.activityLog
     val wheelState: StateFlow<WheelState> = roomRepository.wheelState
+    val playlistState: StateFlow<PlaylistStateData> = roomRepository.playlistState
 
     val authUser: StateFlow<AuthUser?> = authRepository.user
 
@@ -60,6 +62,9 @@ class RoomViewModel @Inject constructor(
     
     private val _wheelEntryInput = MutableStateFlow("")
     val wheelEntryInput: StateFlow<String> = _wheelEntryInput.asStateFlow()
+    
+    private val _showPlaylistPanel = MutableStateFlow(false)
+    val showPlaylistPanel: StateFlow<Boolean> = _showPlaylistPanel.asStateFlow()
     
     private val _copied = MutableStateFlow(false)
     val copied: StateFlow<Boolean> = _copied.asStateFlow()
@@ -259,8 +264,11 @@ class RoomViewModel @Inject constructor(
     }
     
     fun addWheelEntry() {
+        Log.d("WheelPicker", "addWheelEntry called")
         val entry = _wheelEntryInput.value.trim()
+        Log.d("WheelPicker", "Entry input: '$entry'")
         if (entry.isNotEmpty()) {
+            Log.d("WheelPicker", "Sending entry to repository")
             roomRepository.addWheelEntry(entry)
             _wheelEntryInput.value = ""
         }
@@ -275,7 +283,54 @@ class RoomViewModel @Inject constructor(
     }
     
     fun spinWheel() {
+        Log.d("WheelPicker", "spinWheel called")
         roomRepository.spinWheel()
+    }
+    
+    // Playlist UI actions
+    fun openPlaylistPanel() {
+        _showPlaylistPanel.value = true
+        roomRepository.requestPlaylistState()
+    }
+    
+    fun closePlaylistPanel() {
+        _showPlaylistPanel.value = false
+    }
+    
+    fun createPlaylist(name: String, description: String? = null) {
+        roomRepository.createPlaylist(name, description)
+    }
+    
+    fun updatePlaylist(playlistId: String, name: String? = null, description: String? = null, settings: PlaylistSettings? = null) {
+        roomRepository.updatePlaylist(playlistId, name, description, settings)
+    }
+    
+    fun deletePlaylist(playlistId: String) {
+        roomRepository.deletePlaylist(playlistId)
+    }
+    
+    fun addPlaylistItem(playlistId: String, videoUrl: String, title: String? = null, duration: Double? = null, thumbnail: String? = null) {
+        roomRepository.addPlaylistItem(playlistId, videoUrl, title, duration, thumbnail)
+    }
+    
+    fun removePlaylistItem(playlistId: String, itemId: String) {
+        roomRepository.removePlaylistItem(playlistId, itemId)
+    }
+    
+    fun setActivePlaylist(playlistId: String?) {
+        roomRepository.setActivePlaylist(playlistId)
+    }
+    
+    fun playPlaylistItem(playlistId: String, itemId: String) {
+        roomRepository.playPlaylistItem(playlistId, itemId)
+    }
+    
+    fun playNextInPlaylist() {
+        roomRepository.playNextInPlaylist()
+    }
+    
+    fun playPreviousInPlaylist() {
+        roomRepository.playPreviousInPlaylist()
     }
     
     // UI actions

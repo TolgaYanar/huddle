@@ -44,7 +44,10 @@ interface UsePlaylistProps {
   playNextInPlaylist: () => void;
   playPreviousInPlaylist: () => void;
   onVideoEnded?: () => void;
-  loadVideoUrl?: (url: string) => void;
+  loadVideoUrl?: (
+    url: string,
+    options?: { forcePlay?: boolean; skipBroadcast?: boolean }
+  ) => void;
 }
 
 export function usePlaylist({
@@ -92,7 +95,9 @@ export function usePlaylist({
     const cleanup = onPlaylistItemPlayed((data: PlaylistItemPlayedData) => {
       if (data.roomId !== roomId) return;
       if (loadVideoUrl) {
-        loadVideoUrl(data.videoUrl);
+        // Force play and skip broadcast - all clients receive this event,
+        // so we don't want each one to broadcast sync events
+        loadVideoUrl(data.videoUrl, { forcePlay: true, skipBroadcast: true });
       }
     });
     return cleanup;

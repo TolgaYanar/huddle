@@ -1,0 +1,14 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Build Android Project",
+			"type": "shell",
+			"command": "cd c:\\Users\\aa\\Desktop\\huddle\\huddle\\mobile\\android && ./gradlew build",
+			"problemMatcher": [
+				"$gradle"
+			],
+			"group": "build"
+		}
+	]
+}

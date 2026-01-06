@@ -732,20 +732,31 @@ export function useVideoPlayer({
   );
 
   const loadVideoUrl = useCallback(
-    (nextUrl: string) => {
+    (
+      nextUrl: string,
+      options?: { forcePlay?: boolean; skipBroadcast?: boolean }
+    ) => {
+      const { forcePlay, skipBroadcast } = options ?? {};
       const wasPlaying = latestVideoStateRef.current === "Playing";
       setPlayerReady(false);
       setPlayerError(null);
       setUrl(nextUrl);
       setInputUrl(nextUrl);
-      sendSyncEvent("change_url", 0, nextUrl);
+
+      // Only broadcast sync events if not receiving from external source
+      if (!skipBroadcast) {
+        sendSyncEvent("change_url", 0, nextUrl);
+      }
 
       // If the room was already playing, keep it playing after changing the URL.
       // This prevents late receivers from needing to press play (which would
       // otherwise broadcast a fresh play@0 and reset everyone).
-      if (wasPlaying) {
+      // Also auto-play if forcePlay is true (e.g., playlist item was triggered).
+      if (wasPlaying || forcePlay) {
         setVideoState("Playing");
-        sendSyncEvent("play", 0, nextUrl);
+        if (!skipBroadcast) {
+          sendSyncEvent("play", 0, nextUrl);
+        }
       } else {
         setVideoState("Paused");
       }

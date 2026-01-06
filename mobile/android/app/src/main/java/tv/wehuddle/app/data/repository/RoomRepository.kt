@@ -38,6 +38,9 @@ class RoomRepository @Inject constructor(
     private val _wheelState = MutableStateFlow(WheelState("", emptyList(), null))
     val wheelState: StateFlow<WheelState> = _wheelState.asStateFlow()
     
+    private val _playlistState = MutableStateFlow(PlaylistStateData("", emptyList(), null, 0))
+    val playlistState: StateFlow<PlaylistStateData> = _playlistState.asStateFlow()
+    
     // Expose socket connection state and events
     val connectionState: StateFlow<ConnectionState> = socketClient.connectionState
     val socketId: StateFlow<String?> = socketClient.socketId
@@ -380,6 +383,17 @@ class RoomRepository @Inject constructor(
             is SocketEvent.WebRTCIceReceived -> {
                 // These are handled by WebRTC manager observing the same events
             }
+            
+            is SocketEvent.PlaylistStateReceived -> {
+                _playlistState.value = event.data
+            }
+            
+            is SocketEvent.PlaylistItemPlayed -> {
+                // Update the video URL when a playlist item is played
+                _roomState.update { it.copy(
+                    videoState = it.videoState.copy(url = event.data.videoUrl)
+                )}
+            }
         }
     }
     
@@ -666,8 +680,88 @@ class RoomRepository @Inject constructor(
     
     fun spinWheel() {
         val roomId = _roomState.value.roomId
+        val entries = _wheelState.value.entries
+        android.util.Log.d("WheelPicker", "spinWheel in repo: roomId=$roomId, entries count=${entries.size}")
         if (roomId.isNotEmpty()) {
             socketClient.spinWheel(roomId)
+        }
+    }
+    
+    // Playlist methods
+    fun requestPlaylistState() {
+        val roomId = _roomState.value.roomId
+        if (roomId.isNotEmpty()) {
+            socketClient.requestPlaylistState(roomId)
+        }
+    }
+    
+    fun createPlaylist(name: String, description: String? = null, settings: PlaylistSettings? = null) {
+        val roomId = _roomState.value.roomId
+        if (roomId.isNotEmpty()) {
+            socketClient.createPlaylist(roomId, name, description, settings)
+        }
+    }
+    
+    fun updatePlaylist(playlistId: String, name: String? = null, description: String? = null, settings: PlaylistSettings? = null) {
+        val roomId = _roomState.value.roomId
+        if (roomId.isNotEmpty()) {
+            socketClient.updatePlaylist(roomId, playlistId, name, description, settings)
+        }
+    }
+    
+    fun deletePlaylist(playlistId: String) {
+        val roomId = _roomState.value.roomId
+        if (roomId.isNotEmpty()) {
+            socketClient.deletePlaylist(roomId, playlistId)
+        }
+    }
+    
+    fun addPlaylistItem(playlistId: String, videoUrl: String, title: String? = null, duration: Double? = null, thumbnail: String? = null) {
+        val roomId = _roomState.value.roomId
+        if (roomId.isNotEmpty()) {
+            socketClient.addPlaylistItem(roomId, playlistId, videoUrl, title, duration, thumbnail)
+        }
+    }
+    
+    fun removePlaylistItem(playlistId: String, itemId: String) {
+        val roomId = _roomState.value.roomId
+        if (roomId.isNotEmpty()) {
+            socketClient.removePlaylistItem(roomId, playlistId, itemId)
+        }
+    }
+    
+    fun reorderPlaylistItems(playlistId: String, itemIds: List<String>) {
+        val roomId = _roomState.value.roomId
+        if (roomId.isNotEmpty()) {
+            socketClient.reorderPlaylistItems(roomId, playlistId, itemIds)
+        }
+    }
+    
+    fun setActivePlaylist(playlistId: String?) {
+        val roomId = _roomState.value.roomId
+        if (roomId.isNotEmpty()) {
+            socketClient.setActivePlaylist(roomId, playlistId)
+        }
+    }
+    
+    fun playPlaylistItem(playlistId: String, itemId: String) {
+        val roomId = _roomState.value.roomId
+        if (roomId.isNotEmpty()) {
+            socketClient.playPlaylistItem(roomId, playlistId, itemId)
+        }
+    }
+    
+    fun playNextInPlaylist() {
+        val roomId = _roomState.value.roomId
+        if (roomId.isNotEmpty()) {
+            socketClient.playNextInPlaylist(roomId)
+        }
+    }
+    
+    fun playPreviousInPlaylist() {
+        val roomId = _roomState.value.roomId
+        if (roomId.isNotEmpty()) {
+            socketClient.playPreviousInPlaylist(roomId)
         }
     }
     

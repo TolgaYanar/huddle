@@ -344,6 +344,13 @@ export function useActivityLog({
     });
 
     const cleanup = onSyncEvent((data: SyncData) => {
+      console.log(
+        "[SYNC] Received sync event:",
+        data.action,
+        "from:",
+        data.senderUsername || data.senderId
+      );
+
       const guardMs =
         data.action === "seek" ? 500 : data.action === "change_url" ? 400 : 200;
       markApplyingRemoteSync(guardMs);
@@ -400,7 +407,26 @@ export function useActivityLog({
         setVolume(Math.max(0, Math.min(1, data.volume)));
       }
       if (typeof data.isMuted === "boolean") {
-        setMuted(data.isMuted);
+        // Only apply unmute if user has interacted with the document,
+        // otherwise browser will pause the video due to autoplay policy.
+        // Keep video muted to allow playback sync; user can manually unmute.
+        if (data.isMuted === false) {
+          // Check if we can safely unmute (user has interacted)
+          // navigator.userActivation is available in modern browsers
+          const canUnmute =
+            typeof navigator !== "undefined" &&
+            (navigator as { userActivation?: { hasBeenActive?: boolean } })
+              .userActivation?.hasBeenActive;
+          if (canUnmute) {
+            setMuted(false);
+          } else {
+            console.log(
+              "[SYNC] Skipping unmute - user hasn't interacted with page yet"
+            );
+          }
+        } else {
+          setMuted(true);
+        }
       }
       if (typeof data.audioSyncEnabled === "boolean") {
         setAudioSyncEnabled(data.audioSyncEnabled);
@@ -510,8 +536,14 @@ export function useActivityLog({
         }
       }
 
-      if (data.action === "play") setVideoState("Playing");
-      if (data.action === "pause") setVideoState("Paused");
+      if (data.action === "play") {
+        console.log("[SYNC] Setting video state to Playing");
+        setVideoState("Playing");
+      }
+      if (data.action === "pause") {
+        console.log("[SYNC] Setting video state to Paused");
+        setVideoState("Paused");
+      }
 
       // ONLY seek on explicit seek actions, not on play/pause
       if (data.action === "seek") {
