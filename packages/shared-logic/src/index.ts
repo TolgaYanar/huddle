@@ -130,6 +130,54 @@ export interface WebRTCMediaState {
   screen: boolean;
 }
 
+// Playlist types
+export interface PlaylistItem {
+  id: string;
+  videoUrl: string;
+  title: string;
+  addedBy: string;
+  addedByUsername?: string | null;
+  addedAt: number;
+  duration?: number;
+  thumbnail?: string;
+}
+
+export interface Playlist {
+  id: string;
+  roomId: string;
+  name: string;
+  description?: string;
+  items: PlaylistItem[];
+  createdBy: string;
+  createdByUsername?: string | null;
+  createdAt: number;
+  updatedAt: number;
+  isDefault?: boolean;
+  settings: PlaylistSettings;
+}
+
+export interface PlaylistSettings {
+  loop: boolean;
+  shuffle: boolean;
+  autoPlay: boolean;
+}
+
+export interface PlaylistStateData {
+  roomId: string;
+  playlists: Playlist[];
+  activePlaylistId?: string | null;
+  currentItemIndex?: number;
+}
+
+export interface PlaylistItemPlayedData {
+  roomId: string;
+  playlistId: string;
+  itemId: string;
+  itemIndex: number;
+  videoUrl: string;
+  title: string;
+}
+
 function getServerUrl(): string {
   // For Next.js client bundles, env vars are replaced at build-time.
   const fromEnv = process.env.NEXT_PUBLIC_SOCKET_SERVER_URL as
@@ -202,6 +250,7 @@ export const useRoom = (roomId: string, userId: string) => {
   );
   const latestWheelStateRef = useRef<WheelStateData | null>(null);
   const latestWheelSpunRef = useRef<WheelSpunData | null>(null);
+  const latestPlaylistStateRef = useRef<PlaylistStateData | null>(null);
   const pendingSyncEventsRef = useRef<
     Array<{
       action: SyncAction;
@@ -236,6 +285,7 @@ export const useRoom = (roomId: string, userId: string) => {
       latestRoomPasswordRequiredRef.current = null;
       latestWheelStateRef.current = null;
       latestWheelSpunRef.current = null;
+      latestPlaylistStateRef.current = null;
     };
 
     const handleRoomState = (data: RoomStateData) => {
@@ -274,6 +324,10 @@ export const useRoom = (roomId: string, userId: string) => {
       latestWheelSpunRef.current = data;
     };
 
+    const handlePlaylistState = (data: PlaylistStateData) => {
+      latestPlaylistStateRef.current = data;
+    };
+
     // Always listen for room state so we don't miss the first push during join.
     socket.on("room_state", handleRoomState);
     socket.on("chat_history", handleChatHistory);
@@ -283,6 +337,7 @@ export const useRoom = (roomId: string, userId: string) => {
     socket.on("room_requires_password", handleRoomPasswordRequired);
     socket.on("wheel_state", handleWheelState);
     socket.on("wheel_spun", handleWheelSpun);
+    socket.on("playlist_state", handlePlaylistState);
 
     socket.on("connect_error", (err) => {
       // This is the most useful signal when connections fail in production.
@@ -351,6 +406,7 @@ export const useRoom = (roomId: string, userId: string) => {
       socket.off("room_requires_password", handleRoomPasswordRequired);
       socket.off("wheel_state", handleWheelState);
       socket.off("wheel_spun", handleWheelSpun);
+      socket.off("playlist_state", handlePlaylistState);
       socket.disconnect();
     };
   }, [roomId]);
@@ -681,6 +737,166 @@ export const useRoom = (roomId: string, userId: string) => {
     [roomId]
   );
 
+  // --- Playlist methods ---
+  const requestPlaylistState = useCallback(() => {
+    const socket = socketRef.current;
+    if (!socket) return;
+    if (!socket.connected) return;
+    socket.emit("playlist_get", { roomId });
+  }, [roomId]);
+
+  const createPlaylist = useCallback(
+    (
+      name: string,
+      description?: string,
+      settings?: Partial<PlaylistSettings>
+    ) => {
+      const socket = socketRef.current;
+      if (!socket) return;
+      if (!socket.connected) return;
+      socket.emit("playlist_create", { roomId, name, description, settings });
+    },
+    [roomId]
+  );
+
+  const updatePlaylist = useCallback(
+    (
+      playlistId: string,
+      updates: {
+        name?: string;
+        description?: string;
+        settings?: Partial<PlaylistSettings>;
+      }
+    ) => {
+      const socket = socketRef.current;
+      if (!socket) return;
+      if (!socket.connected) return;
+      socket.emit("playlist_update", { roomId, playlistId, ...updates });
+    },
+    [roomId]
+  );
+
+  const deletePlaylist = useCallback(
+    (playlistId: string) => {
+      const socket = socketRef.current;
+      if (!socket) return;
+      if (!socket.connected) return;
+      socket.emit("playlist_delete", { roomId, playlistId });
+    },
+    [roomId]
+  );
+
+  const addPlaylistItem = useCallback(
+    (
+      playlistId: string,
+      videoUrl: string,
+      title: string,
+      duration?: number,
+      thumbnail?: string
+    ) => {
+      const socket = socketRef.current;
+      if (!socket) return;
+      if (!socket.connected) return;
+      socket.emit("playlist_add_item", {
+        roomId,
+        playlistId,
+        videoUrl,
+        title,
+        duration,
+        thumbnail,
+      });
+    },
+    [roomId]
+  );
+
+  const removePlaylistItem = useCallback(
+    (playlistId: string, itemId: string) => {
+      const socket = socketRef.current;
+      if (!socket) return;
+      if (!socket.connected) return;
+      socket.emit("playlist_remove_item", { roomId, playlistId, itemId });
+    },
+    [roomId]
+  );
+
+  const reorderPlaylistItems = useCallback(
+    (playlistId: string, itemIds: string[]) => {
+      const socket = socketRef.current;
+      if (!socket) return;
+      if (!socket.connected) return;
+      socket.emit("playlist_reorder_items", { roomId, playlistId, itemIds });
+    },
+    [roomId]
+  );
+
+  const setActivePlaylist = useCallback(
+    (playlistId: string | null) => {
+      const socket = socketRef.current;
+      if (!socket) return;
+      if (!socket.connected) return;
+      socket.emit("playlist_set_active", { roomId, playlistId });
+    },
+    [roomId]
+  );
+
+  const playPlaylistItem = useCallback(
+    (playlistId: string, itemId: string) => {
+      const socket = socketRef.current;
+      if (!socket) return;
+      if (!socket.connected) return;
+      socket.emit("playlist_play_item", { roomId, playlistId, itemId });
+    },
+    [roomId]
+  );
+
+  const playNextInPlaylist = useCallback(() => {
+    const socket = socketRef.current;
+    if (!socket) return;
+    if (!socket.connected) return;
+    socket.emit("playlist_next", { roomId });
+  }, [roomId]);
+
+  const playPreviousInPlaylist = useCallback(() => {
+    const socket = socketRef.current;
+    if (!socket) return;
+    if (!socket.connected) return;
+    socket.emit("playlist_previous", { roomId });
+  }, [roomId]);
+
+  const onPlaylistState = useCallback(
+    (callback: (data: PlaylistStateData) => void) => {
+      if (socketRef.current) {
+        socketRef.current.on("playlist_state", callback);
+      }
+
+      const cached = latestPlaylistStateRef.current;
+      if (cached && cached.roomId === roomId) {
+        callback(cached);
+      }
+
+      return () => {
+        if (socketRef.current) {
+          socketRef.current.off("playlist_state", callback);
+        }
+      };
+    },
+    [roomId]
+  );
+
+  const onPlaylistItemPlayed = useCallback(
+    (callback: (data: PlaylistItemPlayedData) => void) => {
+      if (socketRef.current) {
+        socketRef.current.on("playlist_item_played", callback);
+      }
+      return () => {
+        if (socketRef.current) {
+          socketRef.current.off("playlist_item_played", callback);
+        }
+      };
+    },
+    []
+  );
+
   const onUserJoined = useCallback(
     (callback: (data: UserPresenceData) => void) => {
       if (socketRef.current) {
@@ -888,6 +1104,20 @@ export const useRoom = (roomId: string, userId: string) => {
     onWebRTCMediaState,
     sendWebRTCSpeaking,
     onWebRTCSpeaking,
+    // Playlist methods
+    requestPlaylistState,
+    createPlaylist,
+    updatePlaylist,
+    deletePlaylist,
+    addPlaylistItem,
+    removePlaylistItem,
+    reorderPlaylistItems,
+    setActivePlaylist,
+    playPlaylistItem,
+    playNextInPlaylist,
+    playPreviousInPlaylist,
+    onPlaylistState,
+    onPlaylistItemPlayed,
     socket: socketRef.current,
   };
 };

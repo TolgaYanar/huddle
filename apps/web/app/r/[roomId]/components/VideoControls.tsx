@@ -390,14 +390,12 @@ export function VideoControls({
             {/* Buffered indicator could go here */}
             <div
               className="absolute h-full bg-linear-to-r from-indigo-500 to-purple-500 rounded-full transition-all"
-              // NOSONAR - dynamic width based on playback progress
               style={{ width: `${progress}%` }}
             />
             {/* Hover indicator */}
             {hoverTime !== null && (
               <div
                 className="absolute -top-8 transform -translate-x-1/2 px-2 py-1 bg-black/80 text-white text-xs rounded pointer-events-none"
-                // NOSONAR - dynamic position based on pointer hover
                 style={{ left: `${hoverPosition}%` }}
               >
                 {formatTime(hoverTime)}
@@ -406,7 +404,6 @@ export function VideoControls({
             {/* Scrubber handle */}
             <div
               className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
-              // NOSONAR - dynamic position based on playback progress
               style={{ left: `calc(${progress}% - 6px)` }}
             />
           </div>

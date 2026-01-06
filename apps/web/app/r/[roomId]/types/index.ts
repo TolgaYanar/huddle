@@ -35,3 +35,20 @@ export type FullscreenChatMessage = {
 // Re-export from lib to keep all types centralized
 export type { VideoPreview } from "../lib/video-preview";
 export type { WebRTCMediaState, WheelSpunData };
+
+// Re-export playlist types
+export type {
+  PlaylistItem,
+  Playlist,
+  PlaylistSettings,
+  PlaylistStateData,
+  PlaylistCreateData,
+  PlaylistUpdateData,
+  PlaylistAddItemData,
+  PlaylistRemoveItemData,
+  PlaylistReorderItemsData,
+  PlaylistDeleteData,
+  PlaylistPlayItemData,
+  PlaylistSetActiveData,
+} from "./playlist";
+export { DEFAULT_PLAYLIST_SETTINGS } from "./playlist";

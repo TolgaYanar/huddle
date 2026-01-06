@@ -66,3 +66,39 @@ model RoomActivity {
 
   @@index([roomId, createdAt])
 }
+
+model RoomPlaylist {
+  id               String   @id @default(cuid())
+  roomId           String
+  name             String
+  description      String?
+  createdBy        String
+  createdByUsername String?
+  isDefault        Boolean  @default(false)
+  loop             Boolean  @default(false)
+  shuffle          Boolean  @default(false)
+  autoPlay         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  items RoomPlaylistItem[]
+
+  @@index([roomId, createdAt])
+}
+
+model RoomPlaylistItem {
+  id              String   @id @default(cuid())
+  playlistId      String
+  videoUrl        String
+  title           String
+  duration        Float?
+  thumbnail       String?
+  addedBy         String
+  addedByUsername String?
+  position        Int      @default(0)
+  addedAt         DateTime @default(now())
+
+  playlist RoomPlaylist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+
+  @@index([playlistId, position])
+}

@@ -134,6 +134,7 @@ export function PlayerSection({
   chatText,
   setChatText,
   handleSendChat,
+  onVideoEnded,
 }: {
   inputUrl: string;
   setInputUrl: React.Dispatch<React.SetStateAction<string>>;
@@ -218,6 +219,8 @@ export function PlayerSection({
   toggleLocalMute: () => void;
   handleProgress: (time: number) => void;
   handleDuration: (dur: number) => void;
+
+  onVideoEnded?: () => void;
 
   fullscreenChatOpen: boolean;
   setFullscreenChatOpen: React.Dispatch<React.SetStateAction<boolean>>;
@@ -1148,6 +1151,9 @@ export function PlayerSection({
                     handleProgress(time);
                   }
                 }}
+                onEnded={() => {
+                  onVideoEnded?.();
+                }}
                 onError={handlePlayerError}
               />
             ) : (
@@ -1280,6 +1286,9 @@ export function PlayerSection({
                   if (typeof time === "number" && !isNaN(time)) {
                     handleProgress(time);
                   }
+                }}
+                onEnded={() => {
+                  onVideoEnded?.();
                 }}
                 style={{ position: "absolute", inset: 0 }}
               />

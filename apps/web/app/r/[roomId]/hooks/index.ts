@@ -7,3 +7,4 @@ export { useFullscreen } from "./useFullscreen";
 export { useStagePinning } from "./useStagePinning";
 export { usePushToTalkBinding } from "./usePushToTalkBinding";
 export { useWebRTCPeers } from "./useWebRTCPeers";
+export { usePlaylist } from "./usePlaylist";

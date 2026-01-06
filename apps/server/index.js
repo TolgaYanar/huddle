@@ -505,6 +505,10 @@ const roomPasswordHash = new Map();
 // Map<roomId, { entries: string[], lastSpin?: { index:number, result:string, entryCount:number, spunAt:number, senderId?:string } }>
 const roomWheel = new Map();
 
+// Room playlists active state (tracks which playlist is active and current item)
+// Map<roomId, { activePlaylistId: string | null, currentItemIndex: number }>
+const roomPlaylistActive = new Map();
+
 function getRoomWheel(roomId) {
   const existing = roomWheel.get(roomId);
   if (existing && Array.isArray(existing.entries)) return existing;
@@ -528,6 +532,82 @@ function emitWheelStateToRoom(roomId) {
     roomId,
     entries: wheel.entries,
     lastSpin: wheel.lastSpin ?? null,
+  });
+}
+
+// Playlist helper functions
+async function getPlaylistsForRoom(roomId) {
+  if (!dbConnected || !prisma) return [];
+  try {
+    const playlists = await prisma.roomPlaylist.findMany({
+      where: { roomId },
+      include: {
+        items: {
+          orderBy: { position: "asc" },
+        },
+      },
+      orderBy: { createdAt: "asc" },
+    });
+
+    return playlists.map((p) => ({
+      id: p.id,
+      roomId: p.roomId,
+      name: p.name,
+      description: p.description,
+      createdBy: p.createdBy,
+      createdByUsername: p.createdByUsername,
+      createdAt: p.createdAt.getTime(),
+      updatedAt: p.updatedAt.getTime(),
+      isDefault: p.isDefault,
+      settings: {
+        loop: p.loop,
+        shuffle: p.shuffle,
+        autoPlay: p.autoPlay,
+      },
+      items: p.items.map((item) => ({
+        id: item.id,
+        videoUrl: item.videoUrl,
+        title: item.title,
+        addedBy: item.addedBy,
+        addedByUsername: item.addedByUsername,
+        addedAt: item.addedAt.getTime(),
+        duration: item.duration,
+        thumbnail: item.thumbnail,
+      })),
+    }));
+  } catch (err) {
+    console.error("Failed to get playlists:", err.message);
+    return [];
+  }
+}
+
+async function emitPlaylistStateTo(socket, roomId) {
+  const playlists = await getPlaylistsForRoom(roomId);
+  const activeState = roomPlaylistActive.get(roomId) || {
+    activePlaylistId: null,
+    currentItemIndex: 0,
+  };
+
+  socket.emit("playlist_state", {
+    roomId,
+    playlists,
+    activePlaylistId: activeState.activePlaylistId,
+    currentItemIndex: activeState.currentItemIndex,
+  });
+}
+
+async function emitPlaylistStateToRoom(roomId) {
+  const playlists = await getPlaylistsForRoom(roomId);
+  const activeState = roomPlaylistActive.get(roomId) || {
+    activePlaylistId: null,
+    currentItemIndex: 0,
+  };
+
+  io.to(roomId).emit("playlist_state", {
+    roomId,
+    playlists,
+    activePlaylistId: activeState.activePlaylistId,
+    currentItemIndex: activeState.currentItemIndex,
   });
 }
 
@@ -684,6 +764,7 @@ io.on("connection", (socket) => {
         });
 
         emitWheelStateTo(socket, roomId);
+        emitPlaylistStateTo(socket, roomId);
       } catch (err) {
         console.error("Failed to re-emit room snapshot", err);
       }
@@ -746,6 +827,7 @@ io.on("connection", (socket) => {
       });
 
       emitWheelStateTo(socket, roomId);
+      emitPlaylistStateTo(socket, roomId);
     } catch (err) {
       console.error("Failed to emit room_users", err);
       socket.emit("room_users", {
@@ -762,6 +844,7 @@ io.on("connection", (socket) => {
       });
 
       emitWheelStateTo(socket, roomId);
+      emitPlaylistStateTo(socket, roomId);
     }
 
     // Persist join as an activity event (optional but useful for moderation/audit).
@@ -1009,6 +1092,408 @@ io.on("connection", (socket) => {
     });
 
     emitWheelStateToRoom(roomId);
+  });
+
+  // --- Playlist management ---
+  socket.on("playlist_get", async (data) => {
+    const { roomId } = data || {};
+    if (!roomId || typeof roomId !== "string") return;
+    if (!socket.rooms.has(roomId)) return;
+    await emitPlaylistStateTo(socket, roomId);
+  });
+
+  socket.on("playlist_create", async (data) => {
+    const { roomId, name, description, settings } = data || {};
+    if (!roomId || typeof roomId !== "string") return;
+    if (!socket.rooms.has(roomId)) return;
+    if (!dbConnected || !prisma) return;
+
+    const playlistName =
+      typeof name === "string" ? name.trim().slice(0, 100) : "";
+    if (!playlistName) return;
+
+    const senderUsername =
+      socket.data?.authUser?.username ||
+      socketIdToUsername.get(socket.id) ||
+      null;
+
+    try {
+      await prisma.roomPlaylist.create({
+        data: {
+          roomId,
+          name: playlistName,
+          description:
+            typeof description === "string" ? description.slice(0, 500) : null,
+          createdBy: socket.id,
+          createdByUsername: senderUsername,
+          loop: settings?.loop ?? false,
+          shuffle: settings?.shuffle ?? false,
+          autoPlay: settings?.autoPlay ?? true,
+        },
+      });
+
+      await emitPlaylistStateToRoom(roomId);
+    } catch (err) {
+      console.error("Failed to create playlist:", err.message);
+    }
+  });
+
+  socket.on("playlist_update", async (data) => {
+    const { roomId, playlistId, name, description, settings } = data || {};
+    if (!roomId || typeof roomId !== "string") return;
+    if (!playlistId || typeof playlistId !== "string") return;
+    if (!socket.rooms.has(roomId)) return;
+    if (!dbConnected || !prisma) return;
+
+    try {
+      const updateData = {};
+      if (typeof name === "string") {
+        updateData.name = name.trim().slice(0, 100);
+      }
+      if (typeof description === "string") {
+        updateData.description = description.slice(0, 500);
+      }
+      if (settings && typeof settings === "object") {
+        if (typeof settings.loop === "boolean") updateData.loop = settings.loop;
+        if (typeof settings.shuffle === "boolean")
+          updateData.shuffle = settings.shuffle;
+        if (typeof settings.autoPlay === "boolean")
+          updateData.autoPlay = settings.autoPlay;
+      }
+
+      if (Object.keys(updateData).length === 0) return;
+
+      await prisma.roomPlaylist.update({
+        where: { id: playlistId },
+        data: updateData,
+      });
+
+      await emitPlaylistStateToRoom(roomId);
+    } catch (err) {
+      console.error("Failed to update playlist:", err.message);
+    }
+  });
+
+  socket.on("playlist_delete", async (data) => {
+    const { roomId, playlistId } = data || {};
+    if (!roomId || typeof roomId !== "string") return;
+    if (!playlistId || typeof playlistId !== "string") return;
+    if (!socket.rooms.has(roomId)) return;
+    if (!dbConnected || !prisma) return;
+
+    try {
+      await prisma.roomPlaylist.delete({
+        where: { id: playlistId },
+      });
+
+      // Clear active state if this was the active playlist
+      const activeState = roomPlaylistActive.get(roomId);
+      if (activeState && activeState.activePlaylistId === playlistId) {
+        roomPlaylistActive.delete(roomId);
+      }
+
+      await emitPlaylistStateToRoom(roomId);
+    } catch (err) {
+      console.error("Failed to delete playlist:", err.message);
+    }
+  });
+
+  socket.on("playlist_add_item", async (data) => {
+    const { roomId, playlistId, videoUrl, title, duration, thumbnail } =
+      data || {};
+    if (!roomId || typeof roomId !== "string") return;
+    if (!playlistId || typeof playlistId !== "string") return;
+    if (!videoUrl || typeof videoUrl !== "string") return;
+    if (!socket.rooms.has(roomId)) return;
+    if (!dbConnected || !prisma) return;
+
+    const itemTitle =
+      typeof title === "string" ? title.trim().slice(0, 200) : "Untitled";
+    const senderUsername =
+      socket.data?.authUser?.username ||
+      socketIdToUsername.get(socket.id) ||
+      null;
+
+    try {
+      // Get the highest position in the playlist
+      const lastItem = await prisma.roomPlaylistItem.findFirst({
+        where: { playlistId },
+        orderBy: { position: "desc" },
+        select: { position: true },
+      });
+
+      const nextPosition = (lastItem?.position ?? -1) + 1;
+
+      await prisma.roomPlaylistItem.create({
+        data: {
+          playlistId,
+          videoUrl: videoUrl.slice(0, 2000),
+          title: itemTitle,
+          duration: typeof duration === "number" ? duration : null,
+          thumbnail:
+            typeof thumbnail === "string" ? thumbnail.slice(0, 2000) : null,
+          addedBy: socket.id,
+          addedByUsername: senderUsername,
+          position: nextPosition,
+        },
+      });
+
+      await emitPlaylistStateToRoom(roomId);
+    } catch (err) {
+      console.error("Failed to add playlist item:", err.message);
+    }
+  });
+
+  socket.on("playlist_remove_item", async (data) => {
+    const { roomId, playlistId, itemId } = data || {};
+    if (!roomId || typeof roomId !== "string") return;
+    if (!playlistId || typeof playlistId !== "string") return;
+    if (!itemId || typeof itemId !== "string") return;
+    if (!socket.rooms.has(roomId)) return;
+    if (!dbConnected || !prisma) return;
+
+    try {
+      await prisma.roomPlaylistItem.delete({
+        where: { id: itemId },
+      });
+
+      await emitPlaylistStateToRoom(roomId);
+    } catch (err) {
+      console.error("Failed to remove playlist item:", err.message);
+    }
+  });
+
+  socket.on("playlist_reorder_items", async (data) => {
+    const { roomId, playlistId, itemIds } = data || {};
+    if (!roomId || typeof roomId !== "string") return;
+    if (!playlistId || typeof playlistId !== "string") return;
+    if (!Array.isArray(itemIds)) return;
+    if (!socket.rooms.has(roomId)) return;
+    if (!dbConnected || !prisma) return;
+
+    try {
+      // Get current active state to track the currently playing item
+      const activeState = roomPlaylistActive.get(roomId);
+      let currentPlayingItemId = null;
+
+      // If this is the active playlist, find the currently playing item
+      if (activeState && activeState.activePlaylistId === playlistId) {
+        const playlist = await prisma.roomPlaylist.findUnique({
+          where: { id: playlistId },
+          include: {
+            items: {
+              orderBy: { position: "asc" },
+            },
+          },
+        });
+
+        if (playlist && playlist.items[activeState.currentItemIndex]) {
+          currentPlayingItemId =
+            playlist.items[activeState.currentItemIndex].id;
+        }
+      }
+
+      // Update positions for all items
+      await prisma.$transaction(
+        itemIds.map((id, index) =>
+          prisma.roomPlaylistItem.update({
+            where: { id },
+            data: { position: index },
+          })
+        )
+      );
+
+      // If we were tracking a currently playing item, update the index to its new position
+      if (currentPlayingItemId && activeState) {
+        const newIndex = itemIds.indexOf(currentPlayingItemId);
+        if (newIndex !== -1) {
+          roomPlaylistActive.set(roomId, {
+            activePlaylistId: playlistId,
+            currentItemIndex: newIndex,
+          });
+        }
+      }
+
+      await emitPlaylistStateToRoom(roomId);
+    } catch (err) {
+      console.error("Failed to reorder playlist items:", err.message);
+    }
+  });
+
+  socket.on("playlist_set_active", async (data) => {
+    const { roomId, playlistId } = data || {};
+    if (!roomId || typeof roomId !== "string") return;
+    if (!socket.rooms.has(roomId)) return;
+
+    // playlistId can be null to clear active playlist
+    const activeId = typeof playlistId === "string" ? playlistId : null;
+
+    roomPlaylistActive.set(roomId, {
+      activePlaylistId: activeId,
+      currentItemIndex: 0,
+    });
+
+    await emitPlaylistStateToRoom(roomId);
+  });
+
+  socket.on("playlist_play_item", async (data) => {
+    const { roomId, playlistId, itemId } = data || {};
+    if (!roomId || typeof roomId !== "string") return;
+    if (!playlistId || typeof playlistId !== "string") return;
+    if (!itemId || typeof itemId !== "string") return;
+    if (!socket.rooms.has(roomId)) return;
+    if (!dbConnected || !prisma) return;
+
+    try {
+      // Get the playlist with items
+      const playlist = await prisma.roomPlaylist.findUnique({
+        where: { id: playlistId },
+        include: {
+          items: {
+            orderBy: { position: "asc" },
+          },
+        },
+      });
+
+      if (!playlist) return;
+
+      const itemIndex = playlist.items.findIndex((item) => item.id === itemId);
+      if (itemIndex === -1) return;
+
+      const item = playlist.items[itemIndex];
+
+      // Update active state
+      roomPlaylistActive.set(roomId, {
+        activePlaylistId: playlistId,
+        currentItemIndex: itemIndex,
+      });
+
+      // Emit playlist item played event to change the video
+      io.to(roomId).emit("playlist_item_played", {
+        roomId,
+        playlistId,
+        itemId: item.id,
+        itemIndex,
+        videoUrl: item.videoUrl,
+        title: item.title,
+      });
+
+      await emitPlaylistStateToRoom(roomId);
+    } catch (err) {
+      console.error("Failed to play playlist item:", err.message);
+    }
+  });
+
+  socket.on("playlist_next", async (data) => {
+    const { roomId } = data || {};
+    if (!roomId || typeof roomId !== "string") return;
+    if (!socket.rooms.has(roomId)) return;
+    if (!dbConnected || !prisma) return;
+
+    const activeState = roomPlaylistActive.get(roomId);
+    if (!activeState || !activeState.activePlaylistId) return;
+
+    try {
+      const playlist = await prisma.roomPlaylist.findUnique({
+        where: { id: activeState.activePlaylistId },
+        include: {
+          items: {
+            orderBy: { position: "asc" },
+          },
+        },
+      });
+
+      if (!playlist || playlist.items.length === 0) return;
+
+      let nextIndex = activeState.currentItemIndex + 1;
+
+      // Handle loop/end of playlist
+      if (nextIndex >= playlist.items.length) {
+        if (playlist.loop) {
+          nextIndex = 0;
+        } else {
+          return; // End of playlist
+        }
+      }
+
+      // Handle shuffle
+      if (playlist.shuffle) {
+        nextIndex = Math.floor(Math.random() * playlist.items.length);
+      }
+
+      const item = playlist.items[nextIndex];
+
+      roomPlaylistActive.set(roomId, {
+        activePlaylistId: playlist.id,
+        currentItemIndex: nextIndex,
+      });
+
+      io.to(roomId).emit("playlist_item_played", {
+        roomId,
+        playlistId: playlist.id,
+        itemId: item.id,
+        itemIndex: nextIndex,
+        videoUrl: item.videoUrl,
+        title: item.title,
+      });
+
+      await emitPlaylistStateToRoom(roomId);
+    } catch (err) {
+      console.error("Failed to play next playlist item:", err.message);
+    }
+  });
+
+  socket.on("playlist_previous", async (data) => {
+    const { roomId } = data || {};
+    if (!roomId || typeof roomId !== "string") return;
+    if (!socket.rooms.has(roomId)) return;
+    if (!dbConnected || !prisma) return;
+
+    const activeState = roomPlaylistActive.get(roomId);
+    if (!activeState || !activeState.activePlaylistId) return;
+
+    try {
+      const playlist = await prisma.roomPlaylist.findUnique({
+        where: { id: activeState.activePlaylistId },
+        include: {
+          items: {
+            orderBy: { position: "asc" },
+          },
+        },
+      });
+
+      if (!playlist || playlist.items.length === 0) return;
+
+      let prevIndex = activeState.currentItemIndex - 1;
+
+      if (prevIndex < 0) {
+        if (playlist.loop) {
+          prevIndex = playlist.items.length - 1;
+        } else {
+          prevIndex = 0;
+        }
+      }
+
+      const item = playlist.items[prevIndex];
+
+      roomPlaylistActive.set(roomId, {
+        activePlaylistId: playlist.id,
+        currentItemIndex: prevIndex,
+      });
+
+      io.to(roomId).emit("playlist_item_played", {
+        roomId,
+        playlistId: playlist.id,
+        itemId: item.id,
+        itemIndex: prevIndex,
+        videoUrl: item.videoUrl,
+        title: item.title,
+      });
+
+      await emitPlaylistStateToRoom(roomId);
+    } catch (err) {
+      console.error("Failed to play previous playlist item:", err.message);
+    }
   });
 
   // Host-only: set or clear room password.

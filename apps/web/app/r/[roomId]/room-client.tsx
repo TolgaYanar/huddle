@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useCallback,
+} from "react";
 import { useRoom, WebRTCMediaState } from "shared-logic";
 
 // Components
@@ -12,6 +18,9 @@ import { PasswordModal } from "./components/PasswordModal";
 import { VideoPreviewModal } from "./components/VideoPreviewModal";
 import { RoomHeader } from "./components/RoomHeader";
 import { RoomAccessError } from "./components/RoomAccessError";
+import { PlaylistPanel } from "./components/PlaylistPanel";
+import { AddToPlaylistModal } from "./components/AddToPlaylistModal";
+import { AddVideosToPlaylistModal } from "./components/AddVideosToPlaylistModal";
 
 // Hooks
 import {
@@ -24,6 +33,7 @@ import {
   useStagePinning,
   usePushToTalkBinding,
   useWebRTCPeers,
+  usePlaylist,
 } from "./hooks";
 
 // Utils
@@ -150,6 +160,20 @@ export default function RoomClient({ roomId }: { roomId: string }) {
     onWebRTCMediaState,
     sendWebRTCSpeaking,
     onWebRTCSpeaking,
+    // Playlist methods
+    requestPlaylistState,
+    createPlaylist,
+    updatePlaylist,
+    deletePlaylist,
+    addPlaylistItem,
+    removePlaylistItem,
+    reorderPlaylistItems,
+    setActivePlaylist,
+    playPlaylistItem,
+    playNextInPlaylist,
+    playPreviousInPlaylist,
+    onPlaylistState,
+    onPlaylistItemPlayed,
     socket,
   } = useRoom(roomId, userId);
 
@@ -443,6 +467,63 @@ export default function RoomClient({ roomId }: { roomId: string }) {
       spinWheel,
     });
 
+  // Playlist management
+  const {
+    playlists,
+    activePlaylistId,
+    activePlaylist,
+    currentItemIndex,
+    isPlaylistPanelOpen,
+    setIsPlaylistPanelOpen,
+    isAddToPlaylistOpen,
+    pendingVideoUrl,
+    openAddToPlaylist,
+    closeAddToPlaylist,
+    createPlaylist: createPlaylistAction,
+    updatePlaylist: updatePlaylistAction,
+    deletePlaylist: deletePlaylistAction,
+    addItem: addPlaylistItemAction,
+    removeItem: removePlaylistItemAction,
+    reorderItems: reorderPlaylistItemsAction,
+    setActive: setActivePlaylistAction,
+    playItem: playPlaylistItemAction,
+    playNext: playNextAction,
+    playPrevious: playPreviousAction,
+  } = usePlaylist({
+    roomId,
+    onPlaylistState,
+    onPlaylistItemPlayed,
+    requestPlaylistState,
+    createPlaylist,
+    updatePlaylist,
+    deletePlaylist,
+    addPlaylistItem,
+    removePlaylistItem,
+    reorderPlaylistItems,
+    setActivePlaylist,
+    playPlaylistItem,
+    playNextInPlaylist,
+    playPreviousInPlaylist,
+    loadVideoUrl,
+  });
+
+  // Handler for video ended - auto-play next if enabled
+  const handleVideoEnded = useCallback(() => {
+    if (activePlaylist?.settings?.autoPlay) {
+      playNextAction();
+    }
+  }, [activePlaylist, playNextAction]);
+
+  // Handler for adding current video to playlist
+  const handleOpenAddToPlaylist = useCallback(() => {
+    if (url) {
+      openAddToPlaylist(url);
+    }
+  }, [url, openAddToPlaylist]);
+
+  // State for Add Videos modal
+  const [isAddVideosModalOpen, setIsAddVideosModalOpen] = useState(false);
+
   // Fullscreen handling
   const {
     playerContainerRef,
@@ -530,6 +611,8 @@ export default function RoomClient({ roomId }: { roomId: string }) {
         copied={copied}
         onCopyInvite={copyInvite}
         onOpenWheel={() => setIsWheelOpen(true)}
+        onOpenPlaylist={() => setIsPlaylistPanelOpen(!isPlaylistPanelOpen)}
+        isPlaylistOpen={isPlaylistPanelOpen}
       />
 
       <PasswordModal
@@ -626,6 +709,7 @@ export default function RoomClient({ roomId }: { roomId: string }) {
           toggleLocalMute={toggleLocalMute}
           handleProgress={handleProgress}
           handleDuration={handleDuration}
+          onVideoEnded={handleVideoEnded}
           fullscreenChatOpen={fullscreenChatOpen}
           setFullscreenChatOpen={setFullscreenChatOpen}
           fullscreenChatMessages={fullscreenChatMessages}
@@ -692,6 +776,52 @@ export default function RoomClient({ roomId }: { roomId: string }) {
         isPreviewLoading={isPreviewLoading}
         onLoadVideo={loadVideoUrl}
         onClose={closePreviewModal}
+      />
+
+      {/* Playlist Panel - positioned as a slide-in panel from the right */}
+      {isPlaylistPanelOpen && (
+        <div className="fixed inset-y-0 right-0 z-40 w-80 max-w-full">
+          <div className="h-full pt-16 pb-4 pr-4">
+            <PlaylistPanel
+              playlists={playlists}
+              activePlaylistId={activePlaylistId}
+              currentItemIndex={currentItemIndex}
+              isOpen={isPlaylistPanelOpen}
+              onClose={() => setIsPlaylistPanelOpen(false)}
+              onCreatePlaylist={createPlaylistAction}
+              onUpdatePlaylist={updatePlaylistAction}
+              onDeletePlaylist={deletePlaylistAction}
+              onRemoveItem={removePlaylistItemAction}
+              onReorderItems={reorderPlaylistItemsAction}
+              onSetActive={setActivePlaylistAction}
+              onPlayItem={playPlaylistItemAction}
+              onPlayNext={playNextAction}
+              onPlayPrevious={playPreviousAction}
+              onAddCurrentVideo={url ? handleOpenAddToPlaylist : undefined}
+              onOpenAddVideos={() => setIsAddVideosModalOpen(true)}
+              currentVideoUrl={url}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Add to Playlist Modal (for single current video) */}
+      <AddToPlaylistModal
+        isOpen={isAddToPlaylistOpen}
+        onClose={closeAddToPlaylist}
+        playlists={playlists}
+        videoUrl={pendingVideoUrl}
+        onAddToPlaylist={addPlaylistItemAction}
+        onCreatePlaylist={createPlaylistAction}
+      />
+
+      {/* Add Videos to Playlist Modal (URL/search/playlist import) */}
+      <AddVideosToPlaylistModal
+        isOpen={isAddVideosModalOpen}
+        onClose={() => setIsAddVideosModalOpen(false)}
+        playlists={playlists}
+        onAddToPlaylist={addPlaylistItemAction}
+        onCreatePlaylist={createPlaylistAction}
       />
     </div>
   );

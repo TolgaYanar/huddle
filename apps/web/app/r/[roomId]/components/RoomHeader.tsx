@@ -21,6 +21,8 @@ interface RoomHeaderProps {
   copied: boolean;
   onCopyInvite: () => void;
   onOpenWheel: () => void;
+  onOpenPlaylist: () => void;
+  isPlaylistOpen: boolean;
 }
 
 export function RoomHeader({
@@ -32,6 +34,8 @@ export function RoomHeader({
   copied,
   onCopyInvite,
   onOpenWheel,
+  onOpenPlaylist,
+  isPlaylistOpen,
 }: RoomHeaderProps) {
   const [user, setUser] = React.useState<AuthUser | null>(null);
   const [isSaved, setIsSaved] = React.useState(false);
@@ -165,6 +169,24 @@ export function RoomHeader({
           }
         >
           Wheel
+        </button>
+
+        <button
+          type="button"
+          onClick={onOpenPlaylist}
+          disabled={passwordRequired}
+          className={`h-8 px-3 rounded-lg border text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+            isPlaylistOpen
+              ? "border-indigo-500/50 bg-indigo-500/20 text-indigo-200"
+              : "border-white/10 bg-white/5 text-slate-200 hover:bg-white/10"
+          }`}
+          title={
+            passwordRequired
+              ? "Join with password first"
+              : "Toggle playlist panel"
+          }
+        >
+          Playlist
         </button>
 
         <button
