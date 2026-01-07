@@ -155,10 +155,11 @@ export function useActivityLog({
         const serverAlreadyExtrapolated = typeof state.serverNow === "number";
         const anchorAt = serverAlreadyExtrapolated
           ? Date.now()
-          : typeof state.updatedAt === "number" && Number.isFinite(state.updatedAt)
+          : typeof state.updatedAt === "number" &&
+              Number.isFinite(state.updatedAt)
             ? state.updatedAt
             : Date.now();
-            
+
         setRoomPlaybackAnchor({
           url: nextUrl,
           isPlaying: playing,
@@ -182,7 +183,7 @@ export function useActivityLog({
         // For room_state events from join/resync, server calculates estimated position
         // For sync_video events, we need to extrapolate ourselves
         const serverAlreadyExtrapolated = typeof state.serverNow === "number";
-        
+
         if (!serverAlreadyExtrapolated && state.isPlaying === true) {
           const updatedAt =
             typeof state.updatedAt === "number" &&

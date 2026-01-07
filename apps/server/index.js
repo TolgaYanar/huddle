@@ -881,7 +881,7 @@ io.on("connection", (socket) => {
 
     // Send current room state to this new joiner.
     const state = roomState.get(roomId);
-    
+
     // Calculate estimated current timestamp if video is playing
     // (same logic as request_room_state)
     let estimatedTimestamp = state?.timestamp;
@@ -899,7 +899,7 @@ io.on("connection", (socket) => {
       estimatedTimestamp =
         prevTimestamp + Math.max(0, (now - prevUpdatedAt) / 1000) * prevSpeed;
     }
-    
+
     socket.emit("room_state", {
       roomId,
       serverNow: Date.now(), // For clock sync
