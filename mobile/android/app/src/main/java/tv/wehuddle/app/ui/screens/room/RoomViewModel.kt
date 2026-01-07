@@ -149,20 +149,61 @@ class RoomViewModel @Inject constructor(
         viewModelScope.launch {
             webRTCManager.initialize()
             
-            // Observe WebRTC signaling events from socket
+            // Observe WebRTC signaling events from socket (incoming)
             roomRepository.socketEvents.collect { event ->
                 when (event) {
                     is SocketEvent.WebRTCOfferReceived -> {
+                        Log.d("RoomViewModel", "Received WebRTC offer from ${event.data.fromId}")
                         webRTCManager.handleOffer(event.data.fromId, event.data)
                     }
                     is SocketEvent.WebRTCAnswerReceived -> {
+                        Log.d("RoomViewModel", "Received WebRTC answer from ${event.data.fromId}")
                         webRTCManager.handleAnswer(event.data.fromId, event.data)
                     }
                     is SocketEvent.WebRTCIceReceived -> {
+                        Log.d("RoomViewModel", "Received ICE candidate from ${event.data.fromId}")
                         webRTCManager.handleIceCandidate(
                             event.data.fromId,
                             event.data
                         )
+                    }
+                    else -> {}
+                }
+            }
+        }
+        
+        // Observe WebRTC events from manager (outgoing) and send to server
+        viewModelScope.launch {
+            webRTCManager.events.collect { event ->
+                when (event) {
+                    is tv.wehuddle.app.data.webrtc.WebRTCEvent.AnswerCreated -> {
+                        Log.d("RoomViewModel", "Sending WebRTC answer to ${event.peerId}")
+                        roomRepository.sendWebRTCAnswer(event.peerId, event.sdp.description)
+                    }
+                    is tv.wehuddle.app.data.webrtc.WebRTCEvent.OfferCreated -> {
+                        Log.d("RoomViewModel", "Sending WebRTC offer to ${event.peerId}")
+                        roomRepository.sendWebRTCOffer(event.peerId, event.sdp.description)
+                    }
+                    is tv.wehuddle.app.data.webrtc.WebRTCEvent.IceCandidateGenerated -> {
+                        Log.d("RoomViewModel", "Sending ICE candidate to ${event.peerId}")
+                        roomRepository.sendWebRTCIce(
+                            event.peerId,
+                            event.candidate.sdp,
+                            event.candidate.sdpMid,
+                            event.candidate.sdpMLineIndex
+                        )
+                    }
+                    is tv.wehuddle.app.data.webrtc.WebRTCEvent.RemoteStreamAdded -> {
+                        Log.d("RoomViewModel", "Remote stream added for ${event.peerId}")
+                    }
+                    is tv.wehuddle.app.data.webrtc.WebRTCEvent.RemoteStreamRemoved -> {
+                        Log.d("RoomViewModel", "Remote stream removed for ${event.peerId}")
+                    }
+                    is tv.wehuddle.app.data.webrtc.WebRTCEvent.ConnectionStateChanged -> {
+                        Log.d("RoomViewModel", "Connection state changed for ${event.peerId}: ${event.state}")
+                    }
+                    is tv.wehuddle.app.data.webrtc.WebRTCEvent.Error -> {
+                        Log.e("RoomViewModel", "WebRTC error: ${event.message}")
                     }
                     else -> {}
                 }
@@ -198,6 +239,13 @@ class RoomViewModel @Inject constructor(
     
     fun onSeek(timestamp: Double) {
         roomRepository.sendSeekEvent(timestamp)
+    }
+
+    /**
+     * Request sync from room - useful for TV when playback drifts
+     */
+    fun requestSync() {
+        roomRepository.requestSync()
     }
 
     fun setMuted(isMuted: Boolean) {

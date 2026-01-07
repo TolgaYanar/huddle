@@ -881,9 +881,32 @@ io.on("connection", (socket) => {
 
     // Send current room state to this new joiner.
     const state = roomState.get(roomId);
+    
+    // Calculate estimated current timestamp if video is playing
+    // (same logic as request_room_state)
+    let estimatedTimestamp = state?.timestamp;
+    if (state && state.isPlaying === true) {
+      const now = Date.now();
+      const prevTimestamp =
+        typeof state.timestamp === "number" ? state.timestamp : 0;
+      const prevUpdatedAt =
+        typeof state.updatedAt === "number" ? state.updatedAt : now;
+      const prevSpeed =
+        typeof state.playbackSpeed === "number" &&
+        Number.isFinite(state.playbackSpeed)
+          ? state.playbackSpeed
+          : 1;
+      estimatedTimestamp =
+        prevTimestamp + Math.max(0, (now - prevUpdatedAt) / 1000) * prevSpeed;
+    }
+    
     socket.emit("room_state", {
       roomId,
+      serverNow: Date.now(), // For clock sync
       ...(state || {}),
+      timestamp: estimatedTimestamp,
+      // Ensure isPlaying is always defined (default to false if missing)
+      isPlaying: state?.isPlaying ?? false,
     });
 
     // Send recent chat history for this room.
@@ -1838,8 +1861,11 @@ io.on("connection", (socket) => {
 
     socket.emit("room_state", {
       roomId,
+      serverNow: Date.now(), // For clock sync
       ...(state || {}),
       timestamp: estimatedTimestamp,
+      // Ensure isPlaying is always defined (default to false if missing)
+      isPlaying: state?.isPlaying ?? false,
     });
   });
 
@@ -1993,6 +2019,7 @@ io.on("connection", (socket) => {
       audioSyncEnabled: next.audioSyncEnabled,
       senderId: socket.id,
       senderUsername,
+      serverNow: Date.now(), // For clock sync
     });
   });
 

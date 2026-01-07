@@ -1,6 +1,8 @@
 package tv.wehuddle.app.data.network
 
+import android.content.Context
 import android.util.Log
+import dagger.hilt.android.qualifiers.ApplicationContext
 import io.socket.client.IO
 import io.socket.client.Socket
 import io.socket.emitter.Emitter
@@ -57,11 +59,44 @@ sealed class SocketEvent {
  * Socket.IO client for real-time room communication
  */
 @Singleton
-class SocketClient @Inject constructor() {
+class SocketClient @Inject constructor(
+    @ApplicationContext private val context: Context
+) {
     
     private val json = Json { 
         ignoreUnknownKeys = true 
         isLenient = true
+    }
+    
+    // Detect if running on emulator
+    private val isEmulator: Boolean by lazy {
+        (android.os.Build.FINGERPRINT.startsWith("generic")
+            || android.os.Build.FINGERPRINT.startsWith("unknown")
+            || android.os.Build.MODEL.contains("google_sdk")
+            || android.os.Build.MODEL.contains("Emulator")
+            || android.os.Build.MODEL.contains("Android SDK built for x86")
+            || android.os.Build.MANUFACTURER.contains("Genymotion")
+            || android.os.Build.BRAND.startsWith("generic") && android.os.Build.DEVICE.startsWith("generic")
+            || "google_sdk" == android.os.Build.PRODUCT
+            || android.os.Build.HARDWARE.contains("ranchu")
+            || android.os.Build.HARDWARE.contains("goldfish"))
+    }
+    
+    private fun getSocketUrl(): String {
+        // On emulator, always use 10.0.2.2 (host machine alias)
+        return if (isEmulator && BuildConfig.DEBUG) {
+            try {
+                val emulatorUrl = BuildConfig::class.java.getField("EMULATOR_SOCKET_URL").get(null) as? String
+                android.util.Log.d("SocketClient", "Running on EMULATOR - using URL: $emulatorUrl")
+                emulatorUrl ?: BuildConfig.SOCKET_URL
+            } catch (e: Exception) {
+                android.util.Log.d("SocketClient", "Emulator URL not found, using default: ${BuildConfig.SOCKET_URL}")
+                BuildConfig.SOCKET_URL
+            }
+        } else {
+            android.util.Log.d("SocketClient", "Running on REAL DEVICE - using URL: ${BuildConfig.SOCKET_URL}")
+            BuildConfig.SOCKET_URL
+        }
     }
     
     private var socket: Socket? = null
@@ -70,7 +105,8 @@ class SocketClient @Inject constructor() {
     private val _connectionState = MutableStateFlow(ConnectionState.DISCONNECTED)
     val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
     
-    private val _events = MutableSharedFlow<SocketEvent>(extraBufferCapacity = 64)
+    // No replay cache - prevents stale events when rejoining rooms
+    private val _events = MutableSharedFlow<SocketEvent>(replay = 0, extraBufferCapacity = 64)
     val events: SharedFlow<SocketEvent> = _events.asSharedFlow()
     
     private val _socketId = MutableStateFlow<String?>(null)
@@ -117,7 +153,8 @@ class SocketClient @Inject constructor() {
         _connectionState.value = ConnectionState.CONNECTING
         
         try {
-            android.util.Log.d("SocketClient", "Attempting to connect to: ${BuildConfig.SOCKET_URL}")
+            val socketUrl = getSocketUrl()
+            android.util.Log.d("SocketClient", "Attempting to connect to: $socketUrl (isEmulator: $isEmulator)")
             
             val options = IO.Options().apply {
                 transports = arrayOf("websocket")
@@ -144,7 +181,7 @@ class SocketClient @Inject constructor() {
                 }
             }
             
-            socket = IO.socket(BuildConfig.SOCKET_URL, options).apply {
+            socket = IO.socket(socketUrl, options).apply {
                 setupEventListeners()
                 connect()
             }
@@ -225,6 +262,15 @@ class SocketClient @Inject constructor() {
      */
     fun requestRoomState(roomId: String) {
         socket?.emit("request_room_state", JSONObject().put("roomId", roomId))
+    }
+    
+    /**
+     * Request room sync - alias for requestRoomState for better readability
+     * Used when TV needs to re-sync with room state
+     */
+    fun requestRoomSync(roomId: String) {
+        Log.d("SocketClient", "Requesting room sync for: $roomId")
+        requestRoomState(roomId)
     }
     
     /**
@@ -395,29 +441,46 @@ class SocketClient @Inject constructor() {
     }
     
     // WebRTC signaling methods
-    fun sendWebRTCOffer(toId: String, sdp: String) {
+    fun sendWebRTCOffer(roomId: String, toId: String, sdp: String) {
+        // Server expects: { roomId, to, sdp } where sdp is { type, sdp }
         val data = JSONObject().apply {
-            put("toId", toId)
-            put("sdp", sdp)
+            put("roomId", roomId)
+            put("to", toId)
+            put("sdp", JSONObject().apply {
+                put("type", "offer")
+                put("sdp", sdp)
+            })
         }
+        Log.d("SocketClient", "Sending webrtc_offer to=$toId, sdp length=${sdp.length}")
         socket?.emit("webrtc_offer", data)
     }
     
-    fun sendWebRTCAnswer(toId: String, sdp: String) {
+    fun sendWebRTCAnswer(roomId: String, toId: String, sdp: String) {
+        // Server expects: { roomId, to, sdp } where sdp is { type, sdp }
         val data = JSONObject().apply {
-            put("toId", toId)
-            put("sdp", sdp)
+            put("roomId", roomId)
+            put("to", toId)
+            put("sdp", JSONObject().apply {
+                put("type", "answer")
+                put("sdp", sdp)
+            })
         }
+        Log.d("SocketClient", "Sending webrtc_answer to=$toId, sdp length=${sdp.length}")
         socket?.emit("webrtc_answer", data)
     }
     
-    fun sendWebRTCIce(toId: String, candidate: String, sdpMid: String?, sdpMLineIndex: Int?) {
+    fun sendWebRTCIce(roomId: String, toId: String, candidate: String, sdpMid: String?, sdpMLineIndex: Int?) {
+        // Server expects: { roomId, to, candidate }
         val data = JSONObject().apply {
-            put("toId", toId)
-            put("candidate", candidate)
-            sdpMid?.let { put("sdpMid", it) }
-            sdpMLineIndex?.let { put("sdpMLineIndex", it) }
+            put("roomId", roomId)
+            put("to", toId)
+            put("candidate", JSONObject().apply {
+                put("candidate", candidate)
+                sdpMid?.let { put("sdpMid", it) }
+                sdpMLineIndex?.let { put("sdpMLineIndex", it) }
+            })
         }
+        Log.d("SocketClient", "Sending webrtc_ice to=$toId")
         socket?.emit("webrtc_ice", data)
     }
     
@@ -574,6 +637,8 @@ class SocketClient @Inject constructor() {
                     isMuted = if (hasIsMuted) obj.optBoolean("isMuted") else null,
                     playbackSpeed = if (hasPlaybackSpeed) obj.optDouble("playbackSpeed").toFloat() else null,
                     audioSyncEnabled = if (hasAudioSyncEnabled) obj.optBoolean("audioSyncEnabled") else null,
+                    updatedAt = obj.optLong("updatedAt").takeIf { it > 0 },
+                    serverNow = obj.optLong("serverNow").takeIf { it > 0 },
                     senderId = obj.optString("senderId").takeIf { it.isNotEmpty() },
                     senderUsername = obj.optString("senderUsername").takeIf { it.isNotEmpty() }
                 )
@@ -602,6 +667,7 @@ class SocketClient @Inject constructor() {
                     playbackSpeed = if (hasPlaybackSpeed) obj.optDouble("playbackSpeed").toFloat() else null,
                     audioSyncEnabled = if (hasAudioSyncEnabled) obj.optBoolean("audioSyncEnabled") else null,
                     updatedAt = obj.optLong("updatedAt").takeIf { it > 0 },
+                    serverNow = obj.optLong("serverNow").takeIf { it > 0 },
                     senderId = obj.optString("senderId").takeIf { it.isNotEmpty() },
                     senderUsername = obj.optString("senderUsername").takeIf { it.isNotEmpty() }
                 )
@@ -807,36 +873,68 @@ class SocketClient @Inject constructor() {
         
         on("webrtc_offer") { args ->
             parseJsonObject(args) { obj ->
-                val data = WebRTCOffer(
-                    fromId = obj.optString("fromId"),
-                    toId = obj.optString("toId"),
-                    sdp = obj.optString("sdp")
-                )
-                emitEvent(SocketEvent.WebRTCOfferReceived(data))
+                // Server sends: { roomId, from, sdp } where sdp is an object { type, sdp }
+                val fromId = obj.optString("from")
+                val sdpObj = obj.opt("sdp")
+                val sdpString: String = when (sdpObj) {
+                    is JSONObject -> sdpObj.optString("sdp")
+                    is String -> sdpObj as String
+                    else -> ""
+                }
+                Log.d("SocketClient", "Parsed webrtc_offer: from=$fromId, sdp length=${sdpString.length}")
+                if (fromId.isNotEmpty() && sdpString.isNotEmpty()) {
+                    val data = WebRTCOffer(
+                        fromId = fromId,
+                        toId = socketId.value ?: "",
+                        sdp = sdpString
+                    )
+                    emitEvent(SocketEvent.WebRTCOfferReceived(data))
+                }
             }
         }
         
         on("webrtc_answer") { args ->
             parseJsonObject(args) { obj ->
-                val data = WebRTCAnswer(
-                    fromId = obj.optString("fromId"),
-                    toId = obj.optString("toId"),
-                    sdp = obj.optString("sdp")
-                )
-                emitEvent(SocketEvent.WebRTCAnswerReceived(data))
+                // Server sends: { roomId, from, sdp } where sdp is an object { type, sdp }
+                val fromId = obj.optString("from")
+                val sdpObj = obj.opt("sdp")
+                val sdpString: String = when (sdpObj) {
+                    is JSONObject -> sdpObj.optString("sdp")
+                    is String -> sdpObj as String
+                    else -> ""
+                }
+                Log.d("SocketClient", "Parsed webrtc_answer: from=$fromId, sdp length=${sdpString.length}")
+                if (fromId.isNotEmpty() && sdpString.isNotEmpty()) {
+                    val data = WebRTCAnswer(
+                        fromId = fromId,
+                        toId = socketId.value ?: "",
+                        sdp = sdpString
+                    )
+                    emitEvent(SocketEvent.WebRTCAnswerReceived(data))
+                }
             }
         }
         
         on("webrtc_ice") { args ->
             parseJsonObject(args) { obj ->
-                val data = WebRTCIceCandidate(
-                    fromId = obj.optString("fromId"),
-                    toId = obj.optString("toId"),
-                    candidate = obj.optString("candidate"),
-                    sdpMid = obj.optString("sdpMid").takeIf { it.isNotEmpty() },
-                    sdpMLineIndex = obj.optInt("sdpMLineIndex", -1).takeIf { it >= 0 }
-                )
-                emitEvent(SocketEvent.WebRTCIceReceived(data))
+                // Server sends: { roomId, from, candidate } where candidate is an object
+                val fromId = obj.optString("from")
+                val candidateObj = obj.optJSONObject("candidate")
+                val candidate: String = candidateObj?.optString("candidate") ?: obj.optString("candidate")
+                val sdpMid: String = candidateObj?.optString("sdpMid") ?: obj.optString("sdpMid")
+                val sdpMLineIndex: Int = candidateObj?.optInt("sdpMLineIndex", -1) ?: obj.optInt("sdpMLineIndex", -1)
+                
+                Log.d("SocketClient", "Parsed webrtc_ice: from=$fromId, candidate=${candidate.take(50)}...")
+                if (fromId.isNotEmpty() && candidate.isNotEmpty()) {
+                    val data = WebRTCIceCandidate(
+                        fromId = fromId,
+                        toId = socketId.value ?: "",
+                        candidate = candidate,
+                        sdpMid = sdpMid.takeIf { it.isNotEmpty() },
+                        sdpMLineIndex = sdpMLineIndex.takeIf { it >= 0 }
+                    )
+                    emitEvent(SocketEvent.WebRTCIceReceived(data))
+                }
             }
         }
         

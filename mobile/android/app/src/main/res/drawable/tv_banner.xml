@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 
+    TV Banner for Android TV Launcher
+    Required dimensions: 320x180 dp (16:9 aspect ratio)
+    This banner appears on the Android TV home screen
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Background with gradient matching app theme -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="135"
+                android:startColor="#0F172A"
+                android:centerColor="#1E293B"
+                android:endColor="#020617"
+                android:type="linear" />
+            <corners android:radius="12dp" />
+        </shape>
+    </item>
+    
+    <!-- Subtle border -->
+    <item>
+        <shape android:shape="rectangle">
+            <stroke
+                android:width="1dp"
+                android:color="#334155" />
+            <corners android:radius="12dp" />
+        </shape>
+    </item>
+    
+    <!-- Inner glow effect -->
+    <item
+        android:left="2dp"
+        android:top="2dp"
+        android:right="2dp"
+        android:bottom="2dp">
+        <shape android:shape="rectangle">
+            <stroke
+                android:width="1dp"
+                android:color="#1A3B82F6" />
+            <corners android:radius="10dp" />
+        </shape>
+    </item>
+    
+    <!-- Foreground icon (scaled down to fit banner) -->
+    <item
+        android:width="80dp"
+        android:height="80dp"
+        android:gravity="center_vertical|left"
+        android:left="40dp">
+        <bitmap
+            android:gravity="center"
+            android:src="@drawable/ic_launcher_foreground"
+            android:tint="#F8FAFC" />
+    </item>
+    
+    <!-- App name area (placeholder - actual text rendered by system) -->
+    <item
+        android:left="140dp"
+        android:top="60dp"
+        android:right="20dp"
+        android:bottom="60dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#00000000" />
+        </shape>
+    </item>
+</layer-list>
+

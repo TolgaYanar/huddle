@@ -30,6 +30,8 @@ data class SyncData(
     val isMuted: Boolean? = null,
     val playbackSpeed: Float? = null,
     val audioSyncEnabled: Boolean? = null,
+    val updatedAt: Long? = null,  // When the sync event was created
+    val serverNow: Long? = null,  // Server's current time for clock sync
     val senderId: String? = null,
     val senderUsername: String? = null
 )
@@ -49,6 +51,7 @@ data class RoomState(
     val playbackSpeed: Float? = null,
     val audioSyncEnabled: Boolean? = null,
     val updatedAt: Long? = null,
+    val serverNow: Long? = null,  // Server's current time for clock sync
     val senderId: String? = null,
     val senderUsername: String? = null
 )

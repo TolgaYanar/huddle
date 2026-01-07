@@ -54,7 +54,8 @@ fun VideoPlayerView(
     onProgress: (Double, Double) -> Unit,
     onReady: () -> Unit,
     onError: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    lastRemoteSyncAt: Long = 0L
 ) {
     val context = LocalContext.current
     val platform = remember(url) { detectPlatform(url) }
@@ -90,23 +91,81 @@ fun VideoPlayerView(
         }
     }
     
-    // Handle play/pause
-    LaunchedEffect(isPlaying) {
+    // Handle play/pause - only for ExoPlayer platforms
+    LaunchedEffect(isPlaying, platform) {
+        // Skip for YouTube, Twitch, Kick - they handle their own playback
+        if (platform != PlatformType.DIRECT && platform != PlatformType.UNKNOWN) {
+            return@LaunchedEffect
+        }
         try {
+            android.util.Log.d("VideoPlayer", "Play state changed: isPlaying=$isPlaying, setting playWhenReady")
             exoPlayer.playWhenReady = isPlaying
         } catch (e: Exception) {
             onError("Play error: ${e.message}")
         }
     }
     
-    // Handle seek
-    LaunchedEffect(currentTime) {
+    // Handle seek - only for ExoPlayer platforms (DIRECT or UNKNOWN URLs)
+    // Track the last synced time to avoid constant re-seeking during normal playback
+    var lastSyncedTime by remember { mutableStateOf(-1.0) }
+    // Track the last time we reported via onProgress - to avoid feedback loop
+    var lastReportedTime by remember { mutableStateOf(-1.0) }
+    // Track last remote sync to reset feedback detection
+    var lastKnownRemoteSyncAt by remember { mutableStateOf(0L) }
+    
+    LaunchedEffect(currentTime, platform, lastRemoteSyncAt) {
+        // Skip for YouTube, Twitch, Kick - they handle their own seeking
+        if (platform != PlatformType.DIRECT && platform != PlatformType.UNKNOWN) {
+            return@LaunchedEffect
+        }
         if (currentTime >= 0) {
             try {
                 val targetMs = (currentTime * 1000).toLong()
-                val diff = kotlin.math.abs(exoPlayer.currentPosition - targetMs)
-                if (diff > 500) { // Only seek if difference > 500ms
+                val playerPosition = exoPlayer.currentPosition
+                val diff = kotlin.math.abs(playerPosition - targetMs)
+                
+                // Check if this is a remote sync event (lastRemoteSyncAt changed)
+                val isRemoteSync = lastRemoteSyncAt > 0 && lastRemoteSyncAt != lastKnownRemoteSyncAt
+                if (isRemoteSync) {
+                    lastKnownRemoteSyncAt = lastRemoteSyncAt
+                    // Remote sync detected - reset feedback detection
+                    lastReportedTime = -1.0
+                    android.util.Log.d("VideoPlayer", "Remote sync detected! Target=${currentTime}s, player=${playerPosition/1000.0}s, diff=${diff}ms")
+                    
+                    // For remote sync, always seek if there's any meaningful difference (>500ms)
+                    if (diff > 500) {
+                        android.util.Log.d("VideoPlayer", "Remote sync: Seeking to ${currentTime}s")
+                        exoPlayer.seekTo(targetMs)
+                        lastSyncedTime = currentTime
+                    }
+                    return@LaunchedEffect
+                }
+                
+                // CRITICAL: If currentTime is close to what we just reported via onProgress,
+                // this is our own feedback loop - don't seek!
+                // Use 2.0s threshold to account for reporting delay and normal playback
+                val isOwnFeedback = kotlin.math.abs(currentTime - lastReportedTime) < 2.0
+                
+                // Only skip seek if BOTH conditions are true:
+                // 1. Looks like our own feedback (close to last report)
+                // 2. Player position is close to target (no actual drift)
+                if (isOwnFeedback && diff < 2000) {
+                    return@LaunchedEffect
+                }
+                
+                // Check if this is a sync event (significant jump from last synced position)
+                val isSync = kotlin.math.abs(currentTime - lastSyncedTime) > 2.0
+                
+                // Seek if:
+                // 1. Difference from player position is very significant (>3s) OR
+                // 2. This is clearly a sync event AND there's noticeable drift (>1.5s)
+                val shouldSeek = diff > 3000 || (isSync && diff > 1500)
+                
+                if (shouldSeek) {
+                    android.util.Log.d("VideoPlayer", "Seeking: target=${currentTime}s, player=${playerPosition/1000.0}s, diff=${diff}ms, isSync=$isSync")
                     exoPlayer.seekTo(targetMs)
+                    lastSyncedTime = currentTime
+                    // Don't update lastReportedTime here - that's only for actual progress reports
                 }
             } catch (e: Exception) {
                 // Ignore seek errors
@@ -114,8 +173,11 @@ fun VideoPlayerView(
         }
     }
     
-    // Handle volume
-    LaunchedEffect(volume, isMuted) {
+    // Handle volume - only for ExoPlayer platforms
+    LaunchedEffect(volume, isMuted, platform) {
+        if (platform != PlatformType.DIRECT && platform != PlatformType.UNKNOWN) {
+            return@LaunchedEffect
+        }
         try {
             exoPlayer.volume = if (isMuted) 0f else volume.coerceIn(0f, 1f)
         } catch (e: Exception) {
@@ -123,8 +185,11 @@ fun VideoPlayerView(
         }
     }
     
-    // Handle playback speed
-    LaunchedEffect(playbackSpeed) {
+    // Handle playback speed - only for ExoPlayer platforms
+    LaunchedEffect(playbackSpeed, platform) {
+        if (platform != PlatformType.DIRECT && platform != PlatformType.UNKNOWN) {
+            return@LaunchedEffect
+        }
         try {
             exoPlayer.setPlaybackSpeed(playbackSpeed.coerceIn(0.25f, 2f))
         } catch (e: Exception) {
@@ -164,6 +229,8 @@ fun VideoPlayerView(
                     val position = exoPlayer.currentPosition / 1000.0
                     val duration = exoPlayer.duration / 1000.0
                     if (duration > 0) {
+                        // Track what we report to avoid feedback loop
+                        lastReportedTime = position
                         onProgress(position, duration)
                     }
                 }

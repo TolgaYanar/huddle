@@ -150,16 +150,20 @@ export function useActivityLog({
             : 1;
         const playing = state.isPlaying === true || state.action === "play";
 
-        const updatedAt =
-          typeof state.updatedAt === "number" &&
-          Number.isFinite(state.updatedAt)
+        // If server already extrapolated (serverNow present), use current time as anchor
+        // Otherwise use the original updatedAt for local extrapolation
+        const serverAlreadyExtrapolated = typeof state.serverNow === "number";
+        const anchorAt = serverAlreadyExtrapolated
+          ? Date.now()
+          : typeof state.updatedAt === "number" && Number.isFinite(state.updatedAt)
             ? state.updatedAt
             : Date.now();
+            
         setRoomPlaybackAnchor({
           url: nextUrl,
           isPlaying: playing,
           anchorTime: t,
-          anchorAt: updatedAt,
+          anchorAt: anchorAt,
           playbackRate: rate,
         });
       }
@@ -174,9 +178,12 @@ export function useActivityLog({
             : 1;
 
         let target = state.timestamp;
-        // Only calculate elapsed time for actively playing content
-        // Don't fast-forward if video is paused
-        if (state.isPlaying === true) {
+        // Only extrapolate if server didn't already (serverNow presence indicates server-side extrapolation)
+        // For room_state events from join/resync, server calculates estimated position
+        // For sync_video events, we need to extrapolate ourselves
+        const serverAlreadyExtrapolated = typeof state.serverNow === "number";
+        
+        if (!serverAlreadyExtrapolated && state.isPlaying === true) {
           const updatedAt =
             typeof state.updatedAt === "number" &&
             Number.isFinite(state.updatedAt)

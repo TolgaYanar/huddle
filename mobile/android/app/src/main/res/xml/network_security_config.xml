@@ -2,11 +2,15 @@
 <network-security-config>
     <!-- Allow cleartext traffic for local development and specific domains -->
     <domain-config cleartextTrafficPermitted="true">
-        <!-- Local development servers -->
+        <!-- Emulator host (10.0.2.2 is special alias for host machine from Android emulator) -->
         <domain includeSubdomains="true">10.0.2.2</domain>
+        <!-- Local development servers -->
         <domain includeSubdomains="true">localhost</domain>
         <domain includeSubdomains="true">127.0.0.1</domain>
+        <!-- Common local network ranges -->
         <domain includeSubdomains="true">192.168.1.152</domain>
+        <domain includeSubdomains="true">192.168.0.1</domain>
+        <domain includeSubdomains="true">192.168.1.1</domain>
     </domain-config>
     
     <!-- Trust custom CAs for video streams -->

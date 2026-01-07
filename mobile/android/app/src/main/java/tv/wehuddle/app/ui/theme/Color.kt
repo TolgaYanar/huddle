@@ -27,6 +27,11 @@ val Rose500 = Color(0xFFF43F5E)
 val Amber200 = Color(0xFFFDE68A)
 val Amber500 = Color(0xFFF59E0B)
 
+// Blue accent (for primary actions)
+val Blue400 = Color(0xFF60A5FA)
+val Blue500 = Color(0xFF3B82F6)
+val Blue600 = Color(0xFF2563EB)
+
 // Transparent overlays
 val White5 = Color(0x0DFFFFFF)
 val White10 = Color(0x1AFFFFFF)
@@ -34,3 +39,9 @@ val White20 = Color(0x33FFFFFF)
 val Black20 = Color(0x33000000)
 val Black30 = Color(0x4D000000)
 val Black50 = Color(0x80000000)
+
+// TV-specific colors for focus states
+val TvFocusBorder = Color(0xFFFFFFFF)
+val TvFocusGlow = Color(0x40FFFFFF)
+val TvSelectedBackground = Color(0xFF2563EB)
+val TvHoverBackground = Color(0xFF1E3A5F)
