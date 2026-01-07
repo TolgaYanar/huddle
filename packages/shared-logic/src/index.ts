@@ -37,6 +37,7 @@ export interface RoomStateData {
   playbackSpeed?: number;
   audioSyncEnabled?: boolean;
   updatedAt?: number;
+  serverNow?: number;
   senderId?: string;
   senderUsername?: string | null;
 }
