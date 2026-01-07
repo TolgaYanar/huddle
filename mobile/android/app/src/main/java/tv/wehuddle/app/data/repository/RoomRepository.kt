@@ -116,7 +116,9 @@ class RoomRepository @Inject constructor(
                     it.copy(
                         hostId = event.data.hostId,
                         participants = participantsList,
-                        userId = currentUserId
+                        userId = currentUserId,
+                        passwordRequired = false,
+                        passwordError = null
                     )
                 }
             }
@@ -176,6 +178,12 @@ class RoomRepository @Inject constructor(
                         SyncAction.set_volume,
                         SyncAction.set_audio_sync -> current.videoState.currentTime
                     }
+                    
+                    // Set lastRemoteSyncAt for actions that change the playback position
+                    val shouldUpdateSyncTime = when (event.data.action) {
+                        SyncAction.play, SyncAction.pause, SyncAction.seek, SyncAction.change_url -> true
+                        else -> false
+                    }
 
                     nextWithAudioSync.copy(
                         videoState = nextWithAudioSync.videoState.copy(
@@ -194,7 +202,8 @@ class RoomRepository @Inject constructor(
                             },
                             volume = event.data.volume ?: current.videoState.volume,
                             isMuted = event.data.isMuted ?: current.videoState.isMuted,
-                            playbackSpeed = event.data.playbackSpeed ?: current.videoState.playbackSpeed
+                            playbackSpeed = event.data.playbackSpeed ?: current.videoState.playbackSpeed,
+                            lastRemoteSyncAt = if (shouldUpdateSyncTime) System.currentTimeMillis() else current.videoState.lastRemoteSyncAt
                         )
                     )
                 }
@@ -240,7 +249,8 @@ class RoomRepository @Inject constructor(
                             volume = event.data.volume ?: current.videoState.volume,
                             isMuted = event.data.isMuted ?: current.videoState.isMuted,
                             playbackSpeed = event.data.playbackSpeed ?: current.videoState.playbackSpeed,
-                            platform = detectPlatform(event.data.videoUrl ?: "")
+                            platform = detectPlatform(event.data.videoUrl ?: ""),
+                            lastRemoteSyncAt = System.currentTimeMillis()
                         )
                     )
 
@@ -326,7 +336,13 @@ class RoomRepository @Inject constructor(
             }
             
             is SocketEvent.PasswordStatus -> {
-                _roomState.update { it.copy(hasRoomPassword = event.data.hasPassword) }
+                _roomState.update { 
+                    it.copy(
+                        hasRoomPassword = event.data.hasPassword,
+                        passwordRequired = false,
+                        passwordError = null
+                    ) 
+                }
             }
             
             is SocketEvent.PasswordRequired -> {
@@ -408,7 +424,7 @@ class RoomRepository @Inject constructor(
     }
     
     fun joinRoom(roomId: String, password: String? = null) {
-        _roomState.update { it.copy(roomId = roomId, passwordRequired = false, passwordError = null) }
+        _roomState.update { it.copy(roomId = roomId) }
         socketClient.joinRoom(roomId, password)
         
         scope.launch {

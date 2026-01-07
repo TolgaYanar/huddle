@@ -703,7 +703,7 @@ class SocketClient @Inject constructor() {
             }
         }
         
-        on("room_password_required") { args ->
+        on("room_requires_password") { args ->
             parseJsonObject(args) { obj ->
                 val data = RoomPasswordRequired(
                     roomId = obj.optString("roomId"),

@@ -81,6 +81,10 @@ fun RoomScreen(
     val Slate400 = Color(0xFF94A3B8)
     val Slate50 = Color(0xFFF8FAFC)
     val Blue500 = Color(0xFF3B82F6)
+    
+    // Password state from room
+    val passwordRequired = roomState.passwordRequired
+    val passwordInput by viewModel.passwordInput.collectAsStateWithLifecycle()
 
     Column(
         modifier = Modifier
@@ -89,6 +93,8 @@ fun RoomScreen(
             .statusBarsPadding()
             .imePadding() // CRITICAL: Moves UI up when keyboard opens
     ) {
+        // Only show room content when password is not required
+        if (!passwordRequired) {
         // 1. Header (Always Visible)
         RoomHeader(
             roomId = roomId,
@@ -191,10 +197,21 @@ fun RoomScreen(
             camEnabled = roomState.localMediaState.cam,
             participants = participants
         )
+        } // End of !passwordRequired condition
+    }
+
+    // Password Modal - Show when password is required
+    if (passwordRequired) {
+        PasswordModal(
+            passwordInput = passwordInput,
+            onPasswordChange = viewModel::updatePasswordInput,
+            onSubmit = viewModel::submitPassword,
+            error = roomState.passwordError
+        )
     }
 
     // Animated Wheel Picker Modal
-    if (showWheelPicker) {
+    if (!passwordRequired && showWheelPicker) {
         AnimatedWheelPickerModal(
             entries = wheelState.entries,
             entryInput = wheelEntryInput,
@@ -219,7 +236,8 @@ fun RoomScreen(
         )
     }
     
-    // Playlist Panel
+    // Playlist Panel - Only show when password is not required
+    if (!passwordRequired) {
     PlaylistPanel(
         playlists = playlistState.playlists,
         activePlaylistId = playlistState.activePlaylistId,
@@ -241,6 +259,7 @@ fun RoomScreen(
         onPlayNext = { viewModel.playNextInPlaylist() },
         onPlayPrevious = { viewModel.playPreviousInPlaylist() }
     )
+    } // End of playlist panel conditional
 }
 
 // --- TAB CONTENTS ---
@@ -382,7 +401,15 @@ private fun VideoTabContent(
                         onPause = { viewModel.onPause(roomState.videoState.currentTime) },
                         onSeek = { time -> viewModel.onSeek(time) },
                         onProgress = { currentTime, duration ->
-                            viewModel.updateVideoState { it.copy(currentTime = currentTime, duration = duration) }
+                            // Skip local progress updates if a remote sync was received recently
+                            // This prevents the local playback position from overwriting the sync position
+                            val timeSinceSync = System.currentTimeMillis() - roomState.videoState.lastRemoteSyncAt
+                            if (timeSinceSync > 1500) { // Wait 1.5s after sync before accepting local progress
+                                viewModel.updateVideoState { it.copy(currentTime = currentTime, duration = duration) }
+                            } else {
+                                // Still update duration but not currentTime
+                                viewModel.updateVideoState { it.copy(duration = duration) }
+                            }
                         },
                         onReady = {
                             viewModel.updateVideoState { it.copy(isReady = true) }
@@ -431,6 +458,7 @@ private fun VideoTabContent(
                 onAudioSyncToggle = { enabled ->
                     viewModel.setAudioSyncEnabled(enabled)
                 },
+                onResync = { viewModel.requestResync() },
                 modifier = Modifier.fillMaxWidth()
             )
         }

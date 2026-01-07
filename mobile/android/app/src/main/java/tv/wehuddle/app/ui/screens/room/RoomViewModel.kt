@@ -360,6 +360,11 @@ class RoomViewModel @Inject constructor(
         roomRepository.clearError()
     }
     
+    // Re-sync: request current room state without broadcasting changes
+    fun requestResync() {
+        roomRepository.requestRoomState()
+    }
+    
     // Media state
     fun toggleMic() {
         val currentState = roomState.value.localMediaState

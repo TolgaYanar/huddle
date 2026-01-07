@@ -522,11 +522,23 @@ export function useVideoPlayer({
       return;
     }
 
+    // Don't re-broadcast when applying remote sync
+    if (applyingRemoteSyncRef.current) {
+      setVideoState("Playing");
+      return;
+    }
+
     const currentTime = getCurrentTimeFromRef(playerRef);
     sendSyncEvent("play", currentTime, url);
     setVideoState("Playing");
     addLogEntry?.({ msg: `started playing`, type: "play", user: "You" });
-  }, [url, sendSyncEvent, addLogEntry, hasInitialSyncRef]);
+  }, [
+    url,
+    sendSyncEvent,
+    addLogEntry,
+    hasInitialSyncRef,
+    applyingRemoteSyncRef,
+  ]);
 
   const handlePause = useCallback(() => {
     // Don't broadcast pause events until user has received initial room state.
@@ -535,16 +547,33 @@ export function useVideoPlayer({
       return;
     }
 
+    // Don't re-broadcast when applying remote sync
+    if (applyingRemoteSyncRef.current) {
+      setVideoState("Paused");
+      return;
+    }
+
     const currentTime = getCurrentTimeFromRef(playerRef);
     sendSyncEvent("pause", currentTime, url);
     setVideoState("Paused");
     addLogEntry?.({ msg: `paused the video`, type: "pause", user: "You" });
-  }, [url, sendSyncEvent, addLogEntry, hasInitialSyncRef]);
+  }, [
+    url,
+    sendSyncEvent,
+    addLogEntry,
+    hasInitialSyncRef,
+    applyingRemoteSyncRef,
+  ]);
 
   const handleSeek = useCallback(
     (seconds: number) => {
       // Don't broadcast seeks until initial sync complete
       if (hasInitialSyncRef && !hasInitialSyncRef.current) {
+        return;
+      }
+
+      // Don't re-broadcast when applying remote sync
+      if (applyingRemoteSyncRef.current) {
         return;
       }
 
@@ -559,13 +588,18 @@ export function useVideoPlayer({
         user: "You",
       });
     },
-    [url, sendSyncEvent, addLogEntry, hasInitialSyncRef]
+    [url, sendSyncEvent, addLogEntry, hasInitialSyncRef, applyingRemoteSyncRef]
   );
 
   const handleSeekTo = useCallback(
     (time: number) => {
       // Don't broadcast seeks until initial sync complete
       if (hasInitialSyncRef && !hasInitialSyncRef.current) {
+        return;
+      }
+
+      // Don't re-broadcast when applying remote sync
+      if (applyingRemoteSyncRef.current) {
         return;
       }
 
@@ -590,6 +624,7 @@ export function useVideoPlayer({
       addLogEntry,
       lastManualSeekRef,
       hasInitialSyncRef,
+      applyingRemoteSyncRef,
     ]
   );
 
@@ -599,6 +634,11 @@ export function useVideoPlayer({
     (time: number) => {
       // Don't broadcast seeks until initial sync complete
       if (hasInitialSyncRef && !hasInitialSyncRef.current) {
+        return;
+      }
+
+      // Don't re-broadcast when applying remote sync
+      if (applyingRemoteSyncRef.current) {
         return;
       }
 
@@ -644,7 +684,14 @@ export function useVideoPlayer({
         user: "You",
       });
     },
-    [url, duration, sendSyncEvent, addLogEntry, hasInitialSyncRef]
+    [
+      url,
+      duration,
+      sendSyncEvent,
+      addLogEntry,
+      hasInitialSyncRef,
+      applyingRemoteSyncRef,
+    ]
   );
 
   // Local-only volume/mute for the custom controller (does not sync to room).

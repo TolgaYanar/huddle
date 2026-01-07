@@ -1818,9 +1818,28 @@ io.on("connection", (socket) => {
     const roomId = normalizeRoomId(rawRoom);
     if (!roomId) return;
     const state = roomState.get(roomId);
+
+    // Calculate estimated current timestamp if video is playing
+    let estimatedTimestamp = state?.timestamp;
+    if (state && state.isPlaying === true) {
+      const now = Date.now();
+      const prevTimestamp =
+        typeof state.timestamp === "number" ? state.timestamp : 0;
+      const prevUpdatedAt =
+        typeof state.updatedAt === "number" ? state.updatedAt : now;
+      const prevSpeed =
+        typeof state.playbackSpeed === "number" &&
+        Number.isFinite(state.playbackSpeed)
+          ? state.playbackSpeed
+          : 1;
+      estimatedTimestamp =
+        prevTimestamp + Math.max(0, (now - prevUpdatedAt) / 1000) * prevSpeed;
+    }
+
     socket.emit("room_state", {
       roomId,
       ...(state || {}),
+      timestamp: estimatedTimestamp,
     });
   });
 

@@ -267,5 +267,7 @@ data class VideoPlayerState(
     // When room audio sync is disabled, these overrides control only the local device.
     // When null, fall back to the synced room values above.
     val localVolumeOverride: Float? = null,
-    val localMutedOverride: Boolean? = null
+    val localMutedOverride: Boolean? = null,
+    // Timestamp of the last remote sync to prevent local progress from overwriting it immediately
+    val lastRemoteSyncAt: Long = 0L
 )

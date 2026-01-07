@@ -602,18 +602,20 @@ export default function RoomClient({ roomId }: { roomId: string }) {
 
   return (
     <div className="min-h-screen flex flex-col bg-linear-to-b from-slate-900 via-slate-950 to-black text-slate-200">
-      <RoomHeader
-        roomId={roomId}
-        isConnected={isConnected}
-        hasRoomPassword={hasRoomPassword}
-        passwordRequired={passwordRequired}
-        inviteLink={inviteLink}
-        copied={copied}
-        onCopyInvite={copyInvite}
-        onOpenWheel={() => setIsWheelOpen(true)}
-        onOpenPlaylist={() => setIsPlaylistPanelOpen(!isPlaylistPanelOpen)}
-        isPlaylistOpen={isPlaylistPanelOpen}
-      />
+      {isClient && !passwordRequired && (
+        <RoomHeader
+          roomId={roomId}
+          isConnected={isConnected}
+          hasRoomPassword={hasRoomPassword}
+          passwordRequired={passwordRequired}
+          inviteLink={inviteLink}
+          copied={copied}
+          onCopyInvite={copyInvite}
+          onOpenWheel={() => setIsWheelOpen(true)}
+          onOpenPlaylist={() => setIsPlaylistPanelOpen(!isPlaylistPanelOpen)}
+          isPlaylistOpen={isPlaylistPanelOpen}
+        />
+      )}
 
       <PasswordModal
         passwordRequired={passwordRequired}
@@ -635,151 +637,155 @@ export default function RoomClient({ roomId }: { roomId: string }) {
         onSpin={() => spinWheel?.()}
       />
 
-      <main
-        className={`flex-1 grid grid-cols-1 ${
-          isActivityCollapsed
-            ? "lg:grid-cols-[280px_minmax(0,1fr)]"
-            : "lg:grid-cols-[280px_minmax(0,1fr)_320px]"
-        } gap-4 px-6 lg:px-8 2xl:px-12 py-6 max-w-screen-2xl 2xl:max-w-none mx-auto w-full`}
-      >
-        <PlayerSection
-          inputUrl={inputUrl}
-          setInputUrl={setInputUrl}
-          handleUrlChange={handleUrlChange}
-          playerContainerRef={playerContainerRef}
-          togglePlayerFullscreen={togglePlayerFullscreen}
-          isPlayerFullscreen={isPlayerFullscreen}
-          isDraggingTile={isDraggingTile}
-          setIsDraggingTile={setIsDraggingTile}
-          isStageDragOver={isStageDragOver}
-          setIsStageDragOver={setIsStageDragOver}
-          setPinnedStage={setPinnedStage}
-          stageView={stageViewForPlayer}
-          screenStageContainerRef={screenStageContainerRef}
-          toggleScreenFullscreen={toggleScreenFullscreen}
-          isScreenFullscreen={isScreenFullscreen}
-          onUnpinStage={onUnpinStage}
-          localCamTrack={camTrackRef.current}
-          remotes={remotesForPlayer}
-          setCamEnabled={setCamEnabled}
-          isClient={isClient}
-          isKick={isKick}
-          isTwitch={isTwitch}
-          isPrime={isPrime}
-          isWebEmbed={isWebEmbed}
-          isBadYoutubeUrl={isBadYoutubeUrl}
-          normalizedUrl={normalizedUrl}
-          kickEmbedSrc={kickEmbedSrc}
-          twitchEmbedSrc={twitchEmbedSrc}
-          canPlay={canPlay}
-          playerReady={playerReady}
-          setPlayerReady={setPlayerReady}
-          playerError={playerError}
-          setPlayerError={setPlayerError}
-          isBuffering={isBuffering}
-          setIsBuffering={setIsBuffering}
-          loadTimeoutRef={loadTimeoutRef}
-          playerRef={playerRef}
-          handlePlayerError={handlePlayerError}
-          applyingRemoteSyncRef={applyingRemoteSyncRef}
-          roomPlaybackAnchorRef={roomPlaybackAnchorRef}
-          lastManualSeekRef={lastManualSeekRef}
-          muted={muted}
-          volume={volume}
-          effectiveMuted={effectiveMuted}
-          effectiveVolume={effectiveVolume}
-          audioSyncEnabled={audioSyncEnabled}
-          onAudioSyncEnabledChange={handleAudioSyncEnabledChange}
-          playbackRate={playbackRate}
-          currentTime={currentTime}
-          duration={duration}
-          canControlPlayback={canControlPlayback}
-          isConnected={isConnected}
-          videoState={videoState}
-          handlePlay={handlePlay}
-          handlePause={handlePause}
-          handleSeekTo={handleSeekTo}
-          handleSeekFromController={handleSeekFromController}
-          handleVolumeChange={handleVolumeChange}
-          handleLocalVolumeChange={handleLocalVolumeChange}
-          handleVolumeFromController={handleVolumeFromController}
-          handlePlaybackRateChange={handlePlaybackRateChange}
-          handlePlaybackRateFromController={handlePlaybackRateFromController}
-          toggleMute={toggleMute}
-          toggleLocalMute={toggleLocalMute}
-          handleProgress={handleProgress}
-          handleDuration={handleDuration}
-          onVideoEnded={handleVideoEnded}
-          fullscreenChatOpen={fullscreenChatOpen}
-          setFullscreenChatOpen={setFullscreenChatOpen}
-          fullscreenChatMessages={fullscreenChatMessages}
-          chatText={chatText}
-          setChatText={setChatText}
-          handleSendChat={handleSendChat}
-        />
+      {isClient && !passwordRequired && (
+        <main
+          className={`flex-1 grid grid-cols-1 ${
+            isActivityCollapsed
+              ? "lg:grid-cols-[280px_minmax(0,1fr)]"
+              : "lg:grid-cols-[280px_minmax(0,1fr)_320px]"
+          } gap-4 px-6 lg:px-8 2xl:px-12 py-6 max-w-screen-2xl 2xl:max-w-none mx-auto w-full`}
+        >
+          <PlayerSection
+            inputUrl={inputUrl}
+            setInputUrl={setInputUrl}
+            handleUrlChange={handleUrlChange}
+            playerContainerRef={playerContainerRef}
+            togglePlayerFullscreen={togglePlayerFullscreen}
+            isPlayerFullscreen={isPlayerFullscreen}
+            isDraggingTile={isDraggingTile}
+            setIsDraggingTile={setIsDraggingTile}
+            isStageDragOver={isStageDragOver}
+            setIsStageDragOver={setIsStageDragOver}
+            setPinnedStage={setPinnedStage}
+            stageView={stageViewForPlayer}
+            screenStageContainerRef={screenStageContainerRef}
+            toggleScreenFullscreen={toggleScreenFullscreen}
+            isScreenFullscreen={isScreenFullscreen}
+            onUnpinStage={onUnpinStage}
+            localCamTrack={camTrackRef.current}
+            remotes={remotesForPlayer}
+            setCamEnabled={setCamEnabled}
+            isClient={isClient}
+            isKick={isKick}
+            isTwitch={isTwitch}
+            isPrime={isPrime}
+            isWebEmbed={isWebEmbed}
+            isBadYoutubeUrl={isBadYoutubeUrl}
+            normalizedUrl={normalizedUrl}
+            kickEmbedSrc={kickEmbedSrc}
+            twitchEmbedSrc={twitchEmbedSrc}
+            canPlay={canPlay}
+            playerReady={playerReady}
+            setPlayerReady={setPlayerReady}
+            playerError={playerError}
+            setPlayerError={setPlayerError}
+            isBuffering={isBuffering}
+            setIsBuffering={setIsBuffering}
+            loadTimeoutRef={loadTimeoutRef}
+            playerRef={playerRef}
+            handlePlayerError={handlePlayerError}
+            applyingRemoteSyncRef={applyingRemoteSyncRef}
+            roomPlaybackAnchorRef={roomPlaybackAnchorRef}
+            lastManualSeekRef={lastManualSeekRef}
+            muted={muted}
+            volume={volume}
+            effectiveMuted={effectiveMuted}
+            effectiveVolume={effectiveVolume}
+            audioSyncEnabled={audioSyncEnabled}
+            onAudioSyncEnabledChange={handleAudioSyncEnabledChange}
+            playbackRate={playbackRate}
+            currentTime={currentTime}
+            duration={duration}
+            canControlPlayback={canControlPlayback}
+            isConnected={isConnected}
+            videoState={videoState}
+            handlePlay={handlePlay}
+            handlePause={handlePause}
+            handleSeekTo={handleSeekTo}
+            handleSeekFromController={handleSeekFromController}
+            handleVolumeChange={handleVolumeChange}
+            handleLocalVolumeChange={handleLocalVolumeChange}
+            handleVolumeFromController={handleVolumeFromController}
+            handlePlaybackRateChange={handlePlaybackRateChange}
+            handlePlaybackRateFromController={handlePlaybackRateFromController}
+            toggleMute={toggleMute}
+            toggleLocalMute={toggleLocalMute}
+            handleProgress={handleProgress}
+            handleDuration={handleDuration}
+            onVideoEnded={handleVideoEnded}
+            fullscreenChatOpen={fullscreenChatOpen}
+            setFullscreenChatOpen={setFullscreenChatOpen}
+            fullscreenChatMessages={fullscreenChatMessages}
+            chatText={chatText}
+            setChatText={setChatText}
+            handleSendChat={handleSendChat}
+          />
 
-        <CallSidebar
-          userId={userId}
-          hostId={hostId}
-          onKickUser={kickUser}
-          participants={participants}
-          usernamesById={usernamesById}
-          hasRoomPassword={hasRoomPassword}
-          onSetRoomPassword={setRoomPassword}
-          localSpeaking={localSpeaking}
-          isCallCollapsed={isCallCollapsed}
-          setIsCallCollapsed={setIsCallCollapsed}
-          micEnabled={micEnabled}
-          setMicEnabled={setMicEnabled}
-          camEnabled={camEnabled}
-          setCamEnabled={setCamEnabled}
-          screenEnabled={screenEnabled}
-          setScreenEnabled={setScreenEnabled}
-          pushToTalkEnabled={pushToTalkEnabled}
-          setPushToTalkEnabled={setPushToTalkEnabled}
-          pushToTalkDown={pushToTalkDown}
-          pushToTalkBindingLabel={pushToTalkBindingLabel}
-          stopPushToTalkTransmit={stopPushToTalkTransmit}
-          isRebindingPushToTalkKey={isRebindingPushToTalkKey}
-          setIsRebindingPushToTalkKey={setIsRebindingPushToTalkKey}
-          echoCancellationEnabled={echoCancellationEnabled}
-          setEchoCancellationEnabled={setEchoCancellationEnabled}
-          noiseSuppressionEnabled={noiseSuppressionEnabled}
-          setNoiseSuppressionEnabled={setNoiseSuppressionEnabled}
-          autoGainControlEnabled={autoGainControlEnabled}
-          setAutoGainControlEnabled={setAutoGainControlEnabled}
-          localVideoRef={localVideoRef}
-          remoteStreams={remoteStreams}
-          remoteSpeaking={remoteSpeaking}
-          remoteMedia={remoteMedia}
-          setIsDraggingTile={setIsDraggingTile}
-          setIsStageDragOver={setIsStageDragOver}
-        />
+          <CallSidebar
+            userId={userId}
+            hostId={hostId}
+            onKickUser={kickUser}
+            participants={participants}
+            usernamesById={usernamesById}
+            hasRoomPassword={hasRoomPassword}
+            onSetRoomPassword={setRoomPassword}
+            localSpeaking={localSpeaking}
+            isCallCollapsed={isCallCollapsed}
+            setIsCallCollapsed={setIsCallCollapsed}
+            micEnabled={micEnabled}
+            setMicEnabled={setMicEnabled}
+            camEnabled={camEnabled}
+            setCamEnabled={setCamEnabled}
+            screenEnabled={screenEnabled}
+            setScreenEnabled={setScreenEnabled}
+            pushToTalkEnabled={pushToTalkEnabled}
+            setPushToTalkEnabled={setPushToTalkEnabled}
+            pushToTalkDown={pushToTalkDown}
+            pushToTalkBindingLabel={pushToTalkBindingLabel}
+            stopPushToTalkTransmit={stopPushToTalkTransmit}
+            isRebindingPushToTalkKey={isRebindingPushToTalkKey}
+            setIsRebindingPushToTalkKey={setIsRebindingPushToTalkKey}
+            echoCancellationEnabled={echoCancellationEnabled}
+            setEchoCancellationEnabled={setEchoCancellationEnabled}
+            noiseSuppressionEnabled={noiseSuppressionEnabled}
+            setNoiseSuppressionEnabled={setNoiseSuppressionEnabled}
+            autoGainControlEnabled={autoGainControlEnabled}
+            setAutoGainControlEnabled={setAutoGainControlEnabled}
+            localVideoRef={localVideoRef}
+            remoteStreams={remoteStreams}
+            remoteSpeaking={remoteSpeaking}
+            remoteMedia={remoteMedia}
+            setIsDraggingTile={setIsDraggingTile}
+            setIsStageDragOver={setIsStageDragOver}
+          />
 
-        <ActivitySidebar
-          roomId={roomId}
-          isConnected={isConnected}
-          isActivityCollapsed={isActivityCollapsed}
-          setIsActivityCollapsed={setIsActivityCollapsed}
-          logs={logs}
-          logsEndRef={logsEndRef}
-          capitalize={capitalize}
-          chatText={chatText}
-          setChatText={setChatText}
-          handleSendChat={handleSendChat}
-        />
-      </main>
+          <ActivitySidebar
+            roomId={roomId}
+            isConnected={isConnected}
+            isActivityCollapsed={isActivityCollapsed}
+            setIsActivityCollapsed={setIsActivityCollapsed}
+            logs={logs}
+            logsEndRef={logsEndRef}
+            capitalize={capitalize}
+            chatText={chatText}
+            setChatText={setChatText}
+            handleSendChat={handleSendChat}
+          />
+        </main>
+      )}
 
-      <VideoPreviewModal
-        showPreviewModal={showPreviewModal}
-        videoPreview={videoPreview}
-        isPreviewLoading={isPreviewLoading}
-        onLoadVideo={loadVideoUrl}
-        onClose={closePreviewModal}
-      />
+      {isClient && !passwordRequired && (
+        <VideoPreviewModal
+          showPreviewModal={showPreviewModal}
+          videoPreview={videoPreview}
+          isPreviewLoading={isPreviewLoading}
+          onLoadVideo={loadVideoUrl}
+          onClose={closePreviewModal}
+        />
+      )}
 
       {/* Playlist Panel - positioned as a slide-in panel from the right */}
-      {isPlaylistPanelOpen && (
+      {isClient && !passwordRequired && isPlaylistPanelOpen && (
         <div className="fixed inset-y-0 right-0 z-40 w-80 max-w-full">
           <div className="h-full pt-16 pb-4 pr-4">
             <PlaylistPanel
@@ -806,23 +812,27 @@ export default function RoomClient({ roomId }: { roomId: string }) {
       )}
 
       {/* Add to Playlist Modal (for single current video) */}
-      <AddToPlaylistModal
-        isOpen={isAddToPlaylistOpen}
-        onClose={closeAddToPlaylist}
-        playlists={playlists}
-        videoUrl={pendingVideoUrl}
-        onAddToPlaylist={addPlaylistItemAction}
-        onCreatePlaylist={createPlaylistAction}
-      />
+      {isClient && !passwordRequired && (
+        <AddToPlaylistModal
+          isOpen={isAddToPlaylistOpen}
+          onClose={closeAddToPlaylist}
+          playlists={playlists}
+          videoUrl={pendingVideoUrl}
+          onAddToPlaylist={addPlaylistItemAction}
+          onCreatePlaylist={createPlaylistAction}
+        />
+      )}
 
       {/* Add Videos to Playlist Modal (URL/search/playlist import) */}
-      <AddVideosToPlaylistModal
-        isOpen={isAddVideosModalOpen}
-        onClose={() => setIsAddVideosModalOpen(false)}
-        playlists={playlists}
-        onAddToPlaylist={addPlaylistItemAction}
-        onCreatePlaylist={createPlaylistAction}
-      />
+      {isClient && !passwordRequired && (
+        <AddVideosToPlaylistModal
+          isOpen={isAddVideosModalOpen}
+          onClose={() => setIsAddVideosModalOpen(false)}
+          playlists={playlists}
+          onAddToPlaylist={addPlaylistItemAction}
+          onCreatePlaylist={createPlaylistAction}
+        />
+      )}
     </div>
   );
 }

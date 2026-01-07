@@ -439,6 +439,7 @@ fun VideoControlsBar(
     onVolumeChange: (Float) -> Unit,
     onPlaybackSpeedChange: (Float) -> Unit,
     onAudioSyncToggle: (Boolean) -> Unit,
+    onResync: (() -> Unit)? = null,
     onFullscreen: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
@@ -561,6 +562,18 @@ fun VideoControlsBar(
                         text = "Audio Sync",
                         style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Medium)
                     )
+                }
+                
+                // Re-sync button
+                if (onResync != null) {
+                    HuddleSmallButton(
+                        onClick = onResync
+                    ) {
+                        Text(
+                            text = "Re-sync",
+                            style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                        )
+                    }
                 }
 
                 // Mute button

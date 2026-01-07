@@ -20,8 +20,8 @@ export function PasswordModal({
 
   return (
     <div className="fixed inset-0 z-60 flex items-center justify-center px-6">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-      <div className="relative w-full max-w-lg rounded-2xl border border-white/10 bg-black/40 p-6 shadow-xl">
+      <div className="absolute inset-0 bg-black" />
+      <div className="relative w-full max-w-lg rounded-2xl border border-white/10 bg-black/80 p-6 shadow-xl">
         <div className="text-xl font-semibold text-slate-50">Room password</div>
         <div className="mt-2 text-sm text-slate-300">
           {passwordError ?? "This room requires a password."}

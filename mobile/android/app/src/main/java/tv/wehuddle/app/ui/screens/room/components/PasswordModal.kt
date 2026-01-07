@@ -38,7 +38,7 @@ fun PasswordModal(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Black50),
+                .background(androidx.compose.ui.graphics.Color.Black),
             contentAlignment = Alignment.Center
         ) {
             GlassCard(
