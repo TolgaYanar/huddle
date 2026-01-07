@@ -11,9 +11,14 @@ android {
     namespace = "tv.wehuddle.app"
     compileSdk = 35
 
+    // For real devices on your network, set HUDDLE_DEV_HOST in gradle.properties
+    // For emulators (both phone and TV), 10.0.2.2 is used automatically at runtime
     val devHost = (project.findProperty("HUDDLE_DEV_HOST") as String?)?.trim()
         ?.takeIf { it.isNotEmpty() }
-        ?: "192.168.1.152"
+        ?: "192.168.1.108"
+    
+    // Emulator host - 10.0.2.2 is the special alias for the host machine
+    val emulatorHost = "10.0.2.2"
 
     defaultConfig {
         applicationId = "tv.wehuddle.app"
@@ -31,10 +36,12 @@ android {
     buildTypes {
         debug {
             isDebuggable = true
-            // For emulator use: http://10.0.2.2:4000
-            // For real device: Replace with your computer's local IP (e.g., http://192.168.1.100:4000)
+            // Primary URL (for real devices on network)
             buildConfigField("String", "SOCKET_URL", "\"http://$devHost:4000\"")
             buildConfigField("String", "API_BASE_URL", "\"http://$devHost:4000/api/\"")
+            // Emulator fallback URL (10.0.2.2 is the host machine from emulator)
+            buildConfigField("String", "EMULATOR_SOCKET_URL", "\"http://$emulatorHost:4000\"")
+            buildConfigField("String", "EMULATOR_API_BASE_URL", "\"http://$emulatorHost:4000/api/\"")
         }
         release {
             isMinifyEnabled = true
@@ -67,6 +74,12 @@ android {
     }
 }
 
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(17))
+    }
+}
+
 dependencies {
     // Android Core
     implementation(libs.androidx.core.ktx)
@@ -84,6 +97,11 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
     implementation(libs.androidx.material.icons.extended)
+    
+    // TV Support - Leanback & Compose TV
+    implementation(libs.androidx.leanback)
+    implementation(libs.androidx.tv.foundation)
+    implementation(libs.androidx.tv.material)
 
     // Navigation
     implementation(libs.androidx.navigation.compose)

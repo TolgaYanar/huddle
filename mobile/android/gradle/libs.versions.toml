@@ -21,6 +21,9 @@ datastore = "1.1.1"
 webrtc = "1.1.1"
 media3 = "1.5.1"
 socketIo = "2.1.1"
+leanback = "1.0.0"
+tvFoundation = "1.0.0-alpha11"
+tvMaterial = "1.0.0"
 
 [libraries]
 # Android Core
@@ -64,6 +67,7 @@ retrofit = { group = "com.squareup.retrofit2", name = "retrofit", version.ref = 
 retrofit-kotlinx-serialization = { group = "com.squareup.retrofit2", name = "converter-kotlinx-serialization", version.ref = "retrofit" }
 
 # Image Loading
+# Image Loading
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
 
 # DataStore
@@ -79,6 +83,11 @@ socket-io-client = { group = "io.socket", name = "socket.io-client", version.ref
 
 # WebRTC
 webrtc = { group = "io.getstream", name = "stream-webrtc-android", version.ref = "webrtc" }
+
+# TV Support
+androidx-leanback = { group = "androidx.leanback", name = "leanback", version.ref = "leanback" }
+androidx-tv-foundation = { group = "androidx.tv", name = "tv-foundation", version.ref = "tvFoundation" }
+androidx-tv-material = { group = "androidx.tv", name = "tv-material", version.ref = "tvMaterial" }
 
 # Testing
 junit = { group = "junit", name = "junit", version.ref = "junit" }

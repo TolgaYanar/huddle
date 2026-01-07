@@ -54,6 +54,8 @@ fun YouTubePlayerView(
     var playerReady by remember { mutableStateOf(false) }
     var lastSeekTime by remember { mutableDoubleStateOf(-1.0) }
     var lastPlayerTime by remember { mutableDoubleStateOf(-1.0) }
+    var lastReportedTime by remember { mutableDoubleStateOf(-1.0) }  // Track our own progress reports
+    var lastReportedTimeMs by remember { mutableLongStateOf(0L) }  // When we reported (for feedback detection)
     var isUserSeeking by remember { mutableStateOf(false) }
     var hasError by remember { mutableStateOf(false) }
     
@@ -83,6 +85,7 @@ fun YouTubePlayerView(
             }
             
             // Enhanced WebChromeClient for media permissions
+            // IMPORTANT: Block YouTube's native fullscreen - we handle fullscreen in our app
             webChromeClient = object : WebChromeClient() {
                 override fun onConsoleMessage(consoleMessage: android.webkit.ConsoleMessage?): Boolean {
                     // Log console messages for debugging
@@ -97,6 +100,17 @@ fun YouTubePlayerView(
                         // Grant all requested permissions
                         request.grant(request.resources)
                     }
+                }
+                
+                // Block YouTube's native fullscreen - we use our own fullscreen overlay
+                override fun onShowCustomView(view: android.view.View?, callback: CustomViewCallback?) {
+                    // Do nothing - block native fullscreen
+                    android.util.Log.d("YouTubePlayer", "Blocked YouTube native fullscreen request")
+                    callback?.onCustomViewHidden()
+                }
+                
+                override fun onHideCustomView() {
+                    // Do nothing
                 }
             }
             
@@ -153,6 +167,9 @@ fun YouTubePlayerView(
             fun onTimeUpdate(currentTimeSeconds: Double, durationSeconds: Double) {
                 lastPlayerTime = currentTimeSeconds
                 if (!isUserSeeking) {
+                    // Track what and when we report to avoid feedback loop
+                    lastReportedTime = currentTimeSeconds
+                    lastReportedTimeMs = System.currentTimeMillis()
                     onProgress(currentTimeSeconds, durationSeconds)
                 }
             }
@@ -203,21 +220,46 @@ fun YouTubePlayerView(
         webView.evaluateJavascript("try { $command(); } catch(e) {}", null)
     }
     
-    // Handle seek from server (with drift protection)
+    // Handle seek from server (with improved drift protection)
     LaunchedEffect(currentTime, playerReady) {
-        if (!playerReady || currentTime < 0) return@LaunchedEffect
+        if (!playerReady || currentTime < 0) {
+            android.util.Log.d("YouTubePlayer", "Seek skipped: playerReady=$playerReady, currentTime=$currentTime")
+            return@LaunchedEffect
+        }
 
         // If the desired time already matches the player's current time, don't seek.
-        // This prevents a seek loop caused by feeding onProgress() back into currentTime.
         val playerTime = lastPlayerTime
-        if (playerTime >= 0) {
-            val delta = kotlin.math.abs(currentTime - playerTime)
-            if (delta < 1.0) return@LaunchedEffect
+        val playerDelta = if (playerTime >= 0) kotlin.math.abs(currentTime - playerTime) else Double.MAX_VALUE
+        
+        // CRITICAL: Only consider it "own feedback" if:
+        // 1. The time matches what we recently reported (within 2s)
+        // 2. The report was very recent (within 2000ms) - older reports are stale
+        val timeSinceReport = System.currentTimeMillis() - lastReportedTimeMs
+        val isRecentReport = timeSinceReport < 2000
+        val isOwnFeedback = isRecentReport && kotlin.math.abs(currentTime - lastReportedTime) < 2.0
+        
+        // Only skip seek if BOTH conditions are true:
+        // 1. Looks like our own feedback (close to last report AND report was recent)
+        // 2. Player position is close to target (no actual drift)
+        if (isOwnFeedback && playerDelta < 2.0) {
+            android.util.Log.d("YouTubePlayer", "Seek skipped: own feedback, delta=$playerDelta, sincereport=${timeSinceReport}ms")
+            return@LaunchedEffect
         }
         
-        // Prevent seeking if we just seeked to a similar time (drift protection)
-        val drift = kotlin.math.abs(currentTime - lastSeekTime)
-        if (drift < 0.5 && lastSeekTime >= 0) return@LaunchedEffect
+        // Check if this is a sync event (significant jump from last seek)
+        val isSync = kotlin.math.abs(currentTime - lastSeekTime) > 2.0
+        
+        // Seek if:
+        // 1. Difference from player position is very significant (>3s) OR
+        // 2. This is clearly a sync event AND there's noticeable drift (>1.5s)
+        val shouldSeek = playerDelta > 3.0 || (isSync && playerDelta > 1.5)
+        
+        if (!shouldSeek) {
+            android.util.Log.d("YouTubePlayer", "Seek skipped: shouldSeek=false, delta=$playerDelta, isSync=$isSync")
+            return@LaunchedEffect
+        }
+        
+        android.util.Log.d("YouTubePlayer", "Seeking: target=${currentTime}s, player=${playerTime}s, delta=${playerDelta}s, isSync=$isSync")
         
         // Mark as seeking to prevent reporting this seek back to server
         isUserSeeking = true
@@ -349,6 +391,20 @@ private fun createYouTubePlayerHtml(videoId: String): String {
                     overflow: hidden;
                 }
                 #player { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+                /* Hide YouTube native controls and overlays */
+                .ytp-chrome-top, .ytp-chrome-bottom, .ytp-gradient-top, .ytp-gradient-bottom,
+                .ytp-watermark, .ytp-pause-overlay, .ytp-show-cards-title,
+                .ytp-ce-element, .ytp-endscreen-content, .ytp-cards-button,
+                .ytp-share-button, .ytp-watch-later-button, .ytp-overflow-button,
+                .ytp-button[aria-label="Share"], .ytp-button[data-tooltip-target-id="ytp-autonav-toggle-button"],
+                .ytp-cued-thumbnail-overlay, .ytp-large-play-button,
+                .ytp-title-channel, .ytp-title-text { 
+                    display: none !important; 
+                    visibility: hidden !important;
+                    pointer-events: none !important;
+                }
+                /* Disable pointer events on overlays */
+                iframe { pointer-events: auto; }
             </style>
         </head>
         <body>
@@ -376,6 +432,8 @@ private fun createYouTubePlayerHtml(videoId: String): String {
                             'iv_load_policy': 3,
                             'autoplay': 0,
                             'enablejsapi': 1,
+                            'cc_load_policy': 0,
+                            'autohide': 1,
                             // CRITICAL FIX 3: Must match the loadDataWithBaseURL domain exactly
                             'origin': 'https://wehuddle.tv' 
                         },

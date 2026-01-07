@@ -27,6 +27,11 @@
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
+    
+    <!-- TV Support - Mark touchscreen as not required for TV compatibility -->
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <!-- Declare that app supports Leanback (TV) UI -->
+    <uses-feature android:name="android.software.leanback" android:required="false" />
 
     <application
         android:name=".HuddleApplication"
@@ -34,6 +39,7 @@
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
+        android:banner="@drawable/tv_banner"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
@@ -42,6 +48,7 @@
         android:networkSecurityConfig="@xml/network_security_config"
         tools:targetApi="35">
 
+        <!-- Main Activity for Mobile -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -53,6 +60,12 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            
+            <!-- TV Leanback Launcher - allows app to appear on TV home screen -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
 
             <!-- Deep link handling -->

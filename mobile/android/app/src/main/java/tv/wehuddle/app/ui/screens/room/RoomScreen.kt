@@ -16,6 +16,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -24,22 +26,34 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.IntOffset
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import tv.wehuddle.app.data.model.*
 import tv.wehuddle.app.ui.components.*
+import tv.wehuddle.app.data.model.PlaylistStateData
 import tv.wehuddle.app.ui.screens.room.components.*
 import tv.wehuddle.app.ui.theme.*
+import tv.wehuddle.app.util.isTV
+import tv.wehuddle.app.util.onDpadKeyEvent
+import tv.wehuddle.app.util.rememberScreenSize
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import org.webrtc.MediaStream
+import android.util.Log
+
+private const val TAG = "RoomScreen"
 
 @Composable
 fun RoomScreen(
@@ -50,6 +64,10 @@ fun RoomScreen(
     viewModel: RoomViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
+    val isTV = isTV()
+    val screenSize = rememberScreenSize()
+    val focusManager = LocalFocusManager.current
+    
     val roomState by viewModel.roomState.collectAsStateWithLifecycle()
     val connectionState by viewModel.connectionState.collectAsStateWithLifecycle()
     val participants by viewModel.participants.collectAsStateWithLifecycle()
@@ -61,6 +79,12 @@ fun RoomScreen(
     val authUser by viewModel.authUser.collectAsStateWithLifecycle()
     val isRoomSaved by viewModel.isRoomSaved.collectAsStateWithLifecycle()
     val saveBusy by viewModel.saveBusy.collectAsStateWithLifecycle()
+    
+    // WebRTC state
+    val localStream by viewModel.localStream.collectAsStateWithLifecycle()
+    val remoteStreams by viewModel.remoteStreams.collectAsStateWithLifecycle()
+    // Collect EGL context as state to ensure recomposition when it becomes available
+    val eglContext by viewModel.eglContext.collectAsStateWithLifecycle()
     
     // Wheel picker state
     val showWheelPicker by viewModel.showWheelPicker.collectAsStateWithLifecycle()
@@ -74,6 +98,30 @@ fun RoomScreen(
     // Tab state
     var selectedTab by remember { mutableIntStateOf(0) }
     val tabs = listOf("Video", "Controls", "Activity")
+    
+    // Fullscreen state
+    var isFullscreen by remember { mutableStateOf(false) }
+    
+    // Log fullscreen state changes
+    LaunchedEffect(isFullscreen) {
+        Log.d(TAG, "Fullscreen state changed: isFullscreen=$isFullscreen")
+    }
+    
+    var fullscreenWebcamPosition by remember { mutableStateOf(WebcamPosition.TOP_RIGHT) }
+    var fullscreenWebcamSize by remember { mutableStateOf(WebcamSize.MEDIUM) }
+    var fullscreenShowWebcams by remember { mutableStateOf(true) }
+    var fullscreenShowChat by remember { mutableStateOf(false) }
+    
+    // Focus requesters for TV
+    val playButtonFocusRequester = remember { FocusRequester() }
+    val tabFocusRequesters = remember { List(tabs.size) { FocusRequester() } }
+    
+    // Request initial focus on TV
+    LaunchedEffect(isTV) {
+        if (isTV) {
+            playButtonFocusRequester.requestFocus()
+        }
+    }
 
     // Define colors locally if not in theme
     val Slate950 = Color(0xFF020617)
@@ -81,13 +129,825 @@ fun RoomScreen(
     val Slate400 = Color(0xFF94A3B8)
     val Slate50 = Color(0xFFF8FAFC)
     val Blue500 = Color(0xFF3B82F6)
+    
+    // Build remote streams info for fullscreen
+    // Use participants list as the source (has mediaState), and join with remoteStreams for actual video
+    val remoteStreamInfoList = remember(remoteStreams, participants, roomState.userId) {
+        // Build from participants (not remoteStreams) so we include everyone with camera on
+        // even if WebRTC stream isn't established yet
+        participants
+            .filter { it.id != roomState.userId } // Exclude self
+            .map { participant ->
+                val stream = remoteStreams[participant.id]
+                RemoteStreamInfo(
+                    peerId = participant.id,
+                    stream = stream,
+                    mediaState = participant.mediaState,
+                    username = participant.username ?: participant.id.take(8)
+                )
+            }
+    }
+    
+    // Fullscreen player overlay state
+    val effectiveVolume = roomState.videoState.localVolumeOverride ?: roomState.videoState.volume
+    val effectiveMuted = roomState.videoState.localMutedOverride ?: roomState.videoState.isMuted
+    
+    // Root Box to contain layouts and fullscreen overlay
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Determine layout based on device type
+        if (isTV && screenSize.isWide) {
+            // TV Wide Layout - Side by side
+            TvWideRoomLayout(
+                roomId = roomId,
+                roomState = roomState,
+                connectionState = connectionState,
+                participants = participants,
+                chatMessages = chatMessages,
+                activityLog = activityLog,
+                videoUrl = videoUrl,
+                chatInput = chatInput,
+                copied = copied,
+                authUser = authUser,
+                isRoomSaved = isRoomSaved,
+                saveBusy = saveBusy,
+                showWheelPicker = showWheelPicker,
+                wheelState = wheelState,
+                wheelEntryInput = wheelEntryInput,
+                showPlaylistPanel = showPlaylistPanel,
+                playlistState = playlistState,
+                viewModel = viewModel,
+                onNavigateBack = onNavigateBack,
+                onNavigateToLogin = onNavigateToLogin,
+                onNavigateToRegister = onNavigateToRegister,
+                context = context,
+                playButtonFocusRequester = playButtonFocusRequester,
+                onEnterFullscreen = { 
+                    Log.d(TAG, "TvWideRoomLayout: onEnterFullscreen called")
+                    isFullscreen = true 
+                },
+                isFullscreen = isFullscreen
+            )
+        } else {
+            // Mobile/Compact TV Layout - Tabbed
+            MobileRoomLayout(
+                roomId = roomId,
+                roomState = roomState,
+                connectionState = connectionState,
+                participants = participants,
+                chatMessages = chatMessages,
+                activityLog = activityLog,
+                videoUrl = videoUrl,
+                chatInput = chatInput,
+                copied = copied,
+                authUser = authUser,
+                isRoomSaved = isRoomSaved,
+                saveBusy = saveBusy,
+                showWheelPicker = showWheelPicker,
+                wheelState = wheelState,
+                wheelEntryInput = wheelEntryInput,
+                showPlaylistPanel = showPlaylistPanel,
+                playlistState = playlistState,
+                selectedTab = selectedTab,
+                onTabSelected = { selectedTab = it },
+                tabs = tabs,
+                viewModel = viewModel,
+                onNavigateBack = onNavigateBack,
+                onNavigateToLogin = onNavigateToLogin,
+                onNavigateToRegister = onNavigateToRegister,
+                context = context,
+                isTV = isTV,
+                onEnterFullscreen = { isFullscreen = true },
+                isFullscreen = isFullscreen
+            )
+        }
+        
+        // Fullscreen player overlay - placed LAST so it appears on top
+        FullscreenPlayerOverlay(
+            isFullscreen = isFullscreen,
+            onExitFullscreen = { isFullscreen = false },
+            videoUrl = roomState.videoState.url,
+            isPlaying = roomState.videoState.isPlaying,
+            currentTime = roomState.videoState.currentTime,
+            duration = roomState.videoState.duration,
+            volume = effectiveVolume,
+            isMuted = effectiveMuted,
+            playbackSpeed = roomState.videoState.playbackSpeed,
+            onPlay = { viewModel.onPlay(roomState.videoState.currentTime) },
+            onPause = { viewModel.onPause(roomState.videoState.currentTime) },
+            onSeek = { time -> viewModel.onSeek(time) },
+            // DON'T update state from fullscreen - it causes constant re-renders and buffering
+            // Fullscreen player plays independently using the initial state
+            onProgress = { _, _ -> /* No-op: fullscreen is independent */ },
+            onReady = { },
+            onError = { error -> viewModel.updateVideoState { it.copy(error = error) } },
+            eglContext = eglContext,
+            localStream = localStream,
+            localMediaState = roomState.localMediaState,
+            remoteStreams = remoteStreamInfoList,
+            localUsername = authUser?.username ?: roomState.userId.take(8),
+            onToggleMic = viewModel::toggleMic,
+            onToggleCam = viewModel::toggleCam,
+            chatMessages = chatMessages,
+            chatInput = chatInput,
+            currentUserId = roomState.userId,
+            onChatInputChange = viewModel::updateChatInput,
+            onSendChat = viewModel::sendChatMessage,
+            webcamPosition = fullscreenWebcamPosition,
+            webcamSize = fullscreenWebcamSize,
+            showWebcams = fullscreenShowWebcams,
+            showChat = fullscreenShowChat,
+            onWebcamPositionChange = { fullscreenWebcamPosition = it },
+            onWebcamSizeChange = { fullscreenWebcamSize = it },
+            onShowWebcamsChange = { fullscreenShowWebcams = it },
+            onShowChatChange = { fullscreenShowChat = it }
+        )
+    }
+}
 
+@Composable
+private fun TvWideRoomLayout(
+    roomId: String,
+    roomState: RoomUiState,
+    connectionState: ConnectionState,
+    participants: List<Participant>,
+    chatMessages: List<ChatMessage>,
+    activityLog: List<ActivityLogEntry>,
+    videoUrl: String,
+    chatInput: String,
+    copied: Boolean,
+    authUser: tv.wehuddle.app.data.model.AuthUser?,
+    isRoomSaved: Boolean,
+    saveBusy: Boolean,
+    showWheelPicker: Boolean,
+    wheelState: WheelState,
+    wheelEntryInput: String,
+    showPlaylistPanel: Boolean,
+    playlistState: PlaylistStateData,
+    viewModel: RoomViewModel,
+    onNavigateBack: () -> Unit,
+    onNavigateToLogin: (String) -> Unit,
+    onNavigateToRegister: (String) -> Unit,
+    context: Context,
+    playButtonFocusRequester: FocusRequester,
+    onEnterFullscreen: () -> Unit,
+    isFullscreen: Boolean = false
+) {
+    val Slate950 = Color(0xFF020617)
+    val Slate900 = Color(0xFF0F172A)
+    val Slate800 = Color(0xFF1E293B)
+    
+    // Track if chat panel is visible
+    var showChatPanel by remember { mutableStateOf(false) }
+    
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Slate950)
+            .onDpadKeyEvent(
+                onBack = {
+                    if (showChatPanel) {
+                        showChatPanel = false
+                        true
+                    } else {
+                        onNavigateBack()
+                        true
+                    }
+                },
+                onPlayPause = {
+                    if (roomState.videoState.isPlaying) {
+                        viewModel.onPause(roomState.videoState.currentTime)
+                    } else {
+                        viewModel.onPlay(roomState.videoState.currentTime)
+                    }
+                    true
+                }
+            )
+    ) {
+        // Main content - Full screen video
+        Column(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            // Compact TV Header - minimal, shows essential info
+            TvRoomHeader(
+                roomId = roomId,
+                isConnected = connectionState == ConnectionState.CONNECTED,
+                participantCount = participants.size,
+                onBack = onNavigateBack
+            )
+            
+            // Video Player - Takes most of the screen
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 8.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color.Black),
+                    contentAlignment = Alignment.Center
+                ) {
+                    val effectiveVolume = roomState.videoState.localVolumeOverride ?: roomState.videoState.volume
+                    val effectiveMuted = roomState.videoState.localMutedOverride ?: roomState.videoState.isMuted
+
+                    if (roomState.videoState.url.isNotEmpty()) {
+                        VideoPlayerView(
+                            url = roomState.videoState.url,
+                            // Pause main player when fullscreen is active to avoid dual playback
+                            isPlaying = roomState.videoState.isPlaying && !isFullscreen,
+                            currentTime = roomState.videoState.currentTime,
+                            volume = effectiveVolume,
+                            isMuted = effectiveMuted,
+                            playbackSpeed = roomState.videoState.playbackSpeed,
+                            onPlay = { viewModel.onPlay(roomState.videoState.currentTime) },
+                            onPause = { viewModel.onPause(roomState.videoState.currentTime) },
+                            onSeek = { time -> viewModel.onSeek(time) },
+                            onProgress = { currentTime, duration ->
+                                // Only update progress when not in fullscreen (fullscreen player handles it)
+                                if (!isFullscreen) {
+                                    viewModel.updateVideoState { it.copy(currentTime = currentTime, duration = duration) }
+                                }
+                            },
+                            onReady = {
+                                viewModel.updateVideoState { it.copy(isReady = true) }
+                            },
+                            onError = { error ->
+                                viewModel.updateVideoState { it.copy(error = error) }
+                            },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        // No video - Show helpful message for TV users
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                Icons.Default.Tv,
+                                contentDescription = null,
+                                tint = Color(0xFF64748B),
+                                modifier = Modifier.size(96.dp)
+                            )
+                            Spacer(Modifier.height(24.dp))
+                            Text(
+                                "Waiting for video...",
+                                color = Color.White,
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(Modifier.height(12.dp))
+                            Text(
+                                "Load a video from your phone or computer",
+                                color = Color(0xFF94A3B8),
+                                fontSize = 18.sp
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                "Room: $roomId",
+                                color = Color(0xFF64748B),
+                                fontSize = 14.sp
+                            )
+                        }
+                    }
+                }
+                
+                // Connection status overlay (top right of video)
+                if (connectionState != ConnectionState.CONNECTED) {
+                    Surface(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(16.dp),
+                        color = Color(0xFFF43F5E).copy(alpha = 0.9f),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                color = Color.White,
+                                strokeWidth = 2.dp
+                            )
+                            Text(
+                                "Connecting...",
+                                color = Color.White,
+                                fontSize = 14.sp
+                            )
+                        }
+                    }
+                }
+                
+                // Participant count overlay (top left of video)
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(16.dp),
+                    color = Slate800.copy(alpha = 0.9f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .background(Color(0xFF22C55E), CircleShape)
+                        )
+                        Text(
+                            "${participants.size} watching",
+                            color = Color.White,
+                            fontSize = 14.sp
+                        )
+                    }
+                }
+            }
+            
+            // TV-optimized playback controls
+            TvPlaybackControls(
+                isPlaying = roomState.videoState.isPlaying,
+                currentTime = roomState.videoState.currentTime,
+                duration = roomState.videoState.duration,
+                onPlay = { viewModel.onPlay(roomState.videoState.currentTime) },
+                onPause = { viewModel.onPause(roomState.videoState.currentTime) },
+                onSeekForward = { viewModel.onSeek(roomState.videoState.currentTime + 10.0) },
+                onSeekBackward = { viewModel.onSeek(maxOf(0.0, roomState.videoState.currentTime - 10.0)) },
+                onSync = { 
+                    Log.d(TAG, "Sync button clicked")
+                    viewModel.requestSync() 
+                },
+                onFullscreen = {
+                    Log.d(TAG, "Fullscreen button clicked in TvPlaybackControls")
+                    onEnterFullscreen()
+                },
+                playButtonFocusRequester = playButtonFocusRequester,
+                showChatButton = true,
+                onChatToggle = { showChatPanel = !showChatPanel },
+                chatUnread = chatMessages.isNotEmpty()
+            )
+            
+            Spacer(Modifier.height(16.dp))
+        }
+        
+        // Slide-in Chat Panel (from right side)
+        androidx.compose.animation.AnimatedVisibility(
+            visible = showChatPanel,
+            modifier = Modifier.align(Alignment.CenterEnd),
+            enter = androidx.compose.animation.slideInHorizontally { it },
+            exit = androidx.compose.animation.slideOutHorizontally { it }
+        ) {
+            TvChatPanel(
+                chatMessages = chatMessages,
+                chatInput = chatInput,
+                currentUserId = roomState.userId,
+                onChatInputChange = viewModel::updateChatInput,
+                onSendChat = viewModel::sendChatMessage,
+                onClose = { showChatPanel = false }
+            )
+        }
+    }
+    
+    // Wheel Picker Modal
+    if (showWheelPicker) {
+        AnimatedWheelPickerModal(
+            entries = wheelState.entries,
+            entryInput = wheelEntryInput,
+            lastSpin = wheelState.lastSpin?.let { spin ->
+                WheelSpunData(
+                    roomId = roomId,
+                    index = spin.index,
+                    result = spin.result,
+                    entryCount = spin.entryCount,
+                    spunAt = spin.spunAt,
+                    senderId = spin.senderId,
+                    entries = wheelState.entries
+                )
+            },
+            isConnected = connectionState == ConnectionState.CONNECTED,
+            onEntryInputChange = { text -> viewModel.updateWheelEntryInput(text) },
+            onAddEntry = { viewModel.addWheelEntry() },
+            onRemoveEntry = { index -> viewModel.removeWheelEntry(index) },
+            onClearAll = { viewModel.clearWheelEntries() },
+            onSpin = { viewModel.spinWheel() },
+            onDismiss = { viewModel.closeWheelPicker() }
+        )
+    }
+}
+
+@Composable
+private fun TvRoomHeader(
+    roomId: String,
+    isConnected: Boolean,
+    participantCount: Int,
+    onBack: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = Color(0xFF0F172A)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                TvIconButton(
+                    onClick = onBack,
+                    icon = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back"
+                )
+                
+                Text(text = "🍿", style = TextStyle(fontSize = 28.sp))
+                Text(
+                    text = "Huddle",
+                    style = TextStyle(
+                        color = Color.White,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                )
+                
+                Surface(
+                    color = Color(0xFF1E293B),
+                    shape = RoundedCornerShape(20.dp)
+                ) {
+                    Text(
+                        text = roomId,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        style = TextStyle(
+                            color = Color(0xFF94A3B8),
+                            fontSize = 14.sp
+                        )
+                    )
+                }
+            }
+            
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    "Use ◀ ▶ to seek, ENTER to play/pause",
+                    color = Color(0xFF64748B),
+                    fontSize = 14.sp
+                )
+                
+                Box(
+                    modifier = Modifier
+                        .size(12.dp)
+                        .background(
+                            if (isConnected) Color(0xFF22C55E) else Color(0xFFF43F5E),
+                            CircleShape
+                        )
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TvPlaybackControls(
+    isPlaying: Boolean,
+    currentTime: Double,
+    duration: Double,
+    onPlay: () -> Unit,
+    onPause: () -> Unit,
+    onSeekForward: () -> Unit,
+    onSeekBackward: () -> Unit,
+    onSync: () -> Unit,
+    onFullscreen: () -> Unit,
+    playButtonFocusRequester: FocusRequester,
+    showChatButton: Boolean = false,
+    onChatToggle: () -> Unit = {},
+    chatUnread: Boolean = false
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp),
+        color = Color(0xFF1E293B),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Left - Time and progress
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    formatTime(currentTime),
+                    color = Color.White,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Medium
+                )
+                
+                // Progress indicator
+                Box(
+                    modifier = Modifier
+                        .width(200.dp)
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(Color(0xFF334155))
+                ) {
+                    val progress = if (duration > 0) (currentTime / duration).toFloat().coerceIn(0f, 1f) else 0f
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(progress)
+                            .background(Color(0xFF3B82F6))
+                    )
+                }
+                
+                Text(
+                    formatTime(duration),
+                    color = Color(0xFF94A3B8),
+                    fontSize = 18.sp
+                )
+            }
+            
+            // Center - Playback controls
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Seek backward
+                TvIconButton(
+                    onClick = onSeekBackward,
+                    icon = Icons.Default.Replay10,
+                    contentDescription = "Rewind 10s",
+                    size = 52.dp,
+                    iconSize = 28.dp
+                )
+                
+                // Play/Pause
+                TvPrimaryButton(
+                    onClick = if (isPlaying) onPause else onPlay,
+                    focusRequester = playButtonFocusRequester,
+                    modifier = Modifier.size(64.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = if (isPlaying) "Pause" else "Play",
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
+                
+                // Seek forward
+                TvIconButton(
+                    onClick = onSeekForward,
+                    icon = Icons.Default.Forward10,
+                    contentDescription = "Forward 10s",
+                    size = 52.dp,
+                    iconSize = 28.dp
+                )
+                
+                // Sync button - force re-sync with room
+                TvIconButton(
+                    onClick = onSync,
+                    icon = Icons.Default.Sync,
+                    contentDescription = "Sync with room",
+                    size = 52.dp,
+                    iconSize = 24.dp
+                )
+                
+                // Fullscreen button
+                TvIconButton(
+                    onClick = onFullscreen,
+                    icon = Icons.Default.Fullscreen,
+                    contentDescription = "Fullscreen",
+                    size = 52.dp,
+                    iconSize = 28.dp
+                )
+            }
+            
+            // Right - Chat button and hints
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    "◀▶ Seek • ENTER Play/Pause",
+                    color = Color(0xFF64748B),
+                    fontSize = 14.sp
+                )
+                
+                if (showChatButton) {
+                    Box {
+                        TvSecondaryButton(
+                            onClick = onChatToggle
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.Chat,
+                                contentDescription = "Chat",
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text("Chat", fontSize = 16.sp)
+                        }
+                        
+                        // Unread indicator
+                        if (chatUnread) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .offset(x = 4.dp, y = (-4).dp)
+                                    .size(12.dp)
+                                    .background(Color(0xFF3B82F6), CircleShape)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TvChatPanel(
+    chatMessages: List<ChatMessage>,
+    chatInput: String,
+    currentUserId: String,
+    onChatInputChange: (String) -> Unit,
+    onSendChat: () -> Unit,
+    onClose: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .width(400.dp)
+            .fillMaxHeight(),
+        color = Color(0xFF0F172A),
+        shape = RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp)
+        ) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Chat",
+                    color = Color.White,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                TvIconButton(
+                    onClick = onClose,
+                    icon = Icons.Default.Close,
+                    contentDescription = "Close chat",
+                    size = 40.dp,
+                    iconSize = 20.dp
+                )
+            }
+            
+            Spacer(Modifier.height(16.dp))
+            
+            // Messages
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                reverseLayout = true,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(chatMessages.reversed()) { msg ->
+                    val isOwn = msg.senderId == currentUserId
+                    val senderLabel = if (isOwn) "You" else msg.senderUsername?.takeIf { it.isNotBlank() } ?: msg.senderId.take(8)
+                    
+                    Surface(
+                        color = if (isOwn) Color(0xFF1E3A5F) else Color(0xFF1E293B),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp)
+                        ) {
+                            Text(
+                                senderLabel,
+                                color = if (isOwn) Color(0xFF60A5FA) else Color(0xFF94A3B8),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                msg.text,
+                                color = Color(0xFFE2E8F0),
+                                fontSize = 14.sp
+                            )
+                        }
+                    }
+                }
+                
+                if (chatMessages.isEmpty()) {
+                    item {
+                        Text(
+                            "No messages yet",
+                            color = Color(0xFF64748B),
+                            fontSize = 14.sp,
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                    }
+                }
+            }
+            
+            Spacer(Modifier.height(16.dp))
+            
+            // Input
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TvTextField(
+                    value = chatInput,
+                    onValueChange = onChatInputChange,
+                    placeholder = "Type a message...",
+                    modifier = Modifier.weight(1f)
+                )
+                TvIconButton(
+                    onClick = onSendChat,
+                    icon = Icons.AutoMirrored.Filled.Send,
+                    contentDescription = "Send"
+                )
+            }
+        }
+    }
+}
+
+private fun formatTime(seconds: Double): String {
+    val totalSeconds = seconds.toInt()
+    val hours = totalSeconds / 3600
+    val minutes = (totalSeconds % 3600) / 60
+    val secs = totalSeconds % 60
+    return if (hours > 0) {
+        String.format("%d:%02d:%02d", hours, minutes, secs)
+    } else {
+        String.format("%d:%02d", minutes, secs)
+    }
+}
+
+@Composable
+private fun MobileRoomLayout(
+    roomId: String,
+    roomState: RoomUiState,
+    connectionState: ConnectionState,
+    participants: List<Participant>,
+    chatMessages: List<ChatMessage>,
+    activityLog: List<ActivityLogEntry>,
+    videoUrl: String,
+    chatInput: String,
+    copied: Boolean,
+    authUser: tv.wehuddle.app.data.model.AuthUser?,
+    isRoomSaved: Boolean,
+    saveBusy: Boolean,
+    showWheelPicker: Boolean,
+    wheelState: WheelState,
+    wheelEntryInput: String,
+    showPlaylistPanel: Boolean,
+    playlistState: PlaylistStateData,
+    selectedTab: Int,
+    onTabSelected: (Int) -> Unit,
+    tabs: List<String>,
+    viewModel: RoomViewModel,
+    onNavigateBack: () -> Unit,
+    onNavigateToLogin: (String) -> Unit,
+    onNavigateToRegister: (String) -> Unit,
+    context: Context,
+    isTV: Boolean,
+    onEnterFullscreen: () -> Unit,
+    isFullscreen: Boolean = false
+) {
+    val Slate950 = Color(0xFF020617)
+    val Slate900 = Color(0xFF0F172A)
+    val Slate400 = Color(0xFF94A3B8)
+    val Slate50 = Color(0xFFF8FAFC)
+    val Blue500 = Color(0xFF3B82F6)
+    
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Slate950)
             .statusBarsPadding()
-            .imePadding() // CRITICAL: Moves UI up when keyboard opens
+            .imePadding()
     ) {
         // 1. Header (Always Visible)
         RoomHeader(
@@ -113,41 +973,58 @@ fun RoomScreen(
             onBack = onNavigateBack
         )
 
-        // 2. Tabs (Always Visible)
-        TabRow(
-            selectedTabIndex = selectedTab,
-            containerColor = Slate900,
-            contentColor = Slate400,
-            indicator = { tabPositions ->
-                TabRowDefaults.SecondaryIndicator(
-                    modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                    height = 2.dp,
-                    color = Blue500
-                )
-            },
-            divider = { HorizontalDivider(color = Color(0xFF1E293B)) }
-        ) {
-            tabs.forEachIndexed { index, title ->
-                Tab(
-                    selected = selectedTab == index,
-                    onClick = { selectedTab = index },
-                    modifier = Modifier.height(48.dp),
-                    text = {
-                        Text(
-                            text = title,
-                            style = TextStyle(
-                                fontSize = 14.sp,
-                                fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Medium,
-                                color = if (selectedTab == index) Slate50 else Slate400
+        // 2. Tabs (Always Visible) - Use TV-aware tabs if on TV
+        if (isTV) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Slate900)
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                tabs.forEachIndexed { index, title ->
+                    TvTab(
+                        selected = selectedTab == index,
+                        onClick = { onTabSelected(index) },
+                        text = title
+                    )
+                }
+            }
+        } else {
+            TabRow(
+                selectedTabIndex = selectedTab,
+                containerColor = Slate900,
+                contentColor = Slate400,
+                indicator = { tabPositions ->
+                    TabRowDefaults.SecondaryIndicator(
+                        modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                        height = 2.dp,
+                        color = Blue500
+                    )
+                },
+                divider = { HorizontalDivider(color = Color(0xFF1E293B)) }
+            ) {
+                tabs.forEachIndexed { index, title ->
+                    Tab(
+                        selected = selectedTab == index,
+                        onClick = { onTabSelected(index) },
+                        modifier = Modifier.height(48.dp),
+                        text = {
+                            Text(
+                                text = title,
+                                style = TextStyle(
+                                    fontSize = 14.sp,
+                                    fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (selectedTab == index) Slate50 else Slate400
+                                )
                             )
-                        )
-                    }
-                )
+                        }
+                    )
+                }
             }
         }
 
         // 3. Content Area (Flexible Weight)
-        // We do NOT put verticalScroll here. Each tab handles its own scrolling.
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -160,18 +1037,21 @@ fun RoomScreen(
                     onLoadVideo = viewModel::loadVideo,
                     roomState = roomState,
                     viewModel = viewModel,
-                    // ADD THESE LINES:
                     chatMessages = chatMessages,
                     chatInput = chatInput,
                     onChatInputChange = viewModel::updateChatInput,
                     onSendChat = viewModel::sendChatMessage,
-                    modifier = Modifier.verticalScroll(rememberScrollState())
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    isTV = isTV,
+                    onEnterFullscreen = onEnterFullscreen,
+                    isFullscreen = isFullscreen
                 )
                 1 -> ControlsTabContent(
                     viewModel = viewModel,
                     roomState = roomState,
                     isHost = viewModel.isHost(),
-                    modifier = Modifier.verticalScroll(rememberScrollState()) // Scroll happens here
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    isTV = isTV
                 )
                 2 -> ActivityTabContent(
                     activityLog = activityLog,
@@ -180,7 +1060,7 @@ fun RoomScreen(
                     onChatInputChange = viewModel::updateChatInput,
                     onSendChat = viewModel::sendChatMessage,
                     localUserId = roomState.userId,
-                    // No scroll modifier passed here, logic is inside to handle LazyColumn
+                    isTV = isTV
                 )
             }
         }
@@ -252,95 +1132,115 @@ private fun VideoTabContent(
     onLoadVideo: () -> Unit,
     roomState: RoomUiState,
     viewModel: RoomViewModel,
-    // NEW PARAMS FOR CHAT
     chatMessages: List<ChatMessage>,
     chatInput: String,
     onChatInputChange: (String) -> Unit,
     onSendChat: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isTV: Boolean = false,
+    onEnterFullscreen: () -> Unit = {},
+    isFullscreen: Boolean = false
 ) {
     var isChatExpanded by remember { mutableStateOf(false) }
     var showYouTubeBrowser by remember { mutableStateOf(false) }
     var browseSource by remember { mutableStateOf(InAppVideoSource.YOUTUBE) }
     var showSourceMenu by remember { mutableStateOf(false) }
+    
+    val padding = if (isTV) 24.dp else 16.dp
+    val spacing = if (isTV) 28.dp else 20.dp
 
     Column(
-        modifier = modifier.padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
+        modifier = modifier.padding(padding),
+        verticalArrangement = Arrangement.spacedBy(spacing)
     ) {
-        // --- 1. Video URL Input (Same as before) ---
+        // --- 1. Video URL Input ---
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(if (isTV) 12.dp else 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            OutlinedTextField(
-                value = videoUrl,
-                onValueChange = onVideoUrlChange,
-                placeholder = { Text("Paste video URL...", color = Color.Gray, fontSize = 14.sp) },
-                modifier = Modifier.weight(1f),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color(0xFF3B82F6),
-                    unfocusedBorderColor = Color(0xFF334155),
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White
-                ),
-                shape = RoundedCornerShape(12.dp),
-                singleLine = true,
-                textStyle = TextStyle(fontSize = 14.sp)
-            )
-            
-            Button(
-                onClick = onLoadVideo,
-                enabled = videoUrl.isNotBlank(),
-                shape = RoundedCornerShape(12.dp),
-                contentPadding = PaddingValues(horizontal = 20.dp)
-            ) {
-                Text("Load")
-            }
-
-            Box {
-                OutlinedButton(
-                    onClick = { showSourceMenu = true },
-                    shape = RoundedCornerShape(12.dp),
-                    contentPadding = PaddingValues(horizontal = 12.dp)
+            if (isTV) {
+                TvTextField(
+                    value = videoUrl,
+                    onValueChange = onVideoUrlChange,
+                    placeholder = "Paste video URL...",
+                    modifier = Modifier.weight(1f)
+                )
+                TvPrimaryButton(
+                    onClick = onLoadVideo,
+                    enabled = videoUrl.isNotBlank()
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = null
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Browse ${browseSource.displayName} (in-app)")
+                    Text("Load", fontSize = 16.sp)
+                }
+            } else {
+                OutlinedTextField(
+                    value = videoUrl,
+                    onValueChange = onVideoUrlChange,
+                    placeholder = { Text("Paste video URL...", color = Color.Gray, fontSize = 14.sp) },
+                    modifier = Modifier.weight(1f),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color(0xFF3B82F6),
+                        unfocusedBorderColor = Color(0xFF334155),
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    singleLine = true,
+                    textStyle = TextStyle(fontSize = 14.sp)
+                )
+                
+                Button(
+                    onClick = onLoadVideo,
+                    enabled = videoUrl.isNotBlank(),
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 20.dp)
+                ) {
+                    Text("Load")
                 }
 
-                DropdownMenu(
-                    expanded = showSourceMenu,
-                    onDismissRequest = { showSourceMenu = false }
-                ) {
-                    DropdownMenuItem(
-                        text = { Text("YouTube") },
-                        onClick = {
-                            browseSource = InAppVideoSource.YOUTUBE
-                            showSourceMenu = false
-                            showYouTubeBrowser = true
-                        }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Twitch") },
-                        onClick = {
-                            browseSource = InAppVideoSource.TWITCH
-                            showSourceMenu = false
-                            showYouTubeBrowser = true
-                        }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Kick") },
-                        onClick = {
-                            browseSource = InAppVideoSource.KICK
-                            showSourceMenu = false
-                            showYouTubeBrowser = true
-                        }
-                    )
+                Box {
+                    OutlinedButton(
+                        onClick = { showSourceMenu = true },
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = null
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Browse ${browseSource.displayName} (in-app)")
+                    }
+
+                    DropdownMenu(
+                        expanded = showSourceMenu,
+                        onDismissRequest = { showSourceMenu = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("YouTube") },
+                            onClick = {
+                                browseSource = InAppVideoSource.YOUTUBE
+                                showSourceMenu = false
+                                showYouTubeBrowser = true
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Twitch") },
+                            onClick = {
+                                browseSource = InAppVideoSource.TWITCH
+                                showSourceMenu = false
+                                showYouTubeBrowser = true
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Kick") },
+                            onClick = {
+                                browseSource = InAppVideoSource.KICK
+                                showSourceMenu = false
+                                showYouTubeBrowser = true
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -373,7 +1273,8 @@ private fun VideoTabContent(
                 if (roomState.videoState.url.isNotEmpty()) {
                     VideoPlayerView(
                         url = roomState.videoState.url,
-                        isPlaying = roomState.videoState.isPlaying,
+                        // Pause main player when fullscreen is active to avoid dual playback
+                        isPlaying = roomState.videoState.isPlaying && !isFullscreen,
                         currentTime = roomState.videoState.currentTime,
                         volume = effectiveVolume,
                         isMuted = effectiveMuted,
@@ -382,7 +1283,10 @@ private fun VideoTabContent(
                         onPause = { viewModel.onPause(roomState.videoState.currentTime) },
                         onSeek = { time -> viewModel.onSeek(time) },
                         onProgress = { currentTime, duration ->
-                            viewModel.updateVideoState { it.copy(currentTime = currentTime, duration = duration) }
+                            // Only update progress when not in fullscreen (fullscreen player handles it)
+                            if (!isFullscreen) {
+                                viewModel.updateVideoState { it.copy(currentTime = currentTime, duration = duration) }
+                            }
                         },
                         onReady = {
                             viewModel.updateVideoState { it.copy(isReady = true) }
@@ -392,6 +1296,23 @@ private fun VideoTabContent(
                         },
                         modifier = Modifier.fillMaxSize()
                     )
+                    
+                    // Fullscreen button overlay (top right)
+                    IconButton(
+                        onClick = onEnterFullscreen,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(8.dp)
+                            .size(36.dp)
+                            .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                    ) {
+                        Icon(
+                            Icons.Default.Fullscreen,
+                            contentDescription = "Enter fullscreen (with webcams)",
+                            tint = Color.White,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
                 } else {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(Icons.Default.PlayCircleOutline, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(48.dp))
@@ -558,22 +1479,28 @@ private fun ControlsTabContent(
     viewModel: RoomViewModel,
     roomState: RoomUiState,
     isHost: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isTV: Boolean = false
 ) {
+    val padding = if (isTV) 24.dp else 16.dp
+    val spacing = if (isTV) 20.dp else 16.dp
+    val fontSize = if (isTV) 22.sp else 18.sp
+    
     Column(
-        modifier = modifier.padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        modifier = modifier.padding(padding),
+        verticalArrangement = Arrangement.spacedBy(spacing)
     ) {
-        Text("Media Controls", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+        Text("Media Controls", color = Color.White, fontWeight = FontWeight.Bold, fontSize = fontSize)
         
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(if (isTV) 16.dp else 12.dp)) {
             // Mic Toggle
             ControlTile(
                 icon = if (roomState.localMediaState.mic) Icons.Default.Mic else Icons.Default.MicOff,
                 label = "Mic",
                 isActive = roomState.localMediaState.mic,
                 onClick = viewModel::toggleMic,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                isTV = isTV
             )
             // Cam Toggle
             ControlTile(
@@ -581,20 +1508,32 @@ private fun ControlsTabContent(
                 label = "Camera",
                 isActive = roomState.localMediaState.cam,
                 onClick = viewModel::toggleCam,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                isTV = isTV
             )
         }
 
         if (isHost) {
-            Spacer(modifier = Modifier.height(16.dp))
-            Text("Host Controls", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-            GlassCard {
-                Button(
-                    onClick = { viewModel.setRoomPassword("") },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Reset Room Password")
+            Spacer(modifier = Modifier.height(spacing))
+            Text("Host Controls", color = Color.White, fontWeight = FontWeight.Bold, fontSize = fontSize)
+            if (isTV) {
+                TvCard {
+                    TvPrimaryButton(
+                        onClick = { viewModel.setRoomPassword("") },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Reset Room Password", fontSize = 16.sp)
+                    }
+                }
+            } else {
+                GlassCard {
+                    Button(
+                        onClick = { viewModel.setRoomPassword("") },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Reset Room Password")
+                    }
                 }
             }
         }
@@ -607,20 +1546,26 @@ private fun ControlTile(
     label: String,
     isActive: Boolean,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isTV: Boolean = false
 ) {
+    val padding = if (isTV) 32.dp else 24.dp
+    val iconSize = if (isTV) 40.dp else 32.dp
+    val fontSize = if (isTV) 18.sp else 14.sp
+    val cornerRadius = if (isTV) 16.dp else 12.dp
+    
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(cornerRadius))
             .background(if (isActive) Color(0xFF3B82F6) else Color(0xFF334155))
             .clickable(onClick = onClick)
-            .padding(vertical = 24.dp),
+            .padding(vertical = padding),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Icon(icon, null, tint = Color.White, modifier = Modifier.size(32.dp))
-        Spacer(Modifier.height(8.dp))
-        Text(label, color = Color.White, fontSize = 14.sp)
+        Icon(icon, null, tint = Color.White, modifier = Modifier.size(iconSize))
+        Spacer(Modifier.height(if (isTV) 12.dp else 8.dp))
+        Text(label, color = Color.White, fontSize = fontSize)
     }
 }
 
@@ -631,8 +1576,11 @@ private fun ActivityTabContent(
     chatInput: String,
     onChatInputChange: (String) -> Unit,
     onSendChat: () -> Unit,
-    localUserId: String
+    localUserId: String,
+    isTV: Boolean = false
 ) {
+    val padding = if (isTV) 24.dp else 16.dp
+    
     // This column takes up the full 'Box' weight from the parent
     Column(
         modifier = Modifier.fillMaxSize()

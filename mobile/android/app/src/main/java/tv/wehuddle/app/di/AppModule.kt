@@ -38,8 +38,10 @@ object AppModule {
     
     @Provides
     @Singleton
-    fun provideSocketClient(): SocketClient {
-        return SocketClient()
+    fun provideSocketClient(
+        @ApplicationContext context: Context
+    ): SocketClient {
+        return SocketClient(context)
     }
     
     @Provides

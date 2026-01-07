@@ -883,6 +883,7 @@ io.on("connection", (socket) => {
     const state = roomState.get(roomId);
     socket.emit("room_state", {
       roomId,
+      serverNow: Date.now(), // For clock sync
       ...(state || {}),
     });
 
@@ -1820,6 +1821,7 @@ io.on("connection", (socket) => {
     const state = roomState.get(roomId);
     socket.emit("room_state", {
       roomId,
+      serverNow: Date.now(), // For clock sync
       ...(state || {}),
     });
   });
@@ -1974,6 +1976,7 @@ io.on("connection", (socket) => {
       audioSyncEnabled: next.audioSyncEnabled,
       senderId: socket.id,
       senderUsername,
+      serverNow: Date.now(), // For clock sync
     });
   });
 
