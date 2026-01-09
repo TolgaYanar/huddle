@@ -9,6 +9,7 @@ export type PlatformType =
   | "kick"
   | "direct"
   | "prime"
+  | "netflix"
   | "unknown";
 
 export interface PlatformCapabilities {
@@ -80,6 +81,17 @@ export const PLATFORM_CAPABILITIES: Record<PlatformType, PlatformCapabilities> =
       canGetCurrentTime: false,
       speedOptions: [],
     },
+    netflix: {
+      canPlay: true,
+      canPause: true,
+      canSeek: true,
+      canMute: true,
+      canChangeSpeed: true,
+      canChangeVolume: true,
+      canGetDuration: true,
+      canGetCurrentTime: true,
+      speedOptions: [0.5, 0.75, 1, 1.25, 1.5],
+    },
     unknown: {
       canPlay: true,
       canPause: true,
@@ -96,6 +108,7 @@ export const PLATFORM_CAPABILITIES: Record<PlatformType, PlatformCapabilities> =
 export function detectPlatform(url: string): PlatformType {
   if (!url) return "unknown";
   const lower = url.toLowerCase();
+  if (lower.includes("netflix.com")) return "netflix";
   if (lower.includes("youtube.com") || lower.includes("youtu.be"))
     return "youtube";
   if (lower.includes("twitch.tv")) return "twitch";

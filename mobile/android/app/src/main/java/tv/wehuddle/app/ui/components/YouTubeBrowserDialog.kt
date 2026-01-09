@@ -72,7 +72,8 @@ enum class InAppVideoSource(
 ) {
     YOUTUBE("YouTube", "https://m.youtube.com"),
     TWITCH("Twitch", "https://m.twitch.tv"),
-    KICK("Kick", "https://kick.com")
+    KICK("Kick", "https://kick.com"),
+    NETFLIX("Netflix", "https://www.netflix.com")
 }
 
 @Composable
@@ -109,6 +110,7 @@ fun InAppVideoBrowserDialog(
             InAppVideoSource.YOUTUBE -> "https://m.youtube.com/results?search_query=$encoded"
             InAppVideoSource.TWITCH -> "https://m.twitch.tv/search?term=$encoded"
             InAppVideoSource.KICK -> "https://kick.com/search?query=$encoded"
+            InAppVideoSource.NETFLIX -> "https://www.netflix.com/search?q=$encoded"
         }
     }
 
@@ -148,6 +150,28 @@ fun InAppVideoBrowserDialog(
                     false
                 }
             }
+            InAppVideoSource.NETFLIX -> {
+                // Netflix URLs can be /watch/12345678 or /title/12345678
+                if (url.contains("netflix.com")) {
+                    // Try to extract watch ID
+                    val watchId = Regex("/watch/(\\d+)").find(url)?.groupValues?.get(1)
+                    if (watchId != null) {
+                        onSelectUrl("https://www.netflix.com/watch/$watchId")
+                        true
+                    } else {
+                        // Try to extract title ID (browsing page)
+                        val titleId = Regex("/title/(\\d+)").find(url)?.groupValues?.get(1)
+                        if (titleId != null) {
+                            onSelectUrl("https://www.netflix.com/watch/$titleId")
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                } else {
+                    false
+                }
+            }
         }
     }
 
@@ -177,7 +201,12 @@ fun InAppVideoBrowserDialog(
                 setSupportZoom(true)
                 builtInZoomControls = true
                 displayZoomControls = false
-                userAgentString = userAgentString + " HuddleInAppBrowser"
+                // Netflix requires desktop user agent to avoid redirect to app
+                userAgentString = if (source == InAppVideoSource.NETFLIX) {
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                } else {
+                    userAgentString + " HuddleInAppBrowser"
+                }
             }
 
             webChromeClient = object : WebChromeClient() {
@@ -213,6 +242,7 @@ fun InAppVideoBrowserDialog(
                         target.startsWith("vnd.youtube:", ignoreCase = true) ||
                         target.startsWith("twitch:", ignoreCase = true) ||
                         target.startsWith("kick:", ignoreCase = true) ||
+                        target.startsWith("nflx:", ignoreCase = true) ||
                         (scheme != null && scheme !in setOf("http", "https", "about", "javascript"))
                     ) {
                         return true
@@ -314,6 +344,7 @@ fun InAppVideoBrowserDialog(
                                 InAppVideoSource.YOUTUBE -> extractYoutubeVideoId(it) != null
                                 InAppVideoSource.TWITCH -> canonicalizeTwitchUrl(it) != null
                                 InAppVideoSource.KICK -> canonicalizeKickUrl(it) != null
+                                InAppVideoSource.NETFLIX -> it.contains("netflix.com") && (it.contains("/watch/") || it.contains("/title/"))
                             }
                         } == true
 

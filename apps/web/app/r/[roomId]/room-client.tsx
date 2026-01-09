@@ -43,6 +43,7 @@ import {
   getKickEmbedSrc,
   getTwitchEmbedSrc,
   isPrimeVideoUrl,
+  isNetflixUrl,
   isProblematicYoutubeUrl,
   shouldEmbedWebpage,
 } from "./lib/video";
@@ -564,10 +565,14 @@ export default function RoomClient({ roomId }: { roomId: string }) {
   const kickEmbedSrc = getKickEmbedSrc(normalizedUrl);
   const isKick = kickEmbedSrc !== null;
   const isPrime = isPrimeVideoUrl(normalizedUrl);
+  const isNetflix = isNetflixUrl(normalizedUrl);
   const isBadYoutubeUrl = isProblematicYoutubeUrl(url);
   const isWebEmbed = shouldEmbedWebpage(normalizedUrl);
   const canPlay =
-    (((!isBadYoutubeUrl && normalizedUrl.length > 0) || isKick || isTwitch) &&
+    (((!isBadYoutubeUrl && normalizedUrl.length > 0) ||
+      isKick ||
+      isTwitch ||
+      isNetflix) &&
       !isPrime) ||
     isWebEmbed;
   const canControlPlayback = !isKick && !isTwitch && !isPrime && !isWebEmbed;
@@ -669,6 +674,7 @@ export default function RoomClient({ roomId }: { roomId: string }) {
             isKick={isKick}
             isTwitch={isTwitch}
             isPrime={isPrime}
+            isNetflix={isNetflix}
             isWebEmbed={isWebEmbed}
             isBadYoutubeUrl={isBadYoutubeUrl}
             normalizedUrl={normalizedUrl}

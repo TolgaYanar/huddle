@@ -884,6 +884,16 @@ private fun AddVideoToPlaylistDialog(
                         enabled = !isLoading,
                         onClick = { onBrowseSource(InAppVideoSource.KICK) }
                     )
+                    
+                    // Netflix
+                    BrowseSourceButton(
+                        label = "Netflix",
+                        icon = Icons.Default.Movie,
+                        color = Color(0xFFE50914),
+                        modifier = Modifier.weight(1f),
+                        enabled = !isLoading,
+                        onClick = { onBrowseSource(InAppVideoSource.NETFLIX) }
+                    )
                 }
                 }
                 

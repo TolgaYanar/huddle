@@ -24,6 +24,7 @@ socketIo = "2.1.1"
 leanback = "1.0.0"
 tvFoundation = "1.0.0-alpha11"
 tvMaterial = "1.0.0"
+webkit = "1.15.0"
 
 [libraries]
 # Android Core
@@ -88,6 +89,9 @@ webrtc = { group = "io.getstream", name = "stream-webrtc-android", version.ref =
 androidx-leanback = { group = "androidx.leanback", name = "leanback", version.ref = "leanback" }
 androidx-tv-foundation = { group = "androidx.tv", name = "tv-foundation", version.ref = "tvFoundation" }
 androidx-tv-material = { group = "androidx.tv", name = "tv-material", version.ref = "tvMaterial" }
+
+# WebView Support Library
+androidx-webkit = { group = "androidx.webkit", name = "webkit", version.ref = "webkit" }
 
 # Testing
 junit = { group = "junit", name = "junit", version.ref = "junit" }

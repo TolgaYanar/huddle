@@ -246,6 +246,11 @@ fun RoomScreen(
             onProgress = { _, _ -> /* No-op: fullscreen is independent */ },
             onReady = { },
             onError = { error -> viewModel.updateVideoState { it.copy(error = error) } },
+            onUrlChange = { newUrl ->
+                // When user selects content in Netflix, sync it to the room
+                viewModel.updateVideoUrl(newUrl)
+                viewModel.loadVideo()
+            },
             eglContext = eglContext,
             localStream = localStream,
             localMediaState = roomState.localMediaState,
@@ -389,7 +394,12 @@ private fun TvWideRoomLayout(
                                 viewModel.updateVideoState { it.copy(error = error) }
                             },
                             modifier = Modifier.fillMaxSize(),
-                            lastRemoteSyncAt = roomState.videoState.lastRemoteSyncAt
+                            lastRemoteSyncAt = roomState.videoState.lastRemoteSyncAt,
+                            onUrlChange = { newUrl ->
+                                // When user selects content in Netflix, sync it to the room
+                                viewModel.updateVideoUrl(newUrl)
+                                viewModel.loadVideo()
+                            }
                         )
                     } else {
                         // No video - Show helpful message for TV users
@@ -1270,6 +1280,14 @@ private fun VideoTabContent(
                                 showYouTubeBrowser = true
                             }
                         )
+                        DropdownMenuItem(
+                            text = { Text("Netflix") },
+                            onClick = {
+                                browseSource = InAppVideoSource.NETFLIX
+                                showSourceMenu = false
+                                showYouTubeBrowser = true
+                            }
+                        )
                     }
                 }
             }
@@ -1331,7 +1349,12 @@ private fun VideoTabContent(
                             viewModel.updateVideoState { it.copy(error = error) }
                         },
                         modifier = Modifier.fillMaxSize(),
-                        lastRemoteSyncAt = roomState.videoState.lastRemoteSyncAt
+                        lastRemoteSyncAt = roomState.videoState.lastRemoteSyncAt,
+                        onUrlChange = { newUrl ->
+                            // When user selects content in Netflix, sync it to the room
+                            viewModel.updateVideoUrl(newUrl)
+                            viewModel.loadVideo()
+                        }
                     )
                     
                     // Fullscreen button overlay (top right)

@@ -6,6 +6,7 @@ import ReactPlayer from "react-player";
 import { PinnedStageOverlay } from "./PinnedStageOverlay";
 import { WebcamOverlay } from "./WebcamOverlay";
 import { VideoControls } from "./VideoControls";
+import { NetflixSyncPlayer } from "./NetflixSyncPlayer";
 import {
   parseDraggedTilePayload,
   TILE_DND_MIME,
@@ -81,6 +82,7 @@ export function PlayerSection({
   isKick,
   isTwitch,
   isPrime,
+  isNetflix,
   isWebEmbed,
   isBadYoutubeUrl,
   normalizedUrl,
@@ -167,6 +169,7 @@ export function PlayerSection({
   isKick: boolean;
   isTwitch: boolean;
   isPrime: boolean;
+  isNetflix: boolean;
   isWebEmbed: boolean;
   isBadYoutubeUrl: boolean;
   normalizedUrl: string;
@@ -621,7 +624,7 @@ export function PlayerSection({
             <div>
               <div className="font-semibold text-slate-50">Video source</div>
               <div className="text-xs text-slate-400 mt-1">
-                Paste a link (Kick/Twitch/YouTube) or a direct file URL
+                Paste a link (YouTube/Twitch/Kick/Netflix) or a direct file URL
                 (MP4/WebM).
               </div>
             </div>
@@ -636,7 +639,10 @@ export function PlayerSection({
                 Kick
               </span>
               <span className="px-2 py-1 rounded-full text-[11px] border border-white/10 bg-black/20 text-slate-300">
-                Prime (link)
+                Netflix
+              </span>
+              <span className="px-2 py-1 rounded-full text-[11px] border border-white/10 bg-black/20 text-slate-300">
+                Prime
               </span>
             </div>
           </div>
@@ -646,7 +652,7 @@ export function PlayerSection({
               type="text"
               value={inputUrl}
               onChange={(e) => setInputUrl(e.target.value)}
-              placeholder="e.g. kick.com/elwind"
+              placeholder="e.g. youtube.com/watch?v=..., netflix.com/watch/..."
               className="flex-1 bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500/40 transition"
             />
             <button
@@ -1028,6 +1034,30 @@ export function PlayerSection({
               />
             ) : isPrime ? (
               <div className="absolute inset-0" />
+            ) : isNetflix ? (
+              <NetflixSyncPlayer
+                url={normalizedUrl}
+                isPlaying={videoState === "playing"}
+                currentTime={currentTime}
+                volume={effectiveVolume}
+                muted={effectiveMuted}
+                playbackRate={playbackRate}
+                onPlay={handlePlay}
+                onPause={handlePause}
+                onSeek={handleSeekTo}
+                onProgress={(time, dur) => {
+                  handleProgress(time);
+                  if (dur > 0) handleDuration(dur);
+                }}
+                onReady={() => {
+                  setPlayerReady(true);
+                  setPlayerError(null);
+                  clearLoadTimeout();
+                }}
+                onError={(err) => setPlayerError(err)}
+                onDuration={handleDuration}
+                className="absolute inset-0"
+              />
             ) : isWebEmbed ? (
               <iframe
                 key={normalizedUrl}
@@ -1296,7 +1326,7 @@ export function PlayerSection({
           </div>
         )}
 
-        {(isKick || isTwitch || isPrime || isWebEmbed) && (
+        {(isKick || isTwitch || isPrime || isNetflix || isWebEmbed) && (
           <div className="absolute top-3 left-3 z-10">
             <span className="px-2.5 py-1 rounded-full text-[11px] font-medium border border-white/10 bg-black/40 text-slate-200">
               {isKick
@@ -1305,12 +1335,14 @@ export function PlayerSection({
                   ? "Twitch"
                   : isPrime
                     ? "Prime Video"
-                    : "Web embed"}
+                    : isNetflix
+                      ? "Netflix Sync"
+                      : "Web embed"}
             </span>
           </div>
         )}
 
-        {isWebEmbed && (
+        {isWebEmbed && !isNetflix && (
           <div className="absolute bottom-3 left-3 z-10 max-w-[75%] rounded-2xl border border-white/10 bg-black/50 backdrop-blur-md px-3 py-2">
             <div className="text-xs text-slate-200">
               This is an embedded website. Huddle can sync the link, but
@@ -1375,7 +1407,7 @@ export function PlayerSection({
           </div>
         )}
 
-        {canPlay && !playerReady && !playerError && (
+        {canPlay && !playerReady && !playerError && !isNetflix && (
           <div className="absolute inset-0 flex items-center justify-center text-slate-300 bg-black/40">
             {isBuffering ? "Buffering���" : "Loading video���"}
           </div>

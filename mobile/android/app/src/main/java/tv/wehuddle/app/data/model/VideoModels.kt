@@ -9,6 +9,7 @@ enum class PlatformType {
     KICK,
     DIRECT,
     PRIME,
+    NETFLIX,
     UNKNOWN
 }
 
@@ -87,6 +88,17 @@ object PlatformCapabilitiesRegistry {
             canGetCurrentTime = false,
             speedOptions = emptyList()
         ),
+        PlatformType.NETFLIX to PlatformCapabilities(
+            canPlay = true,
+            canPause = true,
+            canSeek = true,
+            canMute = true,
+            canChangeSpeed = true,
+            canChangeVolume = true,
+            canGetDuration = true,
+            canGetCurrentTime = true,
+            speedOptions = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f)
+        ),
         PlatformType.UNKNOWN to PlatformCapabilities(
             canPlay = true,
             canPause = true,
@@ -116,6 +128,7 @@ fun detectPlatform(url: String): PlatformType {
     
     val lower = trimmedUrl.lowercase()
     return when {
+        lower.contains("netflix.com") -> PlatformType.NETFLIX
         lower.contains("youtube.com") || lower.contains("youtu.be") -> PlatformType.YOUTUBE
         lower.contains("twitch.tv") -> PlatformType.TWITCH
         lower.contains("kick.com") -> PlatformType.KICK

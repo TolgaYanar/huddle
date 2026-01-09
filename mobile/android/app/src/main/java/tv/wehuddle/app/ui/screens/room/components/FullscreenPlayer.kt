@@ -106,6 +106,7 @@ fun FullscreenPlayerOverlay(
     onProgress: (Double, Double) -> Unit,
     onReady: () -> Unit,
     onError: (String) -> Unit,
+    onUrlChange: ((String) -> Unit)? = null,
     // WebRTC state
     eglContext: EglBase.Context?,
     localStream: MediaStream?,
@@ -198,7 +199,8 @@ fun FullscreenPlayerOverlay(
                     },
                     onReady = onReady,
                     onError = onError,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
+                    onUrlChange = onUrlChange
                 )
             } else {
                 // No video placeholder

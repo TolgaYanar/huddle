@@ -33,6 +33,17 @@
     <!-- Declare that app supports Leanback (TV) UI -->
     <uses-feature android:name="android.software.leanback" android:required="false" />
 
+    <!-- Package visibility for detecting installed apps (Android 11+) -->
+    <queries>
+        <!-- Netflix app -->
+        <package android:name="com.netflix.mediaclient" />
+        <!-- Netflix deep link scheme -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="nflx" />
+        </intent>
+    </queries>
+
     <application
         android:name=".HuddleApplication"
         android:allowBackup="true"
@@ -53,6 +64,8 @@
             android:name=".MainActivity"
             android:exported="true"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+            android:supportsPictureInPicture="true"
+            android:resizeableActivity="true"
             android:windowSoftInputMode="adjustResize"
             android:hardwareAccelerated="true"
             android:theme="@style/Theme.Huddle">

@@ -55,7 +55,8 @@ fun VideoPlayerView(
     onReady: () -> Unit,
     onError: (String) -> Unit,
     modifier: Modifier = Modifier,
-    lastRemoteSyncAt: Long = 0L
+    lastRemoteSyncAt: Long = 0L,
+    onUrlChange: ((String) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val platform = remember(url) { detectPlatform(url) }
@@ -308,6 +309,28 @@ fun VideoPlayerView(
                     platform = platform,
                     modifier = Modifier.fillMaxSize(),
                     onError = onError
+                )
+            }
+            
+            platform == PlatformType.NETFLIX -> {
+                // Netflix WebView player with JavaScript bridge for sync control
+                // Uses desktop user-agent to get HTML5 player with DRM support
+                NetflixWebPlayer(
+                    url = url,
+                    isPlaying = isPlaying,
+                    currentTime = currentTime,
+                    volume = volume,
+                    isMuted = isMuted,
+                    playbackSpeed = playbackSpeed,
+                    onProgress = onProgress,
+                    onPlayPause = { playing ->
+                        if (playing) onPlay() else onPause()
+                    },
+                    onReady = onReady,
+                    onError = onError,
+                    modifier = Modifier.fillMaxSize(),
+                    lastRemoteSyncAt = lastRemoteSyncAt,
+                    onUrlChange = onUrlChange
                 )
             }
             

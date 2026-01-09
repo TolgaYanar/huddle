@@ -84,6 +84,9 @@ dependencies {
     // Android Core
     implementation(libs.androidx.core.ktx)
 
+    // WebView Support Library (for User-Agent Client Hints / UA metadata)
+    implementation(libs.androidx.webkit)
+
     // Lifecycle
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)

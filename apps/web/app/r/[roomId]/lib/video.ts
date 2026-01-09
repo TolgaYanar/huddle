@@ -131,6 +131,7 @@ export function shouldEmbedWebpage(rawUrl: string) {
   if (getKickEmbedSrc(normalized)) return false;
   if (isTwitchUrl(normalized)) return false;
   if (isDirectMediaUrl(normalized)) return false;
+  if (isNetflixUrl(normalized)) return false;
 
   // For everything else, try embedding the webpage.
   return true;
@@ -138,6 +139,10 @@ export function shouldEmbedWebpage(rawUrl: string) {
 
 export function getPrimeVideoMessage() {
   return "Prime Video is DRM-protected and can’t be embedded/controlled inside Huddle. Open it in a new tab/app; Huddle can still sync the link for everyone.";
+}
+
+export function isNetflixUrl(rawUrl: string) {
+  return rawUrl.toLowerCase().includes("netflix.com");
 }
 
 export function isPrimeVideoUrl(rawUrl: string) {
