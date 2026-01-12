@@ -592,6 +592,7 @@ export function useActivityLog({
     userId,
     playerRef,
     applyingRemoteSyncRef,
+    hasInitialSyncRef,
     roomPlaybackAnchorRef,
     setUrl,
     setInputUrl,

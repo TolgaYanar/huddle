@@ -509,6 +509,75 @@ const roomWheel = new Map();
 // Map<roomId, { activePlaylistId: string | null, currentItemIndex: number }>
 const roomPlaylistActive = new Map();
 
+function emitServerSyncToRoom(roomId, payload) {
+  io.to(roomId).emit("receive_sync", {
+    ...payload,
+    senderId: "system",
+    senderUsername: "Playlist",
+    serverNow: Date.now(),
+  });
+}
+
+function applyPlaylistPlaybackToRoomState(roomId, videoUrl) {
+  const prev = roomState.get(roomId) || {};
+  const now = Date.now();
+  const prevUrl = typeof prev.videoUrl === "string" ? prev.videoUrl : null;
+  const prevUpdatedAt = typeof prev.updatedAt === "number" ? prev.updatedAt : 0;
+
+  // Guard against accidental restart loops: if playlist tries to "play" the
+  // same URL repeatedly in a short window, ignore it.
+  if (
+    prevUrl === videoUrl &&
+    prev.isPlaying === true &&
+    now - prevUpdatedAt < 3000
+  ) {
+    return;
+  }
+
+  const prevSpeed =
+    typeof prev.playbackSpeed === "number" &&
+    Number.isFinite(prev.playbackSpeed)
+      ? prev.playbackSpeed
+      : 1;
+
+  // Reset playback anchor to the start of the new media.
+  const next = {
+    ...prev,
+    videoUrl,
+    timestamp: 0,
+    updatedAt: now,
+    playbackSpeed: prevSpeed,
+    action: "play",
+    isPlaying: true,
+    senderId: "system",
+    senderUsername: "Playlist",
+  };
+
+  roomState.set(roomId, next);
+
+  // Broadcast in a receiver-friendly order: change_url -> play.
+  emitServerSyncToRoom(roomId, {
+    action: "change_url",
+    timestamp: 0,
+    videoUrl,
+    updatedAt: now,
+    volume: next.volume,
+    isMuted: next.isMuted,
+    playbackSpeed: next.playbackSpeed,
+    audioSyncEnabled: next.audioSyncEnabled,
+  });
+  emitServerSyncToRoom(roomId, {
+    action: "play",
+    timestamp: 0,
+    videoUrl,
+    updatedAt: now,
+    volume: next.volume,
+    isMuted: next.isMuted,
+    playbackSpeed: next.playbackSpeed,
+    audioSyncEnabled: next.audioSyncEnabled,
+  });
+}
+
 function getRoomWheel(roomId) {
   const existing = roomWheel.get(roomId);
   if (existing && Array.isArray(existing.entries)) return existing;
@@ -1401,6 +1470,10 @@ io.on("connection", (socket) => {
         title: item.title,
       });
 
+      // ALSO update authoritative room sync state so clients (and the server's
+      // regression guard) are aligned with the new media.
+      applyPlaylistPlaybackToRoomState(roomId, item.videoUrl);
+
       await emitPlaylistStateToRoom(roomId);
     } catch (err) {
       console.error("Failed to play playlist item:", err.message);
@@ -1440,7 +1513,23 @@ io.on("connection", (socket) => {
       }
 
       // Handle shuffle
-      if (playlist.shuffle) {
+      if (playlist.shuffle && playlist.items.length > 1) {
+        let candidate = nextIndex;
+        // Try a few times to avoid picking the current item.
+        for (let i = 0; i < 5; i++) {
+          const r = Math.floor(Math.random() * playlist.items.length);
+          if (r !== activeState.currentItemIndex) {
+            candidate = r;
+            break;
+          }
+        }
+        // Hard fallback: advance by 1.
+        if (candidate === activeState.currentItemIndex) {
+          candidate =
+            (activeState.currentItemIndex + 1) % playlist.items.length;
+        }
+        nextIndex = candidate;
+      } else if (playlist.shuffle) {
         nextIndex = Math.floor(Math.random() * playlist.items.length);
       }
 
@@ -1459,6 +1548,8 @@ io.on("connection", (socket) => {
         videoUrl: item.videoUrl,
         title: item.title,
       });
+
+      applyPlaylistPlaybackToRoomState(roomId, item.videoUrl);
 
       await emitPlaylistStateToRoom(roomId);
     } catch (err) {
@@ -1512,6 +1603,8 @@ io.on("connection", (socket) => {
         videoUrl: item.videoUrl,
         title: item.title,
       });
+
+      applyPlaylistPlaybackToRoomState(roomId, item.videoUrl);
 
       await emitPlaylistStateToRoom(roomId);
     } catch (err) {
@@ -1935,6 +2028,23 @@ io.on("connection", (socket) => {
       socket.data?.authUser?.username ||
       socketIdToUsername.get(socket.id) ||
       null;
+
+    // If a user manually changes the URL, stop the playlist from immediately
+    // overriding them. They can re-enable it by pressing Play on a playlist item.
+    if (action === "change_url") {
+      const active = roomPlaylistActive.get(roomId);
+      if (active?.activePlaylistId && senderUsername !== "Playlist") {
+        roomPlaylistActive.set(roomId, {
+          activePlaylistId: null,
+          currentItemIndex: 0,
+        });
+        try {
+          await emitPlaylistStateToRoom(roomId);
+        } catch {
+          // best effort
+        }
+      }
+    }
 
     const shouldAnchorPlaybackPosition =
       action === "play" ||

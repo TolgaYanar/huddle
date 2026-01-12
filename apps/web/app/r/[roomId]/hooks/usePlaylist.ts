@@ -94,11 +94,26 @@ export function usePlaylist({
   useEffect(() => {
     const cleanup = onPlaylistItemPlayed((data: PlaylistItemPlayedData) => {
       if (data.roomId !== roomId) return;
-      if (loadVideoUrl) {
-        // Force play and skip broadcast - all clients receive this event,
-        // so we don't want each one to broadcast sync events
-        loadVideoUrl(data.videoUrl, { forcePlay: true, skipBroadcast: true });
+      // Playback is driven by server sync events (receive_sync change_url/play)
+      // so we do NOT call loadVideoUrl here by default. Calling both can cause
+      // repeated reload/restart loops (especially with YouTube).
+      //
+      // If you need the legacy behavior for debugging, enable it:
+      // localStorage.setItem("huddle:legacyPlaylistPlayback", "1")
+      if (!loadVideoUrl) return;
+      try {
+        if (
+          window.localStorage.getItem("huddle:legacyPlaylistPlayback") !== "1"
+        ) {
+          return;
+        }
+      } catch {
+        return;
       }
+
+      // Legacy behavior: Force play and skip broadcast - all clients receive
+      // this event, so we don't want each one to broadcast sync events.
+      loadVideoUrl(data.videoUrl, { forcePlay: true, skipBroadcast: true });
     });
     return cleanup;
   }, [roomId, onPlaylistItemPlayed, loadVideoUrl]);

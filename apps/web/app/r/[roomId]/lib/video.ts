@@ -97,6 +97,47 @@ export function isYouTubeUrl(rawUrl: string) {
   }
 }
 
+export function getYouTubeVideoId(rawUrl: string): string | null {
+  const normalized = normalizeVideoUrl(rawUrl);
+
+  try {
+    const url = new URL(normalized);
+    const host = url.hostname.replace(/^www\./, "").toLowerCase();
+
+    if (host === "youtu.be") {
+      const id = url.pathname.split("/").filter(Boolean)[0];
+      return id || null;
+    }
+
+    const isYoutubeHost =
+      host === "youtube.com" ||
+      host === "m.youtube.com" ||
+      host === "youtube-nocookie.com" ||
+      host.endsWith(".youtube-nocookie.com");
+    if (!isYoutubeHost) return null;
+
+    // Standard watch URL: /watch?v=<id>
+    if (url.pathname === "/watch") {
+      return url.searchParams.get("v") || null;
+    }
+
+    // Embed URL: /embed/<id>
+    const parts = url.pathname.split("/").filter(Boolean);
+    if (parts[0] === "embed" && parts[1]) return parts[1];
+    if (parts[0] === "shorts" && parts[1]) return parts[1];
+    if (parts[0] === "live" && parts[1]) return parts[1];
+
+    return null;
+  } catch {
+    // Fallback for odd inputs.
+    const m = normalized.match(/[?&]v=([^&#]+)/);
+    if (m?.[1]) return m[1];
+    const short = normalized.match(/youtu\.be\/([^?#/]+)/i);
+    if (short?.[1]) return short[1];
+    return null;
+  }
+}
+
 export function isVimeoUrl(rawUrl: string) {
   try {
     const url = new URL(rawUrl);

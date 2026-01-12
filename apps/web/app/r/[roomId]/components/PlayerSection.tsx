@@ -1,12 +1,17 @@
 "use client";
 
 import React from "react";
-import ReactPlayer from "react-player";
+import ReactPlayerBase from "react-player";
+
+// Cast ReactPlayer to any to work around broken TypeScript definitions
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const ReactPlayer = ReactPlayerBase as any;
 
 import { PinnedStageOverlay } from "./PinnedStageOverlay";
 import { WebcamOverlay } from "./WebcamOverlay";
 import { VideoControls } from "./VideoControls";
 import { NetflixSyncPlayer } from "./NetflixSyncPlayer";
+import YouTubeIFramePlayer from "./YouTubeIFramePlayer";
 import {
   parseDraggedTilePayload,
   TILE_DND_MIME,
@@ -19,6 +24,7 @@ import {
   playFromRef,
   seekToFromRef,
 } from "../lib/player";
+import { getYouTubeVideoId, isYouTubeUrl } from "../lib/video";
 import type { WebRTCMediaState } from "shared-logic";
 
 type StageView = {
@@ -500,22 +506,30 @@ export function PlayerSection({
     return {
       youtube: {
         playerVars: {
+          autoplay: 1,
           controls: 1,
           fs: 0,
           rel: 0,
+          modestbranding: 1,
           enablejsapi: 1,
+          playsinline: 1,
           ...(origin ? { origin } : {}),
+        },
+      },
+      file: {
+        attributes: {
+          crossOrigin: "anonymous",
         },
       },
     } as unknown as PlayerConfig;
   }, []);
 
-  const clearLoadTimeout = () => {
+  const clearLoadTimeout = React.useCallback(() => {
     if (loadTimeoutRef.current) {
       window.clearTimeout(loadTimeoutRef.current);
       loadTimeoutRef.current = null;
     }
-  };
+  }, [loadTimeoutRef]);
 
   const isDirectFile = React.useMemo(() => {
     return /\.(mp4|webm|ogv|ogg)(\?|#|$)/i.test(normalizedUrl);
@@ -615,6 +629,967 @@ export function PlayerSection({
     setIsBuffering(false);
     clearLoadTimeout();
   };
+
+  // For YouTube, avoid swapping the iframe `src` for every playlist item.
+  // Swapping `src` is what triggers autoplay gating in background and makes
+  // the next track sit at 0:00 until the tab regains focus.
+  const isYouTube = React.useMemo(
+    () => isYouTubeUrl(normalizedUrl),
+    [normalizedUrl]
+  );
+  const useYouTubeIFrameApi = React.useMemo(() => {
+    // Default ON: persistent official IFrame API player.
+    // Opt-out via localStorage for debugging: huddle:ytIFrameApi = "0".
+    if (typeof window === "undefined") return true;
+    try {
+      return window.localStorage.getItem("huddle:ytIFrameApi") !== "0";
+    } catch {
+      return true;
+    }
+  }, []);
+  const debugYouTube = React.useMemo(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return window.localStorage.getItem("huddle:debugYouTube") === "1";
+    } catch {
+      return false;
+    }
+  }, []);
+  const [youtubeMountUrl, setYoutubeMountUrl] = React.useState<string | null>(
+    null
+  );
+  const ytRequestedIdRef = React.useRef<string | null>(null);
+  const ytConfirmedIdRef = React.useRef<string | null>(null);
+  const [ytConfirmedId, setYtConfirmedId] = React.useState<string | null>(null);
+  const [ytForceRemountNonce, setYtForceRemountNonce] = React.useState(0);
+  const [ytUseStableIframe, setYtUseStableIframe] = React.useState(() => {
+    // Default OFF: stable-iframe mode depends on the YouTube internal player API
+    // being available, which can be blocked by privacy settings/extensions and
+    // causes timeouts. Users can opt in for background-play experiments.
+    if (typeof window === "undefined") return false;
+    try {
+      return window.localStorage.getItem("huddle:ytStableIframe") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const ytLastForcedRemountIdRef = React.useRef<string | null>(null);
+  const ytVisibleStuckRemountIdRef = React.useRef<string | null>(null);
+  const ytVisibleStuckAttemptsRef = React.useRef(0);
+  const ytLastUserRecoverAtRef = React.useRef(0);
+  const ytLastNormalizedUrlRef = React.useRef<string | null>(null);
+  const ytUrlChangedWhileVisibleRef = React.useRef<boolean>(true);
+  const [ytAudioBlockedInBackground, setYtAudioBlockedInBackground] =
+    React.useState(false);
+
+  const [isPageVisible, setIsPageVisible] = React.useState(true);
+  React.useEffect(() => {
+    if (!isClient) return;
+    const update = () => {
+      setIsPageVisible(
+        typeof document === "undefined" || document.visibilityState !== "hidden"
+      );
+    };
+    update();
+    document.addEventListener("visibilitychange", update);
+    return () => {
+      document.removeEventListener("visibilitychange", update);
+    };
+  }, [isClient]);
+
+  // When returning to visible, try to immediately restore audio if the browser
+  // blocked background unmute on the next item.
+  React.useEffect(() => {
+    if (!isClient) return;
+    if (!isYouTube) return;
+    if (!isPageVisible) return;
+    if (!ytAudioBlockedInBackground) return;
+
+    const wrapper = playerRef.current as
+      | {
+          getInternalPlayer?: () => unknown;
+        }
+      | null
+      | undefined;
+    const internal = wrapper?.getInternalPlayer?.() as
+      | {
+          unMute?: () => void;
+          setVolume?: (vol: number) => void;
+          isMuted?: () => unknown;
+          playVideo?: () => void;
+        }
+      | null
+      | undefined;
+
+    try {
+      if (!internal) return;
+      if (!effectiveMuted && effectiveVolume > 0) {
+        internal.unMute?.();
+        internal.setVolume?.(
+          Math.max(0, Math.min(100, Math.round(effectiveVolume * 100)))
+        );
+        if (videoState === "Playing") internal.playVideo?.();
+      }
+    } catch {
+      // ignore
+    } finally {
+      setYtAudioBlockedInBackground(false);
+    }
+  }, [
+    isClient,
+    isYouTube,
+    isPageVisible,
+    ytAudioBlockedInBackground,
+    playerRef,
+    effectiveMuted,
+    effectiveVolume,
+    videoState,
+  ]);
+
+  // Track whether the most recent YouTube URL change happened while the page
+  // was visible. If the URL changed while hidden (background playlist advance),
+  // we avoid remounting the iframe on return, which would restart playback.
+  React.useEffect(() => {
+    if (!isClient) return;
+    if (useYouTubeIFrameApi) return;
+    if (!isYouTube) {
+      ytLastNormalizedUrlRef.current = null;
+      ytUrlChangedWhileVisibleRef.current = true;
+      return;
+    }
+
+    const prev = ytLastNormalizedUrlRef.current;
+    if (prev !== normalizedUrl) {
+      ytLastNormalizedUrlRef.current = normalizedUrl;
+      ytUrlChangedWhileVisibleRef.current = isPageVisible;
+    }
+  }, [isClient, isYouTube, normalizedUrl, isPageVisible, useYouTubeIFrameApi]);
+
+  React.useEffect(() => {
+    if (!isClient) return;
+    if (useYouTubeIFrameApi) return;
+    if (!isYouTube) {
+      if (youtubeMountUrl !== null) {
+        setYoutubeMountUrl(null);
+        ytRequestedIdRef.current = null;
+        ytConfirmedIdRef.current = null;
+        setYtConfirmedId(null);
+        setYtUseStableIframe(true);
+        ytLastForcedRemountIdRef.current = null;
+        ytLastNormalizedUrlRef.current = null;
+        ytUrlChangedWhileVisibleRef.current = true;
+      }
+      return;
+    }
+
+    // When stable-iframe mode is disabled (fallback), always mount the current URL.
+    if (!ytUseStableIframe) {
+      if (normalizedUrl && youtubeMountUrl !== normalizedUrl) {
+        setYoutubeMountUrl(normalizedUrl);
+        ytRequestedIdRef.current = null;
+        ytConfirmedIdRef.current = null;
+        setYtConfirmedId(null);
+        ytLastForcedRemountIdRef.current = null;
+      }
+      return;
+    }
+
+    // When visible, prefer remounting the iframe for reliability (manual/foreground switches).
+    // When hidden, keep a stable iframe and switch via IFrame API (background-friendly).
+    if (youtubeMountUrl === null && normalizedUrl) {
+      setYoutubeMountUrl(normalizedUrl);
+      return;
+    }
+
+    if (
+      isPageVisible &&
+      ytUrlChangedWhileVisibleRef.current &&
+      normalizedUrl &&
+      youtubeMountUrl !== normalizedUrl
+    ) {
+      setYoutubeMountUrl(normalizedUrl);
+      ytRequestedIdRef.current = null;
+      ytConfirmedIdRef.current = null;
+      setYtConfirmedId(null);
+      ytLastForcedRemountIdRef.current = null;
+    }
+  }, [
+    isClient,
+    isYouTube,
+    normalizedUrl,
+    youtubeMountUrl,
+    isPageVisible,
+    useYouTubeIFrameApi,
+    ytUseStableIframe,
+  ]);
+
+  const playerSrc =
+    isYouTube && !useYouTubeIFrameApi
+      ? (youtubeMountUrl ?? normalizedUrl)
+      : normalizedUrl;
+  const reactPlayerSrc = isYouTube
+    ? playerSrc
+    : canPlay
+      ? playerSrc
+      : undefined;
+
+  const youTubeDesiredId = React.useMemo(
+    () => (isYouTube ? getYouTubeVideoId(normalizedUrl) : null),
+    [isYouTube, normalizedUrl]
+  );
+  const youTubeIsOnDesired =
+    !isYouTube ||
+    !youTubeDesiredId ||
+    useYouTubeIFrameApi ||
+    !ytUseStableIframe ||
+    ytConfirmedId === youTubeDesiredId;
+
+  // If we're visible and the room is "Playing" but the player isn't on the
+  // desired YouTube id, ReactPlayer will keep itself paused (by design). That
+  // pause can cascade into handlePause() and permanently wedge controls.
+  // In that state, force-remount once per target id to recover.
+  React.useEffect(() => {
+    if (!isClient) return;
+    if (!isYouTube) return;
+    if (useYouTubeIFrameApi) return;
+    if (!ytUseStableIframe) return;
+    if (!isPageVisible) return;
+    if (videoState !== "Playing") return;
+    if (youTubeIsOnDesired) {
+      ytVisibleStuckRemountIdRef.current = null;
+      ytVisibleStuckAttemptsRef.current = 0;
+      return;
+    }
+
+    const targetId = youTubeDesiredId;
+    if (!targetId) return;
+    if (ytVisibleStuckRemountIdRef.current === targetId) return;
+
+    let cancelled = false;
+    let timer: number | null = null;
+
+    const probe = () => {
+      if (cancelled) return;
+      if (videoState !== "Playing") return;
+      if (ytConfirmedId === targetId) return;
+
+      const wrapper = playerRef.current as
+        | {
+            getInternalPlayer?: () => unknown;
+          }
+        | null
+        | undefined;
+      const internal = wrapper?.getInternalPlayer?.() as
+        | {
+            getVideoData?: () => unknown;
+            getVideoUrl?: () => unknown;
+          }
+        | null
+        | undefined;
+
+      const internalPresent = Boolean(internal);
+
+      const nowId = (() => {
+        try {
+          const data = internal?.getVideoData?.() as
+            | { video_id?: unknown }
+            | null
+            | undefined;
+          const vid =
+            typeof data?.video_id === "string" && data.video_id
+              ? data.video_id
+              : null;
+          if (vid) return vid;
+
+          const url = internal?.getVideoUrl?.();
+          if (typeof url === "string" && url) return getYouTubeVideoId(url);
+        } catch {
+          // ignore
+        }
+        return null;
+      })();
+
+      // If internal isn't ready yet, keep probing briefly instead of forcing a remount.
+      if (!internalPresent) {
+        ytVisibleStuckAttemptsRef.current += 1;
+        if (ytVisibleStuckAttemptsRef.current < 30) {
+          timer = window.setTimeout(probe, 350);
+          return;
+        }
+
+        // The player hasn't even exposed its internal API yet.
+        // If this persists, stable-iframe mode is not viable in this session.
+        // Fall back to legacy remount-per-URL behavior so playback can proceed.
+        if (ytUseStableIframe) {
+          console.warn(
+            "[yt] stable iframe mode failed; falling back to remount mode",
+            {
+              targetId,
+              normalizedUrl,
+              attempts: ytVisibleStuckAttemptsRef.current,
+            }
+          );
+          setYtUseStableIframe(false);
+          setYtForceRemountNonce((n) => n + 1);
+          ytVisibleStuckAttemptsRef.current = 0;
+          return;
+        }
+
+        // Otherwise, back off and try again later.
+        console.warn(
+          "[yt] internal player not available yet; delaying recovery",
+          {
+            targetId,
+            normalizedUrl,
+            canPlay,
+            playerSrc,
+            attempts: ytVisibleStuckAttemptsRef.current,
+          }
+        );
+        ytVisibleStuckAttemptsRef.current = 0;
+        timer = window.setTimeout(probe, 2000);
+        return;
+      }
+
+      // If a switch request is in-flight, give it more time before remounting.
+      const switchInProgress =
+        ytRequestedIdRef.current === targetId && ytConfirmedId !== targetId;
+      if (switchInProgress) {
+        ytVisibleStuckAttemptsRef.current += 1;
+        if (ytVisibleStuckAttemptsRef.current < 12) {
+          timer = window.setTimeout(probe, 450);
+          return;
+        }
+      }
+
+      ytVisibleStuckRemountIdRef.current = targetId;
+      ytLastForcedRemountIdRef.current = targetId;
+
+      // Reset confirmation and force an actual remount.
+      ytRequestedIdRef.current = null;
+      ytConfirmedIdRef.current = null;
+      setYtConfirmedId(null);
+      setPlayerReady(false);
+      setIsBuffering(true);
+      setYoutubeMountUrl(normalizedUrl);
+      setYtForceRemountNonce((n) => n + 1);
+
+      console.warn(
+        "[yt] stuck not on desired id while Playing; forcing remount",
+        {
+          targetId,
+          nowId,
+          internalPresent,
+          normalizedUrl,
+        }
+      );
+    };
+
+    ytVisibleStuckAttemptsRef.current = 0;
+    timer = window.setTimeout(probe, 900);
+
+    return () => {
+      cancelled = true;
+      if (timer) window.clearTimeout(timer);
+    };
+  }, [
+    isClient,
+    isYouTube,
+    isPageVisible,
+    videoState,
+    youTubeIsOnDesired,
+    youTubeDesiredId,
+    ytConfirmedId,
+    normalizedUrl,
+    useYouTubeIFrameApi,
+    ytUseStableIframe,
+    canPlay,
+    playerSrc,
+    playerRef,
+    setPlayerReady,
+    setIsBuffering,
+  ]);
+
+  // When the room URL changes to a new YouTube video, switch it using the
+  // existing YT player instance.
+  React.useEffect(() => {
+    if (!isClient) return;
+    if (!isYouTube) return;
+    if (useYouTubeIFrameApi) return;
+
+    const targetId = getYouTubeVideoId(normalizedUrl);
+    if (!targetId) return;
+
+    // If we've already confirmed we're on the desired id, don't let transient
+    // failures (getVideoData/getVideoUrl returning null) pause playback.
+    const isAlreadyConfirmed =
+      ytConfirmedIdRef.current === targetId || ytConfirmedId === targetId;
+
+    let cancelled = false;
+    let retryTimer: number | null = null;
+
+    const tryLoad = () => {
+      if (cancelled) return;
+
+      const wrapper = playerRef.current as
+        | {
+            getInternalPlayer?: () => unknown;
+          }
+        | null
+        | undefined;
+
+      const internal = wrapper?.getInternalPlayer?.() as
+        | {
+            loadVideoById?: (id: string) => void;
+            cueVideoById?: (id: string) => void;
+            playVideo?: () => void;
+            getVideoData?: () => unknown;
+            getVideoUrl?: () => unknown;
+            getIframe?: () => unknown;
+          }
+        | null
+        | undefined;
+
+      if (
+        !internal ||
+        (typeof internal.loadVideoById !== "function" &&
+          typeof internal.cueVideoById !== "function")
+      ) {
+        retryTimer = window.setTimeout(tryLoad, 250);
+        return;
+      }
+
+      // During remounts, ReactPlayer can briefly hand us an internal player
+      // whose iframe isn't attached yet. Calling loadVideoById/cueVideoById in
+      // that state triggers the YT warning and can prevent playback.
+      const iframeConnected = (() => {
+        try {
+          const iframe = internal.getIframe?.() as
+            | { isConnected?: unknown }
+            | null
+            | undefined;
+          if (!iframe) return true;
+          if (typeof iframe.isConnected === "boolean")
+            return iframe.isConnected;
+        } catch {
+          // ignore
+        }
+        return true;
+      })();
+
+      if (!iframeConnected) {
+        retryTimer = window.setTimeout(tryLoad, 250);
+        return;
+      }
+
+      // Verify current video id so we don't accidentally restart an old video.
+      const currentId = (() => {
+        try {
+          const data = internal.getVideoData?.() as
+            | { video_id?: unknown }
+            | null
+            | undefined;
+          const vid =
+            typeof data?.video_id === "string" && data.video_id
+              ? data.video_id
+              : null;
+          if (vid) return vid;
+
+          const url = internal.getVideoUrl?.();
+          if (typeof url === "string" && url) return getYouTubeVideoId(url);
+        } catch {
+          // ignore
+        }
+        return null;
+      })();
+
+      if (currentId === targetId) {
+        ytConfirmedIdRef.current = targetId;
+        ytRequestedIdRef.current = targetId;
+        setYtConfirmedId(targetId);
+        // We may have set playerReady=false when the room URL changed. In the
+        // stable-iframe approach, onReady does not fire again; mark ready here.
+        setPlayerReady(true);
+        setPlayerError(null);
+        setIsBuffering(false);
+        clearLoadTimeout();
+        return;
+      }
+
+      // If YouTube can't report the current id right now but we already
+      // confirmed the target, keep playing.
+      if (currentId === null && isAlreadyConfirmed) {
+        ytRequestedIdRef.current = targetId;
+        setPlayerReady(true);
+        setPlayerError(null);
+        setIsBuffering(false);
+        clearLoadTimeout();
+        return;
+      }
+
+      // Track what we WANT, but don't mark as confirmed until we verify.
+      ytRequestedIdRef.current = targetId;
+      if (!isAlreadyConfirmed) {
+        ytConfirmedIdRef.current = null;
+        setYtConfirmedId(null);
+      }
+
+      if (debugYouTube) {
+        console.debug("[yt] switching video via IFrame API", {
+          targetId,
+          videoState,
+          normalizedUrl,
+          currentId,
+        });
+      }
+
+      let attempts = 0;
+
+      const requestSwitch = () => {
+        attempts += 1;
+        try {
+          if (videoState === "Playing") {
+            (internal.loadVideoById ?? internal.cueVideoById)?.(targetId);
+          } else {
+            (internal.cueVideoById ?? internal.loadVideoById)?.(targetId);
+          }
+        } catch (e) {
+          if (debugYouTube) {
+            console.debug("[yt] loadVideoById/cueVideoById failed", e);
+          }
+        }
+      };
+
+      const verifyAndMaybeRetry = () => {
+        if (cancelled) return;
+
+        const nowId = (() => {
+          try {
+            const data = internal.getVideoData?.() as
+              | { video_id?: unknown }
+              | null
+              | undefined;
+            const vid =
+              typeof data?.video_id === "string" && data.video_id
+                ? data.video_id
+                : null;
+            if (vid) return vid;
+
+            const url = internal.getVideoUrl?.();
+            if (typeof url === "string" && url) return getYouTubeVideoId(url);
+          } catch {
+            // ignore
+          }
+          return null;
+        })();
+
+        if (debugYouTube) {
+          console.debug("[yt] verify", {
+            targetId,
+            nowId,
+            attempts,
+            videoState,
+          });
+        }
+
+        if (nowId === targetId) {
+          ytConfirmedIdRef.current = targetId;
+          setYtConfirmedId(targetId);
+          setPlayerReady(true);
+          setPlayerError(null);
+          setIsBuffering(false);
+          clearLoadTimeout();
+          // Only kick play once the *target* is actually loaded.
+          if (videoState === "Playing") {
+            try {
+              internal.playVideo?.();
+            } catch {
+              // ignore
+            }
+          }
+          return;
+        }
+
+        if (attempts >= 6) {
+          // Internal switching sometimes fails (autoplay policy / transient YT
+          // issues). As a last resort, force-remount the iframe to the new URL.
+          // This restores manual switching reliability.
+          if (ytLastForcedRemountIdRef.current !== targetId) {
+            ytLastForcedRemountIdRef.current = targetId;
+            if (debugYouTube) {
+              console.debug(
+                "[yt] forcing iframe remount after failed switches",
+                {
+                  targetId,
+                  normalizedUrl,
+                  attempts,
+                }
+              );
+            }
+            // Only update if it would actually change.
+            setYoutubeMountUrl((prev) =>
+              prev === normalizedUrl ? prev : normalizedUrl
+            );
+          }
+          return;
+        }
+
+        requestSwitch();
+        retryTimer = window.setTimeout(verifyAndMaybeRetry, 500);
+      };
+
+      requestSwitch();
+      retryTimer = window.setTimeout(verifyAndMaybeRetry, 500);
+    };
+
+    tryLoad();
+
+    return () => {
+      cancelled = true;
+      if (retryTimer) window.clearTimeout(retryTimer);
+    };
+  }, [
+    isClient,
+    isYouTube,
+    ytUseStableIframe,
+    normalizedUrl,
+    playerRef,
+    videoState,
+    debugYouTube,
+    useYouTubeIFrameApi,
+    ytConfirmedId,
+    setPlayerReady,
+    setPlayerError,
+    setIsBuffering,
+    clearLoadTimeout,
+  ]);
+
+  // YouTube background-safe ended detection:
+  // ReactPlayer's `onEnded` can be unreliable when autoplay restrictions kick in
+  // after a URL change while the tab is unfocused. The IFrame API emits
+  // onStateChange(ENDED=0) even in the background.
+  const ytEndedAtRef = React.useRef(0);
+  const ytEnsurePlayAtRef = React.useRef(0);
+  const ytEnsureAudioAtRef = React.useRef(0);
+  const ytHiddenSwitchAtRef = React.useRef(0);
+  React.useEffect(() => {
+    if (!isClient) return;
+    if (!isYouTube) return;
+    if (useYouTubeIFrameApi) return;
+
+    let cancelled = false;
+    let attachTimer: number | null = null;
+
+    const tryAttach = () => {
+      if (cancelled) return;
+
+      const wrapper = playerRef.current as
+        | {
+            getInternalPlayer?: () => unknown;
+          }
+        | null
+        | undefined;
+
+      const internal = wrapper?.getInternalPlayer?.() as
+        | {
+            addEventListener?: (evt: string, cb: (e: unknown) => void) => void;
+            removeEventListener?: (
+              evt: string,
+              cb: (e: unknown) => void
+            ) => void;
+            playVideo?: () => void;
+            loadVideoById?: (id: string) => void;
+            cueVideoById?: (id: string) => void;
+            getVideoData?: () => unknown;
+            getVideoUrl?: () => unknown;
+            getPlayerState?: () => unknown;
+            mute?: () => void;
+            unMute?: () => void;
+            isMuted?: () => unknown;
+            setVolume?: (vol: number) => void;
+            getVolume?: () => unknown;
+          }
+        | null
+        | undefined;
+
+      if (!internal || typeof internal.addEventListener !== "function") {
+        // ReactPlayer may not have created the IFrame player yet; retry briefly.
+        attachTimer = window.setTimeout(tryAttach, 250);
+        return;
+      }
+
+      const ensurePlayingIfExpected = () => {
+        if (applyingRemoteSyncRef.current) return;
+        if (videoState !== "Playing") return;
+
+        // Don't restart an old video at its end; only kick play if the internal
+        // player is already on the URL's intended video id.
+        const desiredId = getYouTubeVideoId(normalizedUrl);
+        if (!desiredId) return;
+        // Only kick play if the internal player is already on the desired video.
+        // Otherwise this can restart the previous video at its end.
+        const currentId = (() => {
+          try {
+            const data = internal.getVideoData?.() as
+              | { video_id?: unknown }
+              | null
+              | undefined;
+            const vid =
+              typeof data?.video_id === "string" && data.video_id
+                ? data.video_id
+                : null;
+            if (vid) return vid;
+
+            const url = internal.getVideoUrl?.();
+            if (typeof url === "string" && url) return getYouTubeVideoId(url);
+          } catch {
+            // ignore
+          }
+          return null;
+        })();
+
+        if (currentId !== desiredId) {
+          if (debugYouTube) {
+            console.debug("[yt] skip kick; not on desired id", {
+              desiredId,
+              currentId,
+              requested: ytRequestedIdRef.current,
+              confirmed: ytConfirmedIdRef.current,
+            });
+          }
+          return;
+        }
+
+        const ensureAudioIfExpected = () => {
+          if (applyingRemoteSyncRef.current) return;
+          if (videoState !== "Playing") return;
+
+          const now = Date.now();
+          if (now - ytEnsureAudioAtRef.current < 2000) return;
+          ytEnsureAudioAtRef.current = now;
+
+          try {
+            if (effectiveMuted) {
+              internal.mute?.();
+              return;
+            }
+
+            // Best-effort: some browsers/YouTube policies may still prevent
+            // unmuting without a user gesture, but this helps when it *is*
+            // allowed and the next video starts muted.
+            internal.unMute?.();
+
+            const vol = Math.max(
+              0,
+              Math.min(100, Math.round(effectiveVolume * 100))
+            );
+            if (vol > 0) internal.setVolume?.(vol);
+
+            // If we're hidden and unmute is being ignored, it's almost always
+            // a browser autoplay policy requiring a user gesture.
+            if (!isPageVisible) {
+              const muted = internal.isMuted?.();
+              if (muted === true) {
+                setYtAudioBlockedInBackground(true);
+              }
+            }
+          } catch {
+            // ignore
+          }
+        };
+
+        ensureAudioIfExpected();
+
+        const now = Date.now();
+        if (now - ytEnsurePlayAtRef.current < 1200) return;
+        ytEnsurePlayAtRef.current = now;
+
+        try {
+          internal.playVideo?.();
+        } catch {
+          // ignore
+        }
+      };
+
+      const onStateChange = (ev: unknown) => {
+        const data = (ev as { data?: unknown } | null)?.data;
+        // YouTube IFrame API: ENDED === 0
+        if (data !== 0) return;
+
+        const now = Date.now();
+        if (now - ytEndedAtRef.current < 1500) return;
+        ytEndedAtRef.current = now;
+
+        onVideoEnded?.();
+      };
+
+      // If the next track loads while the tab is unfocused, YouTube may sit in
+      // CUED (5) or UNSTARTED (-1) until the user refocuses. Kick playVideo.
+      const onStateChangeWithKick = (ev: unknown) => {
+        const data = (ev as { data?: unknown } | null)?.data;
+        if (data === 0) {
+          onStateChange(ev);
+          return;
+        }
+
+        // -1: unstarted, 5: cued
+        if (data === -1 || data === 5) {
+          if (debugYouTube) {
+            console.debug("[yt] state", { data, videoState, normalizedUrl });
+          }
+          ensurePlayingIfExpected();
+        }
+      };
+
+      try {
+        internal.addEventListener("onStateChange", onStateChangeWithKick);
+      } catch {
+        // ignore
+      }
+
+      // Background fallback: in hidden tabs, YouTube may not reliably fire
+      // statechange events. Poll player state and kick play when needed.
+      let pollTimer: number | null = null;
+      const startPoll = () => {
+        if (pollTimer) return;
+        pollTimer = window.setInterval(() => {
+          if (cancelled) return;
+          if (isPageVisible) return;
+          if (applyingRemoteSyncRef.current) return;
+          if (videoState !== "Playing") return;
+
+          const desiredId = getYouTubeVideoId(normalizedUrl);
+          if (!desiredId) return;
+
+          const currentId = (() => {
+            try {
+              const data = internal.getVideoData?.() as
+                | { video_id?: unknown }
+                | null
+                | undefined;
+              const vid =
+                typeof data?.video_id === "string" && data.video_id
+                  ? data.video_id
+                  : null;
+              if (vid) return vid;
+
+              const url = internal.getVideoUrl?.();
+              if (typeof url === "string" && url) return getYouTubeVideoId(url);
+            } catch {
+              // ignore
+            }
+            return null;
+          })();
+
+          if (currentId !== desiredId) {
+            // Attempt to advance the internal player to the desired item.
+            // Background tabs can throttle timeouts heavily, so do a periodic
+            // best-effort switch here.
+            const now = Date.now();
+            if (now - ytHiddenSwitchAtRef.current < 2500) return;
+            ytHiddenSwitchAtRef.current = now;
+
+            if (debugYouTube) {
+              console.debug("[yt] hidden poll switch", {
+                desiredId,
+                currentId,
+                normalizedUrl,
+              });
+            }
+
+            try {
+              (internal.loadVideoById ?? internal.cueVideoById)?.(desiredId);
+            } catch {
+              // ignore
+            }
+            return;
+          }
+
+          // If we're on the desired item but audio is missing in background,
+          // try to re-assert unmute/volume before (or while) kicking play.
+          if (!effectiveMuted && effectiveVolume > 0) {
+            const now = Date.now();
+            if (now - ytEnsureAudioAtRef.current >= 2000) {
+              ytEnsureAudioAtRef.current = now;
+              try {
+                internal.unMute?.();
+                internal.setVolume?.(
+                  Math.max(0, Math.min(100, Math.round(effectiveVolume * 100)))
+                );
+
+                const muted = internal.isMuted?.();
+                if (muted === true) {
+                  setYtAudioBlockedInBackground(true);
+                }
+              } catch {
+                // ignore
+              }
+            }
+          }
+
+          const st = internal.getPlayerState?.();
+          // YouTube states: -1 unstarted, 0 ended, 1 playing, 2 paused, 3 buffering, 5 cued
+          if (st === 1) return;
+          if (st === 0) return;
+
+          const now = Date.now();
+          if (now - ytEnsurePlayAtRef.current < 1500) return;
+          ytEnsurePlayAtRef.current = now;
+
+          if (debugYouTube) {
+            console.debug("[yt] hidden poll kick", {
+              st,
+              desiredId,
+              normalizedUrl,
+            });
+          }
+
+          try {
+            internal.playVideo?.();
+          } catch {
+            // ignore
+          }
+        }, 2000);
+      };
+      startPoll();
+
+      return () => {
+        if (pollTimer) {
+          window.clearInterval(pollTimer);
+          pollTimer = null;
+        }
+        try {
+          internal.removeEventListener?.(
+            "onStateChange",
+            onStateChangeWithKick
+          );
+        } catch {
+          // ignore
+        }
+      };
+    };
+
+    const detach = tryAttach();
+
+    return () => {
+      cancelled = true;
+      if (attachTimer) window.clearTimeout(attachTimer);
+      if (typeof detach === "function") detach();
+    };
+  }, [
+    isClient,
+    isYouTube,
+    isPageVisible,
+    normalizedUrl,
+    onVideoEnded,
+    playerRef,
+    videoState,
+    applyingRemoteSyncRef,
+    debugYouTube,
+    effectiveMuted,
+    effectiveVolume,
+    useYouTubeIFrameApi,
+  ]);
 
   return (
     <section className="flex flex-col gap-6 lg:col-start-2 lg:row-start-1 lg:min-w-0">
@@ -1037,7 +2012,7 @@ export function PlayerSection({
             ) : isNetflix ? (
               <NetflixSyncPlayer
                 url={normalizedUrl}
-                isPlaying={videoState === "playing"}
+                isPlaying={videoState === "Playing"}
                 currentTime={currentTime}
                 volume={effectiveVolume}
                 muted={effectiveMuted}
@@ -1186,13 +2161,79 @@ export function PlayerSection({
                 }}
                 onError={handlePlayerError}
               />
+            ) : isYouTube && useYouTubeIFrameApi ? (
+              <YouTubeIFramePlayer
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                ref={playerRef as any}
+                className="absolute inset-0 w-full h-full"
+                videoId={canPlay ? youTubeDesiredId : null}
+                playing={canPlay && videoState === "Playing"}
+                muted={effectiveMuted}
+                volume={effectiveVolume}
+                playbackRate={playbackRate}
+                onReady={() => {
+                  setPlayerReady(true);
+                  setPlayerError(null);
+                  setIsBuffering(false);
+                  clearLoadTimeout();
+
+                  // If the room is already playing, align playhead ASAP.
+                  resumeToRoomTimeIfNeeded();
+                }}
+                onError={(message) => {
+                  setPlayerReady(false);
+                  setIsBuffering(false);
+                  setPlayerError(message);
+                  clearLoadTimeout();
+                }}
+                onPlay={() => {
+                  // The IFrame API's onReady fires once for the player, not
+                  // for every subsequent video. Treat PLAYING as proof the
+                  // current video loaded, otherwise our legacy per-URL load
+                  // timeout can fire mid-play.
+                  setPlayerReady(true);
+                  setPlayerError(null);
+                  setIsBuffering(false);
+                  clearLoadTimeout();
+
+                  if (applyingRemoteSyncRef.current) return;
+
+                  handlePlay();
+                }}
+                onPause={() => {
+                  if (applyingRemoteSyncRef.current) return;
+                  if (videoState !== "Paused") handlePause();
+                }}
+                onEnded={() => {
+                  onVideoEnded?.();
+                }}
+                onDuration={(dur) => {
+                  // Duration becoming available is also a strong signal the
+                  // current video is loaded.
+                  setPlayerReady(true);
+                  setPlayerError(null);
+                  setIsBuffering(false);
+                  clearLoadTimeout();
+
+                  if (Number.isFinite(dur)) handleDuration(dur);
+                }}
+                onProgress={(time) => {
+                  // First progress tick confirms playback is happening.
+                  setPlayerReady(true);
+                  setPlayerError(null);
+                  setIsBuffering(false);
+                  clearLoadTimeout();
+
+                  if (Number.isFinite(time)) handleProgress(time);
+                }}
+              />
             ) : (
               <ReactPlayer
-                ref={
-                  playerRef as unknown as React.RefObject<HTMLVideoElement | null>
-                }
-                src={canPlay ? normalizedUrl : undefined}
-                playing={videoState === "Playing"}
+                key={isYouTube ? `yt-${ytForceRemountNonce}` : undefined}
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                ref={playerRef as any}
+                src={reactPlayerSrc}
+                playing={videoState === "Playing" && youTubeIsOnDesired}
                 muted={effectiveMuted}
                 volume={effectiveVolume}
                 playbackRate={playbackRate}
@@ -1203,74 +2244,50 @@ export function PlayerSection({
                 config={playerConfig}
                 onPlay={() => {
                   if (applyingRemoteSyncRef.current) return;
+                  if (
+                    isYouTube &&
+                    !useYouTubeIFrameApi &&
+                    !youTubeIsOnDesired
+                  ) {
+                    // User is trying to play, but our safety gate is holding
+                    // playback until the desired id is confirmed. If the YT
+                    // internal player isn't available yet, the user will see
+                    // an immediate pause and be unable to seek/resume.
+                    const now = Date.now();
+                    if (now - ytLastUserRecoverAtRef.current > 1200) {
+                      ytLastUserRecoverAtRef.current = now;
+
+                      ytRequestedIdRef.current = null;
+                      ytConfirmedIdRef.current = null;
+                      setYtConfirmedId(null);
+                      setPlayerReady(false);
+                      setIsBuffering(true);
+                      setYoutubeMountUrl(normalizedUrl);
+                      setYtForceRemountNonce((n) => n + 1);
+
+                      console.warn(
+                        "[yt] user play requested while not on desired id; remounting",
+                        {
+                          targetId: youTubeDesiredId,
+                          normalizedUrl,
+                        }
+                      );
+                    }
+
+                    handlePlay();
+                    return;
+                  }
                   handlePlay();
                 }}
                 onPause={() => {
                   if (applyingRemoteSyncRef.current) return;
+                  if (isYouTube && !useYouTubeIFrameApi && !youTubeIsOnDesired)
+                    return;
                   if (videoState !== "Paused") handlePause();
                 }}
-                onSeeked={(e) => {
+                onSeeked={() => {
                   if (applyingRemoteSyncRef.current) return;
-
                   lastManualSeekRef.current = Date.now();
-
-                  const currentTarget = (
-                    e as { currentTarget?: unknown } | null
-                  )?.currentTarget;
-                  const time =
-                    currentTarget &&
-                    typeof (currentTarget as { currentTime?: unknown })
-                      .currentTime === "number"
-                      ? (currentTarget as { currentTime: number }).currentTime
-                      : null;
-
-                  if (typeof time === "number" && !Number.isNaN(time)) {
-                    handleSeekFromController(time);
-                  }
-                }}
-                onVolumeChange={(e) => {
-                  if (applyingRemoteSyncRef.current) return;
-
-                  const currentTarget = (
-                    e as { currentTarget?: unknown } | null
-                  )?.currentTarget;
-                  const volume =
-                    currentTarget &&
-                    typeof (currentTarget as { volume?: unknown }).volume ===
-                      "number"
-                      ? (currentTarget as { volume: number }).volume
-                      : null;
-                  const muted =
-                    currentTarget &&
-                    typeof (currentTarget as { muted?: unknown }).muted ===
-                      "boolean"
-                      ? (currentTarget as { muted: boolean }).muted
-                      : null;
-
-                  if (
-                    typeof volume === "number" &&
-                    !Number.isNaN(volume) &&
-                    typeof muted === "boolean"
-                  ) {
-                    handleVolumeFromController(volume, muted);
-                  }
-                }}
-                onRateChange={(e) => {
-                  if (applyingRemoteSyncRef.current) return;
-
-                  const currentTarget = (
-                    e as { currentTarget?: unknown } | null
-                  )?.currentTarget;
-                  const rate =
-                    currentTarget &&
-                    typeof (currentTarget as { playbackRate?: unknown })
-                      .playbackRate === "number"
-                      ? (currentTarget as { playbackRate: number }).playbackRate
-                      : null;
-
-                  if (typeof rate === "number" && !Number.isNaN(rate)) {
-                    handlePlaybackRateFromController(rate);
-                  }
                 }}
                 onError={handlePlayerError}
                 onReady={() => {
@@ -1278,6 +2295,20 @@ export function PlayerSection({
                   setPlayerError(null);
                   setIsBuffering(false);
                   clearLoadTimeout();
+
+                  if (isYouTube && !useYouTubeIFrameApi) {
+                    // When we *mounted* the desired URL (i.e., visible remounts
+                    // or user recovery remounts), ReactPlayer may fire onReady
+                    // before the IFrame API can report getVideoData().
+                    // Optimistically confirm the desired id so playback and
+                    // seeking aren't blocked.
+                    const desiredId = getYouTubeVideoId(normalizedUrl);
+                    if (desiredId) {
+                      ytRequestedIdRef.current = desiredId;
+                      ytConfirmedIdRef.current = desiredId;
+                      setYtConfirmedId(desiredId);
+                    }
+                  }
 
                   // If the room is already playing, align playhead ASAP.
                   resumeToRoomTimeIfNeeded();
@@ -1288,35 +2319,26 @@ export function PlayerSection({
                   setIsBuffering(false);
                   clearLoadTimeout();
                 }}
-                onLoadedMetadata={(e) => {
-                  setPlayerReady(true);
-                  setPlayerError(null);
-                  setIsBuffering(false);
-                  const dur = (e.currentTarget as HTMLVideoElement).duration;
-                  if (typeof dur === "number" && !isNaN(dur)) {
-                    handleDuration(dur);
-                  }
-                  clearLoadTimeout();
-                }}
-                onCanPlay={() => {
-                  setPlayerReady(true);
-                  setPlayerError(null);
-                  setIsBuffering(false);
-                  clearLoadTimeout();
-                }}
-                onWaiting={() => setIsBuffering(true)}
                 onPlaying={() => {
                   setPlayerReady(true);
                   setIsBuffering(false);
                   clearLoadTimeout();
                 }}
-                onTimeUpdate={(e) => {
-                  const time = (e.currentTarget as HTMLVideoElement)
-                    .currentTime;
-                  if (typeof time === "number" && !isNaN(time)) {
-                    handleProgress(time);
-                  }
-                }}
+                onProgress={
+                  ((state: { playedSeconds: number }) => {
+                    if (Number.isFinite(state.playedSeconds)) {
+                      handleProgress(state.playedSeconds);
+                    }
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  }) as any
+                }
+                onDurationChange={
+                  ((dur: number) => {
+                    if (Number.isFinite(dur)) handleDuration(dur);
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  }) as any
+                }
+                progressInterval={500}
                 onEnded={() => {
                   onVideoEnded?.();
                 }}
@@ -1410,6 +2432,15 @@ export function PlayerSection({
         {canPlay && !playerReady && !playerError && !isNetflix && (
           <div className="absolute inset-0 flex items-center justify-center text-slate-300 bg-black/40">
             {isBuffering ? "Buffering���" : "Loading video���"}
+          </div>
+        )}
+
+        {isYouTube && ytAudioBlockedInBackground && !isPageVisible && (
+          <div className="absolute bottom-3 right-3 z-10 max-w-[75%] rounded-2xl border border-white/10 bg-black/50 backdrop-blur-md px-3 py-2">
+            <div className="text-xs text-slate-200">
+              Audio may be blocked in background by your browser. Return to the
+              tab (or click Play) to re-enable sound.
+            </div>
           </div>
         )}
 

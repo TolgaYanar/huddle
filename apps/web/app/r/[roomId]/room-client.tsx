@@ -509,11 +509,91 @@ export default function RoomClient({ roomId }: { roomId: string }) {
   });
 
   // Handler for video ended - auto-play next if enabled
+  const lastPlaylistAdvanceAtRef = React.useRef(0);
   const handleVideoEnded = useCallback(() => {
+    const now = Date.now();
+    // Guard against duplicate end signals (e.g., ReactPlayer onEnded + YouTube
+    // IFrame onStateChange ENDED) causing multiple advances.
+    if (now - lastPlaylistAdvanceAtRef.current < 2000) return;
+    lastPlaylistAdvanceAtRef.current = now;
+
     if (activePlaylist?.settings?.autoPlay) {
       playNextAction();
     }
   }, [activePlaylist, playNextAction]);
+
+  // Expose playback to OS/browser media controls (background-friendly) and
+  // allow next/prev from media keys while the tab is unfocused.
+  useEffect(() => {
+    if (!isClient) return;
+    if (typeof navigator === "undefined") return;
+    const mediaSession = (
+      navigator as unknown as { mediaSession?: MediaSession }
+    ).mediaSession;
+    if (!mediaSession) return;
+
+    const title =
+      activePlaylist?.items?.[currentItemIndex]?.title ||
+      activePlaylist?.items?.[currentItemIndex]?.videoUrl ||
+      "Huddle";
+
+    const artworkUrl = activePlaylist?.items?.[currentItemIndex]?.thumbnail;
+
+    try {
+      mediaSession.metadata = new MediaMetadata({
+        title,
+        artist: activePlaylist?.name || "Playlist",
+        album: "Huddle",
+        ...(artworkUrl
+          ? {
+              artwork: [
+                { src: artworkUrl, sizes: "96x96", type: "image/png" },
+                { src: artworkUrl, sizes: "192x192", type: "image/png" },
+                { src: artworkUrl, sizes: "512x512", type: "image/png" },
+              ],
+            }
+          : {}),
+      });
+    } catch {
+      // Some browsers are picky about MediaMetadata/artwork.
+    }
+
+    mediaSession.playbackState =
+      videoState === "Playing" ? "playing" : "paused";
+
+    const safeSetHandler = (
+      action: MediaSessionAction,
+      handler: (() => void) | null
+    ) => {
+      try {
+        mediaSession.setActionHandler(action, handler);
+      } catch {
+        // Unsupported action on this browser.
+      }
+    };
+
+    safeSetHandler("play", () => handlePlay());
+    safeSetHandler("pause", () => handlePause());
+    safeSetHandler("nexttrack", () => playNextAction());
+    safeSetHandler("previoustrack", () => playPreviousAction());
+
+    // Clean up handlers so we don't keep stale closures around.
+    return () => {
+      safeSetHandler("play", null);
+      safeSetHandler("pause", null);
+      safeSetHandler("nexttrack", null);
+      safeSetHandler("previoustrack", null);
+    };
+  }, [
+    isClient,
+    activePlaylist,
+    currentItemIndex,
+    videoState,
+    handlePlay,
+    handlePause,
+    playNextAction,
+    playPreviousAction,
+  ]);
 
   // Handler for adding current video to playlist
   const handleOpenAddToPlaylist = useCallback(() => {
