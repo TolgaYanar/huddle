@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useEffect, useMemo } from "react";
 import type { Playlist } from "shared-logic";
+import { getYouTubeStartTime, formatStartTime } from "../lib/video";
 
 interface VideoToAdd {
   id: string;
@@ -800,15 +801,28 @@ export function AddVideosToPlaylistModal({
                       />
                     )}
 
-                    <input
-                      type="text"
-                      value={video.title}
-                      onChange={(e) =>
-                        updateVideoTitle(video.id, e.target.value)
-                      }
-                      className="flex-1 min-w-0 bg-transparent text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500/30 rounded px-1"
-                      title="Edit title"
-                    />
+                    <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                      <input
+                        type="text"
+                        value={video.title}
+                        onChange={(e) =>
+                          updateVideoTitle(video.id, e.target.value)
+                        }
+                        className="w-full bg-transparent text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500/30 rounded px-1"
+                        title="Edit title"
+                      />
+                      {(() => {
+                        const startTime = getYouTubeStartTime(video.url);
+                        if (startTime && startTime > 0) {
+                          return (
+                            <span className="text-[10px] text-indigo-400 px-1">
+                              ⏱ {formatStartTime(startTime)}
+                            </span>
+                          );
+                        }
+                        return null;
+                      })()}
+                    </div>
 
                     <button
                       onClick={() => removeVideo(video.id)}

@@ -24,7 +24,11 @@ import {
   playFromRef,
   seekToFromRef,
 } from "../lib/player";
-import { getYouTubeVideoId, isYouTubeUrl } from "../lib/video";
+import {
+  getYouTubeVideoId,
+  getYouTubeStartTime,
+  isYouTubeUrl,
+} from "../lib/video";
 import type { WebRTCMediaState } from "shared-logic";
 
 type StageView = {
@@ -507,6 +511,13 @@ export function PlayerSection({
   }, [fullscreenChatPos, fullscreenChatSize, clampChatPos]);
 
   type PlayerConfig = React.ComponentProps<typeof ReactPlayer>["config"];
+
+  // Extract start time from YouTube URL for ReactPlayer config
+  const youTubeStartTimeForConfig = React.useMemo(
+    () => getYouTubeStartTime(normalizedUrl),
+    [normalizedUrl]
+  );
+
   const playerConfig = React.useMemo(() => {
     const origin =
       typeof window !== "undefined" ? window.location.origin : undefined;
@@ -521,6 +532,10 @@ export function PlayerSection({
           enablejsapi: 1,
           playsinline: 1,
           ...(origin ? { origin } : {}),
+          // Start at the specified time if provided in the URL
+          ...(youTubeStartTimeForConfig && youTubeStartTimeForConfig > 0
+            ? { start: youTubeStartTimeForConfig }
+            : {}),
         },
       },
       file: {
@@ -529,7 +544,7 @@ export function PlayerSection({
         },
       },
     } as unknown as PlayerConfig;
-  }, []);
+  }, [youTubeStartTimeForConfig]);
 
   const clearLoadTimeout = React.useCallback(() => {
     if (loadTimeoutRef.current) {
@@ -844,6 +859,13 @@ export function PlayerSection({
     () => (isYouTube ? getYouTubeVideoId(normalizedUrl) : null),
     [isYouTube, normalizedUrl]
   );
+
+  // Extract start time from YouTube URL (e.g., ?t=2391)
+  const youTubeStartTime = React.useMemo(
+    () => (isYouTube ? getYouTubeStartTime(normalizedUrl) : null),
+    [isYouTube, normalizedUrl]
+  );
+
   const youTubeIsOnDesired =
     !isYouTube ||
     !youTubeDesiredId ||
@@ -2174,6 +2196,7 @@ export function PlayerSection({
                 ref={playerRef as any}
                 className="absolute inset-0 w-full h-full"
                 videoId={canPlay ? youTubeDesiredId : null}
+                startTime={youTubeStartTime}
                 playing={canPlay && videoState === "Playing"}
                 muted={effectiveMuted}
                 volume={effectiveVolume}

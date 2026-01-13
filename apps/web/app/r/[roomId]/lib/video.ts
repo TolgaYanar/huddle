@@ -39,7 +39,14 @@ export function normalizeVideoUrl(rawUrl: string) {
     const videoId = url.searchParams.get("v");
     if (!videoId) return withScheme;
 
-    // keep only `v`
+    // Preserve the start time parameter if present
+    const timeParam =
+      url.searchParams.get("t") || url.searchParams.get("start");
+
+    // keep only `v` and optionally `t`
+    if (timeParam) {
+      return `https://www.youtube.com/watch?v=${videoId}&t=${timeParam}`;
+    }
     return `https://www.youtube.com/watch?v=${videoId}`;
   } catch {
     return withScheme;
@@ -136,6 +143,92 @@ export function getYouTubeVideoId(rawUrl: string): string | null {
     if (short?.[1]) return short[1];
     return null;
   }
+}
+
+/**
+ * Extracts the start time (in seconds) from a YouTube URL.
+ * Supports both `t=` and `start=` parameters.
+ * Examples:
+ *   - https://youtu.be/ggn8wnWiw2U?t=2391 → 2391
+ *   - https://www.youtube.com/watch?v=xxx&t=1h2m30s → 3750
+ *   - https://www.youtube.com/watch?v=xxx&start=60 → 60
+ */
+export function getYouTubeStartTime(rawUrl: string): number | null {
+  try {
+    const url = new URL(rawUrl);
+
+    // Check for `t` parameter (common in youtu.be and share links)
+    let timeParam = url.searchParams.get("t");
+    // Also check for `start` parameter (used in embed URLs)
+    if (!timeParam) {
+      timeParam = url.searchParams.get("start");
+    }
+
+    if (!timeParam) return null;
+
+    // Parse the time parameter
+    // It can be:
+    // - Pure seconds: "2391"
+    // - Time format: "1h2m30s", "2m30s", "30s", "1h30m"
+    const parsed = parseYouTubeTime(timeParam);
+    return parsed > 0 ? parsed : null;
+  } catch {
+    // Fallback regex for malformed URLs
+    const match = rawUrl.match(/[?&](t|start)=([^&#]+)/i);
+    if (match?.[2]) {
+      const parsed = parseYouTubeTime(match[2]);
+      return parsed > 0 ? parsed : null;
+    }
+    return null;
+  }
+}
+
+/**
+ * Parses YouTube time format into seconds.
+ * Supports: "2391", "1h2m30s", "2m30s", "30s", "1h30m", "1h"
+ */
+function parseYouTubeTime(timeStr: string): number {
+  // If it's a pure number, return it directly
+  const pureNum = parseInt(timeStr, 10);
+  if (/^\d+$/.test(timeStr) && !isNaN(pureNum)) {
+    return pureNum;
+  }
+
+  // Parse time format like "1h2m30s"
+  let totalSeconds = 0;
+
+  const hoursMatch = timeStr.match(/(\d+)h/i);
+  const minutesMatch = timeStr.match(/(\d+)m/i);
+  const secondsMatch = timeStr.match(/(\d+)s/i);
+
+  if (hoursMatch?.[1]) {
+    totalSeconds += parseInt(hoursMatch[1], 10) * 3600;
+  }
+  if (minutesMatch?.[1]) {
+    totalSeconds += parseInt(minutesMatch[1], 10) * 60;
+  }
+  if (secondsMatch?.[1]) {
+    totalSeconds += parseInt(secondsMatch[1], 10);
+  }
+
+  return totalSeconds;
+}
+
+/**
+ * Formats seconds into a human-readable time string.
+ * Examples: 90 → "1:30", 3661 → "1:01:01"
+ */
+export function formatStartTime(seconds: number): string {
+  if (seconds <= 0) return "0:00";
+
+  const hours = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+
+  if (hours > 0) {
+    return `${hours}:${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  }
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
 
 export function isVimeoUrl(rawUrl: string) {

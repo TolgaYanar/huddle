@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useEffect } from "react";
 import type { Playlist } from "shared-logic";
+import { getYouTubeStartTime, formatStartTime } from "../lib/video";
 
 interface AddToPlaylistModalProps {
   isOpen: boolean;
@@ -166,8 +167,19 @@ export function AddToPlaylistModal({
         {/* Content */}
         <div className="p-4 space-y-4">
           {/* Video URL preview */}
-          <div className="text-xs text-slate-500 truncate bg-black/20 rounded-lg px-3 py-2">
-            {videoUrl}
+          <div className="bg-black/20 rounded-lg px-3 py-2">
+            <div className="text-xs text-slate-500 truncate">{videoUrl}</div>
+            {(() => {
+              const startTime = getYouTubeStartTime(videoUrl);
+              if (startTime && startTime > 0) {
+                return (
+                  <div className="text-xs text-indigo-400 mt-1">
+                    ⏱ Starts at {formatStartTime(startTime)}
+                  </div>
+                );
+              }
+              return null;
+            })()}
           </div>
 
           {/* Custom title input */}

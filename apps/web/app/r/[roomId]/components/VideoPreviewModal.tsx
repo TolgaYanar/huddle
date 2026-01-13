@@ -1,6 +1,7 @@
 import React from "react";
 import Image from "next/image";
 import type { VideoPreview } from "../types";
+import { getYouTubeStartTime, formatStartTime } from "../lib/video";
 
 interface VideoPreviewModalProps {
   showPreviewModal: boolean;
@@ -55,11 +56,27 @@ export function VideoPreviewModal({
           <div className="text-sm text-slate-400 mb-1 font-medium uppercase tracking-wide">
             {videoPreview.platform}
           </div>
-          <div className="text-sm text-slate-400 mb-4">
-            Duration:{" "}
-            <span className="text-slate-300 font-semibold">
-              {videoPreview.duration ?? "Unavailable"}
+          <div className="text-sm text-slate-400 mb-4 flex flex-wrap gap-x-4 gap-y-1">
+            <span>
+              Duration:{" "}
+              <span className="text-slate-300 font-semibold">
+                {videoPreview.duration ?? "Unavailable"}
+              </span>
             </span>
+            {(() => {
+              const startTime = getYouTubeStartTime(videoPreview.url);
+              if (startTime && startTime > 0) {
+                return (
+                  <span>
+                    Starts at:{" "}
+                    <span className="text-indigo-400 font-semibold">
+                      {formatStartTime(startTime)}
+                    </span>
+                  </span>
+                );
+              }
+              return null;
+            })()}
           </div>
           <div className="text-sm text-slate-500 font-mono break-all mb-6">
             {videoPreview.url}

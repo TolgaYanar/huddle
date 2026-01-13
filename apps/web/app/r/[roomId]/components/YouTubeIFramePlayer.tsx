@@ -114,6 +114,7 @@ function ytErrorMessage(code: unknown): string {
 export function YouTubeIFramePlayer(
   {
     videoId,
+    startTime,
     playing,
     muted,
     volume,
@@ -128,6 +129,7 @@ export function YouTubeIFramePlayer(
     className,
   }: {
     videoId: string | null;
+    startTime?: number | null;
     playing: boolean;
     muted: boolean;
     volume: number;
@@ -149,8 +151,11 @@ export function YouTubeIFramePlayer(
   const lastStateRef = React.useRef<number | null>(null);
   const lastCommandedPlayingRef = React.useRef<boolean | null>(null);
   const lastCommandedVideoIdRef = React.useRef<string | null>(null);
+  // Track the start time that was used for the current video to avoid re-seeking
+  const usedStartTimeForVideoRef = React.useRef<string | null>(null);
   const latest = React.useRef({
     videoId,
+    startTime,
     playing,
     muted,
     volume,
@@ -167,6 +172,7 @@ export function YouTubeIFramePlayer(
   React.useEffect(() => {
     latest.current = {
       videoId,
+      startTime,
       playing,
       muted,
       volume,
@@ -181,6 +187,7 @@ export function YouTubeIFramePlayer(
     };
   }, [
     videoId,
+    startTime,
     playing,
     muted,
     volume,
@@ -275,6 +282,9 @@ export function YouTubeIFramePlayer(
 
       const origin = window.location.origin;
 
+      // Get the initial start time for the video
+      const initialStartTime = latest.current.startTime;
+
       const player = new window.YT.Player(mount, {
         width: "100%",
         height: "100%",
@@ -287,6 +297,10 @@ export function YouTubeIFramePlayer(
           playsinline: 1,
           enablejsapi: 1,
           origin,
+          // Start at the specified time if provided
+          ...(initialStartTime && initialStartTime > 0
+            ? { start: initialStartTime }
+            : {}),
         },
         events: {
           onReady: () => {
@@ -412,10 +426,21 @@ export function YouTubeIFramePlayer(
       const current = player.getVideoData?.()?.video_id;
       if (desired && desired !== current) {
         lastStateRef.current = null;
+        // Use the start time if this is the first load for this video
+        const effectiveStartSeconds =
+          startTime && startTime > 0 ? startTime : 0;
+        // Mark that we've used the start time for this video
+        usedStartTimeForVideoRef.current = desired;
         if (playing) {
-          player.loadVideoById({ videoId: desired, startSeconds: 0 });
+          player.loadVideoById({
+            videoId: desired,
+            startSeconds: effectiveStartSeconds,
+          });
         } else {
-          player.cueVideoById({ videoId: desired, startSeconds: 0 });
+          player.cueVideoById({
+            videoId: desired,
+            startSeconds: effectiveStartSeconds,
+          });
         }
       }
     } catch {
@@ -445,7 +470,7 @@ export function YouTubeIFramePlayer(
     } catch {
       // ignore
     }
-  }, [videoId, playing, muted, volume, playbackRate]);
+  }, [videoId, startTime, playing, muted, volume, playbackRate]);
 
   // Progress polling
   React.useEffect(() => {
