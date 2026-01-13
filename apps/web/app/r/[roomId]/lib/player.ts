@@ -62,8 +62,12 @@ export function getDurationFromRef(ref: AnyPlayerRef): number {
 }
 
 export function seekToFromRef(ref: AnyPlayerRef, seconds: number): void {
+  console.log(
+    `[PLAYER] seekToFromRef called with ${seconds?.toFixed(2)}s, ref.current=${!!ref.current}`
+  );
   const current = ref.current as { seekTo?: unknown } | null;
   if (current && typeof current.seekTo === "function") {
+    console.log(`[PLAYER] Calling seekTo(${seconds?.toFixed(2)}, "seconds")`);
     (current.seekTo as (amount: number, type?: "seconds" | "fraction") => void)(
       seconds,
       "seconds"
@@ -73,6 +77,7 @@ export function seekToFromRef(ref: AnyPlayerRef, seconds: number): void {
 
   const media = getHtmlMediaElementFromRef(ref);
   if (media) {
+    console.log(`[PLAYER] Setting media.currentTime = ${seconds?.toFixed(2)}`);
     media.currentTime = seconds;
     return;
   }
@@ -80,6 +85,9 @@ export function seekToFromRef(ref: AnyPlayerRef, seconds: number): void {
   const currentMaybe = ref.current as { currentTime?: unknown } | null;
   if (currentMaybe && "currentTime" in currentMaybe) {
     try {
+      console.log(
+        `[PLAYER] Setting currentTime property = ${seconds?.toFixed(2)}`
+      );
       (currentMaybe as { currentTime: number }).currentTime = seconds;
     } catch {
       // ignore

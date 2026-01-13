@@ -218,7 +218,7 @@ export function PlayerSection({
   handlePlay: () => void;
   handlePause: () => void;
   handleSeekTo: (time: number) => void;
-  handleSeekFromController: (time: number) => void;
+  handleSeekFromController: (time: number, opts?: { force?: boolean }) => void;
   handleVolumeChange: (volume: number) => void;
   handleLocalVolumeChange: (volume: number) => void;
   handleVolumeFromController: (volume: number, muted: boolean) => void;
@@ -242,6 +242,13 @@ export function PlayerSection({
   setChatText: React.Dispatch<React.SetStateAction<string>>;
   handleSendChat: (e: React.FormEvent) => void;
 }) {
+  const ytLastProgressRef = React.useRef<{ t: number; at: number } | null>(
+    null
+  );
+
+  React.useEffect(() => {
+    ytLastProgressRef.current = null;
+  }, [normalizedUrl]);
   const fullscreenChatPanelRef = React.useRef<HTMLDivElement | null>(null);
   const isDraggingChatRef = React.useRef(false);
   const dragOffsetRef = React.useRef<{ dx: number; dy: number } | null>(null);
@@ -2177,6 +2184,8 @@ export function PlayerSection({
                   setIsBuffering(false);
                   clearLoadTimeout();
 
+                  ytLastProgressRef.current = null;
+
                   // If the room is already playing, align playhead ASAP.
                   resumeToRoomTimeIfNeeded();
                 }}
@@ -2202,6 +2211,9 @@ export function PlayerSection({
                 }}
                 onPause={() => {
                   if (applyingRemoteSyncRef.current) return;
+                  // Don't broadcast pause when page is hidden - this is browser
+                  // auto-pausing due to visibility policy, not user intent.
+                  if (!isPageVisible) return;
                   if (videoState !== "Paused") handlePause();
                 }}
                 onEnded={() => {
@@ -2224,7 +2236,48 @@ export function PlayerSection({
                   setIsBuffering(false);
                   clearLoadTimeout();
 
-                  if (Number.isFinite(time)) handleProgress(time);
+                  if (!Number.isFinite(time)) return;
+
+                  handleProgress(time);
+
+                  // YouTube IFrame API doesn't reliably surface a native
+                  // "seeked" event to React. Detect seeks by looking for
+                  // large jumps in currentTime between progress ticks.
+                  //
+                  // Ignore programmatic seeks we apply when processing
+                  // remote sync events.
+                  if (applyingRemoteSyncRef.current) {
+                    ytLastProgressRef.current = { t: time, at: Date.now() };
+                    return;
+                  }
+
+                  const now = Date.now();
+                  const prev = ytLastProgressRef.current;
+                  ytLastProgressRef.current = { t: time, at: now };
+                  if (!prev) return;
+
+                  const dtMs = now - prev.at;
+                  // If tab was backgrounded or ticks are delayed, don't infer seeks.
+                  if (dtMs > 3000) return;
+
+                  const delta = time - prev.t;
+                  // Natural progression depends on playback rate and tick interval.
+                  // At 500ms ticks: 1x=0.5s, 1.5x=0.75s, 2x=1s per tick.
+                  // Add buffer for timing jitter. Use lower threshold when paused.
+                  const isPlaying = videoState === "Playing";
+                  const expectedDelta = isPlaying
+                    ? (dtMs / 1000) * playbackRate
+                    : 0;
+                  // Threshold: expected delta + 0.6s buffer for seeks
+                  const minJump = isPlaying ? expectedDelta + 0.6 : 0.25;
+
+                  if (Math.abs(delta) >= minJump) {
+                    console.log(
+                      `[YT-SEEK] Detected seek: delta=${delta.toFixed(2)}s, expected=${expectedDelta.toFixed(2)}s, minJump=${minJump.toFixed(2)}s, time=${time.toFixed(2)}s`
+                    );
+                    lastManualSeekRef.current = Date.now();
+                    handleSeekFromController(time, { force: true });
+                  }
                 }}
               />
             ) : (
@@ -2281,6 +2334,9 @@ export function PlayerSection({
                 }}
                 onPause={() => {
                   if (applyingRemoteSyncRef.current) return;
+                  // Don't broadcast pause when page is hidden - this is browser
+                  // auto-pausing due to visibility policy, not user intent.
+                  if (!isPageVisible) return;
                   if (isYouTube && !useYouTubeIFrameApi && !youTubeIsOnDesired)
                     return;
                   if (videoState !== "Paused") handlePause();
@@ -2288,6 +2344,13 @@ export function PlayerSection({
                 onSeeked={() => {
                   if (applyingRemoteSyncRef.current) return;
                   lastManualSeekRef.current = Date.now();
+                }}
+                onSeek={(time: number) => {
+                  if (applyingRemoteSyncRef.current) return;
+                  if (typeof time !== "number" || Number.isNaN(time)) return;
+
+                  lastManualSeekRef.current = Date.now();
+                  handleSeekFromController(time, { force: true });
                 }}
                 onError={handlePlayerError}
                 onReady={() => {

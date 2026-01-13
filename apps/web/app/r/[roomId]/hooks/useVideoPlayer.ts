@@ -105,6 +105,8 @@ export function useVideoPlayer({
   const lastControllerSeekEmitRef = useRef<{ time: number; at: number } | null>(
     null
   );
+  const pendingControllerSeekRef = useRef<number | null>(null);
+  const controllerSeekFlushTimeoutRef = useRef<number | null>(null);
 
   const effectiveVolume = useMemo(() => {
     const v = localVolumeOverride ?? volume;
@@ -595,15 +597,20 @@ export function useVideoPlayer({
     (time: number) => {
       // Don't broadcast seeks until initial sync complete
       if (hasInitialSyncRef && !hasInitialSyncRef.current) {
+        console.log(`[SEEK-TO] Blocked: initial sync not complete`);
         return;
       }
 
       // Don't re-broadcast when applying remote sync
       if (applyingRemoteSyncRef.current) {
+        console.log(`[SEEK-TO] Blocked: applying remote sync`);
         return;
       }
 
       const newTime = Math.max(0, Math.min(time, duration || Infinity));
+      console.log(
+        `[SEEK-TO] Seeking to ${newTime.toFixed(2)}s and broadcasting`
+      );
       seekToFromRef(playerRef, newTime);
       setCurrentTime(newTime);
       sendSyncEvent("seek", newTime, url);
@@ -631,14 +638,16 @@ export function useVideoPlayer({
   // Used when the user seeks via the built-in player controls.
   // The player already performed the seek, so we only update state + broadcast.
   const handleSeekFromController = useCallback(
-    (time: number) => {
+    (time: number, opts?: { force?: boolean }) => {
       // Don't broadcast seeks until initial sync complete
       if (hasInitialSyncRef && !hasInitialSyncRef.current) {
+        console.log(`[SEEK] Blocked: initial sync not complete`);
         return;
       }
 
       // Don't re-broadcast when applying remote sync
       if (applyingRemoteSyncRef.current) {
+        console.log(`[SEEK] Blocked: applying remote sync`);
         return;
       }
 
@@ -649,7 +658,9 @@ export function useVideoPlayer({
       // delta is small, treat it as noise (not an intentional user seek).
       const isPlaying = latestVideoStateRef.current === "Playing";
       const approxNow = latestCurrentTimeRef.current;
-      if (isPlaying && Math.abs(approxNow - newTime) < 6) {
+      const force = opts?.force === true;
+      if (!force && isPlaying && Math.abs(approxNow - newTime) < 6) {
+        console.log(`[SEEK] Blocked: small delta without force flag`);
         return;
       }
 
@@ -660,35 +671,70 @@ export function useVideoPlayer({
         Math.abs(last.time - newTime) < 0.5
       ) {
         // Likely a follow-up callback from a programmatic seek we already broadcast.
+        console.log(
+          `[SEEK] Blocked: duplicate seek (within 800ms and <0.5s delta)`
+        );
         return;
       }
 
-      // Some embedded players (notably Vimeo) can emit multiple seek events for
-      // a single user action. Debounce these to avoid spamming the room.
+      console.log(`[SEEK] Broadcasting seek to ${newTime.toFixed(2)}s`);
+
+      const emitSeek = (t: number) => {
+        lastControllerSeekEmitRef.current = { time: t, at: Date.now() };
+        setCurrentTime(t);
+        sendSyncEvent("seek", t, url);
+        lastLocalSeekRef.current = { time: t, at: Date.now() };
+        if (lastManualSeekRef) {
+          lastManualSeekRef.current = Date.now();
+        }
+        addLogEntry?.({
+          msg: `seeked to ${formatTime(t)}`,
+          type: "seek",
+          user: "You",
+        });
+      };
+
+      // Many embedded players (including YouTube) can fire multiple seek
+      // callbacks while the user is scrubbing. Don't drop them; instead, emit
+      // the final seek after a short quiet period.
       const lastController = lastControllerSeekEmitRef.current;
-      if (
-        lastController &&
-        Date.now() - lastController.at < 1200 &&
-        Math.abs(lastController.time - newTime) < 6
-      ) {
+      const now = Date.now();
+      const recent = lastController && now - lastController.at < 350;
+
+      if (!recent) {
+        // Fresh seek -> emit immediately.
+        emitSeek(newTime);
+        pendingControllerSeekRef.current = null;
+        if (controllerSeekFlushTimeoutRef.current) {
+          window.clearTimeout(controllerSeekFlushTimeoutRef.current);
+          controllerSeekFlushTimeoutRef.current = null;
+        }
         return;
       }
-      lastControllerSeekEmitRef.current = { time: newTime, at: Date.now() };
 
-      setCurrentTime(newTime);
-      sendSyncEvent("seek", newTime, url);
-      lastLocalSeekRef.current = { time: newTime, at: Date.now() };
-      addLogEntry?.({
-        msg: `seeked to ${formatTime(newTime)}`,
-        type: "seek",
-        user: "You",
-      });
+      // Rapid sequence -> schedule a trailing emit.
+      pendingControllerSeekRef.current = newTime;
+      if (controllerSeekFlushTimeoutRef.current) {
+        window.clearTimeout(controllerSeekFlushTimeoutRef.current);
+      }
+      controllerSeekFlushTimeoutRef.current = window.setTimeout(() => {
+        controllerSeekFlushTimeoutRef.current = null;
+        const pending = pendingControllerSeekRef.current;
+        pendingControllerSeekRef.current = null;
+        if (typeof pending === "number" && Number.isFinite(pending)) {
+          const last = lastControllerSeekEmitRef.current;
+          if (!last || Math.abs(last.time - pending) > 0.25) {
+            emitSeek(pending);
+          }
+        }
+      }, 250);
     },
     [
       url,
       duration,
       sendSyncEvent,
       addLogEntry,
+      lastManualSeekRef,
       hasInitialSyncRef,
       applyingRemoteSyncRef,
     ]

@@ -194,8 +194,8 @@ export default function RoomClient({ roomId }: { roomId: string }) {
         if (!hasInitialSyncRef.current) {
           return;
         }
-        // Also require minimum 1 second since mount to handle race conditions
-        if (Date.now() - mountTimeRef.current < 1000) {
+        // Require a small buffer since mount to handle race conditions
+        if (Date.now() - mountTimeRef.current < 200) {
           return;
         }
       }

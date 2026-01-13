@@ -203,11 +203,11 @@ export function useActivityLog({
       }
 
       // Mark initial sync complete after room state is received.
-      // Delay slightly to let any seek finish.
+      // Keep this short so a page reload doesn't "break" controls.
       if (hasInitialSyncRef && !hasInitialSyncRef.current) {
         window.setTimeout(() => {
           hasInitialSyncRef.current = true;
-        }, 600);
+        }, 150);
       }
 
       if (typeof state.volume === "number" && Number.isFinite(state.volume)) {
@@ -360,7 +360,7 @@ export function useActivityLog({
       );
 
       const guardMs =
-        data.action === "seek" ? 500 : data.action === "change_url" ? 400 : 200;
+        data.action === "seek" ? 800 : data.action === "change_url" ? 400 : 200;
       markApplyingRemoteSync(guardMs);
 
       const time = new Date().toLocaleTimeString([], {
@@ -532,7 +532,7 @@ export function useActivityLog({
           });
         }
 
-        if (data.action === "seek" && prev && prev.isPlaying) {
+        if (data.action === "seek" && prev) {
           setRoomPlaybackAnchor({
             ...prev,
             anchorTime:
@@ -547,20 +547,53 @@ export function useActivityLog({
       if (data.action === "play") {
         console.log("[SYNC] Setting video state to Playing");
         setVideoState("Playing");
+
+        // Also sync position on play if significantly out of sync
+        const currentTime = getCurrentTimeFromRef(playerRef);
+        const target = typeof data.timestamp === "number" ? data.timestamp : 0;
+        if (Math.abs(currentTime - target) > 2) {
+          seekToFromRef(playerRef, target);
+        }
       }
       if (data.action === "pause") {
         console.log("[SYNC] Setting video state to Paused");
         setVideoState("Paused");
+
+        // Also sync position on pause if significantly out of sync
+        const currentTime = getCurrentTimeFromRef(playerRef);
+        const target =
+          typeof data.timestamp === "number" ? data.timestamp : currentTime;
+        if (Math.abs(currentTime - target) > 2) {
+          seekToFromRef(playerRef, target);
+        }
       }
 
-      // ONLY seek on explicit seek actions, not on play/pause
+      // Seek on explicit seek actions
       if (data.action === "seek") {
         const currentTime = getCurrentTimeFromRef(playerRef);
         const target = data.timestamp;
 
-        // Only seek if significantly out of sync (>2 seconds)
-        if (Math.abs(currentTime - target) > 2) {
+        // Server may echo events back to the sender; the sender has already
+        // applied the seek locally, so avoid re-seeking due to rounding.
+        const isMe = data.senderId === userId;
+
+        console.log(
+          `[SYNC] Received seek event: target=${target?.toFixed(2)}s, current=${currentTime?.toFixed(2)}s, isMe=${isMe}, playerRef.current=${!!playerRef.current}`
+        );
+
+        // Always apply seek from other users. The delta check was too strict
+        // (0.25s) and could skip seeks when players were close due to natural
+        // playback drift. Users expect explicit seek actions to always sync.
+        if (!isMe) {
+          console.log(`[SYNC] Applying remote seek to ${target?.toFixed(2)}s`);
           seekToFromRef(playerRef, target);
+          // Verify the seek was applied
+          setTimeout(() => {
+            const newTime = getCurrentTimeFromRef(playerRef);
+            console.log(
+              `[SYNC] Post-seek verification: position=${newTime?.toFixed(2)}s (target was ${target?.toFixed(2)}s)`
+            );
+          }, 100);
         }
       }
     });

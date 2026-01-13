@@ -162,6 +162,14 @@ function validatePassword(raw) {
   return password;
 }
 
+function validatePasswordForLogin(raw) {
+  // Login should accept any password shape and defer to hash verification.
+  // We only enforce a reasonable length bound.
+  const password = String(raw || "");
+  if (password.length < 1 || password.length > 200) return null;
+  return password;
+}
+
 function validateRoomId(raw) {
   const roomId = String(raw || "").trim();
   if (!roomId) return null;
@@ -239,7 +247,7 @@ app.post("/api/auth/login", async (req, res) => {
     }
 
     const username = validateUsername(req.body?.username);
-    const password = validatePassword(req.body?.password);
+    const password = validatePasswordForLogin(req.body?.password);
     if (!username || !password) {
       return res.status(400).json({ error: "invalid_credentials" });
     }
@@ -310,7 +318,7 @@ app.post("/api/auth/login-token", async (req, res) => {
     }
 
     const username = validateUsername(req.body?.username);
-    const password = validatePassword(req.body?.password);
+    const password = validatePasswordForLogin(req.body?.password);
     if (!username || !password) {
       return res.status(400).json({ error: "invalid_credentials" });
     }
@@ -516,6 +524,36 @@ function emitServerSyncToRoom(roomId, payload) {
     senderUsername: "Playlist",
     serverNow: Date.now(),
   });
+}
+
+function getRoomUsersSnapshot(roomId) {
+  const room = io.sockets.adapter.rooms.get(roomId);
+  const users = room ? Array.from(room) : [];
+
+  const usernames = {};
+  for (const id of users) {
+    usernames[id] = socketIdToUsername.get(id) || null;
+  }
+
+  const stateMap = roomMediaState.get(roomId);
+  const mediaStates = {};
+  if (stateMap) {
+    for (const [sid, st] of stateMap.entries()) {
+      mediaStates[sid] = st;
+    }
+  }
+
+  return {
+    roomId,
+    users,
+    usernames,
+    mediaStates,
+    hostId: roomHost.get(roomId) || null,
+  };
+}
+
+function emitRoomUsersToRoom(roomId) {
+  io.to(roomId).emit("room_users", getRoomUsersSnapshot(roomId));
 }
 
 function applyPlaylistPlaybackToRoomState(roomId, videoUrl) {
@@ -749,11 +787,6 @@ async function emitActivityHistory(socket, roomId) {
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
 
-  // Ensure we don't leak stale mappings.
-  socket.on("disconnect", () => {
-    socketIdToUsername.delete(socket.id);
-  });
-
   const joinedRooms = new Set();
 
   // Handle joining a room
@@ -827,6 +860,12 @@ io.on("connection", (socket) => {
           hostId: roomHost.get(roomId),
         });
 
+        // Also broadcast an authoritative snapshot so all clients reconcile.
+        emitRoomUsersToRoom(roomId);
+
+        // Broadcast an authoritative snapshot so all clients reconcile.
+        emitRoomUsersToRoom(roomId);
+
         socket.emit("room_password_status", {
           roomId,
           hasPassword: roomPasswordHash.has(roomId),
@@ -890,6 +929,9 @@ io.on("connection", (socket) => {
         hostId: roomHost.get(roomId),
       });
 
+      // Broadcast an authoritative snapshot so all clients reconcile.
+      emitRoomUsersToRoom(roomId);
+
       socket.emit("room_password_status", {
         roomId,
         hasPassword: roomPasswordHash.has(roomId),
@@ -906,6 +948,9 @@ io.on("connection", (socket) => {
         mediaStates: {},
         hostId: roomHost.get(roomId) || null,
       });
+
+      // Best-effort reconciliation snapshot.
+      emitRoomUsersToRoom(roomId);
 
       socket.emit("room_password_status", {
         roomId,
@@ -1072,6 +1117,9 @@ io.on("connection", (socket) => {
         roomWheel.delete(roomId);
       }
     }
+
+    // Broadcast an authoritative snapshot so all clients reconcile.
+    emitRoomUsersToRoom(roomId);
 
     // Persist leave as an activity event.
     try {
@@ -2143,7 +2191,11 @@ io.on("connection", (socket) => {
 
     // Persist leave events for all rooms this socket joined.
     const rooms = Array.from(joinedRooms);
-    if (rooms.length === 0) return;
+    if (rooms.length === 0) {
+      // Socket never joined a room; still clean up username mapping.
+      socketIdToUsername.delete(socket.id);
+      return;
+    }
 
     // Notify peers for WebRTC cleanup.
     for (const roomId of rooms) {
@@ -2186,7 +2238,13 @@ io.on("connection", (socket) => {
           roomWheel.delete(roomId);
         }
       }
+
+      // Broadcast an authoritative snapshot so all clients reconcile.
+      emitRoomUsersToRoom(roomId);
     }
+
+    // Finally, remove username mapping.
+    socketIdToUsername.delete(socket.id);
 
     (async () => {
       for (const roomId of rooms) {

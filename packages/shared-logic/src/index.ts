@@ -368,6 +368,7 @@ export const useRoom = (roomId: string, userId: string) => {
 
       socket.emit("join_room", {
         roomId,
+        password: password || undefined,
       });
 
       // Flush any events the user triggered before we connected.
@@ -388,6 +389,7 @@ export const useRoom = (roomId: string, userId: string) => {
       }
     });
 
+    socket.off("disconnect");
     socket.on("disconnect", () => {
       console.log("Disconnected from socket server");
       setIsConnected(false);
@@ -408,6 +410,12 @@ export const useRoom = (roomId: string, userId: string) => {
       socket.off("wheel_state", handleWheelState);
       socket.off("wheel_spun", handleWheelSpun);
       socket.off("playlist_state", handlePlaylistState);
+      // Best-effort: tell server we left the room so others update immediately.
+      try {
+        socket.emit("leave_room", { roomId });
+      } catch {
+        // ignore
+      }
       socket.disconnect();
     };
   }, [roomId]);
@@ -444,9 +452,15 @@ export const useRoom = (roomId: string, userId: string) => {
       >
     ) => {
       const socket = socketRef.current;
-      if (!socket) return;
+      if (!socket) {
+        console.log(`[SYNC-SEND] No socket available for action=${action}`);
+        return;
+      }
 
       if (!socket.connected) {
+        console.log(
+          `[SYNC-SEND] Socket not connected, queuing action=${action}`
+        );
         // Queue a small backlog to avoid losing the initial change_url.
         const q = pendingSyncEventsRef.current;
         q.push({ action, timestamp, videoUrl, ...extra });
@@ -454,6 +468,9 @@ export const useRoom = (roomId: string, userId: string) => {
         return;
       }
 
+      console.log(
+        `[SYNC-SEND] Emitting sync_video: action=${action}, timestamp=${timestamp?.toFixed(2)}`
+      );
       socket.emit("sync_video", {
         roomId,
         action,

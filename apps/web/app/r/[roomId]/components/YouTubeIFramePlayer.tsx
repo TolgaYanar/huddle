@@ -146,6 +146,9 @@ export function YouTubeIFramePlayer(
   const wrapperRef = React.useRef<HTMLDivElement | null>(null);
   const mountElRef = React.useRef<HTMLDivElement | null>(null);
   const playerRef = React.useRef<YTPlayer | null>(null);
+  const lastStateRef = React.useRef<number | null>(null);
+  const lastCommandedPlayingRef = React.useRef<boolean | null>(null);
+  const lastCommandedVideoIdRef = React.useRef<string | null>(null);
   const latest = React.useRef({
     videoId,
     playing,
@@ -209,10 +212,15 @@ export function YouTubeIFramePlayer(
         }
       },
       seekTo: (seconds: number) => {
+        const player = playerRef.current;
+        if (!player || typeof player.seekTo !== "function") {
+          console.log(`[YT-IFRAME] seekTo skipped - player not ready`);
+          return;
+        }
         try {
-          playerRef.current?.seekTo(seconds, true);
-        } catch {
-          // ignore
+          player.seekTo(seconds, true);
+        } catch (err) {
+          console.error(`[YT-IFRAME] seekTo error:`, err);
         }
       },
       getCurrentTime: () => {
@@ -283,6 +291,7 @@ export function YouTubeIFramePlayer(
         events: {
           onReady: () => {
             if (cancelled) return;
+            lastStateRef.current = null;
             try {
               // Apply initial audio state
               if (latest.current.muted) {
@@ -316,11 +325,32 @@ export function YouTubeIFramePlayer(
             }
           },
           onStateChange: (ev: { data?: unknown }) => {
-            // 0 ended, 1 playing, 2 paused
-            const s = ev?.data;
-            if (s === 0) latest.current.onEnded?.();
-            if (s === 1) latest.current.onPlay?.();
-            if (s === 2) latest.current.onPause?.();
+            // YouTube player states:
+            // -1 unstarted, 0 ended, 1 playing, 2 paused, 3 buffering, 5 cued
+            const raw = ev?.data;
+            const nextState =
+              typeof raw === "number" && Number.isFinite(raw) ? raw : null;
+            if (nextState === null) return;
+
+            const prev = lastStateRef.current;
+            lastStateRef.current = nextState;
+
+            // Only treat PAUSED as a real pause if we were previously PLAYING.
+            // This avoids spurious pause emissions during initial load,
+            // autoplay blocking, cueing, or buffering transitions.
+            if (nextState === 0) {
+              latest.current.onEnded?.();
+              return;
+            }
+
+            if (nextState === 1 && prev !== 1) {
+              latest.current.onPlay?.();
+              return;
+            }
+
+            if (nextState === 2 && prev === 1) {
+              latest.current.onPause?.();
+            }
           },
           onError: (ev: { data?: unknown }) => {
             latest.current.onError?.(ytErrorMessage(ev?.data));
@@ -381,6 +411,7 @@ export function YouTubeIFramePlayer(
       const desired = videoId;
       const current = player.getVideoData?.()?.video_id;
       if (desired && desired !== current) {
+        lastStateRef.current = null;
         if (playing) {
           player.loadVideoById({ videoId: desired, startSeconds: 0 });
         } else {
@@ -393,10 +424,23 @@ export function YouTubeIFramePlayer(
 
     // Play/pause
     try {
-      if (playing) {
-        player.playVideo();
-      } else {
-        player.pauseVideo();
+      const lastCmdPlaying = lastCommandedPlayingRef.current;
+      const lastCmdVideoId = lastCommandedVideoIdRef.current;
+
+      // Avoid spamming commands on every render; only issue when the
+      // desired state actually changes (or when the video id changes).
+      const videoChanged = videoId !== lastCmdVideoId;
+      const playingChanged = playing !== lastCmdPlaying;
+
+      if (videoChanged) lastCommandedVideoIdRef.current = videoId;
+
+      if (playingChanged || videoChanged) {
+        lastCommandedPlayingRef.current = playing;
+        if (playing) {
+          player.playVideo();
+        } else {
+          player.pauseVideo();
+        }
       }
     } catch {
       // ignore
