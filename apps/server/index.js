@@ -463,6 +463,11 @@ const io = new Server(server, {
     credentials: true,
     methods: ["GET", "POST"],
   },
+  // Connection timeout configuration for production stability
+  pingTimeout: 60000, // 60 seconds - time to wait for pong before disconnecting
+  pingInterval: 25000, // 25 seconds - how often to send ping packets
+  connectTimeout: 45000, // 45 seconds - time to wait for connection to complete
+  upgradeTimeout: 10000, // 10 seconds - time to wait for transport upgrade
 });
 
 // Map socket.id -> authenticated username (if available).
