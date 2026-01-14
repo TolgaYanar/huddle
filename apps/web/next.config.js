@@ -22,6 +22,13 @@ const nextConfig = {
         // Socket.IO (polling + websocket upgrade)
         // Proxying through the web origin helps ensure the browser sends the
         // HttpOnly session cookie during the Socket.IO handshake.
+        // Socket.IO clients may request both `/socket.io` and `/socket.io/*`.
+        // Proxy both forms to avoid Next.js redirects (e.g. 308) that break
+        // WebSocket handshakes.
+        {
+          source: "/socket.io",
+          destination: `${target}/socket.io`,
+        },
         {
           source: "/socket.io/:path*",
           destination: `${target}/socket.io/:path*`,

@@ -190,6 +190,17 @@ async function requireAuth(req, res, next) {
 }
 
 // --- Auth + Saved Rooms REST API ---
+
+// Health check endpoint
+app.get("/health", (req, res) => {
+  res.json({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    database: dbConnected ? "connected" : "disconnected",
+    socketio: io ? "initialized" : "not initialized",
+  });
+});
+
 app.get("/api/auth/me", async (req, res) => {
   try {
     const user = await getAuthUser(req);
@@ -463,11 +474,34 @@ const io = new Server(server, {
     credentials: true,
     methods: ["GET", "POST"],
   },
+  // Explicitly set the path
+  path: "/socket.io",
+  // Allow both polling and websocket transports
+  transports: ["polling", "websocket"],
+  // Allow upgrades from polling to websocket
+  allowUpgrades: true,
   // Connection timeout configuration for production stability
   pingTimeout: 60000, // 60 seconds - time to wait for pong before disconnecting
   pingInterval: 25000, // 25 seconds - how often to send ping packets
   connectTimeout: 45000, // 45 seconds - time to wait for connection to complete
   upgradeTimeout: 10000, // 10 seconds - time to wait for transport upgrade
+  // Set max HTTP buffer size
+  maxHttpBufferSize: 1e6,
+  // Allow HTTP long-polling connections
+  allowEIO3: true,
+});
+
+// Log engine upgrade attempts
+io.engine.on("connection_error", (err) => {
+  console.error("Socket.IO engine connection error:", {
+    message: err.message,
+    code: err.code,
+    context: err.context,
+  });
+});
+
+io.engine.on("initial_headers", (headers, req) => {
+  console.log("Socket.IO initial headers for:", req.url);
 });
 
 // Map socket.id -> authenticated username (if available).

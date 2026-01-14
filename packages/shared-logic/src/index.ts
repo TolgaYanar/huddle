@@ -273,6 +273,13 @@ export const useRoom = (roomId: string, userId: string) => {
       transports: ["polling", "websocket"],
       autoConnect: false,
       withCredentials: true,
+      // Explicitly set the path to match server configuration
+      path: "/socket.io",
+      // Retry configuration for better reliability
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      // Increase timeout for slower connections
+      timeout: 20000,
     });
 
     const socket = socketRef.current;
@@ -342,7 +349,24 @@ export const useRoom = (roomId: string, userId: string) => {
 
     socket.on("connect_error", (err) => {
       // This is the most useful signal when connections fail in production.
-      console.warn("Socket connect_error:", err?.message || err);
+      console.error("Socket connect_error:", err?.message || err);
+      console.error("Connection details:", {
+        url: SERVER_URL,
+        transport: socket.io.engine?.transport?.name,
+        readyState: socket.io.engine?.readyState,
+      });
+    });
+
+    socket.io.on("error", (error) => {
+      console.error("Socket.IO engine error:", error);
+    });
+
+    socket.io.on("reconnect_attempt", (attempt) => {
+      console.log(`Socket reconnection attempt ${attempt}...`);
+    });
+
+    socket.io.on("reconnect_failed", () => {
+      console.error("Socket reconnection failed after all attempts");
     });
 
     socket.on("disconnect", () => {
