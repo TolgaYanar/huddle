@@ -119,7 +119,9 @@ yourdomain.com {
 
 ```env
 PORT=4000
-CORS_ORIGINS=https://yourdomain.com,http://localhost:3000
+# Vercel (web) + Railway (server): allow your web origins.
+# Include both apex + www if you serve both.
+CORS_ORIGINS=https://wehuddle.tv,https://www.wehuddle.tv,http://localhost:3002
 NODE_ENV=production
 DATABASE_URL=postgresql://...
 ```
@@ -127,11 +129,14 @@ DATABASE_URL=postgresql://...
 ### Web App (`apps/web/.env.local`)
 
 ```env
-# For same-origin connection (recommended for production):
+# Vercel (recommended): keep Socket.IO SAME-ORIGIN so the HttpOnly session
+# cookie is sent during the Socket.IO handshake.
+# - Leave unset (or set to an empty string) to use the current origin.
 NEXT_PUBLIC_SOCKET_SERVER_URL=
 
-# OR for separate server (development/different domains):
-NEXT_PUBLIC_SOCKET_SERVER_URL=https://your-server-domain.com
+# IMPORTANT: Vercel must proxy `/socket.io/*` and `/api/*` to Railway.
+# Set this on Vercel as an Environment Variable (Build + Runtime):
+# API_PROXY_TARGET=https://<your-railway-service-domain>
 ```
 
 ## Troubleshooting

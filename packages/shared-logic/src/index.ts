@@ -193,21 +193,8 @@ function getServerUrl(): string {
       return "";
     }
 
-    if (typeof window !== "undefined") {
-      const currentOrigin = window.location.origin;
-      const hostname = window.location.hostname || "localhost";
-      const isLocalHost =
-        hostname === "localhost" ||
-        hostname === "127.0.0.1" ||
-        hostname === "0.0.0.0";
-
-      // In production, we strongly prefer same-origin Socket.IO so the
-      // HttpOnly session cookie (set on the web origin) is included.
-      // If you *really* need a direct cross-origin socket URL, use localhost
-      // for dev or ensure auth is passed via Bearer token instead of cookies.
-      if (!isLocalHost) return currentOrigin;
-    }
-
+    // If an explicit URL is provided, respect it.
+    // (Same-origin behavior is achieved by setting this to an empty string.)
     return trimmed;
   }
 

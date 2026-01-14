@@ -4,7 +4,9 @@ const nextConfig = {
   transpilePackages: ["shared-logic", "@repo/ui"],
   async rewrites() {
     const rawTarget =
-      process.env.API_PROXY_TARGET || process.env.NEXT_PUBLIC_API_BASE_URL;
+      process.env.API_PROXY_TARGET ||
+      process.env.NEXT_PUBLIC_API_BASE_URL ||
+      process.env.NEXT_PUBLIC_SOCKET_SERVER_URL;
 
     if (!rawTarget) return [];
 
