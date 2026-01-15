@@ -591,11 +591,61 @@ const roomPlaylistActive = new Map();
 
 function emitServerSyncToRoom(roomId, payload) {
   io.to(roomId).emit("receive_sync", {
+    roomId,
     ...payload,
     senderId: "system",
     senderUsername: "Playlist",
     serverNow: Date.now(),
   });
+}
+
+function getEstimatedTimestampForState(state, nowMs) {
+  if (!state) return 0;
+  const baseTimestamp =
+    typeof state.timestamp === "number" && Number.isFinite(state.timestamp)
+      ? state.timestamp
+      : 0;
+  if (state.isPlaying !== true) return baseTimestamp;
+
+  const updatedAtMs =
+    typeof state.updatedAt === "number" && Number.isFinite(state.updatedAt)
+      ? state.updatedAt
+      : nowMs;
+  const speed =
+    typeof state.playbackSpeed === "number" &&
+    Number.isFinite(state.playbackSpeed)
+      ? state.playbackSpeed
+      : 1;
+
+  return baseTimestamp + Math.max(0, (nowMs - updatedAtMs) / 1000) * speed;
+}
+
+function buildRoomStatePayload(roomId, state, nowMs) {
+  const estimatedTimestamp = getEstimatedTimestampForState(state, nowMs);
+  return {
+    roomId,
+    serverNow: nowMs,
+    ...(state || {}),
+    timestamp: estimatedTimestamp,
+    // Ensure isPlaying is always defined (default to false if missing)
+    isPlaying: state?.isPlaying ?? false,
+    rev:
+      typeof state?.rev === "number" && Number.isFinite(state.rev)
+        ? state.rev
+        : 0,
+  };
+}
+
+function emitRoomStateToRoom(roomId) {
+  const now = Date.now();
+  const state = roomState.get(roomId);
+  io.to(roomId).emit("room_state", buildRoomStatePayload(roomId, state, now));
+}
+
+function emitRoomStateToSocket(socket, roomId) {
+  const now = Date.now();
+  const state = roomState.get(roomId);
+  socket.emit("room_state", buildRoomStatePayload(roomId, state, now));
 }
 
 function getRoomUsersSnapshot(roomId) {
@@ -633,6 +683,8 @@ function applyPlaylistPlaybackToRoomState(roomId, videoUrl) {
   const now = Date.now();
   const prevUrl = typeof prev.videoUrl === "string" ? prev.videoUrl : null;
   const prevUpdatedAt = typeof prev.updatedAt === "number" ? prev.updatedAt : 0;
+  const prevRev =
+    typeof prev.rev === "number" && Number.isFinite(prev.rev) ? prev.rev : 0;
 
   // Guard against accidental restart loops: if playlist tries to "play" the
   // same URL repeatedly in a short window, ignore it.
@@ -650,42 +702,57 @@ function applyPlaylistPlaybackToRoomState(roomId, videoUrl) {
       ? prev.playbackSpeed
       : 1;
 
-  // Reset playback anchor to the start of the new media.
-  const next = {
+  // Broadcast in a receiver-friendly order: change_url -> play.
+  // Each emitted action gets its own revision so clients can enforce ordering.
+  const changeRev = prevRev + 1;
+  const changeState = {
     ...prev,
     videoUrl,
     timestamp: 0,
     updatedAt: now,
     playbackSpeed: prevSpeed,
-    action: "play",
-    isPlaying: true,
+    action: "change_url",
+    isPlaying: false,
+    rev: changeRev,
     senderId: "system",
     senderUsername: "Playlist",
   };
-
-  roomState.set(roomId, next);
-
-  // Broadcast in a receiver-friendly order: change_url -> play.
+  roomState.set(roomId, changeState);
   emitServerSyncToRoom(roomId, {
     action: "change_url",
     timestamp: 0,
     videoUrl,
     updatedAt: now,
-    volume: next.volume,
-    isMuted: next.isMuted,
-    playbackSpeed: next.playbackSpeed,
-    audioSyncEnabled: next.audioSyncEnabled,
+    rev: changeRev,
+    volume: changeState.volume,
+    isMuted: changeState.isMuted,
+    playbackSpeed: changeState.playbackSpeed,
+    audioSyncEnabled: changeState.audioSyncEnabled,
   });
+  emitRoomStateToRoom(roomId);
+
+  const playRev = changeRev + 1;
+  const playState = {
+    ...changeState,
+    action: "play",
+    isPlaying: true,
+    rev: playRev,
+    // updatedAt remains the same anchor moment.
+    updatedAt: now,
+  };
+  roomState.set(roomId, playState);
   emitServerSyncToRoom(roomId, {
     action: "play",
     timestamp: 0,
     videoUrl,
     updatedAt: now,
-    volume: next.volume,
-    isMuted: next.isMuted,
-    playbackSpeed: next.playbackSpeed,
-    audioSyncEnabled: next.audioSyncEnabled,
+    rev: playRev,
+    volume: playState.volume,
+    isMuted: playState.isMuted,
+    playbackSpeed: playState.playbackSpeed,
+    audioSyncEnabled: playState.audioSyncEnabled,
   });
+  emitRoomStateToRoom(roomId);
 }
 
 function getRoomWheel(roomId) {
@@ -895,6 +962,14 @@ io.on("connection", (socket) => {
     // If the client re-sends join_room (retries, double-mount in dev, etc.),
     // don't spam join activity or user_joined events.
     if (socket.rooms.has(roomId)) {
+      // Refresh join timestamp for stale-event guards.
+      try {
+        if (!socket.data.roomJoinedAt) socket.data.roomJoinedAt = {};
+        socket.data.roomJoinedAt[roomId] = Date.now();
+      } catch {
+        // ignore
+      }
+
       try {
         const room = io.sockets.adapter.rooms.get(roomId);
         const users = room
@@ -954,6 +1029,15 @@ io.on("connection", (socket) => {
     socket.join(roomId);
     joinedRooms.add(roomId);
     console.log(`User ${socket.id} joined room: ${roomId}`);
+
+    // Track when this socket joined this room. Used to reject stale sync events
+    // from freshly-joined clients before they have fully applied room_state.
+    try {
+      if (!socket.data.roomJoinedAt) socket.data.roomJoinedAt = {};
+      socket.data.roomJoinedAt[roomId] = Date.now();
+    } catch {
+      // ignore
+    }
     // Notify others in the room (optional)
     {
       const username =
@@ -1093,6 +1177,10 @@ io.on("connection", (socket) => {
       timestamp: estimatedTimestamp,
       // Ensure isPlaying is always defined (default to false if missing)
       isPlaying: state?.isPlaying ?? false,
+      rev:
+        typeof state?.rev === "number" && Number.isFinite(state.rev)
+          ? state.rev
+          : 0,
     });
 
     // Send recent chat history for this room.
@@ -2053,33 +2141,7 @@ io.on("connection", (socket) => {
   socket.on("request_room_state", (rawRoom) => {
     const roomId = normalizeRoomId(rawRoom);
     if (!roomId) return;
-    const state = roomState.get(roomId);
-
-    // Calculate estimated current timestamp if video is playing
-    let estimatedTimestamp = state?.timestamp;
-    if (state && state.isPlaying === true) {
-      const now = Date.now();
-      const prevTimestamp =
-        typeof state.timestamp === "number" ? state.timestamp : 0;
-      const prevUpdatedAt =
-        typeof state.updatedAt === "number" ? state.updatedAt : now;
-      const prevSpeed =
-        typeof state.playbackSpeed === "number" &&
-        Number.isFinite(state.playbackSpeed)
-          ? state.playbackSpeed
-          : 1;
-      estimatedTimestamp =
-        prevTimestamp + Math.max(0, (now - prevUpdatedAt) / 1000) * prevSpeed;
-    }
-
-    socket.emit("room_state", {
-      roomId,
-      serverNow: Date.now(), // For clock sync
-      ...(state || {}),
-      timestamp: estimatedTimestamp,
-      // Ensure isPlaying is always defined (default to false if missing)
-      isPlaying: state?.isPlaying ?? false,
-    });
+    emitRoomStateToSocket(socket, roomId);
   });
 
   socket.on("request_activity_history", async (rawRoom) => {
@@ -2130,15 +2192,24 @@ io.on("connection", (socket) => {
     // This prevents new joiners from accidentally resetting the room position
     // if their client sends a play event before receiving room state.
     if (
-      (action === "play" || action === "pause") &&
+      (action === "play" || action === "pause" || action === "seek") &&
       typeof timestamp === "number"
     ) {
       const regression = estimatedNowTimestamp - timestamp;
+
+      const joinedAt =
+        socket.data &&
+        socket.data.roomJoinedAt &&
+        typeof socket.data.roomJoinedAt[roomId] === "number"
+          ? socket.data.roomJoinedAt[roomId]
+          : 0;
+      const joinedRecently = joinedAt > 0 && now - joinedAt < 15000;
+
       // If this would jump backwards more than 10 seconds, and we're already
       // past 15 seconds in the video, reject it (likely a new joiner's stale event)
-      if (regression > 10 && estimatedNowTimestamp > 15) {
+      if (regression > 10 && estimatedNowTimestamp > 15 && joinedRecently) {
         console.log(
-          `Room ${roomId}: Rejecting ${action} at ${timestamp} - would regress from ~${estimatedNowTimestamp.toFixed(1)}s`
+          `Room ${roomId}: Rejecting ${action} at ${timestamp} - would regress from ~${estimatedNowTimestamp.toFixed(1)}s (joinedRecently)`
         );
         return;
       }
@@ -2175,17 +2246,17 @@ io.on("connection", (socket) => {
       action === "set_speed";
 
     const hasIncomingTimestamp = typeof timestamp === "number";
-    const nextTimestamp = hasIncomingTimestamp
-      ? timestamp
-      : action === "change_url"
+    const nextTimestamp = shouldAnchorPlaybackPosition
+      ? action === "change_url"
         ? 0
-        : shouldAnchorPlaybackPosition
-          ? estimatedNowTimestamp
-          : prevTimestamp;
+        : hasIncomingTimestamp
+          ? timestamp
+          : estimatedNowTimestamp
+      : prevTimestamp;
 
     const nextUpdatedAt = shouldAnchorPlaybackPosition
       ? now
-      : typeof prev.updatedAt === "number"
+      : typeof prev.updatedAt === "number" && Number.isFinite(prev.updatedAt)
         ? prev.updatedAt
         : now;
     const next = {
@@ -2197,6 +2268,10 @@ io.on("connection", (socket) => {
       senderId: socket.id,
       senderUsername,
     };
+
+    const prevRev =
+      typeof prev.rev === "number" && Number.isFinite(prev.rev) ? prev.rev : 0;
+    next.rev = prevRev + 1;
 
     if (typeof volume === "number" && Number.isFinite(volume)) {
       next.volume = Math.max(0, Math.min(1, volume));
@@ -2237,12 +2312,16 @@ io.on("connection", (socket) => {
       console.error("Failed to persist sync activity", err);
     }
 
-    // Broadcast to everyone else in the room
-    socket.to(roomId).emit("receive_sync", {
+    // Broadcast to everyone in the room (including the sender).
+    // This keeps the sender's room anchor/revision in sync and prevents
+    // local seeks from being immediately "snapped back" by stale anchors.
+    io.to(roomId).emit("receive_sync", {
+      roomId,
       action,
       timestamp: next.timestamp,
       videoUrl: next.videoUrl,
       updatedAt: next.updatedAt,
+      rev: next.rev,
       volume: next.volume,
       isMuted: next.isMuted,
       playbackSpeed: next.playbackSpeed,
@@ -2251,6 +2330,10 @@ io.on("connection", (socket) => {
       senderUsername,
       serverNow: Date.now(), // For clock sync
     });
+
+    // Single authoritative state update for *everyone*.
+    // Clients should drive playback + AV controls from room_state.
+    emitRoomStateToRoom(roomId);
   });
 
   socket.on("disconnect", () => {

@@ -112,6 +112,7 @@ export function PlayerSection({
   handlePlayerError,
   applyingRemoteSyncRef,
   roomPlaybackAnchorRef,
+  roomPlaybackAnchorVersion,
   lastManualSeekRef,
 
   muted,
@@ -128,6 +129,8 @@ export function PlayerSection({
   videoState,
   handlePlay,
   handlePause,
+  suppressNextPlayBroadcast,
+  suppressNextSeekBroadcast,
   handleSeekTo,
   handleSeekFromController,
   handleVolumeChange,
@@ -205,6 +208,7 @@ export function PlayerSection({
     anchorAt: number;
     playbackRate: number;
   } | null>;
+  roomPlaybackAnchorVersion: number;
   lastManualSeekRef: React.MutableRefObject<number>;
 
   muted: boolean;
@@ -221,7 +225,9 @@ export function PlayerSection({
   videoState: string;
   handlePlay: () => void;
   handlePause: () => void;
-  handleSeekTo: (time: number) => void;
+  suppressNextPlayBroadcast: (ms?: number) => void;
+  suppressNextSeekBroadcast: (ms?: number) => void;
+  handleSeekTo: (time: number, opts?: { force?: boolean }) => void;
   handleSeekFromController: (time: number, opts?: { force?: boolean }) => void;
   handleVolumeChange: (volume: number) => void;
   handleLocalVolumeChange: (volume: number) => void;
@@ -557,9 +563,94 @@ export function PlayerSection({
     return /\.(mp4|webm|ogv|ogg)(\?|#|$)/i.test(normalizedUrl);
   }, [normalizedUrl]);
 
-  const resumeToRoomTimeIfNeeded = React.useCallback(() => {
+  const lastRoomSyncAtRef = React.useRef(0);
+
+  const pendingRoomCatchupRef = React.useRef<{
+    target: number;
+    until: number;
+    attempts: number;
+  } | null>(null);
+
+  const tryApplyPendingRoomCatchup = React.useCallback(() => {
+    const pending = pendingRoomCatchupRef.current;
+    if (!pending) return;
+
+    // Drop if expired.
+    if (Date.now() > pending.until || pending.attempts >= 10) {
+      pendingRoomCatchupRef.current = null;
+      return;
+    }
+
+    const current = getCurrentTimeFromRef(playerRef);
+    const drift = Math.abs(current - pending.target);
+
+    // If we've landed close enough, we're done.
+    if (drift <= 2.5 || (current > 3 && pending.target > 5)) {
+      pendingRoomCatchupRef.current = null;
+      return;
+    }
+
+    pending.attempts += 1;
+
+    applyingRemoteSyncRef.current = true;
+    window.setTimeout(() => {
+      applyingRemoteSyncRef.current = false;
+    }, 1500);
+
+    suppressNextSeekBroadcast(3000);
+    seekToFromRef(playerRef, pending.target);
+
+    // YouTube sometimes ignores ReactPlayer.seekTo until the internal player is fully cued.
+    // Calling the internal API improves reliability.
+    try {
+      const wrapper = playerRef.current as
+        | {
+            getInternalPlayer?: () => unknown;
+          }
+        | null
+        | undefined;
+      const internal = wrapper?.getInternalPlayer?.() as
+        | {
+            seekTo?: (seconds: number, allowSeekAhead?: boolean) => void;
+            playVideo?: () => void;
+          }
+        | null
+        | undefined;
+      internal?.seekTo?.(pending.target, true);
+
+      // If the room is already playing, try to start local playback as well.
+      // This often makes the seek "stick" without requiring a user click.
+      const anchor = roomPlaybackAnchorRef.current;
+      const roomIsPlaying =
+        !!anchor && anchor.url === normalizedUrl && anchor.isPlaying === true;
+      if (roomIsPlaying) {
+        suppressNextPlayBroadcast(3000);
+        if (internal?.playVideo) {
+          internal.playVideo();
+        } else {
+          void playFromRef(playerRef);
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    // Retry shortly; this covers the period where the iframe exists but isn't seekable yet.
+    window.setTimeout(() => {
+      tryApplyPendingRoomCatchup();
+    }, 350);
+  }, [
+    applyingRemoteSyncRef,
+    normalizedUrl,
+    playerRef,
+    roomPlaybackAnchorRef,
+    suppressNextPlayBroadcast,
+    suppressNextSeekBroadcast,
+  ]);
+
+  const syncToRoomTimeIfNeeded = React.useCallback(() => {
     const anchor = roomPlaybackAnchorRef.current;
-    if (!anchor || !anchor.isPlaying) return;
+    if (!anchor) return;
 
     // Only try to resume if we're on the same media URL.
     if (anchor.url !== normalizedUrl) return;
@@ -568,10 +659,16 @@ export function PlayerSection({
     const timeSinceManualSeek = Date.now() - lastManualSeekRef.current;
     if (timeSinceManualSeek < 5000) return;
 
+    // Throttle automatic sync to avoid oscillations.
+    const now = Date.now();
+    if (now - lastRoomSyncAtRef.current < 900) return;
+
     const current = getCurrentTimeFromRef(playerRef);
 
     // Calculate expected position based on anchor - use full elapsed time for proper sync
-    const elapsedSeconds = Math.max(0, (Date.now() - anchor.anchorAt) / 1000);
+    const elapsedSeconds = anchor.isPlaying
+      ? Math.max(0, (Date.now() - anchor.anchorAt) / 1000)
+      : 0;
     const expected =
       anchor.anchorTime + elapsedSeconds * (anchor.playbackRate || 1);
     const target = Math.max(0, Math.min(expected, duration || Infinity));
@@ -584,13 +681,14 @@ export function PlayerSection({
     const shouldBeFarAhead = target > 5;
 
     if (atBeginning && shouldBeFarAhead) {
-      // Initial load - player wasn't ready when room state arrived, sync now
-      applyingRemoteSyncRef.current = true;
-      window.setTimeout(() => {
-        applyingRemoteSyncRef.current = false;
-      }, 300);
-
-      seekToFromRef(playerRef, target);
+      // Initial load - player wasn't seekable when room state arrived, keep retrying briefly.
+      lastRoomSyncAtRef.current = Date.now();
+      pendingRoomCatchupRef.current = {
+        target,
+        until: Date.now() + 4000,
+        attempts: 0,
+      };
+      tryApplyPendingRoomCatchup();
       return;
     }
 
@@ -604,17 +702,111 @@ export function PlayerSection({
     applyingRemoteSyncRef.current = true;
     window.setTimeout(() => {
       applyingRemoteSyncRef.current = false;
-    }, 300);
+    }, 1500);
 
+    lastRoomSyncAtRef.current = Date.now();
+    suppressNextSeekBroadcast(2500);
     seekToFromRef(playerRef, target);
   }, [
     applyingRemoteSyncRef,
     duration,
     lastManualSeekRef,
     normalizedUrl,
+    tryApplyPendingRoomCatchup,
     playerRef,
     roomPlaybackAnchorRef,
+    suppressNextSeekBroadcast,
+    // lastRoomSyncAtRef is a ref; intentionally omitted.
   ]);
+
+  // Late-joiner fix: room_state often arrives before the player has loaded the
+  // correct URL. Once the player is ready (and when URL/state changes), sync to
+  // the room anchor if we're clearly behind.
+  React.useEffect(() => {
+    if (!isClient) return;
+    if (!playerReady) return;
+    const id = window.setTimeout(() => {
+      syncToRoomTimeIfNeeded();
+    }, 50);
+    return () => {
+      window.clearTimeout(id);
+    };
+  }, [
+    isClient,
+    playerReady,
+    normalizedUrl,
+    videoState,
+    roomPlaybackAnchorVersion,
+    syncToRoomTimeIfNeeded,
+  ]);
+
+  // If the room is already playing, a late joiner may need a user gesture to
+  // start playback (autoplay policies). When they click Play, ensure we first
+  // catch up to the room anchor, and avoid broadcasting an extra "play" event.
+  const handlePlayWithRoomCatchup = React.useCallback(() => {
+    const anchor = roomPlaybackAnchorRef.current;
+    const isSameUrl = !!anchor && anchor.url === normalizedUrl;
+    // If we don't yet have a usable room anchor (common on fast clicks during join),
+    // treat Play as local-only so we don't accidentally broadcast stale 0:00.
+    const shouldBroadcastPlay = isSameUrl && anchor?.isPlaying === false;
+
+    syncToRoomTimeIfNeeded();
+
+    if (!shouldBroadcastPlay) {
+      // Treat as local-only resume (room already playing, or room_state not ready).
+      suppressNextPlayBroadcast(2500);
+    }
+
+    handlePlay();
+
+    // Best-effort immediate start within the user gesture.
+    // This helps with autoplay policies where state-driven play may be blocked.
+    try {
+      const wrapper = playerRef.current as
+        | {
+            getInternalPlayer?: () => unknown;
+          }
+        | null
+        | undefined;
+      const internal = wrapper?.getInternalPlayer?.() as
+        | {
+            playVideo?: () => void;
+          }
+        | null
+        | undefined;
+
+      if (internal?.playVideo) {
+        internal.playVideo();
+      } else {
+        void playFromRef(playerRef);
+      }
+    } catch {
+      // ignore
+    }
+  }, [
+    handlePlay,
+    normalizedUrl,
+    playerRef,
+    roomPlaybackAnchorRef,
+    suppressNextPlayBroadcast,
+    syncToRoomTimeIfNeeded,
+  ]);
+
+  const cancelPendingRoomCatchup = React.useCallback(() => {
+    pendingRoomCatchupRef.current = null;
+  }, []);
+
+  // Manual seeks (UI progress bar / user gestures) should ALWAYS win.
+  // They must bypass suppression windows and also cancel any in-flight
+  // late-join catch-up retries so the user doesn't get snapped back.
+  const handleUserSeek = React.useCallback(
+    (time: number) => {
+      lastManualSeekRef.current = Date.now();
+      cancelPendingRoomCatchup();
+      handleSeekTo(time, { force: true });
+    },
+    [cancelPendingRoomCatchup, handleSeekTo, lastManualSeekRef]
+  );
 
   React.useEffect(() => {
     if (!isDirectFile) return;
@@ -659,6 +851,45 @@ export function PlayerSection({
     () => isYouTubeUrl(normalizedUrl),
     [normalizedUrl]
   );
+
+  // ReactPlayer's `muted` / `volume` props are not reliably applied immediately
+  // for YouTube across all browser/iframe states. Apply them directly to the
+  // internal YouTube player so the UI feels responsive.
+  React.useEffect(() => {
+    if (!isClient) return;
+    if (!isYouTube) return;
+
+    const wrapper = playerRef.current as
+      | {
+          getInternalPlayer?: () => unknown;
+        }
+      | null
+      | undefined;
+    const internal = wrapper?.getInternalPlayer?.() as
+      | {
+          mute?: () => void;
+          unMute?: () => void;
+          setVolume?: (vol: number) => void;
+        }
+      | null
+      | undefined;
+
+    try {
+      if (!internal) return;
+
+      if (effectiveMuted || effectiveVolume <= 0) {
+        internal.mute?.();
+        return;
+      }
+
+      internal.unMute?.();
+      internal.setVolume?.(
+        Math.max(0, Math.min(100, Math.round(effectiveVolume * 100)))
+      );
+    } catch {
+      // ignore
+    }
+  }, [isClient, isYouTube, playerRef, effectiveMuted, effectiveVolume]);
   const useYouTubeIFrameApi = React.useMemo(() => {
     // Default ON: persistent official IFrame API player.
     // Opt-out via localStorage for debugging: huddle:ytIFrameApi = "0".
@@ -750,7 +981,10 @@ export function PlayerSection({
         internal.setVolume?.(
           Math.max(0, Math.min(100, Math.round(effectiveVolume * 100)))
         );
-        if (videoState === "Playing") internal.playVideo?.();
+        if (videoState === "Playing") {
+          suppressNextPlayBroadcast(2000);
+          internal.playVideo?.();
+        }
       }
     } catch {
       // ignore
@@ -766,6 +1000,7 @@ export function PlayerSection({
     effectiveMuted,
     effectiveVolume,
     videoState,
+    suppressNextPlayBroadcast,
   ]);
 
   // Track whether the most recent YouTube URL change happened while the page
@@ -1231,6 +1466,7 @@ export function PlayerSection({
           // Only kick play once the *target* is actually loaded.
           if (videoState === "Playing") {
             try {
+              suppressNextPlayBroadcast(2000);
               internal.playVideo?.();
             } catch {
               // ignore
@@ -1291,6 +1527,7 @@ export function PlayerSection({
     setPlayerError,
     setIsBuffering,
     clearLoadTimeout,
+    suppressNextPlayBroadcast,
   ]);
 
   // YouTube background-safe ended detection:
@@ -1434,6 +1671,7 @@ export function PlayerSection({
         ytEnsurePlayAtRef.current = now;
 
         try {
+          suppressNextPlayBroadcast(2000);
           internal.playVideo?.();
         } catch {
           // ignore
@@ -1574,6 +1812,7 @@ export function PlayerSection({
           }
 
           try {
+            suppressNextPlayBroadcast(2000);
             internal.playVideo?.();
           } catch {
             // ignore
@@ -1618,6 +1857,7 @@ export function PlayerSection({
     effectiveMuted,
     effectiveVolume,
     useYouTubeIFrameApi,
+    suppressNextPlayBroadcast,
   ]);
 
   return (
@@ -2048,7 +2288,7 @@ export function PlayerSection({
                 playbackRate={playbackRate}
                 onPlay={handlePlay}
                 onPause={handlePause}
-                onSeek={handleSeekTo}
+                onSeek={handleUserSeek}
                 onProgress={(time, dur) => {
                   handleProgress(time);
                   if (dur > 0) handleDuration(dur);
@@ -2096,6 +2336,7 @@ export function PlayerSection({
                   if (applyingRemoteSyncRef.current) return;
 
                   lastManualSeekRef.current = Date.now();
+                  cancelPendingRoomCatchup();
 
                   const currentTarget = (
                     e as { currentTarget?: unknown } | null
@@ -2109,7 +2350,7 @@ export function PlayerSection({
                       : null;
 
                   if (typeof time === "number" && !Number.isNaN(time)) {
-                    handleSeekFromController(time);
+                    handleSeekFromController(time, { force: true });
                   }
                 }}
                 onVolumeChange={(e) => {
@@ -2210,7 +2451,7 @@ export function PlayerSection({
                   ytLastProgressRef.current = null;
 
                   // If the room is already playing, align playhead ASAP.
-                  resumeToRoomTimeIfNeeded();
+                  syncToRoomTimeIfNeeded();
                 }}
                 onError={(message) => {
                   setPlayerReady(false);
@@ -2397,7 +2638,7 @@ export function PlayerSection({
                   }
 
                   // If the room is already playing, align playhead ASAP.
-                  resumeToRoomTimeIfNeeded();
+                  syncToRoomTimeIfNeeded();
                 }}
                 onStart={() => {
                   setPlayerReady(true);
@@ -2566,9 +2807,9 @@ export function PlayerSection({
         effectiveMuted={effectiveMuted}
         playbackRate={playbackRate}
         isBuffering={isBuffering}
-        onPlay={handlePlay}
+        onPlay={handlePlayWithRoomCatchup}
         onPause={handlePause}
-        onSeek={handleSeekTo}
+        onSeek={handleUserSeek}
         onVolumeChange={handleVolumeChange}
         onMuteToggle={toggleMute}
         audioSyncEnabled={audioSyncEnabled}

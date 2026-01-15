@@ -86,6 +86,12 @@ export function useVideoPlayer({
   const latestPlaybackRateRef = useRef(playbackRate);
   const latestCurrentTimeRef = useRef(currentTime);
   const latestVideoStateRef = useRef(videoState);
+  // Suppress broadcasting "play" for a short window when playback is started
+  // programmatically (e.g., YouTube recovery after the tab/window becomes visible).
+  const suppressPlayBroadcastUntilRef = useRef(0);
+  // Suppress broadcasting "seek" for a short window when we seek
+  // programmatically (e.g., late-joiner catch-up to room anchor).
+  const suppressSeekBroadcastUntilRef = useRef(0);
   const lastVolumeEmitAtRef = useRef(0);
   const lastAppliedYoutubeVolumeRef = useRef<{
     vol: number;
@@ -516,6 +522,13 @@ export function useVideoPlayer({
   ]);
 
   const handlePlay = useCallback(() => {
+    // If the player emitted "play" as a side effect of an internal recovery
+    // (not a user action), keep local state in sync but do not broadcast.
+    if (Date.now() < suppressPlayBroadcastUntilRef.current) {
+      setVideoState("Playing");
+      return;
+    }
+
     // Don't broadcast play events until user has received initial room state.
     // Otherwise new joiners can broadcast their cached/default position and
     // reset the room for everyone.
@@ -541,6 +554,14 @@ export function useVideoPlayer({
     hasInitialSyncRef,
     applyingRemoteSyncRef,
   ]);
+
+  const suppressNextPlayBroadcast = useCallback((ms: number = 1500) => {
+    const until = Date.now() + Math.max(0, ms);
+    suppressPlayBroadcastUntilRef.current = Math.max(
+      suppressPlayBroadcastUntilRef.current,
+      until
+    );
+  }, []);
 
   const handlePause = useCallback(() => {
     // Don't broadcast pause events until user has received initial room state.
@@ -594,15 +615,30 @@ export function useVideoPlayer({
   );
 
   const handleSeekTo = useCallback(
-    (time: number) => {
+    (time: number, opts?: { force?: boolean }) => {
+      const force = opts?.force === true;
       // Don't broadcast seeks until initial sync complete
       if (hasInitialSyncRef && !hasInitialSyncRef.current) {
         console.log(`[SEEK-TO] Blocked: initial sync not complete`);
+        const newTime = Math.max(0, Math.min(time, duration || Infinity));
+        seekToFromRef(playerRef, newTime);
+        setCurrentTime(newTime);
+        if (lastManualSeekRef) {
+          lastManualSeekRef.current = Date.now();
+        }
+        return;
+      }
+
+      // Suppress synthetic/programmatic seeks.
+      if (!force && Date.now() < suppressSeekBroadcastUntilRef.current) {
+        const newTime = Math.max(0, Math.min(time, duration || Infinity));
+        seekToFromRef(playerRef, newTime);
+        setCurrentTime(newTime);
         return;
       }
 
       // Don't re-broadcast when applying remote sync
-      if (applyingRemoteSyncRef.current) {
+      if (!force && applyingRemoteSyncRef.current) {
         console.log(`[SEEK-TO] Blocked: applying remote sync`);
         return;
       }
@@ -639,14 +675,29 @@ export function useVideoPlayer({
   // The player already performed the seek, so we only update state + broadcast.
   const handleSeekFromController = useCallback(
     (time: number, opts?: { force?: boolean }) => {
+      const force = opts?.force === true;
       // Don't broadcast seeks until initial sync complete
       if (hasInitialSyncRef && !hasInitialSyncRef.current) {
         console.log(`[SEEK] Blocked: initial sync not complete`);
+        const newTime = Math.max(0, Math.min(time, duration || Infinity));
+        seekToFromRef(playerRef, newTime);
+        setCurrentTime(newTime);
+        if (lastManualSeekRef) {
+          lastManualSeekRef.current = Date.now();
+        }
+        return;
+      }
+
+      // Suppress synthetic/programmatic seeks.
+      if (!force && Date.now() < suppressSeekBroadcastUntilRef.current) {
+        const newTime = Math.max(0, Math.min(time, duration || Infinity));
+        seekToFromRef(playerRef, newTime);
+        setCurrentTime(newTime);
         return;
       }
 
       // Don't re-broadcast when applying remote sync
-      if (applyingRemoteSyncRef.current) {
+      if (!force && applyingRemoteSyncRef.current) {
         console.log(`[SEEK] Blocked: applying remote sync`);
         return;
       }
@@ -658,7 +709,6 @@ export function useVideoPlayer({
       // delta is small, treat it as noise (not an intentional user seek).
       const isPlaying = latestVideoStateRef.current === "Playing";
       const approxNow = latestCurrentTimeRef.current;
-      const force = opts?.force === true;
       if (!force && isPlaying && Math.abs(approxNow - newTime) < 6) {
         console.log(`[SEEK] Blocked: small delta without force flag`);
         return;
@@ -737,8 +787,17 @@ export function useVideoPlayer({
       lastManualSeekRef,
       hasInitialSyncRef,
       applyingRemoteSyncRef,
+      suppressSeekBroadcastUntilRef,
     ]
   );
+
+  const suppressNextSeekBroadcast = useCallback((ms: number = 2000) => {
+    const until = Date.now() + Math.max(0, ms);
+    suppressSeekBroadcastUntilRef.current = Math.max(
+      suppressSeekBroadcastUntilRef.current,
+      until
+    );
+  }, []);
 
   // Local-only volume/mute for the custom controller (does not sync to room).
   const handleLocalVolumeChange = useCallback((newVolume: number) => {
@@ -969,5 +1028,11 @@ export function useVideoPlayer({
     loadVideoUrl,
     handlePlayerError,
     closePreviewModal,
+
+    // Used by player components when they call play() programmatically.
+    suppressNextPlayBroadcast,
+
+    // Used by player components when they seek() programmatically.
+    suppressNextSeekBroadcast,
   };
 }

@@ -16,6 +16,20 @@ import {
 import { normalizeVideoUrl } from "../lib/video";
 import { getCurrentTimeFromRef, seekToFromRef } from "../lib/player";
 
+function serverTimeToClientTime(
+  serverTimeMs: number,
+  serverNowMs: number | undefined,
+  receivedAtMs: number
+): number {
+  if (typeof serverNowMs !== "number" || !Number.isFinite(serverNowMs)) {
+    return receivedAtMs;
+  }
+  // Approximate the client/server clock offset at receive time.
+  // offset ~= clientNow - serverNow
+  const offsetMs = receivedAtMs - serverNowMs;
+  return serverTimeMs + offsetMs;
+}
+
 interface UseActivityLogProps {
   roomId: string;
   userId: string;
@@ -30,6 +44,13 @@ interface UseActivityLogProps {
     anchorAt: number;
     playbackRate: number;
   } | null>;
+  onRoomPlaybackAnchorUpdated?: (next: {
+    url: string;
+    isPlaying: boolean;
+    anchorTime: number;
+    anchorAt: number;
+    playbackRate: number;
+  }) => void;
   setUrl: (url: string) => void;
   setInputUrl: (url: string) => void;
   setVideoState: (state: string) => void;
@@ -69,6 +90,7 @@ export function useActivityLog({
   applyingRemoteSyncRef,
   hasInitialSyncRef,
   roomPlaybackAnchorRef,
+  onRoomPlaybackAnchorUpdated,
   setUrl,
   setInputUrl,
   setVideoState,
@@ -93,6 +115,8 @@ export function useActivityLog({
   const [chatText, setChatText] = useState("");
   const logsEndRef = useRef<HTMLDivElement>(null);
   const remoteSyncResetTimeoutRef = useRef<number | null>(null);
+  const lastAppliedRoomRevRef = useRef<number>(0);
+  const lastResyncRequestAtRef = useRef<number>(0);
 
   const markApplyingRemoteSync = useCallback(
     (durationMs = 200) => {
@@ -120,8 +144,9 @@ export function useActivityLog({
     }) => {
       if (!roomPlaybackAnchorRef) return;
       roomPlaybackAnchorRef.current = next;
+      onRoomPlaybackAnchorUpdated?.(next);
     },
-    [roomPlaybackAnchorRef]
+    [onRoomPlaybackAnchorUpdated, roomPlaybackAnchorRef]
   );
 
   // Auto-scroll logs
@@ -133,6 +158,13 @@ export function useActivityLog({
   useEffect(() => {
     const cleanupRoomState = onRoomState?.((state) => {
       if (!state || state.roomId !== roomId) return;
+
+      if (typeof state.rev === "number" && Number.isFinite(state.rev)) {
+        lastAppliedRoomRevRef.current = Math.max(
+          lastAppliedRoomRevRef.current,
+          state.rev
+        );
+      }
 
       // Room state application may include a seek; give embedded players longer.
       markApplyingRemoteSync(400);
@@ -150,15 +182,23 @@ export function useActivityLog({
             : 1;
         const playing = state.isPlaying === true || state.action === "play";
 
+        const receivedAt = Date.now();
+
         // If server already extrapolated (serverNow present), use current time as anchor
         // Otherwise use the original updatedAt for local extrapolation
-        const serverAlreadyExtrapolated = typeof state.serverNow === "number";
+        const serverAlreadyExtrapolated =
+          typeof state.serverNow === "number" &&
+          Number.isFinite(state.serverNow);
         const anchorAt = serverAlreadyExtrapolated
-          ? Date.now()
+          ? receivedAt
           : typeof state.updatedAt === "number" &&
               Number.isFinite(state.updatedAt)
-            ? state.updatedAt
-            : Date.now();
+            ? serverTimeToClientTime(
+                state.updatedAt,
+                state.serverNow,
+                receivedAt
+              )
+            : receivedAt;
 
         setRoomPlaybackAnchor({
           url: nextUrl,
@@ -214,7 +254,21 @@ export function useActivityLog({
         setVolume(Math.max(0, Math.min(1, state.volume)));
       }
       if (typeof state.isMuted === "boolean") {
-        setMuted(state.isMuted);
+        // Avoid forcing unmute before user interaction (autoplay policy).
+        // Keep playback muted so it can start automatically; user can unmute after interacting.
+        if (state.isMuted === false) {
+          const canUnmute =
+            typeof navigator !== "undefined" &&
+            (navigator as { userActivation?: { hasBeenActive?: boolean } })
+              .userActivation?.hasBeenActive;
+          if (canUnmute) {
+            setMuted(false);
+          } else {
+            setMuted(true);
+          }
+        } else {
+          setMuted(true);
+        }
       }
       if (typeof state.audioSyncEnabled === "boolean") {
         setAudioSyncEnabled(state.audioSyncEnabled);
@@ -352,17 +406,36 @@ export function useActivityLog({
     });
 
     const cleanup = onSyncEvent((data: SyncData) => {
+      const receivedAt = Date.now();
+
+      if (typeof data.rev === "number" && Number.isFinite(data.rev)) {
+        const last = lastAppliedRoomRevRef.current;
+
+        // Drop stale/out-of-order events.
+        if (data.rev <= last) {
+          return;
+        }
+
+        // If there's a gap, we missed at least one event; request a fresh snapshot.
+        if (data.rev > last + 1) {
+          if (
+            requestRoomState &&
+            receivedAt - lastResyncRequestAtRef.current > 1000
+          ) {
+            lastResyncRequestAtRef.current = receivedAt;
+            requestRoomState();
+          }
+          return;
+        }
+
+        lastAppliedRoomRevRef.current = data.rev;
+      }
       console.log(
         "[SYNC] Received sync event:",
         data.action,
         "from:",
         data.senderUsername || data.senderId
       );
-
-      const guardMs =
-        data.action === "seek" ? 800 : data.action === "change_url" ? 400 : 200;
-      markApplyingRemoteSync(guardMs);
-
       const time = new Date().toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",
@@ -382,86 +455,6 @@ export function useActivityLog({
         logMsg = data.videoUrl
           ? `changed video source to ${data.videoUrl}`
           : `changed video source`;
-        if (data.videoUrl) {
-          const nextUrl = normalizeVideoUrl(data.videoUrl);
-          setPlayerReady(false);
-          setPlayerError(null);
-          setUrl(nextUrl);
-          setInputUrl(nextUrl);
-
-          // New media source: anchor starts at 0 (play state comes next).
-          const prev = roomPlaybackAnchorRef?.current;
-          setRoomPlaybackAnchor({
-            url: nextUrl,
-            isPlaying: false,
-            anchorTime: 0,
-            anchorAt: Date.now(),
-            playbackRate: prev?.playbackRate ?? 1,
-          });
-        }
-      }
-
-      // Some senders include the URL on play events (e.g. change_url + immediate play).
-      // Applying it here makes receivers resilient to event ordering.
-      if (data.action === "play" && data.videoUrl) {
-        const nextUrl = normalizeVideoUrl(data.videoUrl);
-        setPlayerReady(false);
-        setPlayerError(null);
-        setUrl(nextUrl);
-        setInputUrl(nextUrl);
-      }
-
-      if (typeof data.volume === "number" && Number.isFinite(data.volume)) {
-        setVolume(Math.max(0, Math.min(1, data.volume)));
-      }
-      if (typeof data.isMuted === "boolean") {
-        // Only apply unmute if user has interacted with the document,
-        // otherwise browser will pause the video due to autoplay policy.
-        // Keep video muted to allow playback sync; user can manually unmute.
-        if (data.isMuted === false) {
-          // Check if we can safely unmute (user has interacted)
-          // navigator.userActivation is available in modern browsers
-          const canUnmute =
-            typeof navigator !== "undefined" &&
-            (navigator as { userActivation?: { hasBeenActive?: boolean } })
-              .userActivation?.hasBeenActive;
-          if (canUnmute) {
-            setMuted(false);
-          } else {
-            console.log(
-              "[SYNC] Skipping unmute - user hasn't interacted with page yet"
-            );
-          }
-        } else {
-          setMuted(true);
-        }
-      }
-      if (typeof data.audioSyncEnabled === "boolean") {
-        setAudioSyncEnabled(data.audioSyncEnabled);
-      }
-      if (
-        typeof data.playbackSpeed === "number" &&
-        Number.isFinite(data.playbackSpeed)
-      ) {
-        setPlaybackRate(data.playbackSpeed);
-
-        const prev = roomPlaybackAnchorRef?.current;
-        if (prev) {
-          const nextAnchor = {
-            ...prev,
-            playbackRate: data.playbackSpeed,
-          };
-          if (typeof data.timestamp === "number") {
-            nextAnchor.anchorTime = data.timestamp;
-          }
-          if (
-            typeof data.updatedAt === "number" &&
-            Number.isFinite(data.updatedAt)
-          ) {
-            nextAnchor.anchorAt = data.updatedAt;
-          }
-          setRoomPlaybackAnchor(nextAnchor);
-        }
       }
 
       if (data.action === "set_audio_sync") {
@@ -494,108 +487,6 @@ export function useActivityLog({
         ...prev,
         { msg: logMsg, type: data.action, time, user: userDisplay },
       ]);
-
-      // Update expected-time anchor for gesture-required resumes.
-      {
-        const now = Date.now();
-        const prev = roomPlaybackAnchorRef?.current;
-
-        const updatedAt =
-          typeof data.updatedAt === "number" && Number.isFinite(data.updatedAt)
-            ? data.updatedAt
-            : now;
-
-        const nextUrl =
-          typeof data.videoUrl === "string" && data.videoUrl
-            ? normalizeVideoUrl(data.videoUrl)
-            : prev?.url;
-
-        if (data.action === "play" && nextUrl) {
-          setRoomPlaybackAnchor({
-            url: nextUrl,
-            isPlaying: true,
-            anchorTime: typeof data.timestamp === "number" ? data.timestamp : 0,
-            anchorAt: updatedAt,
-            playbackRate: prev?.playbackRate ?? 1,
-          });
-        }
-
-        if (data.action === "pause" && prev) {
-          setRoomPlaybackAnchor({
-            ...prev,
-            isPlaying: false,
-            anchorTime:
-              typeof data.timestamp === "number"
-                ? data.timestamp
-                : prev.anchorTime,
-            anchorAt: updatedAt,
-          });
-        }
-
-        if (data.action === "seek" && prev) {
-          setRoomPlaybackAnchor({
-            ...prev,
-            anchorTime:
-              typeof data.timestamp === "number"
-                ? data.timestamp
-                : prev.anchorTime,
-            anchorAt: updatedAt,
-          });
-        }
-      }
-
-      if (data.action === "play") {
-        console.log("[SYNC] Setting video state to Playing");
-        setVideoState("Playing");
-
-        // Also sync position on play if significantly out of sync
-        const currentTime = getCurrentTimeFromRef(playerRef);
-        const target = typeof data.timestamp === "number" ? data.timestamp : 0;
-        if (Math.abs(currentTime - target) > 2) {
-          seekToFromRef(playerRef, target);
-        }
-      }
-      if (data.action === "pause") {
-        console.log("[SYNC] Setting video state to Paused");
-        setVideoState("Paused");
-
-        // Also sync position on pause if significantly out of sync
-        const currentTime = getCurrentTimeFromRef(playerRef);
-        const target =
-          typeof data.timestamp === "number" ? data.timestamp : currentTime;
-        if (Math.abs(currentTime - target) > 2) {
-          seekToFromRef(playerRef, target);
-        }
-      }
-
-      // Seek on explicit seek actions
-      if (data.action === "seek") {
-        const currentTime = getCurrentTimeFromRef(playerRef);
-        const target = data.timestamp;
-
-        // Server may echo events back to the sender; the sender has already
-        // applied the seek locally, so avoid re-seeking due to rounding.
-        const isMe = data.senderId === userId;
-
-        console.log(
-          `[SYNC] Received seek event: target=${target?.toFixed(2)}s, current=${currentTime?.toFixed(2)}s, isMe=${isMe}, playerRef.current=${!!playerRef.current}`
-        );
-
-        // Always apply seek from other users. The delta check was too strict
-        // (0.25s) and could skip seeks when players were close due to natural
-        // playback drift. Users expect explicit seek actions to always sync.
-        if (!isMe) {
-          console.log(`[SYNC] Applying remote seek to ${target?.toFixed(2)}s`);
-          seekToFromRef(playerRef, target);
-          // Verify the seek was applied
-          setTimeout(() => {
-            const newTime = getCurrentTimeFromRef(playerRef);
-            console.log(
-              `[SYNC] Post-seek verification: position=${newTime?.toFixed(2)}s (target was ${target?.toFixed(2)}s)`
-            );
-          }, 100);
-        }
-      }
     });
 
     return () => {

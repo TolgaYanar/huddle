@@ -265,6 +265,10 @@ export default function RoomClient({ roomId }: { roomId: string }) {
     anchorAt: number;
     playbackRate: number;
   } | null>(null);
+  const [roomPlaybackAnchorVersion, setRoomPlaybackAnchorVersion] = useState(0);
+  const onRoomPlaybackAnchorUpdated = React.useCallback(() => {
+    setRoomPlaybackAnchorVersion((v) => v + 1);
+  }, []);
 
   // WebRTC peers
   const { closeAllPeers, renegotiateAllPeers } =
@@ -396,6 +400,9 @@ export default function RoomClient({ roomId }: { roomId: string }) {
     loadVideoUrl,
     handlePlayerError,
     closePreviewModal,
+
+    suppressNextPlayBroadcast,
+    suppressNextSeekBroadcast,
   } = useVideoPlayer({
     isClient,
     roomId,
@@ -434,6 +441,7 @@ export default function RoomClient({ roomId }: { roomId: string }) {
     applyingRemoteSyncRef,
     hasInitialSyncRef,
     roomPlaybackAnchorRef,
+    onRoomPlaybackAnchorUpdated,
     setUrl,
     setInputUrl,
     setVideoState,
@@ -772,6 +780,7 @@ export default function RoomClient({ roomId }: { roomId: string }) {
             handlePlayerError={handlePlayerError}
             applyingRemoteSyncRef={applyingRemoteSyncRef}
             roomPlaybackAnchorRef={roomPlaybackAnchorRef}
+            roomPlaybackAnchorVersion={roomPlaybackAnchorVersion}
             lastManualSeekRef={lastManualSeekRef}
             muted={muted}
             volume={volume}
@@ -787,6 +796,8 @@ export default function RoomClient({ roomId }: { roomId: string }) {
             videoState={videoState}
             handlePlay={handlePlay}
             handlePause={handlePause}
+            suppressNextPlayBroadcast={suppressNextPlayBroadcast}
+            suppressNextSeekBroadcast={suppressNextSeekBroadcast}
             handleSeekTo={handleSeekTo}
             handleSeekFromController={handleSeekFromController}
             handleVolumeChange={handleVolumeChange}

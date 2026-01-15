@@ -18,6 +18,11 @@ export interface SyncData {
   timestamp: number;
   videoUrl?: string;
   updatedAt?: number;
+  // Server epoch millis at time of emission; used to estimate client/server clock offset.
+  serverNow?: number;
+  // Monotonic room revision assigned by the server.
+  // Allows clients to ignore stale events and detect gaps.
+  rev?: number;
   volume?: number;
   isMuted?: boolean;
   playbackSpeed?: number;
@@ -38,6 +43,7 @@ export interface RoomStateData {
   audioSyncEnabled?: boolean;
   updatedAt?: number;
   serverNow?: number;
+  rev?: number;
   senderId?: string;
   senderUsername?: string | null;
 }
