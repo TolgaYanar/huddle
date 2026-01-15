@@ -4,6 +4,8 @@ import { formatTime } from "../lib/activity";
 import {
   getCurrentTimeFromRef,
   getDurationFromRef,
+  getHtmlMediaElementFromRef,
+  playFromRef,
   seekToFromRef,
 } from "../lib/player";
 import {
@@ -92,6 +94,9 @@ export function useVideoPlayer({
   // Suppress broadcasting "seek" for a short window when we seek
   // programmatically (e.g., late-joiner catch-up to room anchor).
   const suppressSeekBroadcastUntilRef = useRef(0);
+  // Some players emit a transient PAUSE event during user seeks/scrubs.
+  // If we broadcast that pause, the whole room can get stuck paused.
+  const suppressPauseBroadcastUntilRef = useRef(0);
   const lastVolumeEmitAtRef = useRef(0);
   const lastAppliedYoutubeVolumeRef = useRef<{
     vol: number;
@@ -113,6 +118,18 @@ export function useVideoPlayer({
   );
   const pendingControllerSeekRef = useRef<number | null>(null);
   const controllerSeekFlushTimeoutRef = useRef<number | null>(null);
+  const lastProgressTickRef = useRef<{ time: number; at: number } | null>(null);
+  const lastAutoResumeAtRef = useRef(0);
+  const pendingPauseTimeoutRef = useRef<number | null>(null);
+  const pendingPauseRef = useRef<{ time: number; url: string } | null>(null);
+
+  const cancelPendingPause = useCallback(() => {
+    if (pendingPauseTimeoutRef.current) {
+      window.clearTimeout(pendingPauseTimeoutRef.current);
+      pendingPauseTimeoutRef.current = null;
+    }
+    pendingPauseRef.current = null;
+  }, []);
 
   const effectiveVolume = useMemo(() => {
     const v = localVolumeOverride ?? volume;
@@ -522,10 +539,13 @@ export function useVideoPlayer({
   ]);
 
   const handlePlay = useCallback(() => {
+    cancelPendingPause();
+
     // If the player emitted "play" as a side effect of an internal recovery
     // (not a user action), keep local state in sync but do not broadcast.
     if (Date.now() < suppressPlayBroadcastUntilRef.current) {
       setVideoState("Playing");
+      latestVideoStateRef.current = "Playing";
       return;
     }
 
@@ -534,18 +554,21 @@ export function useVideoPlayer({
     // reset the room for everyone.
     if (hasInitialSyncRef && !hasInitialSyncRef.current) {
       setVideoState("Playing");
+      latestVideoStateRef.current = "Playing";
       return;
     }
 
     // Don't re-broadcast when applying remote sync
     if (applyingRemoteSyncRef.current) {
       setVideoState("Playing");
+      latestVideoStateRef.current = "Playing";
       return;
     }
 
     const currentTime = getCurrentTimeFromRef(playerRef);
     sendSyncEvent("play", currentTime, url);
     setVideoState("Playing");
+    latestVideoStateRef.current = "Playing";
     addLogEntry?.({ msg: `started playing`, type: "play", user: "You" });
   }, [
     url,
@@ -564,28 +587,50 @@ export function useVideoPlayer({
   }, []);
 
   const handlePause = useCallback(() => {
+    // Ignore transient pause events that happen during/just after a user seek.
+    if (Date.now() < suppressPauseBroadcastUntilRef.current) {
+      console.log(`[PAUSE] Suppressed: recent user seek`);
+      return;
+    }
+
     // Don't broadcast pause events until user has received initial room state.
     if (hasInitialSyncRef && !hasInitialSyncRef.current) {
       setVideoState("Paused");
+      latestVideoStateRef.current = "Paused";
       return;
     }
 
     // Don't re-broadcast when applying remote sync
     if (applyingRemoteSyncRef.current) {
       setVideoState("Paused");
+      latestVideoStateRef.current = "Paused";
       return;
     }
 
+    // During scrubbing, many players emit a PAUSE event as an intermediate
+    // state. If we broadcast that pause immediately, everyone else pauses.
+    // Debounce pause and cancel it if a seek/play follows quickly.
     const currentTime = getCurrentTimeFromRef(playerRef);
-    sendSyncEvent("pause", currentTime, url);
     setVideoState("Paused");
-    addLogEntry?.({ msg: `paused the video`, type: "pause", user: "You" });
+    latestVideoStateRef.current = "Paused";
+
+    cancelPendingPause();
+    pendingPauseRef.current = { time: currentTime, url };
+    pendingPauseTimeoutRef.current = window.setTimeout(() => {
+      pendingPauseTimeoutRef.current = null;
+      const pending = pendingPauseRef.current;
+      pendingPauseRef.current = null;
+      if (!pending) return;
+      sendSyncEvent("pause", pending.time, pending.url);
+      addLogEntry?.({ msg: `paused the video`, type: "pause", user: "You" });
+    }, 300);
   }, [
     url,
     sendSyncEvent,
     addLogEntry,
     hasInitialSyncRef,
     applyingRemoteSyncRef,
+    cancelPendingPause,
   ]);
 
   const handleSeek = useCallback(
@@ -603,7 +648,37 @@ export function useVideoPlayer({
       const time = getCurrentTimeFromRef(playerRef);
       const newTime = Math.max(0, time + seconds);
       seekToFromRef(playerRef, newTime);
+
+      cancelPendingPause();
+
+      if (lastManualSeekRef) {
+        lastManualSeekRef.current = Date.now();
+      }
+
+      // Arm a short pause suppression window for this user navigation.
+      suppressPauseBroadcastUntilRef.current = Math.max(
+        suppressPauseBroadcastUntilRef.current,
+        Date.now() + 800
+      );
+
+      const wasPlaying = latestVideoStateRef.current === "Playing";
+      // User navigation should unpause.
+      if (!wasPlaying) {
+        setVideoState("Playing");
+        // Update ref immediately to avoid duplicate play emits during scrubs.
+        latestVideoStateRef.current = "Playing";
+        // Emit play first so the server doesn't broadcast a paused room_state snapshot.
+        sendSyncEvent("play", newTime, url);
+
+        // For native <video>/<audio> playback, state alone won't start playback.
+        if (getHtmlMediaElementFromRef(playerRef)) {
+          void playFromRef(playerRef);
+        }
+      }
+
+      // Preserve seek event for activity log + precise syncing.
       sendSyncEvent("seek", newTime, url);
+
       lastLocalSeekRef.current = { time: newTime, at: Date.now() };
       addLogEntry?.({
         msg: `jumped to ${formatTime(newTime)}`,
@@ -649,7 +724,36 @@ export function useVideoPlayer({
       );
       seekToFromRef(playerRef, newTime);
       setCurrentTime(newTime);
+
+      cancelPendingPause();
+
+      if (force) {
+        // Arm a short pause suppression window for this user navigation.
+        suppressPauseBroadcastUntilRef.current = Math.max(
+          suppressPauseBroadcastUntilRef.current,
+          Date.now() + 800
+        );
+      }
+
+      const wasPlaying = latestVideoStateRef.current === "Playing";
+      const shouldUnpause = force && !wasPlaying;
+      // If this was a user-initiated seek while paused, unpause.
+      if (shouldUnpause) {
+        setVideoState("Playing");
+        // Update ref immediately to avoid duplicate play emits during scrubs.
+        latestVideoStateRef.current = "Playing";
+        // Emit play first so the server doesn't broadcast a paused room_state snapshot.
+        sendSyncEvent("play", newTime, url);
+
+        // For native <video>/<audio> playback, state alone won't start playback.
+        if (getHtmlMediaElementFromRef(playerRef)) {
+          void playFromRef(playerRef);
+        }
+      }
+
+      // Preserve seek event for activity log + precise syncing.
       sendSyncEvent("seek", newTime, url);
+
       lastLocalSeekRef.current = { time: newTime, at: Date.now() };
       if (lastManualSeekRef) {
         lastManualSeekRef.current = Date.now();
@@ -730,9 +834,38 @@ export function useVideoPlayer({
       console.log(`[SEEK] Broadcasting seek to ${newTime.toFixed(2)}s`);
 
       const emitSeek = (t: number) => {
+        cancelPendingPause();
+
+        if (force) {
+          // Arm a short pause suppression window for this user navigation.
+          suppressPauseBroadcastUntilRef.current = Math.max(
+            suppressPauseBroadcastUntilRef.current,
+            Date.now() + 800
+          );
+        }
+
         lastControllerSeekEmitRef.current = { time: t, at: Date.now() };
         setCurrentTime(t);
+
+        const wasPlaying = latestVideoStateRef.current === "Playing";
+        const shouldUnpause = force && !wasPlaying;
+        // User navigation should unpause.
+        if (shouldUnpause) {
+          setVideoState("Playing");
+          // Update ref immediately to avoid duplicate play emits during scrubs.
+          latestVideoStateRef.current = "Playing";
+          // Emit play first so the server doesn't broadcast a paused room_state snapshot.
+          sendSyncEvent("play", t, url);
+
+          // For native <video>/<audio> playback, state alone won't start playback.
+          if (getHtmlMediaElementFromRef(playerRef)) {
+            void playFromRef(playerRef);
+          }
+        }
+
+        // Preserve seek event for activity log + precise syncing.
         sendSyncEvent("seek", t, url);
+
         lastLocalSeekRef.current = { time: t, at: Date.now() };
         if (lastManualSeekRef) {
           lastManualSeekRef.current = Date.now();
@@ -788,6 +921,7 @@ export function useVideoPlayer({
       hasInitialSyncRef,
       applyingRemoteSyncRef,
       suppressSeekBroadcastUntilRef,
+      cancelPendingPause,
     ]
   );
 
@@ -830,9 +964,58 @@ export function useVideoPlayer({
     }
   }, []);
 
-  const handleProgress = useCallback((time: number) => {
-    setCurrentTime(time);
-  }, []);
+  const handleProgress = useCallback(
+    (time: number) => {
+      const now = Date.now();
+
+      // If the underlying player is clearly advancing time while our UI says
+      // Paused (can happen during YouTube scrubs / transient pause events),
+      // treat that as "actually playing" and resync.
+      const prev = lastProgressTickRef.current;
+      lastProgressTickRef.current = { time, at: now };
+
+      const isActuallyAdvancing =
+        prev &&
+        now - prev.at < 1500 &&
+        time - prev.time > 0.25 &&
+        Number.isFinite(time);
+
+      const uiPaused = latestVideoStateRef.current !== "Playing";
+      const recentUserSeek =
+        !!lastManualSeekRef && now - lastManualSeekRef.current < 5000;
+      const cooldownOk = now - lastAutoResumeAtRef.current > 1500;
+
+      if (
+        isActuallyAdvancing &&
+        uiPaused &&
+        recentUserSeek &&
+        cooldownOk &&
+        !applyingRemoteSyncRef.current &&
+        (hasInitialSyncRef ? hasInitialSyncRef.current : true)
+      ) {
+        lastAutoResumeAtRef.current = now;
+        cancelPendingPause();
+        setVideoState("Playing");
+        latestVideoStateRef.current = "Playing";
+        sendSyncEvent("play", time, url);
+
+        // For native <video>/<audio> playback, state alone won't start playback.
+        if (getHtmlMediaElementFromRef(playerRef)) {
+          void playFromRef(playerRef);
+        }
+      }
+
+      setCurrentTime(time);
+    },
+    [
+      url,
+      sendSyncEvent,
+      hasInitialSyncRef,
+      applyingRemoteSyncRef,
+      lastManualSeekRef,
+      cancelPendingPause,
+    ]
+  );
 
   const handleDuration = useCallback((dur: number) => {
     setDuration(dur);
