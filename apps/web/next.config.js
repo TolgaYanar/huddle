@@ -34,7 +34,11 @@ const nextConfig = {
         // WebSocket handshakes.
         {
           source: "/socket.io",
-          destination: `${target}/socket.io`,
+          destination: `${target}/socket.io/`,
+        },
+        {
+          source: "/socket.io/",
+          destination: `${target}/socket.io/`,
         },
         {
           source: "/socket.io/:path*",
