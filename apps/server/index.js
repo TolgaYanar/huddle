@@ -10,6 +10,10 @@ require("dotenv").config();
 
 const app = express();
 
+// Required when running behind Railway/Vercel/other reverse proxies.
+// Ensures Express correctly interprets forwarded headers.
+app.set("trust proxy", 1);
+
 function parseAllowedOrigins(value) {
   return String(value || "")
     .split(",")
@@ -62,9 +66,35 @@ function parseCookies(headerValue) {
   return out;
 }
 
-function setSessionCookie(res, token) {
+function getRequestHost(req) {
+  const forwardedHost = req?.headers?.["x-forwarded-host"];
+  const raw = Array.isArray(forwardedHost)
+    ? forwardedHost[0]
+    : forwardedHost || req?.headers?.host;
+  // Some proxies may send a comma-separated list.
+  return String(raw || "")
+    .split(",")[0]
+    .trim();
+}
+
+function getCookieDomain(req) {
+  const configured = process.env.COOKIE_DOMAIN;
+  if (configured && String(configured).trim()) return String(configured).trim();
+
+  // Only set a wide cookie domain in production.
+  if (process.env.NODE_ENV !== "production") return undefined;
+
+  const host = getRequestHost(req).toLowerCase();
+  if (host === "wehuddle.tv" || host.endsWith(".wehuddle.tv")) {
+    return ".wehuddle.tv";
+  }
+  return undefined;
+}
+
+function setSessionCookie(req, res, token) {
   const maxAgeSeconds = SESSION_TTL_DAYS * 24 * 60 * 60;
   const secure = process.env.NODE_ENV === "production";
+  const domain = getCookieDomain(req);
 
   // Minimal cookie implementation (no external deps).
   const cookie = [
@@ -74,12 +104,14 @@ function setSessionCookie(res, token) {
     "HttpOnly",
     "SameSite=Lax",
   ];
+  if (domain) cookie.push(`Domain=${domain}`);
   if (secure) cookie.push("Secure");
   res.setHeader("Set-Cookie", cookie.join("; "));
 }
 
-function clearSessionCookie(res) {
+function clearSessionCookie(req, res) {
   const secure = process.env.NODE_ENV === "production";
+  const domain = getCookieDomain(req);
   const cookie = [
     `${SESSION_COOKIE_NAME}=`,
     "Path=/",
@@ -87,6 +119,7 @@ function clearSessionCookie(res) {
     "HttpOnly",
     "SameSite=Lax",
   ];
+  if (domain) cookie.push(`Domain=${domain}`);
   if (secure) cookie.push("Secure");
   res.setHeader("Set-Cookie", cookie.join("; "));
 }
@@ -240,7 +273,7 @@ app.post("/api/auth/register", async (req, res) => {
 
     const { token } = await createSessionForUser(user.id);
 
-    setSessionCookie(res, token);
+    setSessionCookie(req, res, token);
     return res.json({ user });
   } catch (err) {
     if (err && err.code === "P2002") {
@@ -273,7 +306,7 @@ app.post("/api/auth/login", async (req, res) => {
 
     const { token } = await createSessionForUser(user.id);
 
-    setSessionCookie(res, token);
+    setSessionCookie(req, res, token);
     return res.json({
       user: { id: user.id, username: user.username, createdAt: user.createdAt },
     });
@@ -375,11 +408,11 @@ app.post("/api/auth/logout", async (req, res) => {
         await prisma.session.deleteMany({ where: { tokenHash } });
       }
     }
-    clearSessionCookie(res);
+    clearSessionCookie(req, res);
     return res.json({ ok: true });
   } catch (err) {
     console.error("/api/auth/logout failed:", err);
-    clearSessionCookie(res);
+    clearSessionCookie(req, res);
     return res.json({ ok: true });
   }
 });
@@ -475,7 +508,7 @@ const io = new Server(server, {
     methods: ["GET", "POST"],
   },
   // Explicitly set the path
-  path: "/socket.io",
+  path: "/socket.io/",
   // Allow both polling and websocket transports
   transports: ["polling", "websocket"],
   // Allow upgrades from polling to websocket

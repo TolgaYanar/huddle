@@ -252,13 +252,17 @@ export const useRoom = (roomId: string, userId: string) => {
   >([]);
 
   useEffect(() => {
+    const isSameOrigin =
+      typeof window !== "undefined" && SERVER_URL === window.location.origin;
+
     // Initialize socket connection
     socketRef.current = io(SERVER_URL, {
-      // Try WebSocket first (best UX/latency). If the environment blocks
-      // WebSockets, fall back to long-polling automatically.
-      // This also avoids upgrade edge-cases where polling connects but the
-      // websocket upgrade fails behind certain proxies/load balancers.
-      transports: ["websocket", "polling"],
+      // When using same-origin (typically via Vercel rewrites), websocket
+      // upgrades can be unreliable; polling-only is the safe default.
+      // When connecting directly to the backend (e.g. https://api.wehuddle.tv),
+      // websocket works as expected and provides lower latency.
+      transports: isSameOrigin ? ["polling"] : ["websocket", "polling"],
+      upgrade: !isSameOrigin,
       autoConnect: false,
       withCredentials: true,
       // Explicitly set the path to match server configuration

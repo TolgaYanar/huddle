@@ -21,10 +21,10 @@ WebSocket connections were failing with:
 
 ```typescript
 socketRef.current = io(SERVER_URL, {
-  transports: ["polling", "websocket"],
+  transports: ["websocket", "polling"],
   autoConnect: false,
   withCredentials: true,
-  path: "/socket.io", // ✅ Explicit path
+  path: "/socket.io/", // ✅ Explicit path (note trailing slash)
   reconnectionAttempts: 5,
   reconnectionDelay: 1000,
   timeout: 20000,
@@ -38,7 +38,7 @@ const io = new Server(server, {
   cors: {
     /* ... */
   },
-  path: "/socket.io", // ✅ Explicit path
+  path: "/socket.io/", // ✅ Explicit path (note trailing slash)
   transports: ["polling", "websocket"], // ✅ Both transports
   allowUpgrades: true, // ✅ Allow upgrade from polling to WebSocket
   pingTimeout: 60000,
@@ -129,14 +129,22 @@ DATABASE_URL=postgresql://...
 ### Web App (`apps/web/.env.local`)
 
 ```env
-# Vercel (recommended): keep Socket.IO SAME-ORIGIN so the HttpOnly session
-# cookie is sent during the Socket.IO handshake.
-# - Leave unset (or set to an empty string) to use the current origin.
-NEXT_PUBLIC_SOCKET_SERVER_URL=
+# Best long-term: connect Socket.IO directly to the backend domain (no Vercel WS proxy).
+# This requires the server to set the session cookie for `.wehuddle.tv`.
+NEXT_PUBLIC_SOCKET_SERVER_URL=https://api.wehuddle.tv
 
 # IMPORTANT: Vercel must proxy `/socket.io/*` and `/api/*` to Railway.
 # Set this on Vercel as an Environment Variable (Build + Runtime):
 # API_PROXY_TARGET=https://<your-railway-service-domain>
+```
+
+### Cross-subdomain cookie (server)
+
+The server now sets `Domain=.wehuddle.tv` automatically in production when requests come from `*.wehuddle.tv`.
+You can override it explicitly:
+
+```env
+COOKIE_DOMAIN=.wehuddle.tv
 ```
 
 ## Troubleshooting
@@ -163,6 +171,9 @@ NEXT_PUBLIC_SOCKET_SERVER_URL=
 ### Polling works but WebSocket upgrade fails?
 
 This is normal and not a problem! Socket.IO will continue using long-polling, which works fine for most use cases.
+
+If you're deploying the web app on Vercel, it's common for the WebSocket _upgrade_ to fail (redirects/400s) even when polling works.
+In that case, running Socket.IO in polling-only mode is the most reliable option unless you connect directly to your backend domain with a cookie that is valid across subdomains.
 
 If you want WebSocket upgrade to succeed:
 
