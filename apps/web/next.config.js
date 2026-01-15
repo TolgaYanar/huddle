@@ -21,6 +21,11 @@ const nextConfig = {
     // for local API route handlers. Only proxy specific backend routes.
     return {
       beforeFiles: [
+        // Debug/monitoring helper: proxy the server health check
+        {
+          source: "/health",
+          destination: `${target}/health`,
+        },
         // Socket.IO (polling + websocket upgrade)
         // Proxying through the web origin helps ensure the browser sends the
         // HttpOnly session cookie during the Socket.IO handshake.
@@ -50,6 +55,8 @@ const nextConfig = {
           destination: `${target}/api/saved-rooms`,
         },
       ],
+      afterFiles: [],
+      fallback: [],
     };
   },
 };
