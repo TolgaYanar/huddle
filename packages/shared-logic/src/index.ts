@@ -261,7 +261,7 @@ export const useRoom = (roomId: string, userId: string) => {
       autoConnect: false,
       withCredentials: true,
       // Explicitly set the path to match server configuration
-      path: "/socket.io",
+      path: "/socket.io/",
       // Retry configuration for better reliability
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
