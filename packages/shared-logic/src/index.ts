@@ -254,10 +254,11 @@ export const useRoom = (roomId: string, userId: string) => {
   useEffect(() => {
     // Initialize socket connection
     socketRef.current = io(SERVER_URL, {
-      // Prefer starting with polling so we can connect even when WebSocket
-      // upgrades are blocked by proxies/CDNs. Socket.IO will still try to
-      // upgrade to WebSocket when possible.
-      transports: ["polling", "websocket"],
+      // Try WebSocket first (best UX/latency). If the environment blocks
+      // WebSockets, fall back to long-polling automatically.
+      // This also avoids upgrade edge-cases where polling connects but the
+      // websocket upgrade fails behind certain proxies/load balancers.
+      transports: ["websocket", "polling"],
       autoConnect: false,
       withCredentials: true,
       // Explicitly set the path to match server configuration
