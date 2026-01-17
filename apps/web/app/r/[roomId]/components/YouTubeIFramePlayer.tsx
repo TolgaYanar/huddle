@@ -36,6 +36,7 @@ type YTPlayer = {
   seekTo: (seconds: number, allowSeekAhead: boolean) => void;
   getCurrentTime: () => number;
   getDuration: () => number;
+  getPlayerState?: () => number;
   setVolume: (vol: number) => void;
   mute: () => void;
   unMute: () => void;
@@ -145,12 +146,21 @@ export function YouTubeIFramePlayer(
   },
   ref: React.ForwardedRef<YouTubeIFramePlayerHandle>
 ) {
+  const [resetNonce, setResetNonce] = React.useState(0);
   const wrapperRef = React.useRef<HTMLDivElement | null>(null);
   const mountElRef = React.useRef<HTMLDivElement | null>(null);
   const playerRef = React.useRef<YTPlayer | null>(null);
   const lastStateRef = React.useRef<number | null>(null);
   const lastCommandedPlayingRef = React.useRef<boolean | null>(null);
   const lastCommandedVideoIdRef = React.useRef<string | null>(null);
+  const lastRequestedVideoIdRef = React.useRef<string | null>(null);
+  const lastVideoSwitchAtRef = React.useRef(0);
+  const lastEnsurePlayAtRef = React.useRef(0);
+  const kickWindowUntilRef = React.useRef(0);
+  const kickAttemptsRef = React.useRef(0);
+  const kickVideoIdRef = React.useRef<string | null>(null);
+  const startTimeFallbackTriedForVideoRef = React.useRef<string | null>(null);
+  const lastHardResetVideoIdRef = React.useRef<string | null>(null);
   // Track the start time that was used for the current video to avoid re-seeking
   const usedStartTimeForVideoRef = React.useRef<string | null>(null);
   const latest = React.useRef({
@@ -251,7 +261,8 @@ export function YouTubeIFramePlayer(
     []
   );
 
-  // Create/destroy the YT player once.
+  // Create/destroy the YT player (rarely) and allow a hard reset if the
+  // embedded player gets into a wedged state after many playlist switches.
   React.useEffect(() => {
     if (typeof window === "undefined") return;
     const wrapper = wrapperRef.current;
@@ -357,12 +368,47 @@ export function YouTubeIFramePlayer(
               return;
             }
 
+            const maybeKickPlay = () => {
+              if (!latest.current.playing) return;
+              const now = Date.now();
+              if (now > kickWindowUntilRef.current) return;
+              if (kickAttemptsRef.current >= 10) return;
+              if (now - lastEnsurePlayAtRef.current < 500) return;
+
+              lastEnsurePlayAtRef.current = now;
+              kickAttemptsRef.current += 1;
+              try {
+                player.playVideo();
+              } catch {
+                // ignore autoplay/user-gesture errors
+              }
+            };
+
+            // If we're expecting playback, YouTube can briefly enter UNSTARTED (-1)
+            // or CUED (5) after loadVideoById. Kick playVideo() within a bounded
+            // window so we don't create infinite "loading" loops.
+            if (nextState === -1 || nextState === 5) {
+              maybeKickPlay();
+            }
+
             if (nextState === 1 && prev !== 1) {
               latest.current.onPlay?.();
               return;
             }
 
             if (nextState === 2 && prev === 1) {
+              const now = Date.now();
+
+              // Ignore very recent switch-related pauses (common during next).
+              if (now - lastVideoSwitchAtRef.current < 1500) return;
+
+              // If the app expects playback, attempt a bounded recovery.
+              if (latest.current.playing) {
+                maybeKickPlay();
+                // If we're still within the recovery window, don't surface pause.
+                if (now <= kickWindowUntilRef.current) return;
+              }
+
               latest.current.onPause?.();
             }
           },
@@ -394,12 +440,53 @@ export function YouTubeIFramePlayer(
       }
       mountElRef.current = null;
     };
-  }, []);
+  }, [resetNonce]);
 
   // Keep props synced.
   React.useEffect(() => {
     const player = playerRef.current;
     if (!player) return;
+
+    let startFallbackTimer: number | null = null;
+    let hardResetTimer: number | null = null;
+    let ensureStartSeekTimer: number | null = null;
+
+    const maybeSeekToStartTime = () => {
+      const desiredId = latest.current.videoId;
+      const st = latest.current.startTime;
+      if (!desiredId) return;
+      if (!st || !(st > 0)) return;
+
+      const key = `${desiredId}:${Math.floor(st)}`;
+      if (usedStartTimeForVideoRef.current === key) return;
+
+      // Only seek if we're still targeting this video.
+      if (lastRequestedVideoIdRef.current !== desiredId) return;
+
+      try {
+        const cur = playerRef.current?.getCurrentTime?.();
+        const curOk = typeof cur === "number" && Number.isFinite(cur) ? cur : 0;
+        // If we're already near/after the desired start, don't fight the user.
+        if (curOk >= st - 0.75) {
+          usedStartTimeForVideoRef.current = key;
+          return;
+        }
+
+        // Best-effort: seek, then ensure play if expected.
+        playerRef.current?.seekTo?.(st, true);
+        if (latest.current.playing) {
+          try {
+            playerRef.current?.playVideo?.();
+          } catch {
+            // ignore
+          }
+        }
+
+        usedStartTimeForVideoRef.current = key;
+      } catch {
+        // ignore
+      }
+    };
 
     // Audio
     try {
@@ -423,28 +510,144 @@ export function YouTubeIFramePlayer(
     // Video switching
     try {
       const desired = videoId;
-      const current = player.getVideoData?.()?.video_id;
-      if (desired && desired !== current) {
+      // IMPORTANT: Do not rely on getVideoData() here.
+      // During playlist switches, the IFrame API often returns undefined or a
+      // stale id for a short period. If we treat that as "not loaded yet",
+      // we'll spam loadVideoById on every render and wedge the player.
+      if (desired && desired !== lastRequestedVideoIdRef.current) {
+        lastRequestedVideoIdRef.current = desired;
+        lastVideoSwitchAtRef.current = Date.now();
+        kickVideoIdRef.current = desired;
+        kickAttemptsRef.current = 0;
+        kickWindowUntilRef.current = Date.now() + 8000;
         lastStateRef.current = null;
         // Use the start time if this is the first load for this video
         const effectiveStartSeconds =
           startTime && startTime > 0 ? startTime : 0;
         // Mark that we've used the start time for this video
-        usedStartTimeForVideoRef.current = desired;
+        usedStartTimeForVideoRef.current = effectiveStartSeconds
+          ? `${desired}:${Math.floor(effectiveStartSeconds)}`
+          : desired;
         if (playing) {
           player.loadVideoById({
             videoId: desired,
             startSeconds: effectiveStartSeconds,
           });
+
+          // Some videos/embeds ignore startSeconds. Do a delayed seek once.
+          if (effectiveStartSeconds > 0) {
+            ensureStartSeekTimer = window.setTimeout(() => {
+              try {
+                // Only if we still want this same video.
+                if (lastRequestedVideoIdRef.current !== desired) return;
+                const cur = playerRef.current?.getCurrentTime?.();
+                const curOk =
+                  typeof cur === "number" && Number.isFinite(cur) ? cur : 0;
+                if (curOk < effectiveStartSeconds - 0.75) {
+                  maybeSeekToStartTime();
+                }
+              } catch {
+                // ignore
+              }
+            }, 1200);
+          }
+
+          // Best-effort follow-up kick: even after loadVideoById, YouTube can
+          // stay CUED/UNSTARTED. Keep this bounded to the kick window.
+          window.setTimeout(() => {
+            try {
+              const now = Date.now();
+              if (!latest.current.playing) return;
+              if (kickVideoIdRef.current !== desired) return;
+              if (now > kickWindowUntilRef.current) return;
+              if (now - lastEnsurePlayAtRef.current < 500) return;
+              lastEnsurePlayAtRef.current = now;
+              kickAttemptsRef.current += 1;
+              playerRef.current?.playVideo();
+            } catch {
+              // ignore
+            }
+          }, 250);
+
+          // If a timestamped start appears to wedge the player (common on some
+          // videos/embeds), retry once without startSeconds.
+          if (effectiveStartSeconds > 0) {
+            startTimeFallbackTriedForVideoRef.current = null;
+            startFallbackTimer = window.setTimeout(() => {
+              try {
+                if (!latest.current.playing) return;
+                if (kickVideoIdRef.current !== desired) return;
+                if (startTimeFallbackTriedForVideoRef.current === desired)
+                  return;
+
+                const st =
+                  playerRef.current?.getPlayerState?.() ?? lastStateRef.current;
+                // 1 == playing
+                if (st === 1) return;
+
+                startTimeFallbackTriedForVideoRef.current = desired;
+                // Extend recovery window a bit for the fallback attempt.
+                kickWindowUntilRef.current = Date.now() + 6000;
+                kickAttemptsRef.current = 0;
+
+                playerRef.current?.loadVideoById({ videoId: desired });
+                window.setTimeout(() => {
+                  try {
+                    playerRef.current?.playVideo();
+                  } catch {
+                    // ignore
+                  }
+                }, 250);
+              } catch {
+                // ignore
+              }
+            }, 4500);
+          }
+
+          // Last-resort: if the player never reaches PLAYING after a switch,
+          // recreate the IFrame API player once per target video id.
+          hardResetTimer = window.setTimeout(() => {
+            try {
+              if (!latest.current.playing) return;
+              if (kickVideoIdRef.current !== desired) return;
+              if (lastHardResetVideoIdRef.current === desired) return;
+
+              const st =
+                playerRef.current?.getPlayerState?.() ?? lastStateRef.current;
+              if (st === 1) return;
+
+              lastHardResetVideoIdRef.current = desired;
+              setResetNonce((n) => n + 1);
+            } catch {
+              // ignore
+            }
+          }, 10000);
         } else {
           player.cueVideoById({
             videoId: desired,
             startSeconds: effectiveStartSeconds,
           });
+
+          // If we're cueing with a start time, also seek after cue so the
+          // play transition starts at the right offset.
+          if (effectiveStartSeconds > 0) {
+            ensureStartSeekTimer = window.setTimeout(() => {
+              maybeSeekToStartTime();
+            }, 800);
+          }
         }
       }
     } catch {
       // ignore
+    }
+
+    // If the URL changes only in `t=` (same videoId), we still need to seek.
+    // Do it after props update; this also helps when the player ignored
+    // startSeconds.
+    if (videoId && startTime && startTime > 0) {
+      ensureStartSeekTimer = window.setTimeout(() => {
+        maybeSeekToStartTime();
+      }, 250);
     }
 
     // Play/pause
@@ -470,6 +673,12 @@ export function YouTubeIFramePlayer(
     } catch {
       // ignore
     }
+
+    return () => {
+      if (startFallbackTimer) window.clearTimeout(startFallbackTimer);
+      if (hardResetTimer) window.clearTimeout(hardResetTimer);
+      if (ensureStartSeekTimer) window.clearTimeout(ensureStartSeekTimer);
+    };
   }, [videoId, startTime, playing, muted, volume, playbackRate]);
 
   // Progress polling

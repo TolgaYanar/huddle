@@ -12,6 +12,8 @@ import {
   getLoadTimeoutMs,
   getPrimeVideoMessage,
   getTimeoutErrorMessage,
+  getYouTubeStartTime,
+  isYouTubeUrl,
   isPrimeVideoUrl,
   normalizeVideoUrl,
 } from "../lib/video";
@@ -1073,14 +1075,26 @@ export function useVideoPlayer({
     ) => {
       const { forcePlay, skipBroadcast } = options ?? {};
       const wasPlaying = latestVideoStateRef.current === "Playing";
+
+      const initialTime = (() => {
+        try {
+          if (!isYouTubeUrl(nextUrl)) return 0;
+          const st = getYouTubeStartTime(nextUrl);
+          return st && st > 0 ? st : 0;
+        } catch {
+          return 0;
+        }
+      })();
+
       setPlayerReady(false);
       setPlayerError(null);
       setUrl(nextUrl);
       setInputUrl(nextUrl);
+      setCurrentTime(initialTime);
 
       // Only broadcast sync events if not receiving from external source
       if (!skipBroadcast) {
-        sendSyncEvent("change_url", 0, nextUrl);
+        sendSyncEvent("change_url", initialTime, nextUrl);
       }
 
       // If the room was already playing, keep it playing after changing the URL.
@@ -1090,7 +1104,7 @@ export function useVideoPlayer({
       if (wasPlaying || forcePlay) {
         setVideoState("Playing");
         if (!skipBroadcast) {
-          sendSyncEvent("play", 0, nextUrl);
+          sendSyncEvent("play", initialTime, nextUrl);
         }
       } else {
         setVideoState("Paused");
