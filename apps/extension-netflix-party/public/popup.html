@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Huddle for Netflix</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      body {
+        margin: 0;
+        font:
+          13px system-ui,
+          -apple-system,
+          Segoe UI,
+          Roboto,
+          Arial;
+        background: #0b0b0f;
+        color: #fff;
+        width: 320px;
+      }
+      .wrap {
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+      }
+      label {
+        display: block;
+        font-size: 12px;
+        opacity: 0.8;
+        margin-bottom: 4px;
+      }
+      input {
+        width: 100%;
+        padding: 10px;
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: #11111a;
+        color: #fff;
+        outline: none;
+      }
+      .readonly {
+        width: 100%;
+        padding: 10px;
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.04);
+        color: rgba(255, 255, 255, 0.85);
+        font-size: 12px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      button {
+        padding: 10px;
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        background: #1c1c2a;
+        color: #fff;
+        cursor: pointer;
+      }
+      button.primary {
+        background: #5b5bf7;
+        border-color: #5b5bf7;
+      }
+      .status {
+        font-size: 12px;
+        opacity: 0.85;
+      }
+      .hint {
+        font-size: 12px;
+        opacity: 0.7;
+        line-height: 1.3;
+      }
+      .small {
+        font-size: 11px;
+        opacity: 0.7;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div>
+        <label>Server</label>
+        <div class="readonly" id="serverUrl">Configured by build</div>
+      </div>
+      <div>
+        <label for="roomId">Room ID</label>
+        <input id="roomId" placeholder="e.g. netflix-night" />
+      </div>
+      <div class="row">
+        <button class="primary" id="connect">Connect</button>
+        <button id="disconnect">Disconnect</button>
+      </div>
+      <div class="status" id="status">Not connected</div>
+      <div class="hint">
+        Open a Netflix watch page in this tab. Share the same Room ID with
+        friends to sync play/pause/seek.
+      </div>
+      <div class="small">
+        Tip: if your server uses an allowlist, set
+        <code>ALLOW_EXTENSION_ORIGINS=true</code> on the server.
+      </div>
+    </div>
+
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

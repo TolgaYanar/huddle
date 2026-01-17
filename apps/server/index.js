@@ -10,6 +10,18 @@ require("dotenv").config();
 
 const app = express();
 
+const VERBOSE_LOGS =
+  String(process.env.VERBOSE_LOGS || "").trim() === "1" ||
+  String(process.env.VERBOSE_LOGS || "")
+    .trim()
+    .toLowerCase() === "true";
+
+function vLog(...args) {
+  if (!VERBOSE_LOGS) return;
+  // eslint-disable-next-line no-console
+  console.log(...args);
+}
+
 // Required when running behind Railway/Vercel/other reverse proxies.
 // Ensures Express correctly interprets forwarded headers.
 app.set("trust proxy", 1);
@@ -22,6 +34,19 @@ function parseAllowedOrigins(value) {
     .map((origin) => String(origin).toLowerCase().replace(/\/+$/, ""));
 }
 
+function isExtensionOrigin(origin) {
+  const o = String(origin || "").toLowerCase();
+  return (
+    o.startsWith("chrome-extension://") || o.startsWith("moz-extension://")
+  );
+}
+
+const ALLOW_EXTENSION_ORIGINS =
+  String(process.env.ALLOW_EXTENSION_ORIGINS || "").trim() === "1" ||
+  String(process.env.ALLOW_EXTENSION_ORIGINS || "")
+    .trim()
+    .toLowerCase() === "true";
+
 const ALLOWED_ORIGINS = parseAllowedOrigins(process.env.CORS_ORIGINS);
 const corsOptions = {
   origin(origin, callback) {
@@ -31,6 +56,12 @@ const corsOptions = {
 
     // Allow non-browser clients (no Origin header) like curl/mobile.
     if (!origin) return callback(null, true);
+
+    // Optionally allow browser extension origins (Chrome/Firefox) without
+    // needing to hardcode per-user extension IDs.
+    if (ALLOW_EXTENSION_ORIGINS && isExtensionOrigin(origin)) {
+      return callback(null, true);
+    }
     // If no allowlist provided, reflect-request-origin (dev-friendly).
     if (ALLOWED_ORIGINS.length === 0) return callback(null, true);
     return callback(null, ALLOWED_ORIGINS.includes(normalizedOrigin));
@@ -480,7 +511,7 @@ try {
     .$connect()
     .then(() => {
       dbConnected = true;
-      console.log("✓ Database connected successfully");
+      vLog("✓ Database connected successfully");
     })
     .catch((err) => {
       console.warn("⚠ Database connection failed:", err.message);
@@ -501,6 +532,11 @@ const io = new Server(server, {
 
       // Allow non-browser clients (no Origin header) like curl/mobile.
       if (!origin) return callback(null, true);
+
+      // Optionally allow browser extension origins (Chrome/Firefox).
+      if (ALLOW_EXTENSION_ORIGINS && isExtensionOrigin(origin)) {
+        return callback(null, true);
+      }
       if (ALLOWED_ORIGINS.length === 0) return callback(null, true);
       return callback(null, ALLOWED_ORIGINS.includes(normalizedOrigin));
     },
@@ -534,7 +570,7 @@ io.engine.on("connection_error", (err) => {
 });
 
 io.engine.on("initial_headers", (headers, req) => {
-  console.log("Socket.IO initial headers for:", req.url);
+  vLog("Socket.IO initial headers for:", req.url);
 });
 
 // Map socket.id -> authenticated username (if available).
@@ -921,6 +957,18 @@ function verifyPassword(password, stored) {
 const CHAT_HISTORY_LIMIT = 50;
 const ACTIVITY_HISTORY_LIMIT = 100;
 
+// In-memory chat fallback for when the database is unavailable.
+// Keeps the extension chat usable in local/dev without Postgres.
+const roomChatHistory = new Map();
+
+function pushRoomChatMessage(roomId, msg) {
+  if (!roomId || !msg) return;
+  const list = roomChatHistory.get(roomId) || [];
+  list.push(msg);
+  while (list.length > CHAT_HISTORY_LIMIT) list.shift();
+  roomChatHistory.set(roomId, list);
+}
+
 function normalizeRoomId(raw) {
   if (typeof raw === "string") return raw;
   if (raw && typeof raw.roomId === "string") return raw.roomId;
@@ -962,7 +1010,7 @@ async function emitActivityHistory(socket, roomId) {
 }
 
 io.on("connection", (socket) => {
-  console.log("User connected:", socket.id);
+  vLog("User connected:", socket.id);
 
   const joinedRooms = new Set();
 
@@ -1066,7 +1114,7 @@ io.on("connection", (socket) => {
 
     socket.join(roomId);
     joinedRooms.add(roomId);
-    console.log(`User ${socket.id} joined room: ${roomId}`);
+    vLog(`User ${socket.id} joined room: ${roomId}`);
 
     // Track when this socket joined this room. Used to reject stale sync events
     // from freshly-joined clients before they have fully applied room_state.
@@ -2126,11 +2174,21 @@ io.on("connection", (socket) => {
           })),
         });
       } else {
-        socket.emit("chat_history", { roomId, messages: [] });
+        socket.emit("chat_history", {
+          roomId,
+          messages: (roomChatHistory.get(roomId) || []).slice(
+            -CHAT_HISTORY_LIMIT
+          ),
+        });
       }
     } catch (err) {
       console.error("Failed to load chat history:", err.message);
-      socket.emit("chat_history", { roomId, messages: [] });
+      socket.emit("chat_history", {
+        roomId,
+        messages: (roomChatHistory.get(roomId) || []).slice(
+          -CHAT_HISTORY_LIMIT
+        ),
+      });
     }
   });
 
@@ -2138,6 +2196,8 @@ io.on("connection", (socket) => {
     const { roomId, text } = data || {};
     if (!roomId || typeof roomId !== "string") return;
     if (typeof text !== "string") return;
+
+    if (!isSocketInRoom(roomId, socket.id)) return;
 
     const trimmed = text.trim();
     if (!trimmed) return;
@@ -2166,6 +2226,21 @@ io.on("connection", (socket) => {
           text: msg.text,
           createdAt: msg.createdAt,
         });
+      } else {
+        const senderUsername =
+          socket.data?.authUser?.username ||
+          socketIdToUsername.get(socket.id) ||
+          null;
+        const msg = {
+          id: crypto.randomUUID(),
+          roomId,
+          senderId: socket.id,
+          senderUsername,
+          text: trimmed,
+          createdAt: new Date(),
+        };
+        pushRoomChatMessage(roomId, msg);
+        io.to(roomId).emit("chat_message", msg);
       }
     } catch (err) {
       console.error("Failed to save chat message:", err.message);
@@ -2204,7 +2279,7 @@ io.on("connection", (socket) => {
     } = data || {};
     // action can be 'play', 'pause', 'seek', 'change_url', 'set_mute', 'set_speed', 'set_volume', 'set_audio_sync'
 
-    console.log(
+    vLog(
       `Room ${roomId}: ${action} at ${timestamp} ${videoUrl ? `URL: ${videoUrl}` : ""}`
     );
 
@@ -2246,7 +2321,7 @@ io.on("connection", (socket) => {
       // If this would jump backwards more than 10 seconds, and we're already
       // past 15 seconds in the video, reject it (likely a new joiner's stale event)
       if (regression > 10 && estimatedNowTimestamp > 15 && joinedRecently) {
-        console.log(
+        vLog(
           `Room ${roomId}: Rejecting ${action} at ${timestamp} - would regress from ~${estimatedNowTimestamp.toFixed(1)}s (joinedRecently)`
         );
         return;
@@ -2377,7 +2452,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
-    console.log("User disconnected:", socket.id);
+    vLog("User disconnected:", socket.id);
 
     const username =
       socket.data?.authUser?.username ||
