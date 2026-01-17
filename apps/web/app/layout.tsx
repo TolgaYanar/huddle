@@ -19,6 +19,29 @@ export const metadata: Metadata = {
   },
   description:
     "Join WeHuddle to create instant, private video rooms. Watch YouTube together and chat with friends—no account required.",
+  applicationName: "WeHuddle",
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [
+      {
+        url: "/favicon.svg?v=2",
+        type: "image/svg+xml",
+      },
+      // Optional PNG fallback (add apps/web/public/favicon.png if desired)
+      { url: "/favicon.png?v=2", type: "image/png" },
+    ],
+    apple: [
+      // iOS prefers a PNG apple-touch-icon
+      { url: "/apple-icon?v=2", type: "image/png" },
+    ],
+    shortcut: [
+      {
+        url: "/favicon.svg?v=2",
+        type: "image/svg+xml",
+      },
+      { url: "/favicon.png?v=2", type: "image/png" },
+    ],
+  },
   alternates: {
     canonical: "/",
   },
@@ -51,8 +74,37 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": "https://wehuddle.tv/#organization",
+        name: "WeHuddle",
+        url: "https://wehuddle.tv",
+        logo: "https://wehuddle.tv/favicon.svg",
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://wehuddle.tv/#website",
+        name: "WeHuddle",
+        url: "https://wehuddle.tv",
+        description:
+          "Create instant, private video rooms. Watch YouTube together and chat with friends.",
+        publisher: { "@id": "https://wehuddle.tv/#organization" },
+      },
+    ],
+  };
+
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          type="application/ld+json"
+          // eslint-disable-next-line react/no-danger
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable}`}
         suppressHydrationWarning

@@ -118,10 +118,17 @@ function RegisterPageInner() {
           href="/"
           className="font-semibold text-lg sm:text-xl flex items-center gap-2 text-slate-50 tracking-tight"
         >
-          <span aria-hidden className="text-xl">
-            🍿
-          </span>
-          <span>Huddle</span>
+          <picture>
+            <source srcSet="/favicon.svg?v=2" type="image/svg+xml" />
+            <img
+              src="/favicon.svg?v=2"
+              alt="WeHuddle"
+              width={24}
+              height={24}
+              className="h-6 w-6 rounded"
+            />
+          </picture>
+          <span>WeHuddle</span>
         </Link>
         <Link
           href={`/login?next=${encodeURIComponent(next)}`}

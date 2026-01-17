@@ -1,6 +1,8 @@
 import { ImageResponse } from "next/og";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 
 export const alt = "WeHuddle";
 export const size = {
@@ -10,7 +12,33 @@ export const size = {
 
 export const contentType = "image/png";
 
-export default function OpenGraphImage() {
+async function tryReadPublicAssetDataUrl(): Promise<string | null> {
+  const publicDir = path.join(process.cwd(), "public");
+
+  for (const svgName of ["favicon.svg", "popcorn_favicon.svg"]) {
+    try {
+      const svg = await readFile(path.join(publicDir, svgName), "utf8");
+      const encoded = encodeURIComponent(svg);
+      return `data:image/svg+xml;charset=utf-8,${encoded}`;
+    } catch {
+      // try next
+    }
+  }
+
+  for (const pngName of ["favicon.png"]) {
+    try {
+      const buf = await readFile(path.join(publicDir, pngName));
+      return `data:image/png;base64,${buf.toString("base64")}`;
+    } catch {
+      // try next
+    }
+  }
+
+  return null;
+}
+
+export default async function OpenGraphImage() {
+  const favicon = await tryReadPublicAssetDataUrl();
   return new ImageResponse(
     <div
       style={{
@@ -23,7 +51,16 @@ export default function OpenGraphImage() {
         background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)",
       }}
     >
-      <div style={{ fontSize: 200, marginBottom: 20 }}>🍿</div>
+      {favicon ? (
+        <img
+          src={favicon}
+          width={240}
+          height={240}
+          style={{ borderRadius: 48, marginBottom: 24 }}
+        />
+      ) : (
+        <div style={{ fontSize: 200, marginBottom: 20 }}>🍿</div>
+      )}
       <div
         style={{
           fontSize: 72,
