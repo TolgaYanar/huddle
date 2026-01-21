@@ -1,21 +1,12 @@
 import { useCallback } from "react";
 
-import { getHtmlMediaElementFromRef, playFromRef } from "../../../lib/player";
-
 import type { PlaybackHandlersArgs } from "./types";
 
 export function useHandleProgress(args: PlaybackHandlersArgs) {
-  const {
-    state,
-    url,
-    sendSyncEvent,
-    hasInitialSyncRef,
-    applyingRemoteSyncRef,
-    lastManualSeekRef,
-  } = args;
+  const { state, hasInitialSyncRef, applyingRemoteSyncRef, lastManualSeekRef } =
+    args;
 
   const {
-    playerRef,
     latestVideoStateRef,
     lastProgressTickRef,
     lastAutoResumeAtRef,
@@ -54,11 +45,6 @@ export function useHandleProgress(args: PlaybackHandlersArgs) {
         cancelPendingPause();
         setVideoState("Playing");
         latestVideoStateRef.current = "Playing";
-        sendSyncEvent("play", time, url);
-
-        if (getHtmlMediaElementFromRef(playerRef)) {
-          void playFromRef(playerRef);
-        }
       }
 
       setCurrentTime(time);
@@ -71,11 +57,8 @@ export function useHandleProgress(args: PlaybackHandlersArgs) {
       lastManualSeekRef,
       lastProgressTickRef,
       latestVideoStateRef,
-      playerRef,
-      sendSyncEvent,
       setCurrentTime,
       setVideoState,
-      url,
     ],
   );
 }

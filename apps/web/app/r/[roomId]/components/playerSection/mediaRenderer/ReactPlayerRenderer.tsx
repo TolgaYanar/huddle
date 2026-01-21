@@ -35,7 +35,9 @@ export function ReactPlayerRenderer({
   setYtForceRemountNonce,
   clearLoadTimeout,
   syncToRoomTimeIfNeeded,
+  cancelPendingRoomCatchup,
   handlePlay,
+  handleUserPlay,
   handlePause,
   handleSeekFromController,
   lastManualSeekRef,
@@ -70,7 +72,9 @@ export function ReactPlayerRenderer({
   setYtForceRemountNonce: React.Dispatch<React.SetStateAction<number>>;
   clearLoadTimeout: () => void;
   syncToRoomTimeIfNeeded: () => void;
+  cancelPendingRoomCatchup: () => void;
   handlePlay: () => void;
+  handleUserPlay: () => void;
   handlePause: () => void;
   handleSeekFromController: (time: number, opts?: { force?: boolean }) => void;
   lastManualSeekRef: React.MutableRefObject<number>;
@@ -96,7 +100,19 @@ export function ReactPlayerRenderer({
       playsInline={true}
       config={playerConfig}
       onPlay={() => {
-        if (applyingRemoteSyncRef.current) return;
+        const hasUserActivation =
+          typeof navigator !== "undefined" &&
+          (navigator as { userActivation?: { isActive?: boolean } })
+            .userActivation?.isActive === true;
+
+        // If the user explicitly clicks play during a catch-up/remote-sync window,
+        // allow it (otherwise controlled `playing={...}` can immediately re-pause).
+        if (applyingRemoteSyncRef.current && !hasUserActivation) return;
+
+        if (hasUserActivation) {
+          cancelPendingRoomCatchup();
+        }
+
         if (isYouTube && !useYouTubeIFrameApi && !youTubeIsOnDesired) {
           // User is trying to play, but our safety gate is holding
           // playback until the desired id is confirmed. If the YT
@@ -123,28 +139,60 @@ export function ReactPlayerRenderer({
             );
           }
 
-          handlePlay();
+          if (hasUserActivation) {
+            handleUserPlay();
+          } else {
+            handlePlay();
+          }
           return;
         }
-        handlePlay();
+        if (hasUserActivation) {
+          handleUserPlay();
+        } else {
+          handlePlay();
+        }
       }}
       onPause={() => {
-        if (applyingRemoteSyncRef.current) return;
         // Don't broadcast pause when page is hidden - this is browser
         // auto-pausing due to visibility policy, not user intent.
         if (!isPageVisible) return;
         if (isYouTube && !useYouTubeIFrameApi && !youTubeIsOnDesired) return;
+
+        const hasUserActivation =
+          typeof navigator !== "undefined" &&
+          (navigator as { userActivation?: { isActive?: boolean } })
+            .userActivation?.isActive === true;
+        if (hasUserActivation) {
+          cancelPendingRoomCatchup();
+        }
+
         if (videoState !== "Paused") handlePause();
       }}
       onSeeked={() => {
-        if (applyingRemoteSyncRef.current) return;
+        const hasUserActivation =
+          typeof navigator !== "undefined" &&
+          (navigator as { userActivation?: { isActive?: boolean } })
+            .userActivation?.isActive === true;
+        if (applyingRemoteSyncRef.current && !hasUserActivation) return;
+
+        if (hasUserActivation) {
+          cancelPendingRoomCatchup();
+        }
+
         lastManualSeekRef.current = Date.now();
       }}
       onSeek={(time: number) => {
-        if (applyingRemoteSyncRef.current) return;
+        const hasUserActivation =
+          typeof navigator !== "undefined" &&
+          (navigator as { userActivation?: { isActive?: boolean } })
+            .userActivation?.isActive === true;
+        if (applyingRemoteSyncRef.current && !hasUserActivation) return;
         if (typeof time !== "number" || Number.isNaN(time)) return;
 
         lastManualSeekRef.current = Date.now();
+        if (hasUserActivation) {
+          cancelPendingRoomCatchup();
+        }
         handleSeekFromController(time, { force: true });
       }}
       onError={handlePlayerError}

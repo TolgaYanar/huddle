@@ -65,6 +65,7 @@ export function PlayerSection({
   roomPlaybackAnchorRef,
   roomPlaybackAnchorVersion,
   lastManualSeekRef,
+  lastUserPauseAtRef,
 
   muted,
   volume,
@@ -79,7 +80,9 @@ export function PlayerSection({
   isConnected,
   videoState,
   handlePlay,
+  handleUserPlay,
   handlePause,
+  handleUserPause,
   suppressNextPlayBroadcast,
   suppressNextSeekBroadcast,
   handleSeekTo,
@@ -131,6 +134,7 @@ export function PlayerSection({
     applyingRemoteSyncRef,
     roomPlaybackAnchorRef,
     lastManualSeekRef,
+    lastUserPauseAtRef,
     suppressNextPlayBroadcast,
     suppressNextSeekBroadcast,
     handlePlay,
@@ -214,6 +218,7 @@ export function PlayerSection({
       playerConfig,
       onEmbedLoad,
       handlePlay,
+      handleUserPlay,
       handlePause,
       handleUserSeek,
       handleProgress,
@@ -295,7 +300,7 @@ export function PlayerSection({
         playbackRate={playbackRate}
         isBuffering={isBuffering}
         onPlay={handlePlayWithRoomCatchup}
-        onPause={handlePause}
+        onPause={handleUserPause}
         onSeek={handleUserSeek}
         onVolumeChange={handleVolumeChange}
         onMuteToggle={toggleMute}

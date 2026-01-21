@@ -23,6 +23,7 @@ export type UseActivityLogProps = {
   isConnected: boolean;
   playerRef: React.RefObject<unknown>;
   applyingRemoteSyncRef: React.MutableRefObject<boolean>;
+  lastUserPauseAtRef?: React.MutableRefObject<number>;
   hasInitialSyncRef?: React.MutableRefObject<boolean>;
   roomPlaybackAnchorRef?: React.MutableRefObject<RoomPlaybackAnchor | null>;
   onRoomPlaybackAnchorUpdated?: (next: RoomPlaybackAnchor) => void;

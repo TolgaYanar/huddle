@@ -15,12 +15,14 @@ export function YouTubeIFrameApiPlayer({
   playbackRate,
   isPageVisible,
   applyingRemoteSyncRef,
+  cancelPendingRoomCatchup,
   setPlayerReady,
   setPlayerError,
   setIsBuffering,
   clearLoadTimeout,
   syncToRoomTimeIfNeeded,
   handlePlay,
+  handleUserPlay,
   handlePause,
   handleProgress,
   handleDuration,
@@ -39,12 +41,14 @@ export function YouTubeIFrameApiPlayer({
   playbackRate: number;
   isPageVisible: boolean;
   applyingRemoteSyncRef: React.MutableRefObject<boolean>;
+  cancelPendingRoomCatchup: () => void;
   setPlayerReady: React.Dispatch<React.SetStateAction<boolean>>;
   setPlayerError: React.Dispatch<React.SetStateAction<string | null>>;
   setIsBuffering: React.Dispatch<React.SetStateAction<boolean>>;
   clearLoadTimeout: () => void;
   syncToRoomTimeIfNeeded: () => void;
   handlePlay: () => void;
+  handleUserPlay: () => void;
   handlePause: () => void;
   handleProgress: (time: number) => void;
   handleDuration: (dur: number) => void;
@@ -99,15 +103,36 @@ export function YouTubeIFrameApiPlayer({
         setIsBuffering(false);
         clearLoadTimeout();
 
-        if (applyingRemoteSyncRef.current) return;
+        const hasUserActivation =
+          typeof navigator !== "undefined" &&
+          (navigator as { userActivation?: { isActive?: boolean } })
+            .userActivation?.isActive === true;
 
-        handlePlay();
+        // Allow explicit user play during remote-sync windows.
+        if (applyingRemoteSyncRef.current && !hasUserActivation) return;
+        if (hasUserActivation) {
+          cancelPendingRoomCatchup();
+        }
+
+        if (hasUserActivation) {
+          handleUserPlay();
+        } else {
+          handlePlay();
+        }
       }}
       onPause={() => {
-        if (applyingRemoteSyncRef.current) return;
         // Don't broadcast pause when page is hidden - this is browser
         // auto-pausing due to visibility policy, not user intent.
         if (!isPageVisible) return;
+
+        const hasUserActivation =
+          typeof navigator !== "undefined" &&
+          (navigator as { userActivation?: { isActive?: boolean } })
+            .userActivation?.isActive === true;
+        if (hasUserActivation) {
+          cancelPendingRoomCatchup();
+        }
+
         if (videoState !== "Paused") handlePause();
       }}
       onEnded={() => {
@@ -142,7 +167,14 @@ export function YouTubeIFrameApiPlayer({
         // remote sync events.
         if (applyingRemoteSyncRef.current) {
           ytLastProgressRef.current = { t: time, at: Date.now() };
-          return;
+
+          // If user is actively interacting (e.g., dragging the scrubber), we still
+          // want to detect the seek and cancel any in-flight catchup.
+          const hasUserActivation =
+            typeof navigator !== "undefined" &&
+            (navigator as { userActivation?: { isActive?: boolean } })
+              .userActivation?.isActive === true;
+          if (!hasUserActivation) return;
         }
 
         const now = Date.now();
@@ -168,6 +200,7 @@ export function YouTubeIFrameApiPlayer({
             `[YT-SEEK] Detected seek: delta=${delta.toFixed(2)}s, expected=${expectedDelta.toFixed(2)}s, minJump=${minJump.toFixed(2)}s, time=${time.toFixed(2)}s`,
           );
           lastManualSeekRef.current = Date.now();
+          cancelPendingRoomCatchup();
           handleSeekFromController(time, { force: true });
         }
       }}

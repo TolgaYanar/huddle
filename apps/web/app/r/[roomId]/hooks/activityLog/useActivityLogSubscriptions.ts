@@ -21,6 +21,7 @@ export function useActivityLogSubscriptions({
   userId,
   playerRef,
   applyingRemoteSyncRef,
+  lastUserPauseAtRef,
   hasInitialSyncRef,
   roomPlaybackAnchorRef,
   onRoomPlaybackAnchorUpdated,
@@ -91,6 +92,7 @@ export function useActivityLogSubscriptions({
         setVolume,
         setPlaybackRate,
         setAudioSyncEnabled,
+        lastUserPauseAtRef,
       });
     });
 
@@ -152,6 +154,7 @@ export function useActivityLogSubscriptions({
     roomId,
     userId,
     playerRef,
+    lastUserPauseAtRef,
     hasInitialSyncRef,
     roomPlaybackAnchorRef,
     setUrl,

@@ -1,19 +1,16 @@
 import { useCallback } from "react";
 
-import { getCurrentTimeFromRef, pauseFromRef } from "../../../lib/player";
-import { USER_PAUSE_INTENT_WINDOW_MS } from "../constants";
+import { getCurrentTimeFromRef } from "../../../lib/player";
 
 import type { PlaybackHandlersArgs } from "./types";
 
-export function useHandlePlay(args: PlaybackHandlersArgs) {
-  const {
-    state,
-    url,
-    sendSyncEvent,
-    addLogEntry,
-    hasInitialSyncRef,
-    applyingRemoteSyncRef,
-  } = args;
+/**
+ * Handle explicit user-initiated play (native controls/keyboard click).
+ * This should override pause-intent and remote-sync echo windows, but still
+ * respect suppression windows used to avoid duplicate broadcasts (e.g. room catchup).
+ */
+export function useHandleUserPlay(args: PlaybackHandlersArgs) {
+  const { state, url, sendSyncEvent, addLogEntry, hasInitialSyncRef } = args;
 
   const {
     playerRef,
@@ -27,31 +24,18 @@ export function useHandlePlay(args: PlaybackHandlersArgs) {
   return useCallback(() => {
     cancelPendingPause();
 
-    // If user explicitly paused recently, force the player back to paused state
-    // This prevents the player's auto-play from overriding user's pause intent
-    const userPausedRecently =
-      Date.now() - lastUserPauseAtRef.current < USER_PAUSE_INTENT_WINDOW_MS;
-    if (userPausedRecently) {
-      // Force player back to paused state - user's pause intent takes priority
-      setVideoState("Paused");
-      latestVideoStateRef.current = "Paused";
-      void pauseFromRef(playerRef);
-      return;
-    }
+    // User explicitly wants to play now; clear pause intent.
+    lastUserPauseAtRef.current = 0;
 
+    // Respect suppression windows (used to avoid duplicate play broadcasts).
     if (Date.now() < suppressPlayBroadcastUntilRef.current) {
       setVideoState("Playing");
       latestVideoStateRef.current = "Playing";
       return;
     }
 
+    // If we don't have room_state yet, avoid broadcasting a possibly stale play.
     if (hasInitialSyncRef && !hasInitialSyncRef.current) {
-      setVideoState("Playing");
-      latestVideoStateRef.current = "Playing";
-      return;
-    }
-
-    if (applyingRemoteSyncRef.current) {
       setVideoState("Playing");
       latestVideoStateRef.current = "Playing";
       return;
@@ -64,7 +48,6 @@ export function useHandlePlay(args: PlaybackHandlersArgs) {
     addLogEntry?.({ msg: `started playing`, type: "play", user: "You" });
   }, [
     addLogEntry,
-    applyingRemoteSyncRef,
     cancelPendingPause,
     hasInitialSyncRef,
     lastUserPauseAtRef,

@@ -57,6 +57,7 @@ export function PlayerMediaRenderer({
 
   onEmbedLoad,
   handlePlay,
+  handleUserPlay,
   handlePause,
   handleUserSeek,
   handleProgress,
@@ -120,6 +121,7 @@ export function PlayerMediaRenderer({
 
   onEmbedLoad: () => void;
   handlePlay: () => void;
+  handleUserPlay: () => void;
   handlePause: () => void;
   handleUserSeek: (time: number) => void;
   handleProgress: (time: number) => void;
@@ -198,7 +200,7 @@ export function PlayerMediaRenderer({
             applyingRemoteSyncRef={applyingRemoteSyncRef}
             lastManualSeekRef={lastManualSeekRef}
             cancelPendingRoomCatchup={cancelPendingRoomCatchup}
-            handlePlay={handlePlay}
+            handleUserPlay={handleUserPlay}
             handlePause={handlePause}
             handleSeekFromController={handleSeekFromController}
             handleVolumeFromController={handleVolumeFromController}
@@ -224,12 +226,14 @@ export function PlayerMediaRenderer({
             playbackRate={playbackRate}
             isPageVisible={isPageVisible}
             applyingRemoteSyncRef={applyingRemoteSyncRef}
+            cancelPendingRoomCatchup={cancelPendingRoomCatchup}
             setPlayerReady={setPlayerReady}
             setPlayerError={setPlayerError}
             setIsBuffering={setIsBuffering}
             clearLoadTimeout={clearLoadTimeout}
             syncToRoomTimeIfNeeded={syncToRoomTimeIfNeeded}
             handlePlay={handlePlay}
+            handleUserPlay={handleUserPlay}
             handlePause={handlePause}
             handleProgress={handleProgress}
             handleDuration={handleDuration}
@@ -265,7 +269,9 @@ export function PlayerMediaRenderer({
             setYtForceRemountNonce={setYtForceRemountNonce}
             clearLoadTimeout={clearLoadTimeout}
             syncToRoomTimeIfNeeded={syncToRoomTimeIfNeeded}
+            cancelPendingRoomCatchup={cancelPendingRoomCatchup}
             handlePlay={handlePlay}
+            handleUserPlay={handleUserPlay}
             handlePause={handlePause}
             handleSeekFromController={handleSeekFromController}
             lastManualSeekRef={lastManualSeekRef}

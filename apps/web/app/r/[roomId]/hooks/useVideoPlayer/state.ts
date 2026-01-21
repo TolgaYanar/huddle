@@ -65,6 +65,9 @@ export function useVideoPlayerState({
   const suppressSeekBroadcastUntilRef = useRef(0);
   const suppressPauseBroadcastUntilRef = useRef(0);
 
+  // Track when user explicitly clicked pause - this takes priority over room sync
+  const lastUserPauseAtRef = useRef(0);
+
   const lastVolumeEmitAtRef = useRef(0);
   const lastAppliedYoutubeVolumeRef = useRef<{
     vol: number;
@@ -285,6 +288,7 @@ export function useVideoPlayerState({
     lastAutoResumeAtRef,
     pendingPauseTimeoutRef,
     pendingPauseRef,
+    lastUserPauseAtRef,
 
     // computed
     effectiveVolume,

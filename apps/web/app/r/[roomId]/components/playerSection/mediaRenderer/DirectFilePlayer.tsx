@@ -10,7 +10,7 @@ export function DirectFilePlayer({
   applyingRemoteSyncRef,
   lastManualSeekRef,
   cancelPendingRoomCatchup,
-  handlePlay,
+  handleUserPlay,
   handlePause,
   handleSeekFromController,
   handleVolumeFromController,
@@ -31,7 +31,7 @@ export function DirectFilePlayer({
   applyingRemoteSyncRef: React.MutableRefObject<boolean>;
   lastManualSeekRef: React.MutableRefObject<number>;
   cancelPendingRoomCatchup: () => void;
-  handlePlay: () => void;
+  handleUserPlay: () => void;
   handlePause: () => void;
   handleSeekFromController: (time: number, opts?: { force?: boolean }) => void;
   handleVolumeFromController: (volume: number, muted: boolean) => void;
@@ -55,12 +55,11 @@ export function DirectFilePlayer({
       preload="auto"
       muted={effectiveMuted}
       onPlay={(e) => {
-        if (applyingRemoteSyncRef.current) return;
         if (!(e.nativeEvent as Event).isTrusted) return;
-        handlePlay();
+        cancelPendingRoomCatchup();
+        handleUserPlay();
       }}
       onPause={(e) => {
-        if (applyingRemoteSyncRef.current) return;
         if (!(e.nativeEvent as Event).isTrusted) return;
         handlePause();
       }}

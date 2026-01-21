@@ -20,32 +20,50 @@ export function useHandlePause(args: PlaybackHandlersArgs) {
     suppressPauseBroadcastUntilRef,
     pendingPauseTimeoutRef,
     pendingPauseRef,
+    lastUserPauseAtRef,
     setVideoState,
     cancelPendingPause,
   } = state;
 
   return useCallback(() => {
+    const hasUserActivation =
+      typeof navigator !== "undefined" &&
+      (navigator as { userActivation?: { isActive?: boolean } }).userActivation
+        ?.isActive === true;
+
+    // Always reflect the pause locally (even if we suppress broadcasting).
+    setVideoState("Paused");
+    latestVideoStateRef.current = "Paused";
+
+    // If this is a real user gesture pause (native player controls, keyboard, etc),
+    // broadcast immediately.
+    if (hasUserActivation) {
+      lastUserPauseAtRef.current = Date.now();
+      const currentTime = getCurrentTimeFromRef(playerRef);
+      cancelPendingPause();
+      sendSyncEvent("pause", currentTime, url);
+      addLogEntry?.({ msg: `paused the video`, type: "pause", user: "You" });
+      return;
+    }
+
     if (Date.now() < suppressPauseBroadcastUntilRef.current) {
       console.log(`[PAUSE] Suppressed: recent user seek`);
+      // Still treat as local pause; just don't broadcast.
+      cancelPendingPause();
       return;
     }
 
     if (hasInitialSyncRef && !hasInitialSyncRef.current) {
-      setVideoState("Paused");
-      latestVideoStateRef.current = "Paused";
+      cancelPendingPause();
       return;
     }
 
     if (applyingRemoteSyncRef.current) {
-      setVideoState("Paused");
-      latestVideoStateRef.current = "Paused";
+      cancelPendingPause();
       return;
     }
 
     const currentTime = getCurrentTimeFromRef(playerRef);
-    setVideoState("Paused");
-    latestVideoStateRef.current = "Paused";
-
     cancelPendingPause();
     pendingPauseRef.current = { time: currentTime, url };
     pendingPauseTimeoutRef.current = window.setTimeout(() => {
@@ -62,6 +80,7 @@ export function useHandlePause(args: PlaybackHandlersArgs) {
     cancelPendingPause,
     hasInitialSyncRef,
     latestVideoStateRef,
+    lastUserPauseAtRef,
     pendingPauseRef,
     pendingPauseTimeoutRef,
     playerRef,

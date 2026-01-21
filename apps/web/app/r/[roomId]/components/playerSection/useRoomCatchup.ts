@@ -5,6 +5,7 @@ import {
   playFromRef,
   seekToFromRef,
 } from "../../lib/player";
+import { USER_PAUSE_INTENT_WINDOW_MS } from "../../hooks/useVideoPlayer/constants";
 
 export type RoomPlaybackAnchor = {
   url: string;
@@ -32,6 +33,7 @@ type UseRoomCatchupParams = {
   applyingRemoteSyncRef: React.MutableRefObject<boolean>;
   roomPlaybackAnchorRef: React.MutableRefObject<RoomPlaybackAnchor | null>;
   lastManualSeekRef: React.MutableRefObject<number>;
+  lastUserPauseAtRef: React.MutableRefObject<number>;
 
   suppressNextPlayBroadcast: (ms?: number) => void;
   suppressNextSeekBroadcast: (ms?: number) => void;
@@ -50,6 +52,7 @@ export function useRoomCatchup({
   applyingRemoteSyncRef,
   roomPlaybackAnchorRef,
   lastManualSeekRef,
+  lastUserPauseAtRef,
   suppressNextPlayBroadcast,
   suppressNextSeekBroadcast,
   handlePlay,
@@ -58,9 +61,29 @@ export function useRoomCatchup({
   const lastRoomSyncAtRef = React.useRef(0);
 
   const pendingRoomCatchupRef = React.useRef<PendingRoomCatchup | null>(null);
+  const resumeCatchupAfterPauseTimeoutRef = React.useRef<number | null>(null);
+  const resumeSyncAfterPauseTimeoutRef = React.useRef<number | null>(null);
+
+  React.useEffect(() => {
+    return () => {
+      if (resumeCatchupAfterPauseTimeoutRef.current) {
+        window.clearTimeout(resumeCatchupAfterPauseTimeoutRef.current);
+        resumeCatchupAfterPauseTimeoutRef.current = null;
+      }
+      if (resumeSyncAfterPauseTimeoutRef.current) {
+        window.clearTimeout(resumeSyncAfterPauseTimeoutRef.current);
+        resumeSyncAfterPauseTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   const cancelPendingRoomCatchup = React.useCallback(() => {
     pendingRoomCatchupRef.current = null;
+
+    if (resumeCatchupAfterPauseTimeoutRef.current) {
+      window.clearTimeout(resumeCatchupAfterPauseTimeoutRef.current);
+      resumeCatchupAfterPauseTimeoutRef.current = null;
+    }
   }, []);
 
   const tryApplyPendingRoomCatchup = React.useCallback(() => {
@@ -70,6 +93,25 @@ export function useRoomCatchup({
     // Drop if expired.
     if (Date.now() > pending.until || pending.attempts >= 10) {
       pendingRoomCatchupRef.current = null;
+      return;
+    }
+
+    // If user explicitly paused recently, don't auto-resume - respect their intent
+    const userPausedRecently =
+      Date.now() - lastUserPauseAtRef.current < USER_PAUSE_INTENT_WINDOW_MS;
+    if (userPausedRecently) {
+      if (!resumeCatchupAfterPauseTimeoutRef.current) {
+        const remaining =
+          USER_PAUSE_INTENT_WINDOW_MS -
+          Math.max(0, Date.now() - lastUserPauseAtRef.current);
+        resumeCatchupAfterPauseTimeoutRef.current = window.setTimeout(
+          () => {
+            resumeCatchupAfterPauseTimeoutRef.current = null;
+            tryApplyPendingRoomCatchup();
+          },
+          Math.max(0, remaining) + 50,
+        );
+      }
       return;
     }
 
@@ -87,7 +129,7 @@ export function useRoomCatchup({
     applyingRemoteSyncRef.current = true;
     window.setTimeout(() => {
       applyingRemoteSyncRef.current = false;
-    }, 1500);
+    }, 350);
 
     suppressNextSeekBroadcast(3000);
     seekToFromRef(playerRef, pending.target);
@@ -110,19 +152,10 @@ export function useRoomCatchup({
         | undefined;
       internal?.seekTo?.(pending.target, true);
 
-      // If the room is already playing, try to start local playback as well.
-      // This often makes the seek "stick" without requiring a user click.
-      const anchor = roomPlaybackAnchorRef.current;
-      const roomIsPlaying =
-        !!anchor && anchor.url === normalizedUrl && anchor.isPlaying === true;
-      if (roomIsPlaying) {
-        suppressNextPlayBroadcast(3000);
-        if (internal?.playVideo) {
-          internal.playVideo();
-        } else {
-          void playFromRef(playerRef);
-        }
-      }
+      // Intentionally do NOT force play() here.
+      // For some providers (YouTube/ReactPlayer), forcing play during repeated
+      // catchup retries can create multi-second windows where user pause/seek
+      // feels "ignored" because controlled state and catchup fight each other.
     } catch {
       // ignore
     }
@@ -133,10 +166,8 @@ export function useRoomCatchup({
     }, 350);
   }, [
     applyingRemoteSyncRef,
-    normalizedUrl,
+    lastUserPauseAtRef,
     playerRef,
-    roomPlaybackAnchorRef,
-    suppressNextPlayBroadcast,
     suppressNextSeekBroadcast,
   ]);
 
@@ -146,6 +177,25 @@ export function useRoomCatchup({
 
     // Only try to resume if we're on the same media URL.
     if (anchor.url !== normalizedUrl) return;
+
+    // Don't override user's explicit pause for a short window
+    const userPausedRecently =
+      Date.now() - lastUserPauseAtRef.current < USER_PAUSE_INTENT_WINDOW_MS;
+    if (userPausedRecently) {
+      if (!resumeSyncAfterPauseTimeoutRef.current) {
+        const remaining =
+          USER_PAUSE_INTENT_WINDOW_MS -
+          Math.max(0, Date.now() - lastUserPauseAtRef.current);
+        resumeSyncAfterPauseTimeoutRef.current = window.setTimeout(
+          () => {
+            resumeSyncAfterPauseTimeoutRef.current = null;
+            syncToRoomTimeIfNeeded();
+          },
+          Math.max(0, remaining) + 50,
+        );
+      }
+      return;
+    }
 
     // Don't override user's manual seek for 5 seconds
     const timeSinceManualSeek = Date.now() - lastManualSeekRef.current;
@@ -194,7 +244,7 @@ export function useRoomCatchup({
     applyingRemoteSyncRef.current = true;
     window.setTimeout(() => {
       applyingRemoteSyncRef.current = false;
-    }, 1500);
+    }, 350);
 
     lastRoomSyncAtRef.current = Date.now();
     suppressNextSeekBroadcast(2500);
@@ -203,6 +253,7 @@ export function useRoomCatchup({
     applyingRemoteSyncRef,
     duration,
     lastManualSeekRef,
+    lastUserPauseAtRef,
     normalizedUrl,
     tryApplyPendingRoomCatchup,
     playerRef,
@@ -236,6 +287,9 @@ export function useRoomCatchup({
   // start playback (autoplay policies). When they click Play, ensure we first
   // catch up to the room anchor, and avoid broadcasting an extra "play" event.
   const handlePlayWithRoomCatchup = React.useCallback(() => {
+    // Clear user pause intent - user explicitly wants to play now
+    lastUserPauseAtRef.current = 0;
+
     const anchor = roomPlaybackAnchorRef.current;
     const isSameUrl = !!anchor && anchor.url === normalizedUrl;
     // If we don't yet have a usable room anchor (common on fast clicks during join),
@@ -277,6 +331,7 @@ export function useRoomCatchup({
     }
   }, [
     handlePlay,
+    lastUserPauseAtRef,
     normalizedUrl,
     playerRef,
     roomPlaybackAnchorRef,

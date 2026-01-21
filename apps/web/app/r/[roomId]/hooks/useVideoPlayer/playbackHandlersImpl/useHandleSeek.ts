@@ -7,6 +7,7 @@ import {
   playFromRef,
   seekToFromRef,
 } from "../../../lib/player";
+import { USER_PAUSE_INTENT_WINDOW_MS } from "../constants";
 
 import type { PlaybackHandlersArgs } from "./types";
 
@@ -19,6 +20,7 @@ export function useHandleSeek(args: PlaybackHandlersArgs) {
     hasInitialSyncRef,
     applyingRemoteSyncRef,
     lastManualSeekRef,
+    lastUserPauseAtRef,
   } = args;
 
   const {
@@ -50,8 +52,13 @@ export function useHandleSeek(args: PlaybackHandlersArgs) {
         Date.now() + 800,
       );
 
+      // Check if user recently paused - don't auto-resume if so
+      const userPausedRecently =
+        lastUserPauseAtRef &&
+        Date.now() - lastUserPauseAtRef.current < USER_PAUSE_INTENT_WINDOW_MS;
+
       const wasPlaying = latestVideoStateRef.current === "Playing";
-      if (!wasPlaying) {
+      if (!wasPlaying && !userPausedRecently) {
         setVideoState("Playing");
         latestVideoStateRef.current = "Playing";
         sendSyncEvent("play", newTime, url);
@@ -77,6 +84,7 @@ export function useHandleSeek(args: PlaybackHandlersArgs) {
       hasInitialSyncRef,
       lastLocalSeekRef,
       lastManualSeekRef,
+      lastUserPauseAtRef,
       latestVideoStateRef,
       playerRef,
       sendSyncEvent,

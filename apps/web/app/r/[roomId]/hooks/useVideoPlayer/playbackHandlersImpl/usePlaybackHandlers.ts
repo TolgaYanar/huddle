@@ -8,6 +8,8 @@ import { useHandleProgress } from "./useHandleProgress";
 import { useHandleSeek } from "./useHandleSeek";
 import { useHandleSeekFromController } from "./useHandleSeekFromController";
 import { useHandleSeekTo } from "./useHandleSeekTo";
+import { useHandleUserPlay } from "./useHandleUserPlay";
+import { useHandleUserPause } from "./useHandleUserPause";
 
 export function usePlaybackHandlers(args: PlaybackHandlersArgs) {
   const { state } = args;
@@ -15,7 +17,9 @@ export function usePlaybackHandlers(args: PlaybackHandlersArgs) {
     state;
 
   const handlePlay = useHandlePlay(args);
+  const handleUserPlay = useHandleUserPlay(args);
   const handlePause = useHandlePause(args);
+  const handleUserPause = useHandleUserPause(args);
   const handleSeek = useHandleSeek(args);
   const handleSeekTo = useHandleSeekTo(args);
   const handleSeekFromController = useHandleSeekFromController(args);
@@ -46,7 +50,9 @@ export function usePlaybackHandlers(args: PlaybackHandlersArgs) {
 
   return {
     handlePlay,
+    handleUserPlay,
     handlePause,
+    handleUserPause,
     handleSeek,
     handleSeekTo,
     handleSeekFromController,

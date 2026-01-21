@@ -6,6 +6,7 @@ import {
   getYouTubeStartTime,
 } from "../../lib/video";
 import { fetchVideoPreview } from "../../lib/video-preview";
+import { USER_PAUSE_INTENT_WINDOW_MS } from "./constants";
 import type { AddLogEntry, SendSyncEvent } from "./types";
 import type { VideoPlayerState } from "./state";
 
@@ -32,6 +33,7 @@ export function useUrlHandlers({
     setIsPreviewLoading,
     setVideoPreview,
     setShowPreviewModal,
+    lastUserPauseAtRef,
   } = state;
 
   const handleUrlChange = useCallback(
@@ -105,7 +107,12 @@ export function useUrlHandlers({
         sendSyncEvent("change_url", initialTime, nextUrl);
       }
 
-      if (wasPlaying || forcePlay) {
+      // Check if user recently paused - don't auto-resume if so
+      const userPausedRecently =
+        lastUserPauseAtRef &&
+        Date.now() - lastUserPauseAtRef.current < USER_PAUSE_INTENT_WINDOW_MS;
+
+      if (wasPlaying || (forcePlay && !userPausedRecently)) {
         setVideoState("Playing");
         if (!skipBroadcast) {
           sendSyncEvent("play", initialTime, nextUrl);
@@ -133,6 +140,7 @@ export function useUrlHandlers({
       setShowPreviewModal,
       setUrl,
       setVideoState,
+      lastUserPauseAtRef,
     ],
   );
 

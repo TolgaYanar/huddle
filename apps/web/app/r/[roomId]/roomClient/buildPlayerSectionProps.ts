@@ -120,6 +120,7 @@ export function buildPlayerSectionProps(args: {
     roomPlaybackAnchorRef,
     roomPlaybackAnchorVersion,
     lastManualSeekRef,
+    lastUserPauseAtRef: video.lastUserPauseAtRef,
 
     muted: video.muted,
     volume: video.volume,
@@ -135,7 +136,9 @@ export function buildPlayerSectionProps(args: {
     videoState: video.videoState,
 
     handlePlay: video.handlePlay,
+    handleUserPlay: video.handleUserPlay,
     handlePause: video.handlePause,
+    handleUserPause: video.handleUserPause,
     suppressNextPlayBroadcast: video.suppressNextPlayBroadcast,
     suppressNextSeekBroadcast: video.suppressNextSeekBroadcast,
     handleSeekTo: video.handleSeekTo,

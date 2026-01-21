@@ -18,7 +18,7 @@ function getInternalPlayerMaybe(ref: AnyPlayerRef): unknown {
 }
 
 export function getHtmlMediaElementFromRef(
-  ref: AnyPlayerRef
+  ref: AnyPlayerRef,
 ): HTMLMediaElement | null {
   const current = ref.current;
   if (isHtmlMediaElement(current)) return current;
@@ -63,14 +63,14 @@ export function getDurationFromRef(ref: AnyPlayerRef): number {
 
 export function seekToFromRef(ref: AnyPlayerRef, seconds: number): void {
   console.log(
-    `[PLAYER] seekToFromRef called with ${seconds?.toFixed(2)}s, ref.current=${!!ref.current}`
+    `[PLAYER] seekToFromRef called with ${seconds?.toFixed(2)}s, ref.current=${!!ref.current}`,
   );
   const current = ref.current as { seekTo?: unknown } | null;
   if (current && typeof current.seekTo === "function") {
     console.log(`[PLAYER] Calling seekTo(${seconds?.toFixed(2)}, "seconds")`);
     (current.seekTo as (amount: number, type?: "seconds" | "fraction") => void)(
       seconds,
-      "seconds"
+      "seconds",
     );
     return;
   }
@@ -86,7 +86,7 @@ export function seekToFromRef(ref: AnyPlayerRef, seconds: number): void {
   if (currentMaybe && "currentTime" in currentMaybe) {
     try {
       console.log(
-        `[PLAYER] Setting currentTime property = ${seconds?.toFixed(2)}`
+        `[PLAYER] Setting currentTime property = ${seconds?.toFixed(2)}`,
       );
       (currentMaybe as { currentTime: number }).currentTime = seconds;
     } catch {
@@ -106,6 +106,37 @@ export async function playFromRef(ref: AnyPlayerRef): Promise<void> {
     return;
   }
 
+  // Some players (e.g., our YouTube IFrame wrapper) expose the IFrame API
+  // methods directly on the ref handle.
+  const currentWithPlayVideo = ref.current as { playVideo?: unknown } | null;
+  if (
+    currentWithPlayVideo &&
+    typeof currentWithPlayVideo.playVideo === "function"
+  ) {
+    try {
+      (currentWithPlayVideo.playVideo as () => void)();
+    } catch {
+      // ignore
+    }
+    return;
+  }
+
+  // ReactPlayer YouTube internal is the IFrame API player.
+  const internal = getInternalPlayerMaybe(ref) as
+    | {
+        playVideo?: () => void;
+      }
+    | null
+    | undefined;
+  if (internal && typeof internal.playVideo === "function") {
+    try {
+      internal.playVideo();
+    } catch {
+      // ignore
+    }
+    return;
+  }
+
   const current = ref.current as { play?: unknown } | null;
   if (!current || typeof current.play !== "function") return;
 
@@ -121,6 +152,37 @@ export function pauseFromRef(ref: AnyPlayerRef): void {
   if (media) {
     try {
       media.pause();
+    } catch {
+      // ignore
+    }
+    return;
+  }
+
+  // Some players (e.g., our YouTube IFrame wrapper) expose the IFrame API
+  // methods directly on the ref handle.
+  const currentWithPauseVideo = ref.current as { pauseVideo?: unknown } | null;
+  if (
+    currentWithPauseVideo &&
+    typeof currentWithPauseVideo.pauseVideo === "function"
+  ) {
+    try {
+      (currentWithPauseVideo.pauseVideo as () => void)();
+    } catch {
+      // ignore
+    }
+    return;
+  }
+
+  // ReactPlayer YouTube internal is the IFrame API player.
+  const internal = getInternalPlayerMaybe(ref) as
+    | {
+        pauseVideo?: () => void;
+      }
+    | null
+    | undefined;
+  if (internal && typeof internal.pauseVideo === "function") {
+    try {
+      internal.pauseVideo();
     } catch {
       // ignore
     }

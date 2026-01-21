@@ -169,13 +169,6 @@ export function useYouTubePlayerInstance({
               // Ignore very recent switch-related pauses (common during next).
               if (now - lastVideoSwitchAtRef.current < 1500) return;
 
-              // If the app expects playback, attempt a bounded recovery.
-              if (latest.current.playing) {
-                maybeKickPlay();
-                // If we're still within the recovery window, don't surface pause.
-                if (now <= kickWindowUntilRef.current) return;
-              }
-
               latest.current.onPause?.();
             }
           },

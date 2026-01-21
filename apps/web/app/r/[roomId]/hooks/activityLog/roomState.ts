@@ -4,6 +4,7 @@ import { normalizeVideoUrl } from "../../lib/video";
 import { getCurrentTimeFromRef, seekToFromRef } from "../../lib/player";
 import { serverTimeToClientTime } from "./serverTime";
 import type { RoomPlaybackAnchor } from "./types";
+import { USER_PAUSE_INTENT_WINDOW_MS } from "../useVideoPlayer/constants";
 
 export function applyRoomState({
   state,
@@ -20,6 +21,7 @@ export function applyRoomState({
   setVolume,
   setPlaybackRate,
   setAudioSyncEnabled,
+  lastUserPauseAtRef,
 }: {
   state: RoomStateData;
   roomId: string;
@@ -35,6 +37,7 @@ export function applyRoomState({
   setVolume: (volume: number) => void;
   setPlaybackRate: (rate: number) => void;
   setAudioSyncEnabled: (enabled: boolean) => void;
+  lastUserPauseAtRef?: React.MutableRefObject<number>;
 }) {
   if (!state || state.roomId !== roomId) return;
 
@@ -156,9 +159,23 @@ export function applyRoomState({
   }
 
   if (typeof state.isPlaying === "boolean") {
-    setVideoState(state.isPlaying ? "Playing" : "Paused");
+    if (state.isPlaying) {
+      const userPausedRecently =
+        !!lastUserPauseAtRef &&
+        Date.now() - lastUserPauseAtRef.current < USER_PAUSE_INTENT_WINDOW_MS;
+      if (!userPausedRecently) {
+        setVideoState("Playing");
+      }
+    } else {
+      setVideoState("Paused");
+    }
   } else {
-    if (state.action === "play") setVideoState("Playing");
+    if (state.action === "play") {
+      const userPausedRecently =
+        !!lastUserPauseAtRef &&
+        Date.now() - lastUserPauseAtRef.current < USER_PAUSE_INTENT_WINDOW_MS;
+      if (!userPausedRecently) setVideoState("Playing");
+    }
     if (state.action === "pause") setVideoState("Paused");
   }
 }

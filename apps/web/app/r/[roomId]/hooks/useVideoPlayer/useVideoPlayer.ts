@@ -41,6 +41,7 @@ export function useVideoPlayer({
     isPreviewLoading,
     playerRef,
     loadTimeoutRef,
+    lastUserPauseAtRef,
     setUrl,
     setInputUrl,
     setVideoState,
@@ -82,7 +83,9 @@ export function useVideoPlayer({
 
   const {
     handlePlay,
+    handleUserPlay,
     handlePause,
+    handleUserPause,
     handleSeek,
     handleSeekTo,
     handleSeekFromController,
@@ -147,13 +150,16 @@ export function useVideoPlayer({
     // Refs
     playerRef,
     loadTimeoutRef,
+    lastUserPauseAtRef,
 
     // Computed
     normalizedUrl,
 
     // Handlers
     handlePlay,
+    handleUserPlay,
     handlePause,
+    handleUserPause,
     handleSeek,
     handleSeekTo,
     handleSeekFromController,

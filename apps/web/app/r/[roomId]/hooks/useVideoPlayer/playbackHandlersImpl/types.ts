@@ -10,6 +10,8 @@ export type PlaybackHandlersArgs = {
   hasInitialSyncRef?: React.MutableRefObject<boolean>;
   applyingRemoteSyncRef: React.MutableRefObject<boolean>;
   lastManualSeekRef?: React.MutableRefObject<number>;
+  /** Timestamp when user last explicitly clicked pause - used to prevent auto-resume */
+  lastUserPauseAtRef?: React.MutableRefObject<number>;
 };
 
 export type SeekToOpts = { force?: boolean };

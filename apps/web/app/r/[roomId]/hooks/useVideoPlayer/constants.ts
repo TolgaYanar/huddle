@@ -1,0 +1,1 @@
+export const USER_PAUSE_INTENT_WINDOW_MS = 12_000;

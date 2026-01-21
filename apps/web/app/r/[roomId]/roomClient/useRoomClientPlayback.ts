@@ -72,6 +72,7 @@ export function useRoomClientPlayback(args: {
     isConnected: room.isConnected,
     playerRef: video.playerRef,
     applyingRemoteSyncRef,
+    lastUserPauseAtRef: video.lastUserPauseAtRef,
     hasInitialSyncRef,
     roomPlaybackAnchorRef,
     onRoomPlaybackAnchorUpdated,
@@ -142,7 +143,7 @@ export function useRoomClientPlayback(args: {
     currentItemIndex: playlist.currentItemIndex,
     videoState: video.videoState,
     onPlay: video.handlePlay,
-    onPause: video.handlePause,
+    onPause: video.handleUserPause,
     onNext: playlist.playNext,
     onPrevious: playlist.playPrevious,
   });

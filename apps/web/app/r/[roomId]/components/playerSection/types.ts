@@ -82,6 +82,7 @@ export type PlayerSectionProps = {
   } | null>;
   roomPlaybackAnchorVersion: number;
   lastManualSeekRef: React.MutableRefObject<number>;
+  lastUserPauseAtRef: React.MutableRefObject<number>;
 
   muted: boolean;
   volume: number;
@@ -96,7 +97,9 @@ export type PlayerSectionProps = {
   isConnected: boolean;
   videoState: string;
   handlePlay: () => void;
+  handleUserPlay: () => void;
   handlePause: () => void;
+  handleUserPause: () => void;
   suppressNextPlayBroadcast: (ms?: number) => void;
   suppressNextSeekBroadcast: (ms?: number) => void;
   handleSeekTo: (time: number, opts?: { force?: boolean }) => void;
