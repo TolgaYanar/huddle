@@ -1,3 +1,6 @@
+import { initContentScript } from "./content/init";
+
+initContentScript();
 import { io, Socket } from "socket.io-client";
 
 type ExtensionConfig = {
@@ -98,7 +101,7 @@ function debugLog(...args: any[]) {
 
 function getVideoCandidates(): HTMLVideoElement[] {
   return Array.from(document.querySelectorAll("video")).filter(
-    (v): v is HTMLVideoElement => v instanceof HTMLVideoElement
+    (v): v is HTMLVideoElement => v instanceof HTMLVideoElement,
   );
 }
 
@@ -426,15 +429,15 @@ function ensureOverlay() {
   const drift = overlayShadow!.getElementById("drift") as HTMLSpanElement;
   const hint = overlayShadow!.getElementById("hint") as HTMLDivElement;
   const collapse = overlayShadow!.getElementById(
-    "collapse"
+    "collapse",
   ) as HTMLButtonElement;
   const dot = overlayShadow!.getElementById("dot") as HTMLSpanElement;
   const chatList = overlayShadow!.getElementById("chatList") as HTMLDivElement;
   const chatInput = overlayShadow!.getElementById(
-    "chatInput"
+    "chatInput",
   ) as HTMLTextAreaElement;
   const chatSend = overlayShadow!.getElementById(
-    "chatSend"
+    "chatSend",
   ) as HTMLButtonElement;
 
   const syncSendButtonState = () => {
@@ -545,7 +548,7 @@ function recordPendingRoomState(state: RoomState) {
 }
 
 async function safeNetflixSeekViaBackground(
-  seconds: number
+  seconds: number,
 ): Promise<{ ok: boolean; error?: string }> {
   try {
     const resp = await chrome.runtime.sendMessage({
@@ -563,7 +566,7 @@ async function safeNetflixSeekViaBackground(
 }
 
 async function safeNetflixSetPlayingViaBackground(
-  playing: boolean
+  playing: boolean,
 ): Promise<{ ok: boolean; error?: string }> {
   try {
     const resp = await chrome.runtime.sendMessage({
@@ -839,7 +842,7 @@ function attachVideoListeners() {
   const canEmitNow = (
     action: string,
     timestamp: number,
-    gestureWindowMs: number
+    gestureWindowMs: number,
   ) => {
     if (isApplyingRemote) return false;
     if (!shouldEmitLocalSync()) return false;
@@ -935,7 +938,7 @@ chrome.runtime.onMessage.addListener(
     }
 
     return false;
-  }
+  },
 );
 
 (async () => {

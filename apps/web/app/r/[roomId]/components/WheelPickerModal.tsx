@@ -221,15 +221,7 @@ export function WheelPickerModal(props: {
               <div className="absolute left-1/2 -top-1 -translate-x-1/2 z-10 w-0 h-0 border-l-12 border-r-12 border-b-20 border-l-transparent border-r-transparent border-b-white/60" />
 
               <div className="absolute inset-0 rounded-full border border-white/10 bg-black/30 overflow-hidden">
-                <div
-                  className="w-full h-full"
-                  style={{
-                    background: wheelBackground,
-                    transform: `rotate(${wheelRotation}deg)`,
-                    transition: `transform ${SPIN_MS}ms cubic-bezier(0.15, 0.9, 0.15, 1)`,
-                    willChange: "transform",
-                  }}
-                />
+                <div className="w-full h-full wheel-rotator" />
               </div>
 
               <div className="absolute inset-0 flex items-center justify-center">
@@ -260,14 +252,22 @@ export function WheelPickerModal(props: {
               </div>
               <div className="mt-2 min-h-7 flex items-center gap-2">
                 {winnerColor && revealedPick ? (
-                  <span
-                    className="inline-block w-3 h-3 rounded-full border"
-                    style={{
-                      background: winnerColor.chip,
-                      borderColor: winnerColor.border,
-                    }}
+                  <svg
+                    className="shrink-0"
+                    width={12}
+                    height={12}
+                    viewBox="0 0 12 12"
                     aria-hidden
-                  />
+                  >
+                    <circle
+                      cx={6}
+                      cy={6}
+                      r={5}
+                      fill={winnerColor.chip}
+                      stroke={winnerColor.border}
+                      strokeWidth={1}
+                    />
+                  </svg>
                 ) : null}
                 <span className="text-lg text-slate-100 font-semibold">
                   {revealedPick ? revealedPick : isSpinning ? "…" : ""}
@@ -320,10 +320,22 @@ export function WheelPickerModal(props: {
                           isWinner ? "bg-white/5" : ""
                         }`}
                       >
-                        <div
-                          className="w-3 h-3 rounded-full border"
-                          style={{ background: c.chip, borderColor: c.border }}
-                        />
+                        <svg
+                          className="shrink-0"
+                          width={12}
+                          height={12}
+                          viewBox="0 0 12 12"
+                          aria-hidden
+                        >
+                          <circle
+                            cx={6}
+                            cy={6}
+                            r={5}
+                            fill={c.chip}
+                            stroke={c.border}
+                            strokeWidth={1}
+                          />
+                        </svg>
                         <div className="flex-1 min-w-0">
                           <div className="text-slate-100 text-sm truncate">
                             {entry}
@@ -346,6 +358,8 @@ export function WheelPickerModal(props: {
           </div>
         </div>
       </div>
+
+      <style>{`.wheel-rotator{background:${wheelBackground};transform:rotate(${wheelRotation}deg);transition:transform ${SPIN_MS}ms cubic-bezier(0.15, 0.9, 0.15, 1);will-change:transform;}`}</style>
     </div>
   );
 }
