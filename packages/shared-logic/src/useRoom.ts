@@ -5,6 +5,7 @@ import { SERVER_URL } from "./serverUrl";
 import type {
   ActivityHistoryData,
   ChatHistoryData,
+  GameStateData,
   PlaylistStateData,
   RoomPasswordRequiredData,
   RoomPasswordStatusData,
@@ -15,6 +16,7 @@ import type {
 } from "./types";
 import { useActivityApi } from "./useRoom/activity";
 import { useChatApi } from "./useRoom/chat";
+import { useGameApi } from "./useRoom/game";
 import { usePlaylistsApi } from "./useRoom/playlists";
 import { type PendingSyncEvent, useSyncApi } from "./useRoom/sync";
 import { useUsersApi } from "./useRoom/users";
@@ -38,6 +40,7 @@ export const useRoom = (roomId: string, userId: string) => {
   const latestWheelStateRef = useRef<WheelStateData | null>(null);
   const latestWheelSpunRef = useRef<WheelSpunData | null>(null);
   const latestPlaylistStateRef = useRef<PlaylistStateData | null>(null);
+  const latestGameStateRef = useRef<GameStateData | null>(null);
 
   const pendingSyncEventsRef = useRef<PendingSyncEvent[]>([]);
 
@@ -72,6 +75,7 @@ export const useRoom = (roomId: string, userId: string) => {
       latestWheelStateRef.current = null;
       latestWheelSpunRef.current = null;
       latestPlaylistStateRef.current = null;
+      latestGameStateRef.current = null;
     };
 
     const handleRoomState = (data: RoomStateData) => {
@@ -114,6 +118,10 @@ export const useRoom = (roomId: string, userId: string) => {
       latestPlaylistStateRef.current = data;
     };
 
+    const handleGameState = (data: GameStateData) => {
+      latestGameStateRef.current = data;
+    };
+
     // Always listen for room state so we don't miss the first push during join.
     socket.on("room_state", handleRoomState);
     socket.on("chat_history", handleChatHistory);
@@ -124,6 +132,7 @@ export const useRoom = (roomId: string, userId: string) => {
     socket.on("wheel_state", handleWheelState);
     socket.on("wheel_spun", handleWheelSpun);
     socket.on("playlist_state", handlePlaylistState);
+    socket.on("game_state", handleGameState);
 
     socket.on("connect_error", (err) => {
       console.error("Socket connect_error:", err?.message || err);
@@ -206,6 +215,7 @@ export const useRoom = (roomId: string, userId: string) => {
       socket.off("wheel_state", handleWheelState);
       socket.off("wheel_spun", handleWheelSpun);
       socket.off("playlist_state", handlePlaylistState);
+      socket.off("game_state", handleGameState);
 
       // Best-effort: tell server we left the room so others update immediately.
       try {
@@ -260,6 +270,12 @@ export const useRoom = (roomId: string, userId: string) => {
     latestPlaylistStateRef,
   });
 
+  const gameApi = useGameApi({
+    roomId,
+    socketRef,
+    latestGameStateRef,
+  });
+
   return {
     isConnected,
     ...usersApi,
@@ -269,6 +285,7 @@ export const useRoom = (roomId: string, userId: string) => {
     ...activityApi,
     ...webrtcApi,
     ...playlistsApi,
+    ...gameApi,
     socket: socketRef.current,
   };
 };

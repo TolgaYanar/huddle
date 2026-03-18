@@ -173,6 +173,40 @@ export interface PlaylistStateData {
   currentItemIndex?: number;
 }
 
+// Game types
+export interface GameGuess {
+  socketId: string;
+  username: string | null;
+  guess: string;
+  correct: boolean;
+  turnNumber: number;
+}
+
+export interface GameWinner {
+  socketId: string;
+  username: string | null;
+}
+
+export interface GameStateData {
+  roomId: string;
+  status: "idle" | "active" | "finished";
+  questionerId?: string;
+  questionerName?: string | null;
+  category?: string;
+  answer?: string; // only sent to questioner or when finished
+  answerMasked?: string[]; // array of chars: revealed letters or '_'
+  images?: string[];
+  turnOrder?: string[];
+  turnOrderUsernames?: Record<string, string | null>;
+  currentTurnIndex?: number;
+  currentTurnSocketId?: string | null;
+  guesses?: GameGuess[];
+  hintsRevealed?: number;
+  winners?: string[];
+  winnerUsernames?: GameWinner[];
+  startedAt?: number;
+}
+
 export interface PlaylistItemPlayedData {
   roomId: string;
   playlistId: string;

@@ -15,6 +15,7 @@ const { attachChatHandlers } = require("./handlers/chat");
 const { attachActivityHandlers } = require("./handlers/activity");
 const { attachSyncHandlers } = require("./handlers/syncVideo");
 const { attachDisconnectHandler } = require("./handlers/disconnect");
+const { attachGameHandlers } = require("./handlers/game");
 
 function registerSocket(io, deps) {
   const state = createSocketState();
@@ -56,6 +57,8 @@ function registerSocket(io, deps) {
     attachActivityHandlers(state, socket, deps);
 
     attachSyncHandlers(io, state, socket, deps);
+
+    attachGameHandlers(io, state, socket);
 
     attachDisconnectHandler(io, state, socket, joinedRooms, deps);
   });

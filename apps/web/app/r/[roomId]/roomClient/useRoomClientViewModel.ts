@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRoom } from "shared-logic";
+import { useGame } from "../hooks/useGame";
 import {
   useFullscreen,
   usePushToTalkBinding,
@@ -276,6 +277,18 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
     onSpin: () => room.spinWheel?.(),
   };
 
+  const game = useGame({
+    onGameState: room.onGameState,
+    requestGameState: room.requestGameState,
+    startGame: room.startGame,
+    submitGuess: room.submitGuess,
+    revealHint: room.revealHint,
+    skipTurn: room.skipTurn,
+    endGame: room.endGame,
+    resetGame: room.resetGame,
+    mySocketId: userId,
+  });
+
   const activitySidebarProps = {
     roomId,
     isConnected: room.isConnected,
@@ -287,6 +300,22 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
     chatText: playback.activity.chatText,
     setChatText: playback.activity.setChatText,
     handleSendChat: playback.activity.handleSendChat,
+    gameProps: {
+      gameState: game.gameState,
+      mySocketId: userId,
+      isMyTurn: game.isMyTurn,
+      amQuestioner: game.amQuestioner,
+      guessInput: game.guessInput,
+      setGuessInput: game.setGuessInput,
+      isSetupOpen: game.isSetupOpen,
+      setIsSetupOpen: game.setIsSetupOpen,
+      handleSubmitGuess: game.handleSubmitGuess,
+      handleStartGame: game.handleStartGame,
+      revealHint: game.revealHint,
+      skipTurn: game.skipTurn,
+      endGame: game.endGame,
+      resetGame: game.resetGame,
+    },
   };
 
   return {
