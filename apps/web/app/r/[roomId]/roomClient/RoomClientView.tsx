@@ -11,6 +11,7 @@ import { RoomAccessError } from "../components/RoomAccessError";
 import { PlaylistPanel } from "../components/PlaylistPanel";
 import { AddToPlaylistModal } from "../components/AddToPlaylistModal";
 import { AddVideosToPlaylistModal } from "../components/AddVideosToPlaylistModal";
+import { GameModal } from "../components/GameModal";
 
 export type RoomClientViewProps = {
   roomId: string;
@@ -37,6 +38,8 @@ export type RoomClientViewProps = {
   addVideosToPlaylistModalProps: React.ComponentProps<
     typeof AddVideosToPlaylistModal
   >;
+
+  gameModalProps: React.ComponentProps<typeof GameModal>;
 };
 
 export function RoomClientView({
@@ -56,6 +59,7 @@ export function RoomClientView({
   playlistPanelProps,
   addToPlaylistModalProps,
   addVideosToPlaylistModalProps,
+  gameModalProps,
 }: RoomClientViewProps) {
   if (roomAccessError) {
     return <RoomAccessError error={roomAccessError} />;
@@ -103,6 +107,8 @@ export function RoomClientView({
       {isReady && (
         <AddVideosToPlaylistModal {...addVideosToPlaylistModalProps} />
       )}
+
+      {isReady && <GameModal {...gameModalProps} />}
     </div>
   );
 }

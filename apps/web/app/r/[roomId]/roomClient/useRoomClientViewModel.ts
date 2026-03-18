@@ -141,6 +141,7 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
   }, [playback.playlist, playback.video.url]);
 
   const [isAddVideosModalOpen, setIsAddVideosModalOpen] = useState(false);
+  const [openGameId, setOpenGameId] = useState<string | null>(null);
 
   const playerSectionProps = buildPlayerSectionProps({
     isClient,
@@ -316,6 +317,13 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
       endGame: game.endGame,
       resetGame: game.resetGame,
     },
+    onOpenGame: setOpenGameId,
+  };
+
+  const gameModalProps = {
+    openGameId,
+    onClose: () => setOpenGameId(null),
+    gameProps: activitySidebarProps.gameProps,
   };
 
   return {
@@ -335,5 +343,6 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
     playlistPanelProps,
     addToPlaylistModalProps,
     addVideosToPlaylistModalProps,
+    gameModalProps,
   };
 }
