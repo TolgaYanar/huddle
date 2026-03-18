@@ -142,7 +142,7 @@ export function useRoomCatchup({
     const drift = Math.abs(current - pending.target);
 
     // If we've landed close enough, we're done.
-    if (drift <= CATCHUP_ACCEPTABLE_DRIFT_S || (current > CATCHUP_AT_BEGINNING_THRESHOLD_S && pending.target > CATCHUP_FAR_AHEAD_THRESHOLD_S)) {
+    if (drift <= CATCHUP_ACCEPTABLE_DRIFT_S) {
       pendingRoomCatchupRef.current = null;
       return;
     }

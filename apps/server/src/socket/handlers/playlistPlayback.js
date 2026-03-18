@@ -21,7 +21,7 @@ function attachPlaylistPlaybackHandlers(io, state, socket, deps) {
         },
       });
 
-      if (!playlist) return;
+      if (!playlist || playlist.roomId !== roomId) return;
 
       const itemIndex = playlist.items.findIndex((item) => item.id === itemId);
       if (itemIndex === -1) return;
@@ -106,6 +106,14 @@ function attachPlaylistPlaybackHandlers(io, state, socket, deps) {
 
       const item = playlist.items[nextIndex];
 
+      // Guard against concurrent playlist_next from multiple clients (e.g. video-ended
+      // fires on every client simultaneously). If another handler already advanced the
+      // index while we were awaiting the DB query, bail out to avoid double-advancing.
+      const freshActiveState = state.roomPlaylistActive.get(roomId);
+      if (freshActiveState?.currentItemIndex !== activeState.currentItemIndex) {
+        return;
+      }
+
       state.roomPlaylistActive.set(roomId, {
         activePlaylistId: playlist.id,
         currentItemIndex: nextIndex,
@@ -160,6 +168,12 @@ function attachPlaylistPlaybackHandlers(io, state, socket, deps) {
       }
 
       const item = playlist.items[prevIndex];
+
+      // Same concurrent-advance guard as playlist_next.
+      const freshActiveState = state.roomPlaylistActive.get(roomId);
+      if (freshActiveState?.currentItemIndex !== activeState.currentItemIndex) {
+        return;
+      }
 
       state.roomPlaylistActive.set(roomId, {
         activePlaylistId: playlist.id,

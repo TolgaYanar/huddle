@@ -61,6 +61,9 @@ function attachJoinRoomHandler(io, state, socket, joinedRooms, deps) {
 
         emitWheelStateTo(state, socket, roomId);
         await emitPlaylistStateTo(deps, state, socket, roomId);
+
+        // Always re-send room state so reconnecting clients can re-sync.
+        emitRoomStateToSocket(state, socket, roomId);
       } catch (err) {
         console.error("Failed to re-emit room snapshot", err);
       }

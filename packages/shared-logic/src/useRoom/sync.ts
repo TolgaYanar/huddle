@@ -53,9 +53,6 @@ export function useSyncApi({
         return;
       }
 
-      console.log(
-        `[SYNC-SEND] Emitting sync_video: action=${action}, timestamp=${timestamp?.toFixed(2)}`,
-      );
       socket.emit("sync_video", {
         roomId,
         action,

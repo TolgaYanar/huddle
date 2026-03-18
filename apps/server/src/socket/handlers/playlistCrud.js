@@ -73,10 +73,11 @@ function attachPlaylistCrudHandlers(io, state, socket, deps) {
 
       if (Object.keys(updateData).length === 0) return;
 
-      await deps.getPrisma().roomPlaylist.update({
-        where: { id: playlistId },
+      const updated = await deps.getPrisma().roomPlaylist.updateMany({
+        where: { id: playlistId, roomId },
         data: updateData,
       });
+      if (updated.count === 0) return;
 
       await emitPlaylistStateToRoom(deps, state, io, roomId);
     } catch (err) {
@@ -92,9 +93,10 @@ function attachPlaylistCrudHandlers(io, state, socket, deps) {
     if (!deps.isDbConnected() || !deps.getPrisma()) return;
 
     try {
-      await deps.getPrisma().roomPlaylist.delete({
-        where: { id: playlistId },
+      const deleted = await deps.getPrisma().roomPlaylist.deleteMany({
+        where: { id: playlistId, roomId },
       });
+      if (deleted.count === 0) return;
 
       // Clear active state if this was the active playlist
       const activeState = state.roomPlaylistActive.get(roomId);
@@ -115,6 +117,20 @@ function attachPlaylistCrudHandlers(io, state, socket, deps) {
 
     // playlistId can be null to clear active playlist
     const activeId = typeof playlistId === "string" ? playlistId : null;
+
+    // When setting a non-null active playlist, verify it belongs to this room.
+    if (activeId) {
+      if (!deps.isDbConnected() || !deps.getPrisma()) return;
+      try {
+        const exists = await deps.getPrisma().roomPlaylist.findFirst({
+          where: { id: activeId, roomId },
+          select: { id: true },
+        });
+        if (!exists) return;
+      } catch {
+        return;
+      }
+    }
 
     state.roomPlaylistActive.set(roomId, {
       activePlaylistId: activeId,

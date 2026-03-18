@@ -18,6 +18,13 @@ function attachPlaylistItemHandlers(io, state, socket, deps) {
       null;
 
     try {
+      // Verify the playlist belongs to this room before adding items.
+      const playlistCheck = await deps.getPrisma().roomPlaylist.findFirst({
+        where: { id: playlistId, roomId },
+        select: { id: true },
+      });
+      if (!playlistCheck) return;
+
       // Get the highest position in the playlist
       const lastItem = await deps.getPrisma().roomPlaylistItem.findFirst({
         where: { playlistId },
@@ -56,8 +63,9 @@ function attachPlaylistItemHandlers(io, state, socket, deps) {
     if (!deps.isDbConnected() || !deps.getPrisma()) return;
 
     try {
-      await deps.getPrisma().roomPlaylistItem.delete({
-        where: { id: itemId },
+      // deleteMany with a relation filter ensures the item belongs to this room.
+      await deps.getPrisma().roomPlaylistItem.deleteMany({
+        where: { id: itemId, playlist: { roomId } },
       });
 
       await emitPlaylistStateToRoom(deps, state, io, roomId);
@@ -71,6 +79,8 @@ function attachPlaylistItemHandlers(io, state, socket, deps) {
     if (!roomId || typeof roomId !== "string") return;
     if (!playlistId || typeof playlistId !== "string") return;
     if (!Array.isArray(itemIds)) return;
+    if (itemIds.length > 500) return;
+    if (itemIds.some((id) => typeof id !== "string")) return;
     if (!socket.rooms.has(roomId)) return;
     if (!deps.isDbConnected() || !deps.getPrisma()) return;
 
