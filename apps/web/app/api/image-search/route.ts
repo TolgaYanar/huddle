@@ -1,68 +1,61 @@
 import { type NextRequest, NextResponse } from "next/server";
 
+const IMAGE_EXTENSIONS = /\.(jpe?g|png|gif|webp|svg)$/i;
+
 export async function GET(request: NextRequest) {
   const q = request.nextUrl.searchParams.get("q")?.trim();
   if (!q) return NextResponse.json({ images: [] });
 
   try {
-    // Step 1 — get the vqd token DuckDuckGo requires for image API calls
-    const initRes = await fetch(
-      `https://duckduckgo.com/?q=${encodeURIComponent(q)}&iax=images&ia=images`,
+    const params = new URLSearchParams({
+      action: "query",
+      generator: "search",
+      gsrsearch: q,
+      gsrnamespace: "6", // File namespace only
+      gsrlimit: "20",
+      prop: "imageinfo",
+      iiprop: "url|thumburl|mime",
+      iiurlwidth: "300",
+      format: "json",
+      origin: "*",
+    });
+
+    const res = await fetch(
+      `https://commons.wikimedia.org/w/api.php?${params}`,
       {
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-          "Accept-Language": "en-US,en;q=0.9",
-          Accept:
-            "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        },
+        headers: { "User-Agent": "huddle-app/1.0 (image search)" },
       },
     );
 
-    const html = await initRes.text();
-
-    // vqd appears as: vqd="4-..." or vqd=4-...
-    const vqdMatch =
-      html.match(/vqd="([^"]+)"/) || html.match(/vqd=([\d-]+)/);
-    const vqd = vqdMatch?.[1];
-
-    if (!vqd) {
-      return NextResponse.json({ images: [], error: "token_missing" });
-    }
-
-    // Step 2 — fetch image results
-    const imgUrl =
-      `https://duckduckgo.com/i.js` +
-      `?q=${encodeURIComponent(q)}&o=json&p=1&s=0&u=bing&f=,,,&l=us-en` +
-      `&vqd=${encodeURIComponent(vqd)}`;
-
-    const imgRes = await fetch(imgUrl, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        Referer: "https://duckduckgo.com/",
-        Accept: "application/json, text/javascript, */*; q=0.01",
-      },
-    });
-
-    const data = (await imgRes.json()) as {
-      results?: {
-        image: string;
-        thumbnail: string;
-        title: string;
-        width: number;
-        height: number;
-      }[];
+    const data = (await res.json()) as {
+      query?: {
+        pages?: Record<
+          string,
+          {
+            title?: string;
+            imageinfo?: { url: string; thumburl: string; mime: string }[];
+          }
+        >;
+      };
     };
 
-    const images = (data.results ?? []).slice(0, 16).map((r) => ({
-      url: r.image,
-      thumbnail: r.thumbnail,
-      title: r.title,
-    }));
+    const images = Object.values(data.query?.pages ?? {})
+      .flatMap((p) => {
+        const info = p.imageinfo?.[0];
+        if (!info) return [];
+        if (!IMAGE_EXTENSIONS.test(info.url)) return [];
+        if (info.mime?.startsWith("audio") || info.mime?.startsWith("video")) return [];
+        return [{
+          url: info.url,
+          thumbnail: info.thumburl || info.url,
+          title: (p.title ?? "").replace("File:", "").replace(/_/g, " "),
+        }];
+      })
+      .slice(0, 16);
 
     return NextResponse.json({ images });
-  } catch {
+  } catch (err) {
+    console.error("Image search error:", err);
     return NextResponse.json({ images: [], error: "search_failed" });
   }
 }
