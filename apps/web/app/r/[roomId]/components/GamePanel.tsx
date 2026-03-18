@@ -8,6 +8,49 @@ const CATEGORIES = [
   "Music", "Sports", "Animals", "Things", "Other",
 ];
 
+// ─── Image Result Cell ────────────────────────────────────────────────────────
+
+function ImageResultCell({
+  img,
+  selected,
+  onSelect,
+}: {
+  img: ImageResult;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  const [hidden, setHidden] = useState(false);
+  if (hidden) return null;
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      title={img.title}
+      className={`group relative flex items-center justify-center h-24 rounded-xl overflow-hidden border-2 transition-colors bg-white ${
+        selected ? "border-sky-400" : "border-transparent hover:border-sky-400/50"
+      }`}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={img.thumbnail}
+        alt={img.title}
+        className="max-w-full max-h-full w-auto h-auto object-contain p-2"
+        onError={() => setHidden(true)}
+      />
+      {/* Hover title overlay */}
+      <div className="absolute bottom-0 inset-x-0 bg-black/70 px-1.5 py-0.5 translate-y-full group-hover:translate-y-0 transition-transform">
+        <p className="text-[10px] text-slate-200 truncate">{img.title}</p>
+      </div>
+      {selected && (
+        <div className="absolute top-1 right-1 w-5 h-5 rounded-full bg-sky-500 flex items-center justify-center shadow-md">
+          <span className="text-white text-[10px] font-bold">✓</span>
+        </div>
+      )}
+    </button>
+  );
+}
+
 // ─── Image Picker ─────────────────────────────────────────────────────────────
 
 interface ImageResult {
@@ -105,38 +148,14 @@ function ImagePicker({
           {error && <p className="text-xs text-rose-400">{error}</p>}
 
           {results.length > 0 && (
-            <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto pr-1">
+            <div className="grid grid-cols-3 gap-2 max-h-72 overflow-y-auto pr-1">
               {results.map((img, i) => (
-                <button
+                <ImageResultCell
                   key={i}
-                  type="button"
-                  onClick={() => onSelect(img.url)}
-                  title={img.title}
-                  className={`relative aspect-4/3 rounded-xl overflow-hidden border-2 transition-colors bg-slate-800 ${
-                    selected === img.url
-                      ? "border-sky-400"
-                      : "border-white/10 hover:border-white/30"
-                  }`}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={img.thumbnail}
-                    alt={img.title}
-                    className="absolute inset-0 w-full h-full object-contain p-1"
-                    onError={(e) => {
-                      const btn = (e.target as HTMLImageElement).closest("button");
-                      if (btn) btn.style.display = "none";
-                    }}
-                  />
-                  {selected === img.url && (
-                    <div className="absolute top-1 right-1 w-5 h-5 rounded-full bg-sky-500 flex items-center justify-center shadow">
-                      <span className="text-white text-xs font-bold">✓</span>
-                    </div>
-                  )}
-                  <div className="absolute bottom-0 inset-x-0 bg-black/60 px-1.5 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <p className="text-[10px] text-slate-300 truncate">{img.title}</p>
-                  </div>
-                </button>
+                  img={img}
+                  selected={selected === img.url}
+                  onSelect={() => onSelect(img.url)}
+                />
               ))}
             </div>
           )}
