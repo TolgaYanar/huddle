@@ -1,6 +1,23 @@
 import React, { useState } from "react";
 import { GamePanel, type GamePanelProps } from "./GamePanel";
 
+type GameId = "guess-it";
+
+const AVAILABLE_GAMES: {
+  id: GameId;
+  name: string;
+  description: string;
+  emoji: string;
+}[] = [
+  {
+    id: "guess-it",
+    name: "Guess It!",
+    description:
+      "Post clue images, others guess the answer turn by turn. Reveal hints letter by letter.",
+    emoji: "🔍",
+  },
+];
+
 export type ActivityLogEntry = {
   id?: string;
   msg: string;
@@ -43,6 +60,7 @@ export function ActivitySidebar(props: {
   } = props;
 
   const [activeTab, setActiveTab] = useState<Tab>("activity");
+  const [selectedGame, setSelectedGame] = useState<GameId | null>(null);
 
   const hasActiveGame =
     gameProps.gameState.status === "active" ||
@@ -178,7 +196,46 @@ export function ActivitySidebar(props: {
       {/* Games tab */}
       {!isActivityCollapsed && activeTab === "games" && (
         <div className="flex-1 min-h-0 overflow-y-auto p-4">
-          <GamePanel {...gameProps} />
+          {selectedGame === null ? (
+            /* Lobby */
+            <div className="flex flex-col gap-3">
+              <div className="text-xs text-slate-500 font-medium uppercase tracking-wider">
+                Choose a game
+              </div>
+              {AVAILABLE_GAMES.map((g) => (
+                <button
+                  key={g.id}
+                  type="button"
+                  onClick={() => setSelectedGame(g.id)}
+                  className="w-full text-left p-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-colors group"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">{g.emoji}</span>
+                    <div>
+                      <div className="text-sm font-semibold text-slate-200 group-hover:text-white">
+                        {g.name}
+                      </div>
+                      <div className="text-xs text-slate-500 mt-0.5 leading-relaxed">
+                        {g.description}
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          ) : (
+            /* Selected game */
+            <div className="flex flex-col gap-3">
+              <button
+                type="button"
+                onClick={() => setSelectedGame(null)}
+                className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 transition-colors self-start"
+              >
+                ← Back to games
+              </button>
+              {selectedGame === "guess-it" && <GamePanel {...gameProps} />}
+            </div>
+          )}
         </div>
       )}
     </aside>
