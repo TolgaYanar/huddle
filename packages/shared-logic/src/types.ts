@@ -194,7 +194,8 @@ export interface GameStateData {
   questionerName?: string | null;
   category?: string;
   answer?: string; // only sent to questioner or when finished
-  answerMasked?: string[]; // array of chars: revealed letters or '_'
+  answerMasked?: string[]; // array of chars: revealed letters or '_'; absent when hideBlanks is on and no hints yet
+  hideBlanks?: boolean;
   images?: string[];
   turnOrder?: string[];
   turnOrderUsernames?: Record<string, string | null>;

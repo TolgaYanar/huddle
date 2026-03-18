@@ -14,7 +14,7 @@ export function useGame({
 }: {
   onGameState: (cb: (data: GameStateData) => void) => () => void;
   requestGameState: () => void;
-  startGame: (category: string, answer: string, images: string[]) => void;
+  startGame: (category: string, answer: string, images: string[], hideBlanks: boolean) => void;
   submitGuess: (guess: string) => void;
   revealHint: () => void;
   skipTurn: () => void;
@@ -68,8 +68,8 @@ export function useGame({
   );
 
   const handleStartGame = useCallback(
-    (category: string, answer: string, images: string[]) => {
-      startGame(category, answer, images);
+    (category: string, answer: string, images: string[], hideBlanks: boolean) => {
+      startGame(category, answer, images, hideBlanks);
       setIsSetupOpen(false);
     },
     [startGame],

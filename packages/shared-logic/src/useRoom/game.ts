@@ -20,10 +20,10 @@ export function useGameApi({
   }, [roomId, socketRef]);
 
   const startGame = useCallback(
-    (category: string, answer: string, images: string[]) => {
+    (category: string, answer: string, images: string[], hideBlanks: boolean) => {
       const socket = socketRef.current;
       if (!socket?.connected) return;
-      socket.emit("game_start", { roomId, category, answer, images });
+      socket.emit("game_start", { roomId, category, answer, images, hideBlanks });
     },
     [roomId, socketRef],
   );

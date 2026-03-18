@@ -33,6 +33,11 @@ function buildGameStatePayload(state, roomId, forSocketId) {
       ? game.turnOrder[game.currentTurnIndex % game.turnOrder.length]
       : null;
 
+  // When hideBlanks is on and no hints have been revealed yet,
+  // non-questioners don't see the blanks (can't count letters).
+  const blanksVisible =
+    isQuestioner || isFinished || !game.hideBlanks || game.hintsRevealed > 0;
+
   return {
     roomId,
     status: game.status,
@@ -40,7 +45,8 @@ function buildGameStatePayload(state, roomId, forSocketId) {
     questionerName: game.questionerName,
     category: game.category,
     answer: isQuestioner || isFinished ? game.answer : undefined,
-    answerMasked: game.answerMasked,
+    answerMasked: blanksVisible ? game.answerMasked : undefined,
+    hideBlanks: game.hideBlanks,
     images: game.images,
     turnOrder: game.turnOrder,
     turnOrderUsernames,
@@ -95,6 +101,8 @@ function attachGameHandlers(io, state, socket) {
           .slice(0, 5)
       : [];
 
+    const hideBlanks = data.hideBlanks === true;
+
     const room = io.sockets.adapter.rooms.get(roomId);
     const turnOrder = room
       ? [...room].filter((id) => id !== socket.id)
@@ -110,6 +118,7 @@ function attachGameHandlers(io, state, socket) {
       answerMasked: Array.from(cleanAnswer).map((c) =>
         c === " " ? " " : "_"
       ),
+      hideBlanks,
       images: cleanImages,
       turnOrder,
       currentTurnIndex: 0,
@@ -223,9 +232,11 @@ function attachGameHandlers(io, state, socket) {
     if (!roomId || typeof roomId !== "string") return;
     if (!socket.rooms.has(roomId)) return;
 
+    // Anyone in the room can clear a finished game to start a new one.
+    // Only the questioner can clear an active game.
     const game = state.roomGame.get(roomId);
     if (!game) return;
-    if (socket.id !== game.questionerId) return;
+    if (game.status === "active" && socket.id !== game.questionerId) return;
 
     state.roomGame.delete(roomId);
     emitGameStateToRoom(io, state, roomId);
