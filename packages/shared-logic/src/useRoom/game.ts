@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import type { MutableRefObject } from "react";
 import type { Socket } from "socket.io-client";
 
-import type { GameStateData } from "../types";
+import type { GameRoundInput, GameStateData } from "../types";
 
 export function useGameApi({
   roomId,
@@ -20,10 +20,10 @@ export function useGameApi({
   }, [roomId, socketRef]);
 
   const startGame = useCallback(
-    (category: string, answer: string, images: string[], hideBlanks: boolean) => {
+    (rounds: GameRoundInput[]) => {
       const socket = socketRef.current;
       if (!socket?.connected) return;
-      socket.emit("game_start", { roomId, category, answer, images, hideBlanks });
+      socket.emit("game_start", { roomId, rounds });
     },
     [roomId, socketRef],
   );
@@ -47,6 +47,18 @@ export function useGameApi({
     const socket = socketRef.current;
     if (!socket?.connected) return;
     socket.emit("game_skip_turn", { roomId });
+  }, [roomId, socketRef]);
+
+  const endRound = useCallback(() => {
+    const socket = socketRef.current;
+    if (!socket?.connected) return;
+    socket.emit("game_end_round", { roomId });
+  }, [roomId, socketRef]);
+
+  const nextRound = useCallback(() => {
+    const socket = socketRef.current;
+    if (!socket?.connected) return;
+    socket.emit("game_next_round", { roomId });
   }, [roomId, socketRef]);
 
   const endGame = useCallback(() => {
@@ -87,6 +99,8 @@ export function useGameApi({
     submitGuess,
     revealHint,
     skipTurn,
+    endRound,
+    nextRound,
     endGame,
     resetGame,
     onGameState,

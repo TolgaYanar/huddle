@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { GameStateData } from "shared-logic";
+import type { GameRoundInput, GameStateData } from "shared-logic";
 
 export function useGame({
   onGameState,
@@ -8,16 +8,20 @@ export function useGame({
   submitGuess,
   revealHint,
   skipTurn,
+  endRound,
+  nextRound,
   endGame,
   resetGame,
   mySocketId,
 }: {
   onGameState: (cb: (data: GameStateData) => void) => () => void;
   requestGameState: () => void;
-  startGame: (category: string, answer: string, images: string[], hideBlanks: boolean) => void;
+  startGame: (rounds: GameRoundInput[]) => void;
   submitGuess: (guess: string) => void;
   revealHint: () => void;
   skipTurn: () => void;
+  endRound: () => void;
+  nextRound: () => void;
   endGame: () => void;
   resetGame: () => void;
   mySocketId: string;
@@ -32,9 +36,7 @@ export function useGame({
 
   useEffect(() => {
     mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
+    return () => { mountedRef.current = false; };
   }, []);
 
   useEffect(() => {
@@ -45,13 +47,14 @@ export function useGame({
     return cleanup;
   }, [onGameState, requestGameState]);
 
-  // Reset guess input when turn changes or game ends
+  // Reset guess input on turn change or round change
   useEffect(() => {
     setGuessInput("");
-  }, [gameState.currentTurnIndex, gameState.status]);
+  }, [gameState.currentTurnIndex, gameState.currentRoundIndex, gameState.status]);
 
   const isMyTurn =
     gameState.status === "active" &&
+    gameState.currentRound?.status === "active" &&
     gameState.currentTurnSocketId === mySocketId;
 
   const amQuestioner =
@@ -68,8 +71,8 @@ export function useGame({
   );
 
   const handleStartGame = useCallback(
-    (category: string, answer: string, images: string[], hideBlanks: boolean) => {
-      startGame(category, answer, images, hideBlanks);
+    (rounds: GameRoundInput[]) => {
+      startGame(rounds);
       setIsSetupOpen(false);
     },
     [startGame],
@@ -87,6 +90,8 @@ export function useGame({
     handleStartGame,
     revealHint,
     skipTurn,
+    endRound,
+    nextRound,
     endGame,
     resetGame,
   };
