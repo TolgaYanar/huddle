@@ -105,33 +105,37 @@ function ImagePicker({
           {error && <p className="text-xs text-rose-400">{error}</p>}
 
           {results.length > 0 && (
-            <div className="grid grid-cols-4 gap-1.5 max-h-52 overflow-y-auto">
+            <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto pr-1">
               {results.map((img, i) => (
                 <button
                   key={i}
                   type="button"
                   onClick={() => onSelect(img.url)}
                   title={img.title}
-                  className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${
+                  className={`relative aspect-4/3 rounded-xl overflow-hidden border-2 transition-colors bg-slate-800 ${
                     selected === img.url
-                      ? "border-sky-400 scale-95"
-                      : "border-transparent hover:border-white/30"
+                      ? "border-sky-400"
+                      : "border-white/10 hover:border-white/30"
                   }`}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={img.thumbnail}
                     alt={img.title}
-                    className="w-full h-full object-cover"
+                    className="absolute inset-0 w-full h-full object-contain p-1"
                     onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = "none";
+                      const btn = (e.target as HTMLImageElement).closest("button");
+                      if (btn) btn.style.display = "none";
                     }}
                   />
                   {selected === img.url && (
-                    <div className="absolute inset-0 bg-sky-500/30 flex items-center justify-center">
-                      <span className="text-white text-lg font-bold">✓</span>
+                    <div className="absolute top-1 right-1 w-5 h-5 rounded-full bg-sky-500 flex items-center justify-center shadow">
+                      <span className="text-white text-xs font-bold">✓</span>
                     </div>
                   )}
+                  <div className="absolute bottom-0 inset-x-0 bg-black/60 px-1.5 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <p className="text-[10px] text-slate-300 truncate">{img.title}</p>
+                  </div>
                 </button>
               ))}
             </div>
