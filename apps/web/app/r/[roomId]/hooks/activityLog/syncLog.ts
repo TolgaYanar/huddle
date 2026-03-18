@@ -44,13 +44,6 @@ export function handleSyncEvent({
     lastAppliedRoomRevRef.current = data.rev;
   }
 
-  console.log(
-    "[SYNC] Received sync event:",
-    data.action,
-    "from:",
-    data.senderUsername || data.senderId,
-  );
-
   const time = new Date().toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",

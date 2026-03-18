@@ -4,7 +4,6 @@ import React from "react";
 import Link from "next/link";
 
 import {
-  apiAuthMe,
   apiListSavedRooms,
   apiLogout,
   apiSaveRoom,
@@ -23,6 +22,8 @@ interface RoomHeaderProps {
   onOpenWheel: () => void;
   onOpenPlaylist: () => void;
   isPlaylistOpen: boolean;
+  authUser: AuthUser | null;
+  onAuthUserChange: (user: AuthUser | null) => void;
 }
 
 export function RoomHeader({
@@ -36,30 +37,16 @@ export function RoomHeader({
   onOpenWheel,
   onOpenPlaylist,
   isPlaylistOpen,
+  authUser,
+  onAuthUserChange,
 }: RoomHeaderProps) {
-  const [user, setUser] = React.useState<AuthUser | null>(null);
   const [isSaved, setIsSaved] = React.useState(false);
   const [saveBusy, setSaveBusy] = React.useState(false);
+  const [saveError, setSaveError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     let cancelled = false;
-    apiAuthMe()
-      .then((r) => {
-        if (cancelled) return;
-        setUser(r.user);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setUser(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  React.useEffect(() => {
-    let cancelled = false;
-    if (!user) {
+    if (!authUser) {
       setIsSaved(false);
       return;
     }
@@ -77,7 +64,7 @@ export function RoomHeader({
     return () => {
       cancelled = true;
     };
-  }, [user, roomId]);
+  }, [authUser, roomId]);
 
   return (
     <header className="h-16 flex items-center justify-between px-6 lg:px-8 border-b border-white/10 backdrop-blur-md bg-black/30 sticky top-0 z-50">
@@ -104,11 +91,11 @@ export function RoomHeader({
       </div>
 
       <div className="flex items-center gap-3">
-        {user ? (
+        {authUser ? (
           <>
             <div className="hidden md:inline-flex items-center gap-2 text-xs border border-white/10 bg-black/20 rounded-full px-3 py-1 text-slate-300">
               <span className="text-slate-400">@</span>
-              <span className="text-slate-200">{user.username}</span>
+              <span className="text-slate-200">{authUser.username}</span>
             </div>
             <button
               type="button"
@@ -116,7 +103,7 @@ export function RoomHeader({
                 try {
                   await apiLogout();
                 } finally {
-                  setUser(null);
+                  onAuthUserChange(null);
                   setIsSaved(false);
                 }
               }}
@@ -136,10 +123,11 @@ export function RoomHeader({
 
         <button
           type="button"
-          disabled={passwordRequired || !user || saveBusy}
+          disabled={passwordRequired || !authUser || saveBusy}
           onClick={async () => {
-            if (!user) return;
+            if (!authUser) return;
             setSaveBusy(true);
+            setSaveError(null);
             try {
               if (isSaved) {
                 await apiUnsaveRoom(roomId);
@@ -148,6 +136,8 @@ export function RoomHeader({
                 await apiSaveRoom(roomId);
                 setIsSaved(true);
               }
+            } catch {
+              setSaveError(isSaved ? "Failed to unsave" : "Failed to save");
             } finally {
               setSaveBusy(false);
             }
@@ -156,15 +146,19 @@ export function RoomHeader({
           title={
             passwordRequired
               ? "Join with password first"
-              : !user
+              : !authUser
                 ? "Log in to save rooms"
                 : isSaved
                   ? "Remove from saved rooms"
                   : "Save this room"
           }
         >
-          {isSaved ? "Saved" : "Save"}
+          {saveBusy ? "…" : isSaved ? "Saved" : "Save"}
         </button>
+
+        {saveError && (
+          <span className="text-xs text-rose-400">{saveError}</span>
+        )}
 
         <button
           type="button"
@@ -197,6 +191,7 @@ export function RoomHeader({
         </button>
 
         <button
+          type="button"
           onClick={onCopyInvite}
           className="h-8 px-3 rounded-lg border border-white/10 bg-white/5 text-slate-200 text-xs font-medium hover:bg-white/10 transition-colors"
           title={inviteLink || ""}

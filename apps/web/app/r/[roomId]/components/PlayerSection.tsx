@@ -2,7 +2,7 @@
 
 import React from "react";
 
-import { PlayerControlsBar } from "./playerSection/PlayerControlsBar";
+import { VideoControls } from "./VideoControls";
 import { VideoSourceCard } from "./playerSection/VideoSourceCard";
 import { PlayerViewport } from "./playerSection/PlayerViewport";
 import { makePlayerMediaProps } from "./playerSection/makePlayerMediaProps";
@@ -288,7 +288,7 @@ export function PlayerSection({
         mediaProps={mediaProps}
       />
 
-      <PlayerControlsBar
+      <VideoControls
         url={normalizedUrl}
         isPlaying={videoState === "Playing"}
         currentTime={currentTime}

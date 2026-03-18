@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { apiLogin } from "../lib/api";
+import { PasswordToggleButton } from "../components/PasswordToggleButton";
 
 function LoginPageInner() {
   const router = useRouter();
@@ -13,6 +14,7 @@ function LoginPageInner() {
 
   const [username, setUsername] = React.useState("");
   const [password, setPassword] = React.useState("");
+  const [showPassword, setShowPassword] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -117,17 +119,20 @@ function LoginPageInner() {
                 <label className="text-xs font-medium text-slate-300">
                   Password
                 </label>
-                <input
-                  value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value);
-                    setError(null);
-                  }}
-                  placeholder="Enter your password"
-                  type="password"
-                  autoComplete="current-password"
-                  className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500/40 transition"
-                />
+                <div className="relative">
+                  <input
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      setError(null);
+                    }}
+                    placeholder="Enter your password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="current-password"
+                    className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 pr-10 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500/40 transition"
+                  />
+                  <PasswordToggleButton show={showPassword} onToggle={() => setShowPassword((v) => !v)} />
+                </div>
               </div>
 
               {error && (

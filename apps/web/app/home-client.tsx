@@ -35,6 +35,8 @@ function normalizeRoomId(input: string) {
   return cleaned.replace(/^-+|-+$/g, "");
 }
 
+const CURRENT_YEAR = new Date().getFullYear();
+
 export function HomeClient() {
   const router = useRouter();
   const [joinValue, setJoinValue] = useState("");
@@ -115,6 +117,7 @@ export function HomeClient() {
                 <span className="text-slate-200">{user.username}</span>
               </div>
               <button
+                type="button"
                 className="h-8 px-3 rounded-lg border border-white/10 bg-white/5 text-slate-200 text-xs font-medium hover:bg-white/10 transition-colors"
                 onClick={async () => {
                   try {
@@ -147,7 +150,7 @@ export function HomeClient() {
         </div>
       </header>
 
-      <main className="flex-1 flex items-center justify-center p-6">
+      <main className="flex-1 flex flex-col items-center justify-center p-6 gap-10">
         <div className="w-full max-w-xl">
           <div className="backdrop-blur-md bg-white/5 rounded-2xl border border-white/10 p-5 sm:p-6">
             <h1 className="font-semibold text-slate-50 text-xl">
@@ -167,6 +170,7 @@ export function HomeClient() {
                     {savedRooms.slice(0, 5).map((r) => (
                       <button
                         key={r.roomId}
+                        type="button"
                         className="h-10 w-full rounded-xl font-medium text-sm transition-colors bg-white/5 border border-white/10 hover:bg-white/10 text-slate-50 text-left px-4"
                         onClick={() => router.push(`/r/${r.roomId}`)}
                         title={r.roomId}
@@ -180,6 +184,7 @@ export function HomeClient() {
 
               {lastRoomId && (
                 <button
+                  type="button"
                   className="h-11 w-full rounded-xl font-semibold text-sm transition-colors bg-white/5 border border-white/10 hover:bg-white/10 text-slate-50"
                   onClick={() => {
                     router.push(`/r/${lastRoomId}`);
@@ -190,6 +195,7 @@ export function HomeClient() {
               )}
 
               <button
+                type="button"
                 className="h-11 w-full rounded-xl font-semibold text-sm transition-colors bg-slate-50 text-slate-950 hover:bg-slate-50/90"
                 onClick={() => {
                   router.push(`/r/${generateRoomId()}`);
@@ -203,10 +209,16 @@ export function HomeClient() {
                   type="text"
                   value={joinValue}
                   onChange={(e) => setJoinValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && normalizedJoin) {
+                      router.push(`/r/${normalizedJoin}`);
+                    }
+                  }}
                   placeholder="Enter room name or paste invite link (/r/...)"
                   className="flex-1 bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500/40 transition"
                 />
                 <button
+                  type="button"
                   className="h-11 px-4 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                   disabled={!normalizedJoin}
                   onClick={() => {
@@ -226,7 +238,56 @@ export function HomeClient() {
             </div>
           </div>
         </div>
+
+        {/* Features section */}
+        <div className="w-full max-w-xl grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {[
+            {
+              icon: (
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.91 11.672a.375.375 0 010 .656l-5.603 3.113a.375.375 0 01-.557-.328V8.887c0-.286.307-.466.557-.328l5.603 3.113z" />
+                </svg>
+              ),
+              title: "Perfectly in sync",
+              description: "Play, pause, and seek together in real time across YouTube, Twitch, Vimeo, and more.",
+            },
+            {
+              icon: (
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 9.75a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375m-13.5 3.01c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.184-4.183a1.14 1.14 0 01.778-.332 48.294 48.294 0 005.83-.498c1.585-.233 2.708-1.626 2.708-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
+                </svg>
+              ),
+              title: "Live chat",
+              description: "Chat with everyone in the room while watching. Messages sync instantly.",
+            },
+            {
+              icon: (
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
+                </svg>
+              ),
+              title: "Video & voice calls",
+              description: "See and hear your friends while watching. No downloads required.",
+            },
+          ].map(({ icon, title, description }) => (
+            <div
+              key={title}
+              className="backdrop-blur-md bg-white/5 rounded-2xl border border-white/10 p-4 flex flex-col gap-2"
+            >
+              <div className="text-indigo-400">{icon}</div>
+              <div className="text-sm font-medium text-slate-200">{title}</div>
+              <div className="text-xs text-slate-400 leading-relaxed">{description}</div>
+            </div>
+          ))}
+        </div>
       </main>
+
+      <footer className="py-4 px-6 border-t border-white/5 flex items-center justify-center gap-4 text-xs text-slate-500">
+        <Link href="/privacy" className="hover:text-slate-300 transition-colors">Privacy Policy</Link>
+        <span>·</span>
+        <span>© {CURRENT_YEAR} WeHuddle</span>
+      </footer>
     </div>
   );
 }

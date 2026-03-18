@@ -5,6 +5,11 @@ const {
 } = require("../helpers/chat");
 
 function attachChatHandlers(io, state, socket, deps, isSocketInRoom) {
+  // Per-socket sliding-window rate limit: max 5 messages per 3 seconds.
+  const CHAT_RATE_WINDOW_MS = 3000;
+  const CHAT_RATE_MAX = 5;
+  const chatTimestamps = [];
+
   socket.on("request_chat_history", async (rawRoom) => {
     const roomId = normalizeRoomId(rawRoom);
     if (!roomId) return;
@@ -21,6 +26,17 @@ function attachChatHandlers(io, state, socket, deps, isSocketInRoom) {
     const trimmed = text.trim();
     if (!trimmed) return;
     if (trimmed.length > 2000) return;
+
+    // Rate limiting: max CHAT_RATE_MAX messages per CHAT_RATE_WINDOW_MS.
+    const now = Date.now();
+    while (chatTimestamps.length > 0 && now - chatTimestamps[0] >= CHAT_RATE_WINDOW_MS) {
+      chatTimestamps.shift();
+    }
+    if (chatTimestamps.length >= CHAT_RATE_MAX) {
+      socket.emit("chat_rate_limited", { roomId });
+      return;
+    }
+    chatTimestamps.push(now);
 
     try {
       await persistOrFallbackChatMessage(

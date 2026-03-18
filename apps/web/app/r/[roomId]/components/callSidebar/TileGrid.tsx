@@ -92,8 +92,9 @@ export function TileGrid(props: {
             }}
             className="h-9 w-9 inline-flex items-center justify-center rounded-xl border border-white/20 bg-black/60 text-slate-50 text-sm hover:bg-white/10 transition-colors"
             title="Fullscreen"
+            aria-label="Toggle fullscreen"
           >
-            ⛶
+            <span aria-hidden="true">⛶</span>
           </button>
         </div>
         <video

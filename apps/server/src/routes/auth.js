@@ -1,3 +1,19 @@
+const { createRateLimiter } = require("../auth/rateLimiter");
+
+// 10 login attempts per 15 minutes per IP.
+const loginLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: "too_many_login_attempts",
+});
+
+// 5 registration attempts per hour per IP.
+const registerLimiter = createRateLimiter({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  message: "too_many_register_attempts",
+});
+
 function registerAuthRoutes(
   app,
   {
@@ -17,6 +33,54 @@ function registerAuthRoutes(
     sha256Hex,
   },
 ) {
+  // Shared: validate inputs, create user, return { user, token, expiresAt }.
+  async function createUser(body) {
+    const username = validateUsername(body?.username);
+    const password = validatePassword(body?.password);
+    if (!username) {
+      return {
+        err: { status: 400, body: { error: "invalid_username", hint: "3-20 chars: a-z 0-9 _" } },
+      };
+    }
+    if (!password) {
+      return {
+        err: { status: 400, body: { error: "invalid_password", hint: "min 8 characters" } },
+      };
+    }
+
+    const user = await getPrisma().user.create({
+      data: { username, passwordHash: hashPassword(password) },
+      select: { id: true, username: true, createdAt: true },
+    });
+
+    const { token, expiresAt } = await createSessionForUser(user.id);
+    return { user, token, expiresAt };
+  }
+
+  // Shared: validate credentials, find user, verify password, return { user, token, expiresAt }.
+  async function authenticateUser(body) {
+    const username = validateUsername(body?.username);
+    const password = validatePasswordForLogin(body?.password);
+    if (!username || !password) {
+      return { err: { status: 400, body: { error: "invalid_credentials" } } };
+    }
+
+    const user = await getPrisma().user.findUnique({
+      where: { username },
+      select: { id: true, username: true, passwordHash: true, createdAt: true },
+    });
+
+    const ok = user ? verifyPassword(password, user.passwordHash) : false;
+    if (!ok) return { err: { status: 401, body: { error: "invalid_credentials" } } };
+
+    const { token, expiresAt } = await createSessionForUser(user.id);
+    return {
+      user: { id: user.id, username: user.username, createdAt: user.createdAt },
+      token,
+      expiresAt,
+    };
+  }
+
   app.get("/api/auth/me", async (req, res) => {
     try {
       const user = await getAuthUser(req);
@@ -27,37 +91,15 @@ function registerAuthRoutes(
     }
   });
 
-  app.post("/api/auth/register", async (req, res) => {
+  app.post("/api/auth/register", registerLimiter, async (req, res) => {
     try {
       if (!isDbConnected() || !getPrisma()) {
         return res.status(503).json({ error: "db_unavailable" });
       }
-
-      const username = validateUsername(req.body?.username);
-      const password = validatePassword(req.body?.password);
-      if (!username) {
-        return res
-          .status(400)
-          .json({ error: "invalid_username", hint: "3-20 chars: a-z 0-9 _" });
-      }
-      if (!password) {
-        return res
-          .status(400)
-          .json({ error: "invalid_password", hint: "min 8 characters" });
-      }
-
-      const user = await getPrisma().user.create({
-        data: {
-          username,
-          passwordHash: hashPassword(password),
-        },
-        select: { id: true, username: true, createdAt: true },
-      });
-
-      const { token } = await createSessionForUser(user.id);
-
-      setSessionCookie(req, res, token);
-      return res.json({ user });
+      const result = await createUser(req.body);
+      if (result.err) return res.status(result.err.status).json(result.err.body);
+      setSessionCookie(req, res, result.token);
+      return res.json({ user: result.user });
     } catch (err) {
       if (err && err.code === "P2002") {
         return res.status(409).json({ error: "username_taken" });
@@ -67,41 +109,15 @@ function registerAuthRoutes(
     }
   });
 
-  app.post("/api/auth/login", async (req, res) => {
+  app.post("/api/auth/login", loginLimiter, async (req, res) => {
     try {
       if (!isDbConnected() || !getPrisma()) {
         return res.status(503).json({ error: "db_unavailable" });
       }
-
-      const username = validateUsername(req.body?.username);
-      const password = validatePasswordForLogin(req.body?.password);
-      if (!username || !password) {
-        return res.status(400).json({ error: "invalid_credentials" });
-      }
-
-      const user = await getPrisma().user.findUnique({
-        where: { username },
-        select: {
-          id: true,
-          username: true,
-          passwordHash: true,
-          createdAt: true,
-        },
-      });
-
-      const ok = user ? verifyPassword(password, user.passwordHash) : false;
-      if (!ok) return res.status(401).json({ error: "invalid_credentials" });
-
-      const { token } = await createSessionForUser(user.id);
-
-      setSessionCookie(req, res, token);
-      return res.json({
-        user: {
-          id: user.id,
-          username: user.username,
-          createdAt: user.createdAt,
-        },
-      });
+      const result = await authenticateUser(req.body);
+      if (result.err) return res.status(result.err.status).json(result.err.body);
+      setSessionCookie(req, res, result.token);
+      return res.json({ user: result.user });
     } catch (err) {
       console.error("/api/auth/login failed:", err);
       return res.status(500).json({ error: "server_error" });
@@ -109,35 +125,14 @@ function registerAuthRoutes(
   });
 
   // Token-returning variants (recommended for mobile).
-  app.post("/api/auth/register-token", async (req, res) => {
+  app.post("/api/auth/register-token", registerLimiter, async (req, res) => {
     try {
       if (!isDbConnected() || !getPrisma()) {
         return res.status(503).json({ error: "db_unavailable" });
       }
-
-      const username = validateUsername(req.body?.username);
-      const password = validatePassword(req.body?.password);
-      if (!username) {
-        return res
-          .status(400)
-          .json({ error: "invalid_username", hint: "3-20 chars: a-z 0-9 _" });
-      }
-      if (!password) {
-        return res
-          .status(400)
-          .json({ error: "invalid_password", hint: "min 8 characters" });
-      }
-
-      const user = await getPrisma().user.create({
-        data: {
-          username,
-          passwordHash: hashPassword(password),
-        },
-        select: { id: true, username: true, createdAt: true },
-      });
-
-      const { token, expiresAt } = await createSessionForUser(user.id);
-      return res.json({ user, token, expiresAt });
+      const result = await createUser(req.body);
+      if (result.err) return res.status(result.err.status).json(result.err.body);
+      return res.json({ user: result.user, token: result.token, expiresAt: result.expiresAt });
     } catch (err) {
       if (err && err.code === "P2002") {
         return res.status(409).json({ error: "username_taken" });
@@ -147,41 +142,14 @@ function registerAuthRoutes(
     }
   });
 
-  app.post("/api/auth/login-token", async (req, res) => {
+  app.post("/api/auth/login-token", loginLimiter, async (req, res) => {
     try {
       if (!isDbConnected() || !getPrisma()) {
         return res.status(503).json({ error: "db_unavailable" });
       }
-
-      const username = validateUsername(req.body?.username);
-      const password = validatePasswordForLogin(req.body?.password);
-      if (!username || !password) {
-        return res.status(400).json({ error: "invalid_credentials" });
-      }
-
-      const user = await getPrisma().user.findUnique({
-        where: { username },
-        select: {
-          id: true,
-          username: true,
-          passwordHash: true,
-          createdAt: true,
-        },
-      });
-
-      const ok = user ? verifyPassword(password, user.passwordHash) : false;
-      if (!ok) return res.status(401).json({ error: "invalid_credentials" });
-
-      const { token, expiresAt } = await createSessionForUser(user.id);
-      return res.json({
-        user: {
-          id: user.id,
-          username: user.username,
-          createdAt: user.createdAt,
-        },
-        token,
-        expiresAt,
-      });
+      const result = await authenticateUser(req.body);
+      if (result.err) return res.status(result.err.status).json(result.err.body);
+      return res.json({ user: result.user, token: result.token, expiresAt: result.expiresAt });
     } catch (err) {
       console.error("/api/auth/login-token failed:", err);
       return res.status(500).json({ error: "server_error" });

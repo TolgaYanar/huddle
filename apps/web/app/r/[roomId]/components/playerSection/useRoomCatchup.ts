@@ -7,6 +7,23 @@ import {
 } from "../../lib/player";
 import { USER_PAUSE_INTENT_WINDOW_MS } from "../../hooks/useVideoPlayer/constants";
 
+// Max retry attempts before giving up on a pending catchup.
+const CATCHUP_MAX_ATTEMPTS = 10;
+// Acceptable drift (seconds) before we consider the player close enough.
+const CATCHUP_ACCEPTABLE_DRIFT_S = 2.5;
+// How long (ms) to keep retrying a catchup after a player load.
+const CATCHUP_RETRY_WINDOW_MS = 4000;
+// Player position considered "at the beginning" (seconds).
+const CATCHUP_AT_BEGINNING_THRESHOLD_S = 3;
+// Target position considered "far ahead" — worth a forced seek from beginning (seconds).
+const CATCHUP_FAR_AHEAD_THRESHOLD_S = 5;
+// Drift threshold (seconds) to trigger a normal sync.
+const SYNC_DRIFT_THRESHOLD_S = 3;
+// If we just received an anchor and drift is below this, skip the redundant seek.
+const SYNC_RECENT_ANCHOR_DRIFT_SKIP_S = 5;
+// Recent anchor window: skip seek if anchor arrived less than this many ms ago.
+const SYNC_RECENT_ANCHOR_WINDOW_MS = 1000;
+
 export type RoomPlaybackAnchor = {
   url: string;
   isPlaying: boolean;
@@ -16,6 +33,7 @@ export type RoomPlaybackAnchor = {
 };
 
 type PendingRoomCatchup = {
+  url: string;
   target: number;
   until: number;
   attempts: number;
@@ -90,8 +108,13 @@ export function useRoomCatchup({
     const pending = pendingRoomCatchupRef.current;
     if (!pending) return;
 
-    // Drop if expired.
-    if (Date.now() > pending.until || pending.attempts >= 10) {
+    // Drop if expired or the room changed to a different video.
+    const anchor = roomPlaybackAnchorRef.current;
+    if (
+      Date.now() > pending.until ||
+      pending.attempts >= CATCHUP_MAX_ATTEMPTS ||
+      pending.url !== anchor?.url
+    ) {
       pendingRoomCatchupRef.current = null;
       return;
     }
@@ -119,7 +142,7 @@ export function useRoomCatchup({
     const drift = Math.abs(current - pending.target);
 
     // If we've landed close enough, we're done.
-    if (drift <= 2.5 || (current > 3 && pending.target > 5)) {
+    if (drift <= CATCHUP_ACCEPTABLE_DRIFT_S || (current > CATCHUP_AT_BEGINNING_THRESHOLD_S && pending.target > CATCHUP_FAR_AHEAD_THRESHOLD_S)) {
       pendingRoomCatchupRef.current = null;
       return;
     }
@@ -217,29 +240,30 @@ export function useRoomCatchup({
 
     const drift = Math.abs(current - target);
 
-    // ALWAYS sync if we're at the beginning (< 3 sec) but should be much further (> 5 sec ahead)
-    // This handles the case where player loads after room state arrived
-    const atBeginning = current < 3;
-    const shouldBeFarAhead = target > 5;
+    // ALWAYS sync if we're at the beginning but should be much further ahead.
+    // This handles the case where player loads after room state arrived.
+    const atBeginning = current < CATCHUP_AT_BEGINNING_THRESHOLD_S;
+    const shouldBeFarAhead = target > CATCHUP_FAR_AHEAD_THRESHOLD_S;
 
     if (atBeginning && shouldBeFarAhead) {
       // Initial load - player wasn't seekable when room state arrived, keep retrying briefly.
       lastRoomSyncAtRef.current = Date.now();
       pendingRoomCatchupRef.current = {
+        url: normalizedUrl,
         target,
-        until: Date.now() + 4000,
+        until: Date.now() + CATCHUP_RETRY_WINDOW_MS,
         attempts: 0,
       };
       tryApplyPendingRoomCatchup();
       return;
     }
 
-    // For normal cases, only sync if drift is significant
-    if (drift <= 3) return;
+    // For normal cases, only sync if drift is significant.
+    if (drift <= SYNC_DRIFT_THRESHOLD_S) return;
 
-    // Avoid redundant seeks if we just synced
+    // Avoid redundant seeks if we just synced.
     const timeSinceAnchor = Date.now() - anchor.anchorAt;
-    if (timeSinceAnchor < 1000 && drift < 5) return;
+    if (timeSinceAnchor < SYNC_RECENT_ANCHOR_WINDOW_MS && drift < SYNC_RECENT_ANCHOR_DRIFT_SKIP_S) return;
 
     applyingRemoteSyncRef.current = true;
     window.setTimeout(() => {

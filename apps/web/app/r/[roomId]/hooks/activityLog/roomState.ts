@@ -111,6 +111,9 @@ export function applyRoomState({
       target = state.timestamp + elapsed * rate;
     }
 
+    // Clamp to valid range — guards against stale updatedAt overshooting video end.
+    target = Math.max(0, target);
+
     // Only seek if significantly out of sync
     if (Math.abs(current - target) > 2) {
       seekToFromRef(playerRef, target);

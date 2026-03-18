@@ -6,8 +6,8 @@ import {
   useRoomState,
   useStagePinning,
 } from "../hooks";
+import { apiAuthMe, type AuthUser } from "../../../lib/api";
 import type { RoomClientViewProps } from "./RoomClientView";
-import { makeRoomClientViewProps } from "./makeRoomClientViewProps";
 import { useUnhandledRejectionGuard } from "./useUnhandledRejectionGuard";
 import { useGuardedSendSyncEvent } from "./useGuardedSendSyncEvent";
 import { useCopyInvite, useInviteLink } from "./useInviteLink";
@@ -21,6 +21,7 @@ import { useRoomClientRtc } from "./useRoomClientRtc";
 export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
   const [userId, setUserId] = useState("");
   const [isClient, setIsClient] = useState(false);
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [isCallCollapsed, setIsCallCollapsed] = useState(false);
   const [isActivityCollapsed, setIsActivityCollapsed] = useState(false);
 
@@ -35,6 +36,14 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
     setIsClient(true);
     mountTimeRef.current = Date.now();
     hasInitialSyncRef.current = false;
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiAuthMe()
+      .then((r) => { if (!cancelled) setAuthUser(r.user); })
+      .catch(() => { if (!cancelled) setAuthUser(null); });
+    return () => { cancelled = true; };
   }, []);
 
   useUnhandledRejectionGuard();
@@ -242,6 +251,8 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
               !playback.playlist.isPlaylistPanelOpen,
             ),
           isPlaylistOpen: playback.playlist.isPlaylistPanelOpen,
+          authUser,
+          onAuthUserChange: setAuthUser,
         }
       : null;
 
@@ -278,7 +289,7 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
     handleSendChat: playback.activity.handleSendChat,
   };
 
-  return makeRoomClientViewProps({
+  return {
     roomId,
     isClient,
     passwordRequired: roomState.passwordRequired,
@@ -295,5 +306,5 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
     playlistPanelProps,
     addToPlaylistModalProps,
     addVideosToPlaylistModalProps,
-  });
+  };
 }

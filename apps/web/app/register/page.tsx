@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { apiRegister } from "../lib/api";
+import { PasswordToggleButton } from "../components/PasswordToggleButton";
 
 // Password requirements
 const PASSWORD_REQUIREMENTS = [
@@ -81,6 +82,8 @@ function RegisterPageInner() {
   const [username, setUsername] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [confirmPassword, setConfirmPassword] = React.useState("");
+  const [showPassword, setShowPassword] = React.useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [showRequirements, setShowRequirements] = React.useState(false);
@@ -210,25 +213,28 @@ function RegisterPageInner() {
                 <label className="text-xs font-medium text-slate-300">
                   Password
                 </label>
-                <input
-                  value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value);
-                    setShowRequirements(true);
-                    setError(null);
-                  }}
-                  onFocus={() => setShowRequirements(true)}
-                  placeholder="Create a strong password"
-                  type="password"
-                  autoComplete="new-password"
-                  className={`w-full bg-black/20 border rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 transition ${
-                    password.length > 0
-                      ? passwordValid
-                        ? "border-emerald-500/40 focus:ring-emerald-500/30 focus:border-emerald-500/40"
-                        : "border-amber-500/40 focus:ring-amber-500/30 focus:border-amber-500/40"
-                      : "border-white/10 focus:ring-indigo-500/30 focus:border-indigo-500/40"
-                  }`}
-                />
+                <div className="relative">
+                  <input
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      setShowRequirements(true);
+                      setError(null);
+                    }}
+                    onFocus={() => setShowRequirements(true)}
+                    placeholder="Create a strong password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="new-password"
+                    className={`w-full bg-black/20 border rounded-xl px-4 py-2.5 pr-10 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 transition ${
+                      password.length > 0
+                        ? passwordValid
+                          ? "border-emerald-500/40 focus:ring-emerald-500/30 focus:border-emerald-500/40"
+                          : "border-amber-500/40 focus:ring-amber-500/30 focus:border-amber-500/40"
+                        : "border-white/10 focus:ring-indigo-500/30 focus:border-indigo-500/40"
+                    }`}
+                  />
+                  <PasswordToggleButton show={showPassword} onToggle={() => setShowPassword((v) => !v)} />
+                </div>
                 {showRequirements && (
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2">
                     {PASSWORD_REQUIREMENTS.map((req) => (
@@ -247,23 +253,26 @@ function RegisterPageInner() {
                 <label className="text-xs font-medium text-slate-300">
                   Confirm Password
                 </label>
-                <input
-                  value={confirmPassword}
-                  onChange={(e) => {
-                    setConfirmPassword(e.target.value);
-                    setError(null);
-                  }}
-                  placeholder="Confirm your password"
-                  type="password"
-                  autoComplete="new-password"
-                  className={`w-full bg-black/20 border rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 transition ${
-                    confirmPassword.length > 0
-                      ? passwordsMatch
-                        ? "border-emerald-500/40 focus:ring-emerald-500/30 focus:border-emerald-500/40"
-                        : "border-rose-500/40 focus:ring-rose-500/30 focus:border-rose-500/40"
-                      : "border-white/10 focus:ring-indigo-500/30 focus:border-indigo-500/40"
-                  }`}
-                />
+                <div className="relative">
+                  <input
+                    value={confirmPassword}
+                    onChange={(e) => {
+                      setConfirmPassword(e.target.value);
+                      setError(null);
+                    }}
+                    placeholder="Confirm your password"
+                    type={showConfirmPassword ? "text" : "password"}
+                    autoComplete="new-password"
+                    className={`w-full bg-black/20 border rounded-xl px-4 py-2.5 pr-10 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 transition ${
+                      confirmPassword.length > 0
+                        ? passwordsMatch
+                          ? "border-emerald-500/40 focus:ring-emerald-500/30 focus:border-emerald-500/40"
+                          : "border-rose-500/40 focus:ring-rose-500/30 focus:border-rose-500/40"
+                        : "border-white/10 focus:ring-indigo-500/30 focus:border-indigo-500/40"
+                    }`}
+                  />
+                  <PasswordToggleButton show={showConfirmPassword} onToggle={() => setShowConfirmPassword((v) => !v)} />
+                </div>
                 {confirmPassword.length > 0 && !passwordsMatch && (
                   <div className="text-xs text-rose-400 mt-1">
                     Passwords do not match

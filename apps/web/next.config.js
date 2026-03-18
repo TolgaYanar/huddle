@@ -5,9 +5,7 @@ const nextConfig = {
   // Socket.IO WebSocket upgrades cannot follow redirects.
   // Vercel/Next may normalize trailing slashes with a 308 which breaks the
   // Engine.IO websocket handshake on `/socket.io/`.
-  experimental: {
-    skipTrailingSlashRedirect: true,
-  },
+  skipTrailingSlashRedirect: true,
   async rewrites() {
     const rawTarget =
       process.env.API_PROXY_TARGET ||
