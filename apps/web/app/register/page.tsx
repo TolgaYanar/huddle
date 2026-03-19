@@ -187,7 +187,7 @@ function RegisterPageInner() {
                     setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""));
                     setError(null);
                   }}
-                  placeholder="your_username"
+                  placeholder="Your Username"
                   autoComplete="username"
                   autoCapitalize="none"
                   autoCorrect="off"

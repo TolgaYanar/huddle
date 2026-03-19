@@ -11,6 +11,7 @@ import type {
   RoomPasswordStatusData,
   RoomStateData,
   RoomUsersData,
+  TimerStateData,
   WheelSpunData,
   WheelStateData,
 } from "./types";
@@ -22,9 +23,13 @@ import { type PendingSyncEvent, useSyncApi } from "./useRoom/sync";
 import { useUsersApi } from "./useRoom/users";
 import { useWebRtcApi } from "./useRoom/webrtc";
 import { useWheelApi } from "./useRoom/wheel";
+import { useTimerApi } from "./useRoom/timer";
 
 export const useRoom = (roomId: string, userId: string) => {
   const [isConnected, setIsConnected] = useState(false);
+  // 0 = not reconnecting, 1-N = current attempt number
+  const [reconnectAttempt, setReconnectAttempt] = useState(0);
+  const [reconnectFailed, setReconnectFailed] = useState(false);
   const socketRef = useRef<Socket | null>(null);
 
   const latestRoomStateRef = useRef<RoomStateData | null>(null);
@@ -41,6 +46,7 @@ export const useRoom = (roomId: string, userId: string) => {
   const latestWheelSpunRef = useRef<WheelSpunData | null>(null);
   const latestPlaylistStateRef = useRef<PlaylistStateData | null>(null);
   const latestGameStateRef = useRef<GameStateData | null>(null);
+  const latestTimerStateRef = useRef<TimerStateData | null>(null);
 
   const pendingSyncEventsRef = useRef<PendingSyncEvent[]>([]);
 
@@ -76,6 +82,7 @@ export const useRoom = (roomId: string, userId: string) => {
       latestWheelSpunRef.current = null;
       latestPlaylistStateRef.current = null;
       latestGameStateRef.current = null;
+      latestTimerStateRef.current = null;
     };
 
     const handleRoomState = (data: RoomStateData) => {
@@ -122,6 +129,10 @@ export const useRoom = (roomId: string, userId: string) => {
       latestGameStateRef.current = data;
     };
 
+    const handleTimerState = (data: TimerStateData) => {
+      latestTimerStateRef.current = data;
+    };
+
     // Always listen for room state so we don't miss the first push during join.
     socket.on("room_state", handleRoomState);
     socket.on("chat_history", handleChatHistory);
@@ -133,6 +144,7 @@ export const useRoom = (roomId: string, userId: string) => {
     socket.on("wheel_spun", handleWheelSpun);
     socket.on("playlist_state", handlePlaylistState);
     socket.on("game_state", handleGameState);
+    socket.on("timer_state", handleTimerState);
 
     socket.on("connect_error", (err) => {
       console.error("Socket connect_error:", err?.message || err);
@@ -148,24 +160,28 @@ export const useRoom = (roomId: string, userId: string) => {
     });
 
     socket.io.on("reconnect_attempt", (attempt) => {
-      console.log(`Socket reconnection attempt ${attempt}...`);
+      setReconnectAttempt(attempt);
+      setReconnectFailed(false);
     });
 
     socket.io.on("reconnect_failed", () => {
-      console.error("Socket reconnection failed after all attempts");
+      setReconnectFailed(true);
+      setReconnectAttempt(0);
     });
 
     socket.off("disconnect");
     socket.on("disconnect", () => {
-      console.log("Disconnected from socket server");
       setIsConnected(false);
+      setReconnectAttempt(0);
+      setReconnectFailed(false);
       // Avoid stale cached room/users/password data showing up while disconnected or on the next reconnect.
       clearCachedRoomData();
     });
 
     socket.on("connect", () => {
-      console.log("Connected to socket server");
       setIsConnected(true);
+      setReconnectAttempt(0);
+      setReconnectFailed(false);
       // New connection => drop any cached events from a previous socket id.
       clearCachedRoomData();
 
@@ -216,6 +232,7 @@ export const useRoom = (roomId: string, userId: string) => {
       socket.off("wheel_spun", handleWheelSpun);
       socket.off("playlist_state", handlePlaylistState);
       socket.off("game_state", handleGameState);
+      socket.off("timer_state", handleTimerState);
 
       // Best-effort: tell server we left the room so others update immediately.
       try {
@@ -276,8 +293,27 @@ export const useRoom = (roomId: string, userId: string) => {
     latestGameStateRef,
   });
 
+  const timerApi = useTimerApi({
+    roomId,
+    socketRef,
+    latestTimerStateRef,
+  });
+
+  const manualReconnect = () => {
+    const socket = socketRef.current;
+    if (!socket) return;
+    setReconnectFailed(false);
+    setReconnectAttempt(0);
+    // Fully reset then reconnect so the attempt counter starts fresh.
+    socket.disconnect();
+    socket.connect();
+  };
+
   return {
     isConnected,
+    reconnectAttempt,
+    reconnectFailed,
+    manualReconnect,
     ...usersApi,
     ...wheelApi,
     ...syncApi,
@@ -286,6 +322,7 @@ export const useRoom = (roomId: string, userId: string) => {
     ...webrtcApi,
     ...playlistsApi,
     ...gameApi,
+    ...timerApi,
     socket: socketRef.current,
   };
 };

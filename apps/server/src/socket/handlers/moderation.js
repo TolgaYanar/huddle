@@ -110,6 +110,21 @@ function attachModerationHandlers(io, state, socket, deps) {
       }
     }
   });
+
+  // Host-only: transfer host role to another participant.
+  socket.on("transfer_host", (data) => {
+    const { roomId, targetId } = data || {};
+    if (!roomId || typeof roomId !== "string") return;
+    if (!targetId || typeof targetId !== "string") return;
+    if (state.roomHost.get(roomId) !== socket.id) return;
+
+    // Target must still be in the room.
+    const roomSockets = io.sockets.adapter.rooms.get(roomId);
+    if (!roomSockets || !roomSockets.has(targetId)) return;
+
+    state.roomHost.set(roomId, targetId);
+    io.to(roomId).emit("room_host", { roomId, hostId: targetId });
+  });
 }
 
 module.exports = {

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 import type { UserPresenceData } from "shared-logic";
 
@@ -18,6 +18,22 @@ export function useWebRTCPeerSubscriptions<MediaState>(args: {
   latestRef: WebRTCPeersLatestRef<MediaState>;
 }) {
   const { isConnected, userId, roomId, latestRef } = args;
+
+  // Buffer ICE candidates that arrive before remote description is set.
+  const pendingIceRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
+
+  const flushPendingIce = async (peerId: string, pc: RTCPeerConnection) => {
+    const pending = pendingIceRef.current.get(peerId);
+    if (!pending || pending.length === 0) return;
+    pendingIceRef.current.delete(peerId);
+    for (const candidate of pending) {
+      try {
+        await pc.addIceCandidate(candidate);
+      } catch {
+        // ignore
+      }
+    }
+  };
 
   // Presence + signaling wiring.
   useEffect(() => {
@@ -86,6 +102,7 @@ export function useWebRTCPeerSubscriptions<MediaState>(args: {
     const cleanupLeft = _onUserLeft?.((peer) => {
       const peerId = toSocketId(peer);
       if (!peerId) return;
+      pendingIceRef.current.delete(peerId);
       latestRef.current.closePeer(peerId);
     });
 
@@ -98,6 +115,7 @@ export function useWebRTCPeerSubscriptions<MediaState>(args: {
 
       try {
         await pc.setRemoteDescription(data.sdp as RTCSessionDescriptionInit);
+        await flushPendingIce(data.from, pc);
         latestRef.current.syncTracksToPeer(data.from, pc);
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
@@ -116,6 +134,7 @@ export function useWebRTCPeerSubscriptions<MediaState>(args: {
         const pc = latestRef.current.createPeerConnection(data.from);
         try {
           await pc.setRemoteDescription(data.sdp as RTCSessionDescriptionInit);
+          await flushPendingIce(data.from, pc);
         } catch {
           // ignore
         }
@@ -128,8 +147,16 @@ export function useWebRTCPeerSubscriptions<MediaState>(args: {
       if (data.roomId !== currentRoomId) return;
       if (!data.from || data.from === currentUserId) return;
       const pc = latestRef.current.createPeerConnection(data.from);
+      const candidate = data.candidate as RTCIceCandidateInit;
+      // If remote description isn't set yet, buffer the candidate.
+      if (!pc.remoteDescription) {
+        const buf = pendingIceRef.current.get(data.from) ?? [];
+        buf.push(candidate);
+        pendingIceRef.current.set(data.from, buf);
+        return;
+      }
       try {
-        await pc.addIceCandidate(data.candidate as RTCIceCandidateInit);
+        await pc.addIceCandidate(candidate);
       } catch {
         // ignore
       }

@@ -7,5 +7,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "daily",
       priority: 1,
     },
+    {
+      url: "https://wehuddle.tv/privacy",
+      changeFrequency: "monthly",
+      priority: 0.3,
+    },
   ];
 }

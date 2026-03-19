@@ -10,6 +10,21 @@ import {
   apiLogout,
   type AuthUser,
 } from "./lib/api";
+import { readRoomHistory, type RoomHistoryEntry } from "./lib/roomHistory";
+
+function timeAgo(ms: number): string {
+  const diff = Date.now() - ms;
+  const sec = Math.floor(diff / 1000);
+  if (sec < 60) return "just now";
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  const day = Math.floor(hr / 24);
+  if (day === 1) return "yesterday";
+  if (day < 7) return `${day}d ago`;
+  return new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
 
 function generateRoomId() {
   // Friendly, URL-safe, reasonably unique (no server round-trip needed)
@@ -40,7 +55,7 @@ const CURRENT_YEAR = new Date().getFullYear();
 export function HomeClient() {
   const router = useRouter();
   const [joinValue, setJoinValue] = useState("");
-  const [lastRoomId, setLastRoomId] = useState<string | null>(null);
+  const [roomHistory, setRoomHistory] = useState<RoomHistoryEntry[]>([]);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [savedRooms, setSavedRooms] = useState<
     Array<{ roomId: string; createdAt: string }>
@@ -48,12 +63,7 @@ export function HomeClient() {
   const normalizedJoin = normalizeRoomId(joinValue);
 
   useEffect(() => {
-    try {
-      const last = window.localStorage.getItem("huddle:lastRoomId");
-      if (last) setLastRoomId(last);
-    } catch {
-      // ignore
-    }
+    setRoomHistory(readRoomHistory());
   }, []);
 
   useEffect(() => {
@@ -161,37 +171,68 @@ export function HomeClient() {
             </p>
 
             <div className="mt-5 grid gap-3">
-              {user && savedRooms.length > 0 && (
+              {roomHistory.length > 0 && (
                 <div className="rounded-xl border border-white/10 bg-black/20 p-3">
-                  <div className="text-xs font-medium text-slate-300">
-                    Saved rooms
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-medium text-slate-300">Recent rooms</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        try { window.localStorage.removeItem("huddle:roomHistory"); } catch { /* ignore */ }
+                        setRoomHistory([]);
+                      }}
+                      className="text-xs text-slate-600 hover:text-slate-400 transition-colors"
+                    >
+                      Clear
+                    </button>
                   </div>
-                  <div className="mt-2 grid gap-2">
+                  <div className="grid gap-1.5">
+                    {roomHistory.slice(0, 5).map((r) => {
+                      const savedEntry = savedRooms.find((s) => s.roomId === r.roomId);
+                      return (
+                        <button
+                          key={r.roomId}
+                          type="button"
+                          className="w-full rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors text-left px-3 py-2 flex items-center gap-3"
+                          onClick={() => router.push(`/r/${r.roomId}`)}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium text-slate-100 truncate">
+                              {r.name ?? <span className="font-mono text-slate-300">{r.roomId}</span>}
+                            </div>
+                            {r.name && (
+                              <div className="text-xs text-slate-500 font-mono truncate">{r.roomId}</div>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {savedEntry && (
+                              <span className="text-xs text-indigo-300">Saved</span>
+                            )}
+                            <span className="text-xs text-slate-500">{timeAgo(r.visitedAt)}</span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {roomHistory.length === 0 && user && savedRooms.length > 0 && (
+                <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+                  <div className="text-xs font-medium text-slate-300 mb-2">Saved rooms</div>
+                  <div className="grid gap-1.5">
                     {savedRooms.slice(0, 5).map((r) => (
                       <button
                         key={r.roomId}
                         type="button"
                         className="h-10 w-full rounded-xl font-medium text-sm transition-colors bg-white/5 border border-white/10 hover:bg-white/10 text-slate-50 text-left px-4"
                         onClick={() => router.push(`/r/${r.roomId}`)}
-                        title={r.roomId}
                       >
                         <span className="font-mono">{r.roomId}</span>
                       </button>
                     ))}
                   </div>
                 </div>
-              )}
-
-              {lastRoomId && (
-                <button
-                  type="button"
-                  className="h-11 w-full rounded-xl font-semibold text-sm transition-colors bg-white/5 border border-white/10 hover:bg-white/10 text-slate-50"
-                  onClick={() => {
-                    router.push(`/r/${lastRoomId}`);
-                  }}
-                >
-                  Continue last room
-                </button>
               )}
 
               <button

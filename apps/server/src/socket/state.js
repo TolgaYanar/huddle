@@ -13,6 +13,7 @@ function createSocketState() {
     roomHost: new Map(),
     roomBans: new Map(),
     roomPasswordHash: new Map(),
+    roomName: new Map(),
 
     // Wheel
     roomWheel: new Map(),
@@ -22,6 +23,9 @@ function createSocketState() {
 
     // Playlists
     roomPlaylistActive: new Map(),
+
+    // Timers
+    roomTimer: new Map(),
 
     // Chat fallback
     roomChatHistory: new Map(),

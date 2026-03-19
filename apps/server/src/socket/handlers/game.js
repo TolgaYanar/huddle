@@ -31,7 +31,6 @@ function parseRounds(rounds) {
         typeof r.image === "string" && r.image.startsWith("http")
           ? r.image
           : "";
-      if (!image) return null;
       return {
         category,
         answer,

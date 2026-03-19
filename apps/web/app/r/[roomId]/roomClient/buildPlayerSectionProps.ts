@@ -24,6 +24,7 @@ export function buildPlayerSectionProps(args: {
   videoEmbed: VideoEmbedInfo;
 
   remotesForPlayer: RoomClientViewProps["playerSectionProps"]["remotes"];
+  localUsername?: string | null;
 
   applyingRemoteSyncRef: React.MutableRefObject<boolean>;
   roomPlaybackAnchorRef: React.MutableRefObject<{
@@ -55,6 +56,7 @@ export function buildPlayerSectionProps(args: {
     mediaTracks,
     videoEmbed,
     remotesForPlayer,
+    localUsername,
     applyingRemoteSyncRef,
     roomPlaybackAnchorRef,
     roomPlaybackAnchorVersion,
@@ -90,6 +92,7 @@ export function buildPlayerSectionProps(args: {
     onUnpinStage: stagePinning.onUnpinStage,
 
     localCamTrack: mediaTracks.camTrackRef.current,
+    localUsername,
     remotes: remotesForPlayer,
 
     setCamEnabled: mediaTracks.setCamEnabled,

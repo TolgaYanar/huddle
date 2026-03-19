@@ -7,17 +7,20 @@ type RemoteStream = {
   id: string;
   stream: MediaStream;
   media?: WebRTCMediaState;
+  username?: string | null;
 };
 
 export function WebcamOverlay({
   active,
   localCamTrack,
+  localUsername,
   remotes,
   containerRef,
   onCloseLocal,
 }: {
   active: boolean;
   localCamTrack: MediaStreamTrack | null;
+  localUsername?: string | null;
   remotes: RemoteStream[];
   containerRef?: React.RefObject<HTMLElement | null>;
   onCloseLocal?: () => void;
@@ -110,23 +113,6 @@ export function WebcamOverlay({
     () => remotes.filter((r) => Boolean(r.media?.cam)),
     [remotes]
   );
-
-  // Debug logging
-  useEffect(() => {
-    if (active) {
-      console.log("[WebcamOverlay] Active:", {
-        hasLocal,
-        remoteCamCount,
-        hasAny,
-        remotes: remotes.map((r) => ({
-          id: r.id,
-          hasCam: r.media?.cam,
-          hasStream: !!r.stream,
-        })),
-        localCamTrack: !!localCamTrack,
-      });
-    }
-  }, [active, hasLocal, remoteCamCount, hasAny, remotes, localCamTrack]);
 
   const thumbHeight = Math.round(thumbWidth * (2 / 3));
 
@@ -237,7 +223,7 @@ export function WebcamOverlay({
       <div className="backdrop-blur-md bg-black/30 border border-white/10 rounded-2xl p-2">
         <div className="flex items-center gap-2 overflow-x-auto max-w-[85vw]">
           {hasLocal && (
-            <div className="relative">
+            <div className="relative shrink-0">
               <video
                 ref={setVideoRef("local")}
                 autoPlay
@@ -246,6 +232,11 @@ export function WebcamOverlay({
                 className="rounded-xl object-cover border border-white/10 bg-black"
                 style={{ width: thumbWidth, height: thumbHeight }}
               />
+              {localUsername && (
+                <span className="absolute bottom-1 left-1 right-1 text-center text-white text-[10px] font-medium leading-tight bg-black/60 rounded-md px-1 py-0.5 truncate pointer-events-none">
+                  {localUsername}
+                </span>
+              )}
               {onCloseLocal && (
                 <button
                   type="button"
@@ -260,15 +251,21 @@ export function WebcamOverlay({
           )}
 
           {camRemotes.map((r) => (
-            <video
-              key={r.id}
-              ref={setVideoRef(r.id)}
-              autoPlay
-              playsInline
-              muted
-              className="rounded-xl object-cover border border-white/10 bg-black"
-              style={{ width: thumbWidth, height: thumbHeight }}
-            />
+            <div key={r.id} className="relative shrink-0">
+              <video
+                ref={setVideoRef(r.id)}
+                autoPlay
+                playsInline
+                muted
+                className="rounded-xl object-cover border border-white/10 bg-black"
+                style={{ width: thumbWidth, height: thumbHeight }}
+              />
+              {r.username && (
+                <span className="absolute bottom-1 left-1 right-1 text-center text-white text-[10px] font-medium leading-tight bg-black/60 rounded-md px-1 py-0.5 truncate pointer-events-none">
+                  {r.username}
+                </span>
+              )}
+            </div>
           ))}
         </div>
 

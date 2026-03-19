@@ -10,6 +10,8 @@ const {
   attachPlaylistPlaybackHandlers,
 } = require("./handlers/playlistPlayback");
 const { attachModerationHandlers } = require("./handlers/moderation");
+const { attachRoomSettingsHandlers } = require("./handlers/roomSettings");
+const { attachTimerHandlers } = require("./handlers/timer");
 const { attachWebRTCHandlers } = require("./handlers/webrtc");
 const { attachChatHandlers } = require("./handlers/chat");
 const { attachActivityHandlers } = require("./handlers/activity");
@@ -50,6 +52,8 @@ function registerSocket(io, deps) {
     attachPlaylistPlaybackHandlers(io, state, socket, deps);
 
     attachModerationHandlers(io, state, socket, deps);
+    attachRoomSettingsHandlers(io, state, socket, deps);
+    attachTimerHandlers(io, state, socket);
 
     attachWebRTCHandlers(io, state, socket, deps);
 

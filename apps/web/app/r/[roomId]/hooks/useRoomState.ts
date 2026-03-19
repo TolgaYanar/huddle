@@ -41,6 +41,7 @@ export function useRoomState({
   joinRoom,
 }: UseRoomStateProps) {
   const [hostId, setHostId] = useState<string | null>(null);
+  const [roomName, setRoomNameState] = useState<string | null>(null);
   const [participants, setParticipants] = useState<string[]>([]);
   const [usernamesById, setUsernamesById] = useState<
     Record<string, string | null>
@@ -167,7 +168,7 @@ export function useRoomState({
     };
   }, [onUserJoined, onUserLeft, userId]);
 
-  // Socket events for host and banned
+  // Socket events for host, banned, and room name
   useEffect(() => {
     if (!socket) return;
     const onHost = (data: { roomId: string; hostId?: string | null }) => {
@@ -185,12 +186,19 @@ export function useRoomState({
       }
     };
 
+    const onRoomNameChanged = (data: { roomId: string; name: string | null }) => {
+      if (data.roomId !== roomId) return;
+      setRoomNameState(data.name ?? null);
+    };
+
     socket.on("room_host", onHost);
     socket.on("room_banned", onBanned);
+    socket.on("room_name_changed", onRoomNameChanged);
 
     return () => {
       socket.off("room_host", onHost);
       socket.off("room_banned", onBanned);
+      socket.off("room_name_changed", onRoomNameChanged);
     };
   }, [socket, roomId]);
 
@@ -205,8 +213,21 @@ export function useRoomState({
     socket.emit("kick_user", { roomId, targetId });
   };
 
+  const setRoomName = (name: string) => {
+    if (!socket?.connected) return;
+    socket.emit("set_room_name", { roomId, name });
+  };
+
+  const transferHost = (targetId: string) => {
+    if (!socket?.connected) return;
+    socket.emit("transfer_host", { roomId, targetId });
+  };
+
   return {
     hostId,
+    roomName,
+    setRoomName,
+    transferHost,
     participants,
     usernamesById,
     roomAccessError,

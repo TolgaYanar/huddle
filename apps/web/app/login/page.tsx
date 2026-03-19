@@ -117,7 +117,7 @@ function LoginPageInner() {
                     );
                     setError(null);
                   }}
-                  placeholder="your_username"
+                  placeholder="Your Username"
                   autoComplete="username"
                   autoCapitalize="none"
                   autoCorrect="off"

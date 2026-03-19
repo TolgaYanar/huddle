@@ -169,6 +169,73 @@ function applyPlaylistPlaybackToRoomState(io, state, roomId, videoUrl) {
   emitRoomStateToRoom(io, state, roomId);
 }
 
+// Upsert the current room state to the DB (best-effort, for persistence across restarts).
+async function persistRoomState(deps, state, roomId) {
+  if (!deps.isDbConnected || !deps.isDbConnected()) return;
+  const prisma = deps.getPrisma?.();
+  if (!prisma) return;
+  const st = state.roomState.get(roomId);
+  const pl = state.roomPlaylistActive.get(roomId);
+  const name = state.roomName.get(roomId) || null;
+  try {
+    await prisma.roomState.upsert({
+      where: { roomId },
+      update: {
+        name,
+        videoUrl: st?.videoUrl || null,
+        timestamp: typeof st?.timestamp === "number" ? st.timestamp : 0,
+        isPlaying: st?.isPlaying === true,
+        activePlaylistId: pl?.activePlaylistId || null,
+        activePlaylistIdx: pl?.currentItemIndex ?? 0,
+      },
+      create: {
+        roomId,
+        name,
+        videoUrl: st?.videoUrl || null,
+        timestamp: typeof st?.timestamp === "number" ? st.timestamp : 0,
+        isPlaying: st?.isPlaying === true,
+        activePlaylistId: pl?.activePlaylistId || null,
+        activePlaylistIdx: pl?.currentItemIndex ?? 0,
+      },
+    });
+  } catch {
+    // best effort — never let persistence failures break the handler
+  }
+}
+
+// Restore room state from DB into in-memory if missing (handles server restarts).
+async function restoreRoomStateFromDB(deps, state, roomId) {
+  if (!deps.isDbConnected || !deps.isDbConnected()) return;
+  const prisma = deps.getPrisma?.();
+  if (!prisma) return;
+  try {
+    const saved = await prisma.roomState.findUnique({ where: { roomId } });
+    if (!saved) return;
+    if (saved.name && !state.roomName.has(roomId)) {
+      state.roomName.set(roomId, saved.name);
+    }
+    if (saved.videoUrl && !state.roomState.has(roomId)) {
+      state.roomState.set(roomId, {
+        videoUrl: saved.videoUrl,
+        timestamp: saved.timestamp ?? 0,
+        // Always restore as paused — the video may be hours ahead in real time.
+        isPlaying: false,
+        action: "pause",
+        updatedAt: Date.now(),
+        rev: 1,
+      });
+    }
+    if (saved.activePlaylistId && !state.roomPlaylistActive.has(roomId)) {
+      state.roomPlaylistActive.set(roomId, {
+        activePlaylistId: saved.activePlaylistId,
+        currentItemIndex: saved.activePlaylistIdx ?? 0,
+      });
+    }
+  } catch {
+    // best effort
+  }
+}
+
 module.exports = {
   emitServerSyncToRoom,
   getEstimatedTimestampForState,
@@ -176,4 +243,6 @@ module.exports = {
   emitRoomStateToRoom,
   emitRoomStateToSocket,
   applyPlaylistPlaybackToRoomState,
+  persistRoomState,
+  restoreRoomStateFromDB,
 };

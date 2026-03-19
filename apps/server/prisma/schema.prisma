@@ -67,6 +67,17 @@ model RoomActivity {
   @@index([roomId, createdAt])
 }
 
+model RoomState {
+  roomId            String   @id
+  name              String?
+  videoUrl          String?
+  timestamp         Float    @default(0)
+  isPlaying         Boolean  @default(false)
+  activePlaylistId  String?
+  activePlaylistIdx Int      @default(0)
+  updatedAt         DateTime @updatedAt
+}
+
 model RoomPlaylist {
   id               String   @id @default(cuid())
   roomId           String

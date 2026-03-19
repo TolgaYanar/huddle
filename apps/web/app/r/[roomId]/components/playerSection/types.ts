@@ -14,6 +14,7 @@ export type RemoteStream = {
   id: string;
   stream: MediaStream;
   media?: WebRTCMediaState;
+  username?: string | null;
 };
 
 export type FullscreenChatMessage = {
@@ -46,6 +47,7 @@ export type PlayerSectionProps = {
   onUnpinStage: () => void;
 
   localCamTrack: MediaStreamTrack | null;
+  localUsername?: string | null;
   remotes: RemoteStream[];
 
   setCamEnabled: (enabled: boolean) => void;

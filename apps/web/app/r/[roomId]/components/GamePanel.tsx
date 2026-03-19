@@ -260,31 +260,19 @@ function RoundEditor({
   onRemove,
   canRemove,
 }: {
-  index: number;
+  index?: number;
   round: GameRoundInput;
   onChange: (round: GameRoundInput) => void;
   onRemove: () => void;
   canRemove: boolean;
 }) {
+  const [pickerOpen, setPickerOpen] = useState(!round.image);
+
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/3 p-4">
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-          Round {index + 1}
-        </span>
-        {canRemove && (
-          <button
-            type="button"
-            onClick={onRemove}
-            className="text-slate-600 hover:text-rose-400 transition-colors text-sm px-1"
-          >
-            Remove
-          </button>
-        )}
-      </div>
-
+      {/* Category + Answer */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-1">
           <label className="text-xs text-slate-500">Category</label>
           <select
             value={round.category}
@@ -297,10 +285,8 @@ function RoundEditor({
             ))}
           </select>
         </div>
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs text-slate-500">
-            Answer <span className="text-slate-600">(hidden from guessers)</span>
-          </label>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-slate-500">Answer <span className="text-slate-600">(secret)</span></label>
           <input
             type="text"
             value={round.answer}
@@ -312,27 +298,91 @@ function RoundEditor({
         </div>
       </div>
 
-      <label className="flex items-center gap-2.5 cursor-pointer">
-        <div className="relative shrink-0">
-          <input
-            type="checkbox"
-            checked={round.hideBlanks}
-            onChange={(e) => onChange({ ...round, hideBlanks: e.target.checked })}
-            className="sr-only"
-          />
-          <div className={`w-8 h-4 rounded-full border transition-colors ${round.hideBlanks ? "bg-sky-600 border-sky-500" : "bg-white/10 border-white/20"}`}>
-            <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform ${round.hideBlanks ? "translate-x-4" : "translate-x-0.5"}`} />
+      {/* Image section — collapsed when an image is set */}
+      {pickerOpen ? (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <label className="text-xs text-slate-500">Clue image <span className="text-slate-600">(optional)</span></label>
+            <button
+              type="button"
+              onClick={() => setPickerOpen(false)}
+              className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
+            >
+              {round.image ? "Done ✓" : "Skip — text only"}
+            </button>
           </div>
+          <ImagePicker
+            selected={round.image}
+            onSelect={(url) => {
+              onChange({ ...round, image: url });
+              if (url) setPickerOpen(false);
+            }}
+          />
         </div>
-        <span className="text-xs text-slate-400">Hide letter count until first hint</span>
-      </label>
+      ) : round.image ? (
+        <div className="flex items-center gap-3 p-2 rounded-xl bg-emerald-600/10 border border-emerald-600/20">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={round.image}
+            alt="Clue"
+            className="w-10 h-10 rounded-lg object-cover border border-white/10 shrink-0"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src =
+                "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Crect width='40' height='40' fill='%23334155'/%3E%3C/svg%3E";
+            }}
+          />
+          <span className="flex-1 text-xs text-emerald-400 font-medium">Image selected ✓</span>
+          <button
+            type="button"
+            onClick={() => setPickerOpen(true)}
+            className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
+          >
+            Change
+          </button>
+          <button
+            type="button"
+            onClick={() => { onChange({ ...round, image: "" }); }}
+            className="text-slate-500 hover:text-rose-400 transition-colors text-lg leading-none px-1"
+          >
+            ×
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setPickerOpen(true)}
+          className="flex items-center gap-2 text-xs text-slate-600 hover:text-sky-400 transition-colors py-0.5"
+        >
+          <span className="w-5 h-5 rounded-md border border-dashed border-white/15 flex items-center justify-center hover:border-sky-500/40 text-slate-600">+</span>
+          Add clue image <span className="text-slate-700">(optional — text-only is fine)</span>
+        </button>
+      )}
 
-      <div className="flex flex-col gap-1.5">
-        <label className="text-xs text-slate-500">Clue image</label>
-        <ImagePicker
-          selected={round.image}
-          onSelect={(url) => onChange({ ...round, image: url })}
-        />
+      {/* Hide blanks toggle + remove */}
+      <div className="flex items-center gap-2.5">
+        <label className="flex items-center gap-2 cursor-pointer flex-1">
+          <div className="relative shrink-0">
+            <input
+              type="checkbox"
+              checked={round.hideBlanks}
+              onChange={(e) => onChange({ ...round, hideBlanks: e.target.checked })}
+              className="sr-only"
+            />
+            <div className={`w-7 h-3.5 rounded-full transition-colors ${round.hideBlanks ? "bg-sky-600" : "bg-white/10"}`}>
+              <div className={`absolute top-0.5 w-2.5 h-2.5 rounded-full bg-white shadow transition-transform ${round.hideBlanks ? "translate-x-3.5" : "translate-x-0.5"}`} />
+            </div>
+          </div>
+          <span className="text-xs text-slate-500">Hide letter count until first hint</span>
+        </label>
+        {canRemove && (
+          <button
+            type="button"
+            onClick={onRemove}
+            className="text-xs text-slate-600 hover:text-rose-400 transition-colors shrink-0"
+          >
+            Remove
+          </button>
+        )}
       </div>
     </div>
   );
@@ -375,7 +425,7 @@ function RoundSetupForm({
     setRounds((prev) => prev.map((x, idx) => (idx === i ? r : x)));
 
   const isRoundValid = (r: GameRoundInput) =>
-    r.answer.trim().length > 0 && r.image.length > 0;
+    r.answer.trim().length > 0;
 
   const validRounds = rounds.filter(isRoundValid);
 
@@ -397,7 +447,7 @@ function RoundSetupForm({
             type="button"
             onClick={() => setActiveIdx(i)}
             title={r.answer.trim() || `Round ${i + 1}`}
-            className={`w-9 h-9 rounded-full text-xs font-bold transition-all ${
+            className={`w-10 h-10 rounded-full text-sm font-bold transition-all ${
               i === activeIdx
                 ? isRoundValid(r)
                   ? "bg-sky-500 text-white ring-2 ring-sky-400/40 ring-offset-1 ring-offset-[#1a1a2e]"
@@ -415,7 +465,7 @@ function RoundSetupForm({
             type="button"
             onClick={addRound}
             title="Add round"
-            className="w-9 h-9 rounded-full border border-dashed border-white/20 text-slate-500 text-lg hover:border-sky-500/50 hover:text-sky-400 transition-colors"
+            className="w-10 h-10 rounded-full border border-dashed border-white/20 text-slate-500 text-lg hover:border-sky-500/50 hover:text-sky-400 transition-colors"
           >
             +
           </button>
@@ -557,16 +607,21 @@ function ActiveRoundView({
       </div>
 
       {/* Clue image */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={round.image}
-        alt="Clue"
-        className="w-full max-h-72 object-contain rounded-2xl border border-white/10 bg-black/20"
-        onError={(e) => {
-          (e.target as HTMLImageElement).src =
-            "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Crect width='200' height='200' fill='%23334155'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%2394a3b8' font-size='14'%3ENo image%3C/text%3E%3C/svg%3E";
-        }}
-      />
+      {round.image ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={round.image}
+          alt="Clue"
+          className="w-full max-h-72 object-contain rounded-2xl border border-white/10 bg-black/20"
+          onError={(e) => {
+            (e.target as HTMLImageElement).style.display = "none";
+          }}
+        />
+      ) : (
+        <div className="flex items-center justify-center h-24 rounded-2xl border border-dashed border-white/10 bg-white/3">
+          <span className="text-sm text-slate-600">Text-only round — no image clue</span>
+        </div>
+      )}
 
       {/* Answer blanks */}
       <AnswerBlanks masked={round.answerMasked} hidden={blanksHidden} />
@@ -718,15 +773,17 @@ function RoundResultsView({
         <span className="px-2 py-0.5 rounded-lg bg-white/5">{round.category}</span>
       </div>
 
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={round.image}
-        alt="Clue"
-        className="w-full max-h-52 object-contain rounded-2xl border border-white/10 bg-black/20"
-        onError={(e) => {
-          (e.target as HTMLImageElement).style.opacity = "0.3";
-        }}
-      />
+      {round.image && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={round.image}
+          alt="Clue"
+          className="w-full max-h-52 object-contain rounded-2xl border border-white/10 bg-black/20"
+          onError={(e) => {
+            (e.target as HTMLImageElement).style.display = "none";
+          }}
+        />
+      )}
 
       <div className="text-center">
         <div className="text-xs text-slate-500 mb-1">Answer</div>

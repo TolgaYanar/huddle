@@ -32,6 +32,7 @@ export function PlayerViewport({
   onUnpinStage,
 
   localCamTrack,
+  localUsername,
   remotes,
   setCamEnabled,
 
@@ -64,6 +65,7 @@ export function PlayerViewport({
   onUnpinStage: () => void;
 
   localCamTrack: MediaStreamTrack | null;
+  localUsername?: string | null;
   remotes: RemoteStream[];
   setCamEnabled: (enabled: boolean) => void;
 
@@ -176,6 +178,7 @@ export function PlayerViewport({
       <WebcamOverlay
         active={isPlayerFullscreen}
         localCamTrack={localCamTrack}
+        localUsername={localUsername}
         containerRef={playerContainerRef}
         remotes={remotes}
         onCloseLocal={() => setCamEnabled(false)}

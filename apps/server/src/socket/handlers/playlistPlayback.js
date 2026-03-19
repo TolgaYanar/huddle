@@ -1,5 +1,5 @@
 const { emitPlaylistStateToRoom } = require("../helpers/playlists");
-const { applyPlaylistPlaybackToRoomState } = require("../helpers/sync");
+const { applyPlaylistPlaybackToRoomState, persistRoomState } = require("../helpers/sync");
 
 function attachPlaylistPlaybackHandlers(io, state, socket, deps) {
   socket.on("playlist_play_item", async (data) => {
@@ -46,6 +46,7 @@ function attachPlaylistPlaybackHandlers(io, state, socket, deps) {
 
       // Also update authoritative room sync state.
       applyPlaylistPlaybackToRoomState(io, state, roomId, item.videoUrl);
+      persistRoomState(deps, state, roomId);
 
       await emitPlaylistStateToRoom(deps, state, io, roomId);
     } catch (err) {
@@ -129,6 +130,7 @@ function attachPlaylistPlaybackHandlers(io, state, socket, deps) {
       });
 
       applyPlaylistPlaybackToRoomState(io, state, roomId, item.videoUrl);
+      persistRoomState(deps, state, roomId);
 
       await emitPlaylistStateToRoom(deps, state, io, roomId);
     } catch (err) {
@@ -190,6 +192,7 @@ function attachPlaylistPlaybackHandlers(io, state, socket, deps) {
       });
 
       applyPlaylistPlaybackToRoomState(io, state, roomId, item.videoUrl);
+      persistRoomState(deps, state, roomId);
 
       await emitPlaylistStateToRoom(deps, state, io, roomId);
     } catch (err) {

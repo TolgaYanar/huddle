@@ -18,6 +18,9 @@ import { buildPlaylistPanelProps } from "./buildPlaylistPanelProps";
 import { buildCallSidebarProps } from "./buildCallSidebarProps";
 import { useRoomClientPlayback } from "./useRoomClientPlayback";
 import { useRoomClientRtc } from "./useRoomClientRtc";
+import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
+import { useTimer } from "../hooks/useTimer";
+import { writeRoomHistory } from "../../../lib/roomHistory";
 
 export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
   const [userId, setUserId] = useState("");
@@ -88,6 +91,12 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
     joinRoom: room.joinRoom,
   });
 
+  // Write room to visit history whenever connected or room name changes.
+  useEffect(() => {
+    if (!isClient || !room.isConnected) return;
+    writeRoomHistory(roomId, roomState.roomName);
+  }, [isClient, room.isConnected, roomId, roomState.roomName]);
+
   const playback = useRoomClientPlayback({
     roomId,
     userId,
@@ -131,8 +140,26 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
       id: s.id,
       stream: s.stream,
       media: rtc.remoteMedia[s.id],
+      username: roomState.usernamesById[s.id] ?? null,
     }));
-  }, [rtc.remoteStreams, rtc.remoteMedia]);
+  }, [rtc.remoteStreams, rtc.remoteMedia, roomState.usernamesById]);
+
+  const { timer } = useTimer({ onTimerState: room.onTimerState });
+
+  useKeyboardShortcuts({
+    enabled: isClient && !roomState.passwordRequired,
+    canControlPlayback: videoEmbed.canControlPlayback,
+    isPlaying: playback.video.videoState === "Playing",
+    currentTime: playback.video.currentTime,
+    volume: playback.video.volume,
+    effectiveMuted: playback.video.effectiveMuted,
+    handleUserPlay: playback.video.handleUserPlay,
+    handleUserPause: playback.video.handleUserPause,
+    handleSeekFromController: playback.video.handleSeekFromController,
+    handleVolumeFromController: playback.video.handleVolumeFromController,
+    toggleLocalMute: playback.video.toggleLocalMute,
+    togglePlayerFullscreen: fullscreen.togglePlayerFullscreen,
+  });
 
   const handleOpenAddToPlaylist = useCallback(() => {
     if (playback.video.url) {
@@ -142,6 +169,8 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
 
   const [isAddVideosModalOpen, setIsAddVideosModalOpen] = useState(false);
   const [openGameId, setOpenGameId] = useState<string | null>(null);
+  const [isRoomSettingsOpen, setIsRoomSettingsOpen] = useState(false);
+  const [isTimerOpen, setIsTimerOpen] = useState(false);
 
   const playerSectionProps = buildPlayerSectionProps({
     isClient,
@@ -152,6 +181,7 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
     mediaTracks: rtc.mediaTracks,
     videoEmbed,
     remotesForPlayer,
+    localUsername: authUser?.username ?? null,
     applyingRemoteSyncRef: playback.applyingRemoteSyncRef,
     roomPlaybackAnchorRef: playback.roomPlaybackAnchorRef,
     roomPlaybackAnchorVersion: playback.roomPlaybackAnchorVersion,
@@ -238,10 +268,16 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
     onCreatePlaylist: playback.playlist.createPlaylist,
   };
 
+  const timerWidgetProps = {
+    timer,
+    onClick: () => setIsTimerOpen(true),
+  };
+
   const headerProps =
     isClient && !roomState.passwordRequired
       ? {
           isConnected: room.isConnected,
+          reconnectAttempt: room.reconnectAttempt,
           hasRoomPassword: roomState.hasRoomPassword,
           passwordRequired: roomState.passwordRequired,
           inviteLink,
@@ -253,6 +289,12 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
               !playback.playlist.isPlaylistPanelOpen,
             ),
           isPlaylistOpen: playback.playlist.isPlaylistPanelOpen,
+          roomName: roomState.roomName,
+          isHost: roomState.hostId === userId,
+          onSetRoomName: roomState.setRoomName,
+          onOpenSettings: () => setIsRoomSettingsOpen(true),
+          onOpenTimer: () => setIsTimerOpen(true),
+          timerWidgetProps,
           authUser,
           onAuthUserChange: setAuthUser,
         }
@@ -333,6 +375,39 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
     gameProps,
   };
 
+  const reconnectBannerProps = {
+    isConnected: room.isConnected,
+    reconnectAttempt: room.reconnectAttempt,
+    reconnectFailed: room.reconnectFailed,
+    onManualReconnect: room.manualReconnect,
+  };
+
+  const timerModalProps = {
+    open: isTimerOpen,
+    onClose: () => setIsTimerOpen(false),
+    timer,
+    onSetDuration: room.timerSetDuration,
+    onStart: room.timerStart,
+    onPause: room.timerPause,
+    onReset: room.timerReset,
+    isConnected: room.isConnected,
+  };
+
+  const roomSettingsPanelProps = {
+    isOpen: isRoomSettingsOpen,
+    onClose: () => setIsRoomSettingsOpen(false),
+    roomName: roomState.roomName,
+    onSetRoomName: roomState.setRoomName,
+    hasRoomPassword: roomState.hasRoomPassword,
+    onSetRoomPassword: (pw: string) => room.setRoomPassword?.(pw),
+    participants: roomState.participants,
+    usernamesById: roomState.usernamesById,
+    userId,
+    hostId: roomState.hostId,
+    onKickUser: roomState.kickUser,
+    onTransferHost: roomState.transferHost,
+  };
+
   return {
     roomId,
     isClient,
@@ -351,5 +426,8 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
     addToPlaylistModalProps,
     addVideosToPlaylistModalProps,
     gameModalProps,
+    reconnectBannerProps,
+    roomSettingsPanelProps,
+    timerModalProps,
   };
 }

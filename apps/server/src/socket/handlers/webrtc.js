@@ -65,7 +65,10 @@ function attachWebRTCHandlers(io, state, socket, deps) {
     map.set(socket.id, normalized);
 
     // Log user media changes into chat as system messages.
-    const short = String(socket.id).slice(0, 6);
+    const short =
+      socket.data?.authUser?.username ||
+      state.socketIdToUsername.get(socket.id) ||
+      String(socket.id).slice(0, 6);
     const messages = [];
     if (prev.screen !== normalized.screen) {
       messages.push(

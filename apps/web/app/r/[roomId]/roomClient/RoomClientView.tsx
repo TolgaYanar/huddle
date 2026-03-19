@@ -12,6 +12,11 @@ import { PlaylistPanel } from "../components/PlaylistPanel";
 import { AddToPlaylistModal } from "../components/AddToPlaylistModal";
 import { AddVideosToPlaylistModal } from "../components/AddVideosToPlaylistModal";
 import { GameModal } from "../components/GameModal";
+import { ReconnectBanner } from "../components/ReconnectBanner";
+import { RoomSettingsPanel } from "../components/RoomSettingsPanel";
+import type { RoomSettingsPanelProps } from "../components/RoomSettingsPanel";
+import { TimerModal } from "../components/TimerModal";
+import type { TimerModalProps } from "../components/TimerModal";
 
 export type RoomClientViewProps = {
   roomId: string;
@@ -40,6 +45,9 @@ export type RoomClientViewProps = {
   >;
 
   gameModalProps: React.ComponentProps<typeof GameModal>;
+  reconnectBannerProps: React.ComponentProps<typeof ReconnectBanner>;
+  roomSettingsPanelProps: RoomSettingsPanelProps;
+  timerModalProps: TimerModalProps;
 };
 
 export function RoomClientView({
@@ -60,6 +68,9 @@ export function RoomClientView({
   addToPlaylistModalProps,
   addVideosToPlaylistModalProps,
   gameModalProps,
+  reconnectBannerProps,
+  roomSettingsPanelProps,
+  timerModalProps,
 }: RoomClientViewProps) {
   if (roomAccessError) {
     return <RoomAccessError error={roomAccessError} />;
@@ -109,6 +120,11 @@ export function RoomClientView({
       )}
 
       {isReady && <GameModal {...gameModalProps} />}
+
+      {isClient && <ReconnectBanner {...reconnectBannerProps} />}
+
+      {isReady && <RoomSettingsPanel {...roomSettingsPanelProps} />}
+      {isReady && <TimerModal {...timerModalProps} />}
     </div>
   );
 }

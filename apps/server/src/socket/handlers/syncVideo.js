@@ -2,6 +2,7 @@ const { normalizeRoomId } = require("../helpers/chat");
 const {
   emitRoomStateToSocket,
   emitRoomStateToRoom,
+  persistRoomState,
 } = require("../helpers/sync");
 const { emitPlaylistStateToRoom } = require("../helpers/playlists");
 
@@ -153,6 +154,11 @@ function attachSyncHandlers(io, state, socket, deps) {
     if (action === "change_url") next.isPlaying = false;
 
     state.roomState.set(roomId, next);
+
+    // Persist room state on meaningful actions so it survives server restarts.
+    if (action === "change_url" || action === "pause") {
+      persistRoomState(deps, state, roomId);
+    }
 
     // Persist this event for activity feed/history.
     try {

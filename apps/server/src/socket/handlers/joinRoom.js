@@ -4,8 +4,9 @@ const {
   emitRoomUsersSnapshotToSocket,
 } = require("../helpers/users");
 const { emitWheelStateTo } = require("../helpers/wheel");
+const { emitTimerStateTo } = require("../helpers/timer");
 const { emitPlaylistStateTo } = require("../helpers/playlists");
-const { emitRoomStateToSocket } = require("../helpers/sync");
+const { emitRoomStateToSocket, restoreRoomStateFromDB } = require("../helpers/sync");
 const { emitChatHistoryToSocket } = require("../helpers/chat");
 const { emitActivityHistory } = require("../helpers/activity");
 const { emitGameStateTo } = require("../helpers/game");
@@ -22,6 +23,9 @@ function attachJoinRoomHandler(io, state, socket, joinedRooms, deps) {
       typeof payload === "object" && payload ? payload.password : undefined;
 
     if (!roomId || typeof roomId !== "string") return;
+
+    // Restore persisted state if in-memory is cold (server restart recovery).
+    await restoreRoomStateFromDB(deps, state, roomId);
 
     const banned = state.roomBans.get(roomId);
     if (banned && banned.has(socket.id)) {
@@ -61,10 +65,16 @@ function attachJoinRoomHandler(io, state, socket, joinedRooms, deps) {
         });
 
         emitWheelStateTo(state, socket, roomId);
+        emitTimerStateTo(state, socket, roomId);
         await emitPlaylistStateTo(deps, state, socket, roomId);
 
         // Always re-send room state so reconnecting clients can re-sync.
         emitRoomStateToSocket(state, socket, roomId);
+
+        const roomNameOnRejoin = state.roomName.get(roomId);
+        if (roomNameOnRejoin) {
+          socket.emit("room_name_changed", { roomId, name: roomNameOnRejoin });
+        }
 
         // Ensure this socket is in participants for any active games
         // (handles reconnection / late-join scenarios).
@@ -122,6 +132,7 @@ function attachJoinRoomHandler(io, state, socket, joinedRooms, deps) {
       });
 
       emitWheelStateTo(state, socket, roomId);
+      emitTimerStateTo(state, socket, roomId);
       await emitPlaylistStateTo(deps, state, socket, roomId);
     } catch (err) {
       console.error("Failed to emit room_users", err);
@@ -178,6 +189,12 @@ function attachJoinRoomHandler(io, state, socket, joinedRooms, deps) {
 
     // Send current room state to this new joiner.
     emitRoomStateToSocket(state, socket, roomId);
+
+    // Send room name if one has been set.
+    const roomName = state.roomName.get(roomId);
+    if (roomName) {
+      socket.emit("room_name_changed", { roomId, name: roomName });
+    }
 
     // Ensure this socket is in participants for any active games (late-join fix).
     const gamesOnJoin = state.roomGames.get(roomId);

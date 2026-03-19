@@ -247,6 +247,17 @@ export interface GameStateData {
   games: GameData[];
 }
 
+export type TimerStatus = "idle" | "running" | "paused" | "finished";
+
+export interface TimerStateData {
+  roomId: string;
+  status: TimerStatus;
+  durationMs: number;
+  remainingMs: number;
+  endsAt: number | null;
+  serverNow: number;
+}
+
 export interface PlaylistItemPlayedData {
   roomId: string;
   playlistId: string;

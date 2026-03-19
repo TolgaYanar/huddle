@@ -10,10 +10,13 @@ import {
   apiUnsaveRoom,
   type AuthUser,
 } from "../../../lib/api";
+import { TimerWidget } from "./TimerWidget";
+import type { TimerState } from "../hooks/useTimer";
 
 interface RoomHeaderProps {
   roomId: string;
   isConnected: boolean;
+  reconnectAttempt: number;
   hasRoomPassword: boolean;
   passwordRequired: boolean;
   inviteLink: string;
@@ -22,6 +25,12 @@ interface RoomHeaderProps {
   onOpenWheel: () => void;
   onOpenPlaylist: () => void;
   isPlaylistOpen: boolean;
+  roomName: string | null;
+  isHost: boolean;
+  onSetRoomName: (name: string) => void;
+  onOpenSettings: () => void;
+  onOpenTimer: () => void;
+  timerWidgetProps: { timer: TimerState; onClick: () => void };
   authUser: AuthUser | null;
   onAuthUserChange: (user: AuthUser | null) => void;
 }
@@ -29,6 +38,7 @@ interface RoomHeaderProps {
 export function RoomHeader({
   roomId,
   isConnected,
+  reconnectAttempt,
   hasRoomPassword,
   passwordRequired,
   inviteLink,
@@ -37,12 +47,30 @@ export function RoomHeader({
   onOpenWheel,
   onOpenPlaylist,
   isPlaylistOpen,
+  roomName,
+  isHost,
+  onSetRoomName,
+  onOpenSettings,
+  onOpenTimer,
+  timerWidgetProps,
   authUser,
   onAuthUserChange,
 }: RoomHeaderProps) {
   const [isSaved, setIsSaved] = React.useState(false);
   const [saveBusy, setSaveBusy] = React.useState(false);
   const [saveError, setSaveError] = React.useState<string | null>(null);
+  const [editingName, setEditingName] = React.useState(false);
+  const [nameInput, setNameInput] = React.useState("");
+
+  const startEditName = () => {
+    setNameInput(roomName ?? "");
+    setEditingName(true);
+  };
+
+  const commitName = () => {
+    onSetRoomName(nameInput.trim());
+    setEditingName(false);
+  };
 
   React.useEffect(() => {
     let cancelled = false;
@@ -85,8 +113,54 @@ export function RoomHeader({
           </picture>
           <span>WeHuddle</span>
         </Link>
-        <span className="hidden sm:inline-flex items-center gap-2 text-xs border border-white/10 bg-black/20 rounded-full px-3 py-1 text-slate-300">
-          Room <span className="font-mono text-slate-200">{roomId}</span>
+        <span className="hidden sm:inline-flex items-center gap-1.5 text-xs border border-white/10 bg-black/20 rounded-full px-3 py-1 text-slate-300">
+          {editingName ? (
+            <>
+              <input
+                autoFocus
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") commitName();
+                  if (e.key === "Escape") setEditingName(false);
+                }}
+                maxLength={40}
+                placeholder={roomId}
+                className="bg-transparent text-slate-200 outline-none w-36 placeholder:text-slate-500"
+              />
+              <button
+                type="button"
+                onClick={commitName}
+                className="text-indigo-300 hover:text-indigo-200 font-medium"
+              >
+                Save
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditingName(false)}
+                className="text-slate-500 hover:text-slate-300"
+              >
+                ✕
+              </button>
+            </>
+          ) : (
+            <>
+              <span className="text-slate-400">Room</span>
+              <span className="font-medium text-slate-200 max-w-[160px] truncate">
+                {roomName ?? <span className="font-mono">{roomId}</span>}
+              </span>
+              {isHost && (
+                <button
+                  type="button"
+                  onClick={startEditName}
+                  title="Rename room"
+                  className="text-slate-500 hover:text-slate-300 transition-colors"
+                >
+                  ✎
+                </button>
+              )}
+            </>
+          )}
         </span>
       </div>
 
@@ -199,6 +273,29 @@ export function RoomHeader({
           {copied ? "Copied" : "Copy invite"}
         </button>
 
+        <TimerWidget {...timerWidgetProps} />
+
+        <button
+          type="button"
+          onClick={onOpenTimer}
+          disabled={passwordRequired}
+          className="h-8 px-3 rounded-lg border border-white/10 bg-white/5 text-slate-200 text-xs font-medium hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          title={passwordRequired ? "Join with password first" : "Open timer"}
+        >
+          Timer
+        </button>
+
+        {isHost && (
+          <button
+            type="button"
+            onClick={onOpenSettings}
+            className="h-8 px-3 rounded-lg border border-indigo-500/40 bg-indigo-500/10 text-indigo-200 text-xs font-medium hover:bg-indigo-500/20 transition-colors"
+            title="Room settings"
+          >
+            Settings
+          </button>
+        )}
+
         <span className="hidden sm:inline-flex items-center gap-2 text-xs font-medium bg-black/20 px-3 py-1 rounded-full border border-white/10">
           <span className="text-slate-300">Password</span>
           <span
@@ -208,22 +305,22 @@ export function RoomHeader({
           </span>
         </span>
 
-        <div className="flex items-center gap-2 text-xs sm:text-sm font-medium bg-black/20 px-3 py-1 rounded-full border border-white/10">
-          <div className="relative">
-            <div
-              className={`w-2.5 h-2.5 rounded-full ${
-                isConnected ? "bg-emerald-500" : "bg-rose-500"
-              }`}
-            />
-            <div
-              className={`absolute -inset-1 rounded-full ${
-                isConnected
-                  ? "ring-2 ring-emerald-500/20"
-                  : "ring-2 ring-rose-500/20"
-              }`}
-            />
+        <div className={`flex items-center gap-2 text-xs sm:text-sm font-medium px-3 py-1 rounded-full border transition-colors ${
+          isConnected
+            ? "bg-black/20 border-white/10"
+            : "bg-rose-500/10 border-rose-500/30"
+        }`}>
+          <div className="relative shrink-0">
+            <div className={`w-2.5 h-2.5 rounded-full ${isConnected ? "bg-emerald-500" : "bg-rose-500"}`} />
+            {isConnected && (
+              <div className="absolute -inset-1 rounded-full ring-2 ring-emerald-500/20" />
+            )}
           </div>
-          {isConnected ? "Connected" : "Reconnecting…"}
+          {isConnected
+            ? "Connected"
+            : reconnectAttempt > 0
+              ? `Reconnecting… (${reconnectAttempt}/5)`
+              : "Disconnected"}
         </div>
       </div>
     </header>
