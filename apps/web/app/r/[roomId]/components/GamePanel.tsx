@@ -251,9 +251,9 @@ function ImagePicker({
   );
 }
 
-// ─── Round card (setup form) ──────────────────────────────────────────────────
+// ─── Round editor (single active round) ──────────────────────────────────────
 
-function RoundCard({
+function RoundEditor({
   index,
   round,
   onChange,
@@ -266,123 +266,74 @@ function RoundCard({
   onRemove: () => void;
   canRemove: boolean;
 }) {
-  const [expanded, setExpanded] = useState(index === 0);
-  const isValid = round.answer.trim().length > 0 && round.image.length > 0;
-
   return (
-    <div
-      className={`rounded-2xl border ${isValid ? "border-white/10" : "border-white/5"} bg-white/5 overflow-hidden`}
-    >
-      <div className="flex items-center gap-3 px-4 py-3">
-        <div
-          className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-            isValid ? "bg-sky-600 text-white" : "bg-white/10 text-slate-400"
-          }`}
-        >
-          {isValid ? "✓" : index + 1}
-        </div>
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          className="flex-1 text-left text-sm font-medium text-slate-200 hover:text-white transition-colors"
-        >
-          {round.answer.trim() || `Round ${index + 1}`}
-          {round.category && (
-            <span className="ml-2 text-xs text-slate-500 font-normal">
-              {round.category}
-            </span>
-          )}
-        </button>
-        <div className="flex items-center gap-1">
+    <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/3 p-4">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+          Round {index + 1}
+        </span>
+        {canRemove && (
           <button
             type="button"
-            onClick={() => setExpanded((v) => !v)}
-            className="text-slate-500 hover:text-slate-300 px-1 text-sm transition-colors"
+            onClick={onRemove}
+            className="text-slate-600 hover:text-rose-400 transition-colors text-sm px-1"
           >
-            {expanded ? "▲" : "▼"}
+            Remove
           </button>
-          {canRemove && (
-            <button
-              type="button"
-              onClick={onRemove}
-              className="text-slate-600 hover:text-rose-400 px-1 text-lg transition-colors"
-            >
-              ×
-            </button>
-          )}
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs text-slate-500">Category</label>
+          <select
+            value={round.category}
+            onChange={(e) => onChange({ ...round, category: e.target.value })}
+            aria-label="Category"
+            className="bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/25"
+          >
+            {CATEGORIES.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs text-slate-500">
+            Answer <span className="text-slate-600">(hidden from guessers)</span>
+          </label>
+          <input
+            type="text"
+            value={round.answer}
+            onChange={(e) => onChange({ ...round, answer: e.target.value })}
+            placeholder="e.g. Apple, Picasso…"
+            maxLength={100}
+            className="bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-sky-500/25"
+          />
         </div>
       </div>
 
-      {expanded && (
-        <div className="px-4 pb-4 flex flex-col gap-4 border-t border-white/5 pt-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-slate-400">
-                Category
-              </label>
-              <select
-                value={round.category}
-                onChange={(e) => onChange({ ...round, category: e.target.value })}
-                aria-label="Category"
-                className="bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/25"
-              >
-                {CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-slate-400">
-                Answer{" "}
-                <span className="text-slate-600 font-normal">(hidden)</span>
-              </label>
-              <input
-                type="text"
-                value={round.answer}
-                onChange={(e) => onChange({ ...round, answer: e.target.value })}
-                placeholder="e.g. Apple, Picasso…"
-                maxLength={100}
-                className="bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-sky-500/25"
-              />
-            </div>
-          </div>
-
-          <label className="flex items-center gap-3 cursor-pointer">
-            <div className="relative shrink-0">
-              <input
-                type="checkbox"
-                checked={round.hideBlanks}
-                onChange={(e) =>
-                  onChange({ ...round, hideBlanks: e.target.checked })
-                }
-                className="sr-only"
-              />
-              <div
-                className={`w-9 h-5 rounded-full border transition-colors ${round.hideBlanks ? "bg-sky-600 border-sky-500" : "bg-white/10 border-white/20"}`}
-              >
-                <div
-                  className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${round.hideBlanks ? "translate-x-4" : "translate-x-0.5"}`}
-                />
-              </div>
-            </div>
-            <span className="text-xs text-slate-400">
-              Hide letter count until first hint
-            </span>
-          </label>
-
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-slate-400">
-              Clue image
-            </label>
-            <ImagePicker
-              selected={round.image}
-              onSelect={(url) => onChange({ ...round, image: url })}
-            />
+      <label className="flex items-center gap-2.5 cursor-pointer">
+        <div className="relative shrink-0">
+          <input
+            type="checkbox"
+            checked={round.hideBlanks}
+            onChange={(e) => onChange({ ...round, hideBlanks: e.target.checked })}
+            className="sr-only"
+          />
+          <div className={`w-8 h-4 rounded-full border transition-colors ${round.hideBlanks ? "bg-sky-600 border-sky-500" : "bg-white/10 border-white/20"}`}>
+            <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform ${round.hideBlanks ? "translate-x-4" : "translate-x-0.5"}`} />
           </div>
         </div>
-      )}
+        <span className="text-xs text-slate-400">Hide letter count until first hint</span>
+      </label>
+
+      <div className="flex flex-col gap-1.5">
+        <label className="text-xs text-slate-500">Clue image</label>
+        <ImagePicker
+          selected={round.image}
+          onSelect={(url) => onChange({ ...round, image: url })}
+        />
+      </div>
     </div>
   );
 }
@@ -403,25 +354,34 @@ function RoundSetupForm({
   const [rounds, setRounds] = useState<GameRoundInput[]>([
     { category: "Brands", answer: "", image: "", hideBlanks: false },
   ]);
+  const [activeIdx, setActiveIdx] = useState(0);
 
   const addRound = () => {
     if (rounds.length >= 10) return;
+    const newIdx = rounds.length;
     setRounds((prev) => [
       ...prev,
       { category: "Brands", answer: "", image: "", hideBlanks: false },
     ]);
+    setActiveIdx(newIdx);
+  };
+
+  const removeRound = (i: number) => {
+    setRounds((prev) => prev.filter((_, idx) => idx !== i));
+    setActiveIdx((prev) => Math.min(prev, rounds.length - 2));
   };
 
   const updateRound = (i: number, r: GameRoundInput) =>
     setRounds((prev) => prev.map((x, idx) => (idx === i ? r : x)));
 
-  const removeRound = (i: number) =>
-    setRounds((prev) => prev.filter((_, idx) => idx !== i));
+  const isRoundValid = (r: GameRoundInput) =>
+    r.answer.trim().length > 0 && r.image.length > 0;
 
-  const validRounds = rounds.filter((r) => r.answer.trim() && r.image);
+  const validRounds = rounds.filter(isRoundValid);
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-4">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="text-base font-semibold text-slate-100">{title}</div>
         <div className="text-xs text-slate-500">
@@ -429,30 +389,51 @@ function RoundSetupForm({
         </div>
       </div>
 
-      <div className="flex flex-col gap-3">
+      {/* Round chips */}
+      <div className="flex items-center gap-2 flex-wrap">
         {rounds.map((r, i) => (
-          <RoundCard
+          <button
             key={i}
-            index={i}
-            round={r}
-            onChange={(updated) => updateRound(i, updated)}
-            onRemove={() => removeRound(i)}
-            canRemove={rounds.length > 1}
-          />
+            type="button"
+            onClick={() => setActiveIdx(i)}
+            title={r.answer.trim() || `Round ${i + 1}`}
+            className={`w-9 h-9 rounded-full text-xs font-bold transition-all ${
+              i === activeIdx
+                ? isRoundValid(r)
+                  ? "bg-sky-500 text-white ring-2 ring-sky-400/40 ring-offset-1 ring-offset-[#1a1a2e]"
+                  : "bg-white/15 text-white ring-2 ring-white/25 ring-offset-1 ring-offset-[#1a1a2e]"
+                : isRoundValid(r)
+                  ? "bg-sky-600/30 text-sky-300 hover:bg-sky-600/50"
+                  : "bg-white/8 text-slate-500 hover:bg-white/12 hover:text-slate-300"
+            }`}
+          >
+            {isRoundValid(r) ? "✓" : i + 1}
+          </button>
         ))}
+        {rounds.length < 10 && (
+          <button
+            type="button"
+            onClick={addRound}
+            title="Add round"
+            className="w-9 h-9 rounded-full border border-dashed border-white/20 text-slate-500 text-lg hover:border-sky-500/50 hover:text-sky-400 transition-colors"
+          >
+            +
+          </button>
+        )}
       </div>
 
-      {rounds.length < 10 && (
-        <button
-          type="button"
-          onClick={addRound}
-          className="w-full py-3 rounded-2xl border border-dashed border-white/20 text-slate-400 text-sm hover:border-white/40 hover:text-slate-200 transition-colors"
-        >
-          + Add round
-        </button>
-      )}
+      {/* Active round editor — key resets ImagePicker state when switching */}
+      <RoundEditor
+        key={activeIdx}
+        index={activeIdx}
+        round={rounds[activeIdx]}
+        onChange={(r) => updateRound(activeIdx, r)}
+        onRemove={() => removeRound(activeIdx)}
+        canRemove={rounds.length > 1}
+      />
 
-      <div className="flex gap-3 pt-1">
+      {/* Actions */}
+      <div className="flex gap-3">
         <button
           type="button"
           onClick={onCancel}
