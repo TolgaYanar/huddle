@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { LogEntry } from "../../types";
 import type { UseActivityLogProps } from "./types";
@@ -33,15 +33,29 @@ export function useActivityLog({
   requestChatHistory,
   requestActivityHistory,
   sendChatMessage,
+  addReactionFn,
+  onReactionUpdated,
 }: UseActivityLogProps) {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [chatText, setChatText] = useState("");
+  const [reactions, setReactions] = useState<
+    Record<string, Record<string, string[]>>
+  >({});
   const logsEndRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll logs
   useEffect(() => {
     logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [logs]);
+
+  // Subscribe to reaction updates
+  useEffect(() => {
+    if (!onReactionUpdated) return;
+    const cleanup = onReactionUpdated((data) => {
+      setReactions((prev) => ({ ...prev, [data.messageId]: data.reactions }));
+    });
+    return () => cleanup?.();
+  }, [onReactionUpdated]);
 
   useActivityLogSubscriptions({
     roomId,
@@ -96,6 +110,13 @@ export function useActivityLog({
     setChatText("");
   };
 
+  const addReaction = useCallback(
+    (messageId: string, emoji: string) => {
+      addReactionFn?.(messageId, emoji);
+    },
+    [addReactionFn],
+  );
+
   const addLogEntry = (entry: Omit<LogEntry, "time">) => {
     const time = new Date().toLocaleTimeString([], {
       hour: "2-digit",
@@ -112,5 +133,7 @@ export function useActivityLog({
     setChatText,
     handleSendChat,
     addLogEntry,
+    reactions,
+    addReaction,
   };
 }

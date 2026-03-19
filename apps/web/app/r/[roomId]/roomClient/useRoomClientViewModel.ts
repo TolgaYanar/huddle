@@ -33,6 +33,7 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
   const [noiseSuppressionEnabled, setNoiseSuppressionEnabled] = useState(true);
   const [autoGainControlEnabled, setAutoGainControlEnabled] = useState(true);
   const [pushToTalkEnabled, setPushToTalkEnabled] = useState(false);
+  const [guestUsername, setGuestUsernameState] = useState("");
   const hasInitialSyncRef = useRef<boolean>(false);
   const mountTimeRef = useRef<number>(Date.now());
 
@@ -40,6 +41,9 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
     setIsClient(true);
     mountTimeRef.current = Date.now();
     hasInitialSyncRef.current = false;
+    try {
+      setGuestUsernameState(window.localStorage.getItem("huddle:username") ?? "");
+    } catch { /* ignore */ }
   }, []);
 
   useEffect(() => {
@@ -59,6 +63,24 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
     hasInitialSyncRef,
     mountTimeRef,
   );
+
+  // Auto-send saved guest name when connecting (only for non-auth users)
+  useEffect(() => {
+    if (!isClient || !room.isConnected || authUser) return;
+    const name = guestUsername.trim();
+    if (name) room.setUsername(name);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isClient, room.isConnected, authUser]);
+
+  const setGuestUsername = useCallback((name: string) => {
+    const trimmed = name.trim().slice(0, 30);
+    setGuestUsernameState(trimmed);
+    try {
+      if (trimmed) window.localStorage.setItem("huddle:username", trimmed);
+      else window.localStorage.removeItem("huddle:username");
+    } catch { /* ignore */ }
+    room.setUsername(trimmed);
+  }, [room.setUsername]);
 
   useEffect(() => {
     if (room.isConnected && room.socket?.id) {
@@ -181,7 +203,7 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
     mediaTracks: rtc.mediaTracks,
     videoEmbed,
     remotesForPlayer,
-    localUsername: authUser?.username ?? null,
+    localUsername: authUser?.username ?? (guestUsername || null),
     applyingRemoteSyncRef: playback.applyingRemoteSyncRef,
     roomPlaybackAnchorRef: playback.roomPlaybackAnchorRef,
     roomPlaybackAnchorVersion: playback.roomPlaybackAnchorVersion,
@@ -221,6 +243,8 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
     usernamesById: roomState.usernamesById,
     hasRoomPassword: roomState.hasRoomPassword,
     onSetRoomPassword: room.setRoomPassword,
+    guestUsername: authUser ? null : guestUsername,
+    setGuestUsername: authUser ? null : setGuestUsername,
     localSpeaking: rtc.mediaTracks.localSpeaking,
     isCallCollapsed,
     setIsCallCollapsed,
@@ -356,6 +380,7 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
 
   const activitySidebarProps = {
     roomId,
+    userId,
     isConnected: room.isConnected,
     isActivityCollapsed,
     setIsActivityCollapsed,
@@ -365,6 +390,8 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
     chatText: playback.activity.chatText,
     setChatText: playback.activity.setChatText,
     handleSendChat: playback.activity.handleSendChat,
+    reactions: playback.activity.reactions,
+    addReaction: playback.activity.addReaction,
     gameProps,
     onOpenGame: setOpenGameId,
   };

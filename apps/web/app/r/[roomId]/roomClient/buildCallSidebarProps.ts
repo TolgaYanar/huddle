@@ -13,6 +13,8 @@ export function buildCallSidebarProps(args: {
   usernamesById: Record<string, string | null>;
   hasRoomPassword: boolean;
   onSetRoomPassword: (password: string) => void;
+  guestUsername: string | null;
+  setGuestUsername: ((name: string) => void) | null;
 
   localSpeaking: boolean;
   micEnabled: boolean;
@@ -58,6 +60,8 @@ export function buildCallSidebarProps(args: {
     usernamesById: args.usernamesById,
     hasRoomPassword: args.hasRoomPassword,
     onSetRoomPassword: args.onSetRoomPassword,
+    guestUsername: args.guestUsername,
+    setGuestUsername: args.setGuestUsername,
 
     localSpeaking: args.localSpeaking,
     isCallCollapsed: args.isCallCollapsed,

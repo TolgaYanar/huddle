@@ -23,8 +23,8 @@ export function ParticipantsWithoutStream(props: {
 
   return (
     <div className="mt-3 rounded-2xl border border-white/10 bg-black/20 p-3">
-      <div className="text-xs text-slate-300 font-medium">
-        Participants (no stream yet)
+      <div className="text-xs text-slate-400 font-medium">
+        In room · no stream
       </div>
       <div className="mt-2 flex flex-col gap-2">
         {participantsWithoutStream.map((id) => {

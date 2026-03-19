@@ -191,14 +191,20 @@ export function useRoomState({
       setRoomNameState(data.name ?? null);
     };
 
+    const onUsernameChanged = (data: { socketId: string; username: string | null }) => {
+      setUsernamesById((prev) => ({ ...prev, [data.socketId]: data.username }));
+    };
+
     socket.on("room_host", onHost);
     socket.on("room_banned", onBanned);
     socket.on("room_name_changed", onRoomNameChanged);
+    socket.on("username_changed", onUsernameChanged);
 
     return () => {
       socket.off("room_host", onHost);
       socket.off("room_banned", onBanned);
       socket.off("room_name_changed", onRoomNameChanged);
+      socket.off("username_changed", onUsernameChanged);
     };
   }, [socket, roomId]);
 

@@ -56,4 +56,11 @@ export type UseActivityLogProps = {
   requestChatHistory?: () => void;
   requestActivityHistory?: () => void;
   sendChatMessage?: (text: string) => void;
+  addReactionFn?: (messageId: string, emoji: string) => void;
+  onReactionUpdated?: (
+    callback: (data: {
+      messageId: string;
+      reactions: Record<string, string[]>;
+    }) => void,
+  ) => (() => void) | undefined;
 };

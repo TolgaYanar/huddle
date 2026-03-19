@@ -10,6 +10,8 @@ export type CallSidebarProps = {
   usernamesById?: Record<string, string | null>;
   hasRoomPassword: boolean;
   onSetRoomPassword: (password: string) => void;
+  guestUsername: string | null;
+  setGuestUsername: ((name: string) => void) | null;
 
   localSpeaking: boolean;
   isCallCollapsed: boolean;

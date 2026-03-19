@@ -130,6 +130,15 @@ export function useUsersApi({
     [socketRef],
   );
 
+  const setUsername = useCallback(
+    (username: string) => {
+      const socket = socketRef.current;
+      if (!socket?.connected) return;
+      socket.emit("set_username", { username });
+    },
+    [socketRef],
+  );
+
   return {
     joinRoom,
     setRoomPassword,
@@ -138,5 +147,6 @@ export function useUsersApi({
     onRoomPasswordRequired,
     onUserJoined,
     onUserLeft,
+    setUsername,
   };
 }

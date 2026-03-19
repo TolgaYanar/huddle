@@ -1,5 +1,45 @@
 import React from "react";
 
+function Toggle({
+  checked,
+  onChange,
+  label,
+  description,
+}: {
+  checked: boolean;
+  onChange: () => void;
+  label: string;
+  description?: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked ? "true" : "false"}
+      onClick={onChange}
+      className="flex items-center justify-between w-full gap-3 text-left hover:bg-white/5 rounded-lg px-1 py-1 transition-colors"
+    >
+      <div className="min-w-0">
+        <span className="text-xs text-slate-300">{label}</span>
+        {description && (
+          <span className="block text-[10px] text-slate-500 leading-tight">{description}</span>
+        )}
+      </div>
+      <div
+        className={`relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors ${
+          checked ? "bg-sky-500" : "bg-white/10"
+        }`}
+      >
+        <span
+          className={`inline-block h-3 w-3 rounded-full bg-white shadow transition-transform ${
+            checked ? "translate-x-3.5" : "translate-x-0.5"
+          }`}
+        />
+      </div>
+    </button>
+  );
+}
+
 export function AudioProcessingControls(props: {
   echoCancellationEnabled: boolean;
   setEchoCancellationEnabled: React.Dispatch<React.SetStateAction<boolean>>;
@@ -18,45 +58,28 @@ export function AudioProcessingControls(props: {
   } = props;
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <button
-        type="button"
-        onClick={() => setEchoCancellationEnabled((v) => !v)}
-        className={`h-9 px-3 rounded-xl border border-white/10 text-sm font-medium transition-colors ${
-          echoCancellationEnabled
-            ? "bg-white/5 text-slate-200 hover:bg-white/10"
-            : "bg-white/5 text-slate-400 hover:bg-white/10"
-        }`}
-        title="Echo cancellation (may reduce speaker echo)"
-      >
-        {echoCancellationEnabled ? "🔁 Echo cancel" : "🔁 Echo off"}
-      </button>
-
-      <button
-        type="button"
-        onClick={() => setNoiseSuppressionEnabled((v) => !v)}
-        className={`h-9 px-3 rounded-xl border border-white/10 text-sm font-medium transition-colors ${
-          noiseSuppressionEnabled
-            ? "bg-white/5 text-slate-200 hover:bg-white/10"
-            : "bg-white/5 text-slate-400 hover:bg-white/10"
-        }`}
-        title="Noise suppression (may reduce background noise)"
-      >
-        {noiseSuppressionEnabled ? "🧹 Noise suppress" : "🧹 Noise off"}
-      </button>
-
-      <button
-        type="button"
-        onClick={() => setAutoGainControlEnabled((v) => !v)}
-        className={`h-9 px-3 rounded-xl border border-white/10 text-sm font-medium transition-colors ${
-          autoGainControlEnabled
-            ? "bg-white/5 text-slate-200 hover:bg-white/10"
-            : "bg-white/5 text-slate-400 hover:bg-white/10"
-        }`}
-        title="Auto gain control (may normalize mic volume)"
-      >
-        {autoGainControlEnabled ? "🎚 Auto gain" : "🎚 Gain off"}
-      </button>
+    <div className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 flex flex-col gap-0.5">
+      <div className="text-[10px] font-medium text-slate-500 uppercase tracking-wide mb-1">
+        Audio
+      </div>
+      <Toggle
+        checked={echoCancellationEnabled}
+        onChange={() => setEchoCancellationEnabled((v) => !v)}
+        label="Echo cancellation"
+        description="Reduces speaker echo"
+      />
+      <Toggle
+        checked={noiseSuppressionEnabled}
+        onChange={() => setNoiseSuppressionEnabled((v) => !v)}
+        label="Noise suppression"
+        description="Filters background noise"
+      />
+      <Toggle
+        checked={autoGainControlEnabled}
+        onChange={() => setAutoGainControlEnabled((v) => !v)}
+        label="Auto gain"
+        description="Normalizes mic volume"
+      />
     </div>
   );
 }

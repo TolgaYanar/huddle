@@ -1,8 +1,82 @@
-import React from "react";
+import React, { useState } from "react";
 
 import type { CallSidebarProps } from "./types";
+
+function GuestNameEditor({
+  guestUsername,
+  setGuestUsername,
+}: {
+  guestUsername: string;
+  setGuestUsername: (name: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+
+  const startEdit = () => {
+    setDraft(guestUsername);
+    setEditing(true);
+  };
+
+  const commit = () => {
+    const trimmed = draft.trim();
+    if (trimmed) setGuestUsername(trimmed);
+    setEditing(false);
+  };
+
+  return (
+    <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/20 px-3 py-2">
+      {editing ? (
+        <>
+          <input
+            autoFocus
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") commit();
+              if (e.key === "Escape") setEditing(false);
+            }}
+            maxLength={30}
+            placeholder="Your display name"
+            className="flex-1 bg-transparent text-sm text-slate-100 placeholder:text-slate-500 outline-none min-w-0"
+          />
+          <button
+            type="button"
+            onClick={commit}
+            disabled={!draft.trim()}
+            className="text-xs text-indigo-400 hover:text-indigo-300 font-medium disabled:opacity-40 shrink-0"
+          >
+            Save
+          </button>
+          <button
+            type="button"
+            onClick={() => setEditing(false)}
+            className="text-xs text-slate-500 hover:text-slate-300 shrink-0"
+          >
+            ✕
+          </button>
+        </>
+      ) : (
+        <>
+          <span className="text-xs text-slate-400 shrink-0">You</span>
+          <span className="flex-1 text-sm font-medium text-slate-200 truncate min-w-0">
+            {guestUsername || (
+              <span className="text-slate-500 font-normal">Set your name…</span>
+            )}
+          </span>
+          <button
+            type="button"
+            onClick={startEdit}
+            className="text-xs text-slate-500 hover:text-slate-300 transition-colors shrink-0"
+            title="Edit display name"
+          >
+            ✎
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
 import { CallHeader } from "./CallHeader";
-import { RoomPasswordCard } from "./RoomPasswordCard";
 import { DeviceControls } from "./DeviceControls";
 import { AudioProcessingControls } from "./AudioProcessingControls";
 import { TileGrid } from "./TileGrid";
@@ -15,8 +89,8 @@ export function CallSidebar(props: CallSidebarProps) {
     onKickUser,
     participants,
     usernamesById,
-    hasRoomPassword,
-    onSetRoomPassword,
+    guestUsername,
+    setGuestUsername,
     localSpeaking,
     isCallCollapsed,
     setIsCallCollapsed,
@@ -48,8 +122,6 @@ export function CallSidebar(props: CallSidebarProps) {
   } = props;
 
   const isHost = Boolean(userId && hostId && userId === hostId);
-  const [showPasswordEditor, setShowPasswordEditor] = React.useState(false);
-  const [passwordDraft, setPasswordDraft] = React.useState("");
 
   const remoteStreamIds = new Set(remoteStreams.map((s) => s.id));
   const participantsWithoutStream = participants.filter(
@@ -70,17 +142,24 @@ export function CallSidebar(props: CallSidebarProps) {
           setIsCallCollapsed={setIsCallCollapsed}
         />
 
-        {!isCallCollapsed && (
+        {isCallCollapsed ? (
+          <div className="flex items-center gap-2">
+            <span className={`w-2 h-2 rounded-full ${micEnabled ? "bg-sky-400" : "bg-slate-600"}`} title={micEnabled ? "Mic on" : "Mic off"} />
+            <span className={`w-2 h-2 rounded-full ${camEnabled ? "bg-indigo-400" : "bg-slate-600"}`} title={camEnabled ? "Camera on" : "Camera off"} />
+            <span className={`w-2 h-2 rounded-full ${screenEnabled ? "bg-rose-400" : "bg-slate-600"}`} title={screenEnabled ? "Screen sharing" : "Screen off"} />
+            <span className="text-xs text-slate-500">
+              {[remoteStreams.length + 1, participantsWithoutStream.length].reduce((a, b) => a + b, 0)}{" "}
+              {remoteStreams.length + 1 + participantsWithoutStream.length === 1 ? "person" : "people"}
+            </span>
+          </div>
+        ) : (
           <>
-            <RoomPasswordCard
-              isHost={isHost}
-              hasRoomPassword={hasRoomPassword}
-              onSetRoomPassword={onSetRoomPassword}
-              showPasswordEditor={showPasswordEditor}
-              setShowPasswordEditor={setShowPasswordEditor}
-              passwordDraft={passwordDraft}
-              setPasswordDraft={setPasswordDraft}
-            />
+            {guestUsername !== null && setGuestUsername !== null && (
+              <GuestNameEditor
+                guestUsername={guestUsername}
+                setGuestUsername={setGuestUsername}
+              />
+            )}
 
             <DeviceControls
               micEnabled={micEnabled}
@@ -133,12 +212,6 @@ export function CallSidebar(props: CallSidebarProps) {
               onKickUser={onKickUser}
             />
           </>
-        )}
-
-        {isCallCollapsed && (
-          <div className="text-xs text-slate-400">
-            Call is collapsed. Expand to view tiles.
-          </div>
         )}
       </div>
     </aside>

@@ -95,6 +95,8 @@ export function useRoomClientPlayback(args: {
     requestChatHistory: room.requestChatHistory,
     requestActivityHistory: room.requestActivityHistory,
     sendChatMessage: room.sendChatMessage,
+    addReactionFn: room.addReaction,
+    onReactionUpdated: room.onReactionUpdated,
   });
 
   const wheel = useWheelPicker({

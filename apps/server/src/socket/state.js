@@ -30,6 +30,9 @@ function createSocketState() {
     // Chat fallback
     roomChatHistory: new Map(),
 
+    // Reactions: Map<roomId, Map<messageId, Record<emoji, Set<socketId>>>>
+    roomReactions: new Map(),
+
     CHAT_HISTORY_LIMIT,
     ACTIVITY_HISTORY_LIMIT,
   };

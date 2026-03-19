@@ -8,33 +8,31 @@ export function CallHeader(props: {
   const { localSpeaking, isCallCollapsed, setIsCallCollapsed } = props;
 
   return (
-    <div className="flex items-start justify-between gap-4">
-      <div>
-        <div className="font-semibold text-slate-50">Call</div>
-        <div className="text-xs text-slate-400 mt-1">
-          Screen share, webcam, and mic between users.
-        </div>
-      </div>
-      <div className="flex items-center gap-2 text-xs">
+    <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center gap-2">
+        <span className="font-semibold text-sm text-slate-100">Call</span>
         <span
-          className={`px-2 py-1 rounded-full border border-white/10 ${
+          className={`inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full border transition-colors ${
             localSpeaking
-              ? "bg-emerald-500/15 text-emerald-200"
-              : "bg-black/20 text-slate-300"
+              ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
+              : "bg-black/20 border-white/10 text-slate-400"
           }`}
         >
-          {localSpeaking ? "Speaking" : "Silent"}
+          <span
+            className={`w-1.5 h-1.5 rounded-full ${localSpeaking ? "bg-emerald-400" : "bg-slate-500"}`}
+          />
+          {localSpeaking ? "Speaking" : "Muted"}
         </span>
-
-        <button
-          type="button"
-          onClick={() => setIsCallCollapsed((v) => !v)}
-          className="h-8 px-3 rounded-lg border border-white/10 bg-white/5 text-slate-200 text-xs font-medium hover:bg-white/10 transition-colors"
-          title={isCallCollapsed ? "Expand call" : "Collapse call"}
-        >
-          {isCallCollapsed ? "Expand" : "Collapse"}
-        </button>
       </div>
+
+      <button
+        type="button"
+        onClick={() => setIsCallCollapsed((v) => !v)}
+        className="h-7 px-2.5 rounded-lg border border-white/10 bg-white/5 text-slate-400 text-xs hover:bg-white/10 hover:text-slate-200 transition-colors"
+        title={isCallCollapsed ? "Expand call" : "Collapse call"}
+      >
+        {isCallCollapsed ? "Expand" : "Collapse"}
+      </button>
     </div>
   );
 }

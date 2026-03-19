@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState } from "react";
 import type { GamePanelProps } from "./GamePanel";
 
@@ -24,10 +26,47 @@ export type ActivityLogEntry = {
   user: string;
 };
 
+const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥"] as const;
+
+const EVENT_COLORS: Record<string, string> = {
+  play: "text-emerald-400",
+  pause: "text-amber-400",
+  seek: "text-indigo-400",
+  change_url: "text-rose-400",
+  join: "text-violet-400",
+  leave: "text-slate-500",
+  error: "text-red-400",
+};
+
+const EVENT_ICONS: Record<string, string> = {
+  play: "▶",
+  pause: "⏸",
+  seek: "⇄",
+  change_url: "↗",
+  join: "→",
+  leave: "←",
+  error: "!",
+};
+
+function userColor(name: string): string {
+  const palette = [
+    "bg-sky-600/60 text-sky-100",
+    "bg-violet-600/60 text-violet-100",
+    "bg-emerald-600/60 text-emerald-100",
+    "bg-rose-600/60 text-rose-100",
+    "bg-amber-600/60 text-amber-100",
+    "bg-indigo-600/60 text-indigo-100",
+  ];
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffff;
+  return palette[h % palette.length]!;
+}
+
 type Tab = "activity" | "games";
 
 export function ActivitySidebar(props: {
   roomId: string;
+  userId: string;
   isConnected: boolean;
 
   isActivityCollapsed: boolean;
@@ -41,25 +80,31 @@ export function ActivitySidebar(props: {
   setChatText: React.Dispatch<React.SetStateAction<string>>;
   handleSendChat: (e: React.FormEvent) => void;
 
+  reactions: Record<string, Record<string, string[]>>;
+  addReaction: (messageId: string, emoji: string) => void;
+
   gameProps: GamePanelProps;
   onOpenGame: (gameId: string) => void;
 }) {
   const {
     roomId,
+    userId,
     isConnected,
     isActivityCollapsed,
     setIsActivityCollapsed,
     logs,
     logsEndRef,
-    capitalize,
     chatText,
     setChatText,
     handleSendChat,
+    reactions,
+    addReaction,
     gameProps,
     onOpenGame,
   } = props;
 
   const [activeTab, setActiveTab] = useState<Tab>("activity");
+  const [hoveredMsgId, setHoveredMsgId] = useState<string | null>(null);
 
   const hasActiveGame = gameProps.gameState.games.some(
     (g) => g.status === "active" || g.status === "finished",
@@ -85,7 +130,7 @@ export function ActivitySidebar(props: {
                     : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
                 }`}
               >
-                Activity
+                Chat
               </button>
               <button
                 type="button"
@@ -123,48 +168,149 @@ export function ActivitySidebar(props: {
         </div>
       </div>
 
-      {/* Activity tab */}
+      {/* Chat/Activity tab */}
       {!isActivityCollapsed && activeTab === "activity" && (
         <>
-          <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
+          <div className="flex-1 min-h-0 overflow-y-auto px-3 py-3 flex flex-col gap-0">
             {logs.length === 0 && (
               <div className="text-center text-slate-500 mt-8 text-sm">
-                Waiting for activity...
+                No messages yet…
               </div>
             )}
-            {logs.map((log, i) => (
-              <div
-                key={i}
-                className={`p-3 rounded-xl bg-black/20 border border-white/5 text-sm ${
-                  log.type === "play"
-                    ? "border-l-4 border-l-emerald-500"
-                    : log.type === "pause"
-                      ? "border-l-4 border-l-amber-500"
-                      : log.type === "seek"
-                        ? "border-l-4 border-l-indigo-500"
-                        : log.type === "change_url"
-                          ? "border-l-4 border-l-rose-500"
-                          : log.type === "chat"
-                            ? "border-l-4 border-l-sky-500"
-                            : log.type === "join" || log.type === "leave"
-                              ? "border-l-4 border-l-violet-500"
-                              : log.type === "error"
-                                ? "border-l-4 border-l-red-600"
-                                : ""
-                }`}
-              >
-                <div className="flex justify-between items-center mb-1 text-xs text-slate-500">
-                  <span className="uppercase tracking-wider font-bold text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-slate-400">
-                    {capitalize(log.type)}
+
+            {logs.map((log, i) => {
+              const prev = logs[i - 1];
+              const next = logs[i + 1];
+
+              if (log.type === "chat") {
+                const isFirstInGroup =
+                  !prev || prev.type !== "chat" || prev.user !== log.user;
+                const isLastInGroup =
+                  !next || next.type !== "chat" || next.user !== log.user;
+                const msgReactions = log.id ? (reactions[log.id] ?? {}) : {};
+                const hasReactions = Object.keys(msgReactions).length > 0;
+                const avatarColor = userColor(log.user);
+
+                return (
+                  <div
+                    key={i}
+                    className={`flex gap-2.5 ${isFirstInGroup ? "mt-4 first:mt-0" : "mt-0.5"}`}
+                  >
+                    {/* Avatar column */}
+                    <div className="w-7 shrink-0 pt-0.5">
+                      {isFirstInGroup ? (
+                        <div
+                          className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold ${avatarColor}`}
+                        >
+                          {log.user[0]?.toUpperCase() ?? "?"}
+                        </div>
+                      ) : (
+                        <div className="w-7" />
+                      )}
+                    </div>
+
+                    {/* Message content */}
+                    <div className="flex-1 min-w-0">
+                      {isFirstInGroup && (
+                        <div className="flex items-baseline gap-2 mb-0.5">
+                          <span className="text-xs font-semibold text-slate-200 truncate">
+                            {log.user}
+                          </span>
+                          <span className="text-[10px] text-slate-500 shrink-0">
+                            {log.time}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Bubble + emoji picker */}
+                      <div
+                        className="relative group/msg"
+                        onMouseEnter={() => setHoveredMsgId(log.id ?? null)}
+                        onMouseLeave={() => setHoveredMsgId(null)}
+                      >
+                        <p className="text-sm text-slate-300 leading-relaxed break-words">
+                          {log.msg}
+                        </p>
+
+                        {/* Emoji picker — appears on hover if message has an id */}
+                        {log.id && hoveredMsgId === log.id && (
+                          <div className="absolute -top-6 right-0 flex items-center gap-0.5 bg-slate-800/95 border border-white/10 rounded-full px-1.5 py-0.5 shadow-lg z-20">
+                            {REACTION_EMOJIS.map((emoji) => (
+                              <button
+                                key={emoji}
+                                type="button"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => {
+                                  addReaction(log.id!, emoji);
+                                }}
+                                className="text-sm leading-none hover:scale-125 active:scale-110 transition-transform px-0.5"
+                                title={emoji}
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Reactions */}
+                      {hasReactions && (
+                        <div className="flex flex-wrap gap-1 mt-1.5">
+                          {Object.entries(msgReactions).map(
+                            ([emoji, userIds]) => {
+                              const isMine = userIds.includes(userId);
+                              return (
+                                <button
+                                  key={emoji}
+                                  type="button"
+                                  onClick={() =>
+                                    log.id && addReaction(log.id, emoji)
+                                  }
+                                  className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border transition-colors ${
+                                    isMine
+                                      ? "bg-sky-500/20 border-sky-500/40 text-sky-200 hover:bg-sky-500/30"
+                                      : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10"
+                                  }`}
+                                >
+                                  <span>{emoji}</span>
+                                  <span>{userIds.length}</span>
+                                </button>
+                              );
+                            },
+                          )}
+                        </div>
+                      )}
+
+                      {/* Timestamp for non-first messages in group (on last) */}
+                      {!isFirstInGroup && isLastInGroup && (
+                        <div className="text-[10px] text-slate-600 mt-0.5">
+                          {log.time}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              }
+
+              // System event — compact centered divider
+              const color =
+                EVENT_COLORS[log.type] ?? "text-slate-500";
+              const icon = EVENT_ICONS[log.type] ?? "·";
+
+              return (
+                <div
+                  key={i}
+                  className="flex items-center gap-2 py-2 select-none"
+                >
+                  <div className="flex-1 h-px bg-white/5" />
+                  <span className={`text-[10px] ${color} shrink-0 font-medium`}>
+                    {icon} {log.user} {log.msg} · {log.time}
                   </span>
-                  <span>{log.time}</span>
+                  <div className="flex-1 h-px bg-white/5" />
                 </div>
-                <div className="text-slate-300 leading-relaxed">
-                  <strong className="text-slate-200">{log.user}</strong>{" "}
-                  {log.msg}
-                </div>
-              </div>
-            ))}
+              );
+            })}
+
             <div ref={logsEndRef} />
           </div>
 
@@ -191,7 +337,7 @@ export function ActivitySidebar(props: {
         </>
       )}
 
-      {/* Games tab — lobby only */}
+      {/* Games tab */}
       {!isActivityCollapsed && activeTab === "games" && (
         <div className="flex-1 min-h-0 overflow-y-auto p-4">
           <div className="flex flex-col gap-3">

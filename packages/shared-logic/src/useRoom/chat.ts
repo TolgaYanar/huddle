@@ -64,10 +64,40 @@ export function useChatApi({
     socket.emit("request_chat_history", roomId);
   }, [roomId, socketRef]);
 
+  const addReaction = useCallback(
+    (messageId: string, emoji: string) => {
+      const socket = socketRef.current;
+      if (!socket?.connected) return;
+      socket.emit("add_reaction", { roomId, messageId, emoji });
+    },
+    [roomId, socketRef],
+  );
+
+  const onReactionUpdated = useCallback(
+    (
+      callback: (data: {
+        messageId: string;
+        reactions: Record<string, string[]>;
+      }) => void,
+    ) => {
+      if (socketRef.current) {
+        socketRef.current.on("reaction_updated", callback);
+      }
+      return () => {
+        if (socketRef.current) {
+          socketRef.current.off("reaction_updated", callback);
+        }
+      };
+    },
+    [socketRef],
+  );
+
   return {
     sendChatMessage,
     onChatMessage,
     onChatHistory,
     requestChatHistory,
+    addReaction,
+    onReactionUpdated,
   };
 }
