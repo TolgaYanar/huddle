@@ -11,7 +11,15 @@ function getGuessers(game) {
 function getCurrentGuesserSocketId(game) {
   const guessers = getGuessers(game);
   if (guessers.length === 0) return null;
-  return guessers[game.session.currentGuesserIdx % guessers.length];
+
+  // Skip players who have already guessed correctly this round
+  const questioner = getActiveQuestioner(game);
+  const round = questioner ? questioner.rounds[questioner.currentRoundIndex] : null;
+  const winners = round ? new Set(round.winners) : new Set();
+  const remaining = guessers.filter((id) => !winners.has(id));
+  if (remaining.length === 0) return null;
+
+  return remaining[game.session.currentGuesserIdx % remaining.length];
 }
 
 function buildRoundPayload(round, isQuestioner) {

@@ -1,6 +1,7 @@
 const {
   getActiveQuestioner,
   getGuessers,
+  getCurrentGuesserSocketId,
   emitGameStateTo,
   emitGameStateToRoom,
 } = require("../helpers/game");
@@ -51,6 +52,10 @@ function parseRounds(rounds) {
 function getOrCreateRoomGames(state, roomId) {
   if (!state.roomGames.has(roomId)) state.roomGames.set(roomId, new Map());
   return state.roomGames.get(roomId);
+}
+
+function isHost(state, roomId, socketId) {
+  return state.roomHost.get(roomId) === socketId;
 }
 
 function attachGameHandlers(io, state, socket) {
@@ -163,7 +168,7 @@ function attachGameHandlers(io, state, socket) {
     if (!games) return;
     const game = games.get(gameId);
     if (!game || game.session.status !== "staging") return;
-    if (socket.id !== game.creatorId) return;
+    if (socket.id !== game.creatorId && !isHost(state, roomId, socket.id)) return;
     if (game.questioners.length === 0) return;
 
     const room = io.sockets.adapter.rooms.get(roomId);
@@ -196,8 +201,8 @@ function attachGameHandlers(io, state, socket) {
     const guessers = getGuessers(game);
     if (guessers.length === 0) return;
 
-    const currentGuesser = guessers[game.session.currentGuesserIdx % guessers.length];
-    if (socket.id !== currentGuesser) return;
+    const currentGuesser = getCurrentGuesserSocketId(game);
+    if (!currentGuesser || socket.id !== currentGuesser) return;
 
     const cleanGuess =
       typeof guess === "string" ? guess.trim().slice(0, 100) : "";
@@ -273,8 +278,11 @@ function attachGameHandlers(io, state, socket) {
 
     const questioner = getActiveQuestioner(game);
     if (!questioner) return;
-    if (socket.id !== questioner.socketId && socket.id !== game.creatorId)
-      return;
+    if (
+      socket.id !== questioner.socketId &&
+      socket.id !== game.creatorId &&
+      !isHost(state, roomId, socket.id)
+    ) return;
 
     game.session.currentGuesserIdx++;
     emitGameStateToRoom(io, state, roomId);
@@ -293,8 +301,11 @@ function attachGameHandlers(io, state, socket) {
 
     const questioner = getActiveQuestioner(game);
     if (!questioner) return;
-    if (socket.id !== questioner.socketId && socket.id !== game.creatorId)
-      return;
+    if (
+      socket.id !== questioner.socketId &&
+      socket.id !== game.creatorId &&
+      !isHost(state, roomId, socket.id)
+    ) return;
 
     const round = questioner.rounds[questioner.currentRoundIndex];
     if (round) {
@@ -318,31 +329,30 @@ function attachGameHandlers(io, state, socket) {
 
     const questioner = getActiveQuestioner(game);
     if (!questioner) return;
-    if (socket.id !== questioner.socketId && socket.id !== game.creatorId)
-      return;
+    if (
+      socket.id !== questioner.socketId &&
+      socket.id !== game.creatorId &&
+      !isHost(state, roomId, socket.id)
+    ) return;
 
     questioner.currentRoundIndex++;
     game.session.currentGuesserIdx = 0;
 
-    // If this questioner is done, find the next one with rounds remaining
-    if (questioner.currentRoundIndex >= questioner.rounds.length) {
-      let found = false;
-      for (let i = 1; i <= game.questioners.length; i++) {
-        const nextIdx =
-          (game.session.currentQuestionerIdx + i) % game.questioners.length;
-        if (
-          game.questioners[nextIdx].currentRoundIndex <
-          game.questioners[nextIdx].rounds.length
-        ) {
-          game.session.currentQuestionerIdx = nextIdx;
-          game.session.currentGuesserIdx = 0;
-          found = true;
-          break;
-        }
+    // Always rotate to the next questioner with remaining rounds (alternating model).
+    // If we wrap all the way around and nobody has rounds left, end the session.
+    let found = false;
+    for (let i = 1; i <= game.questioners.length; i++) {
+      const nextIdx =
+        (game.session.currentQuestionerIdx + i) % game.questioners.length;
+      const nextQ = game.questioners[nextIdx];
+      if (nextQ.currentRoundIndex < nextQ.rounds.length) {
+        game.session.currentQuestionerIdx = nextIdx;
+        found = true;
+        break;
       }
-      if (!found) {
-        game.session.status = "finished";
-      }
+    }
+    if (!found) {
+      game.session.status = "finished";
     }
 
     emitGameStateToRoom(io, state, roomId);
@@ -358,7 +368,7 @@ function attachGameHandlers(io, state, socket) {
     if (!games) return;
     const game = games.get(gameId);
     if (!game) return;
-    if (socket.id !== game.creatorId) return;
+    if (socket.id !== game.creatorId && !isHost(state, roomId, socket.id)) return;
 
     game.session.status = "finished";
     const questioner = getActiveQuestioner(game);
@@ -383,8 +393,11 @@ function attachGameHandlers(io, state, socket) {
     if (!games) return;
     const game = games.get(gameId);
     if (!game) return;
-    if (game.session.status === "active" && socket.id !== game.creatorId)
-      return;
+    if (
+      game.session.status === "active" &&
+      socket.id !== game.creatorId &&
+      !isHost(state, roomId, socket.id)
+    ) return;
 
     games.delete(gameId);
     emitGameStateToRoom(io, state, roomId);

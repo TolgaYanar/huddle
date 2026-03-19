@@ -19,6 +19,7 @@ const CATEGORIES = [
 export type GamePanelProps = {
   gameState: GameStateData;
   mySocketId: string;
+  isRoomHost: boolean;
   createGame: (rounds: GameRoundInput[]) => void;
   addRounds: (gameId: string, rounds: GameRoundInput[]) => void;
   removeRounds: (gameId: string) => void;
@@ -719,10 +720,12 @@ function RoundResultsView({
 }) {
   const canAdvance =
     questioner.socketId === mySocketId || game.creatorId === mySocketId;
-  const isLastRound = questioner.currentRoundIndex >= questioner.totalRounds - 1;
-  // Check if any other questioner still has rounds
-  const moreQuestioners = game.questioners.some((q) => !q.isDone);
-  const hasMore = !isLastRound || moreQuestioners;
+  // Rounds remaining after this one (for current questioner and all others)
+  const remainingCurrent = questioner.totalRounds - questioner.currentRoundIndex - 1;
+  const remainingOthers = game.questioners
+    .filter((q) => q.socketId !== questioner.socketId)
+    .reduce((sum, q) => sum + Math.max(0, q.totalRounds - q.currentRoundIndex), 0);
+  const hasMore = remainingCurrent > 0 || remainingOthers > 0;
 
   return (
     <div className="flex flex-col gap-5">
@@ -791,16 +794,16 @@ function RoundResultsView({
         </div>
       )}
 
-      {canAdvance && hasMore && (
+      {canAdvance && (
         <button
           type="button"
           onClick={onNextRound}
           className="w-full py-3 rounded-xl bg-sky-600 text-white text-sm font-semibold hover:bg-sky-500 transition-colors"
         >
-          Next round →
+          {hasMore ? "Next round →" : "See final scores →"}
         </button>
       )}
-      {!canAdvance && hasMore && (
+      {!canAdvance && (
         <p className="text-center text-xs text-slate-500">
           Waiting for {questioner.username ?? "the questioner"} to continue…
         </p>
@@ -814,13 +817,16 @@ function RoundResultsView({
 function FinalScoreboard({
   game,
   mySocketId,
+  isRoomHost,
   onReset,
 }: {
   game: GameData;
   mySocketId: string;
+  isRoomHost: boolean;
   onReset: () => void;
 }) {
   const isCreator = game.creatorId === mySocketId;
+  const canManage = isCreator || isRoomHost;
   const totalRounds = game.questioners.reduce(
     (sum, q) => sum + q.totalRounds,
     0,
@@ -875,7 +881,7 @@ function FinalScoreboard({
         </div>
       )}
 
-      {isCreator && (
+      {canManage && (
         <button
           type="button"
           onClick={onReset}
@@ -893,6 +899,7 @@ function FinalScoreboard({
 function StagingView({
   game,
   mySocketId,
+  isRoomHost,
   onAddRounds,
   onRemoveRounds,
   onStart,
@@ -900,6 +907,7 @@ function StagingView({
 }: {
   game: GameData;
   mySocketId: string;
+  isRoomHost: boolean;
   onAddRounds: (rounds: GameRoundInput[]) => void;
   onRemoveRounds: () => void;
   onStart: () => void;
@@ -907,6 +915,7 @@ function StagingView({
 }) {
   const [setupOpen, setSetupOpen] = useState(false);
   const isCreator = game.creatorId === mySocketId;
+  const canManage = isCreator || isRoomHost;
   const amQuestioner = game.questioners.some((q) => q.socketId === mySocketId);
 
   if (setupOpen) {
@@ -976,7 +985,7 @@ function StagingView({
           {amQuestioner ? "Edit my rounds" : "+ Add my rounds"}
         </button>
 
-        {amQuestioner && !isCreator && (
+        {amQuestioner && !canManage && (
           <button
             type="button"
             onClick={onRemoveRounds}
@@ -986,7 +995,7 @@ function StagingView({
           </button>
         )}
 
-        {isCreator && (
+        {canManage && (
           <>
             <button
               type="button"
@@ -1016,6 +1025,7 @@ function StagingView({
 function GameView({
   game,
   mySocketId,
+  isRoomHost,
   onAddRounds,
   onRemoveRounds,
   onStart,
@@ -1030,6 +1040,7 @@ function GameView({
 }: {
   game: GameData;
   mySocketId: string;
+  isRoomHost: boolean;
   onAddRounds: (rounds: GameRoundInput[]) => void;
   onRemoveRounds: () => void;
   onStart: () => void;
@@ -1043,6 +1054,7 @@ function GameView({
   onBack: () => void;
 }) {
   const isCreator = game.creatorId === mySocketId;
+  const canManage = isCreator || isRoomHost;
 
   const header = (
     <div className="flex items-center gap-3 mb-5">
@@ -1056,7 +1068,7 @@ function GameView({
       <div className="flex-1 text-sm font-medium text-slate-300 truncate">
         {game.creatorName ?? "Unknown"}'s game
       </div>
-      {isCreator && game.status === "active" && (
+      {canManage && game.status === "active" && (
         <button
           type="button"
           onClick={onEndSession}
@@ -1075,6 +1087,7 @@ function GameView({
         <StagingView
           game={game}
           mySocketId={mySocketId}
+          isRoomHost={isRoomHost}
           onAddRounds={onAddRounds}
           onRemoveRounds={onRemoveRounds}
           onStart={onStart}
@@ -1088,7 +1101,7 @@ function GameView({
     return (
       <div>
         {header}
-        <FinalScoreboard game={game} mySocketId={mySocketId} onReset={onReset} />
+        <FinalScoreboard game={game} mySocketId={mySocketId} isRoomHost={isRoomHost} onReset={onReset} />
       </div>
     );
   }
@@ -1160,13 +1173,17 @@ function GameView({
 function GameLobby({
   games,
   mySocketId,
+  isRoomHost,
   onSelectGame,
   onCreateGame,
+  onDeleteGame,
 }: {
   games: GameData[];
   mySocketId: string;
+  isRoomHost: boolean;
   onSelectGame: (gameId: string) => void;
   onCreateGame: (rounds: GameRoundInput[]) => void;
+  onDeleteGame: (gameId: string) => void;
 }) {
   const [creatingGame, setCreatingGame] = useState(false);
 
@@ -1232,25 +1249,37 @@ function GameLobby({
               (s, q) => s + q.totalRounds,
               0,
             );
+            const canDelete = isRoomHost || game.creatorId === mySocketId;
             return (
-              <button
-                key={game.gameId}
-                type="button"
-                onClick={() => onSelectGame(game.gameId)}
-                className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors text-left"
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-slate-200 truncate">
-                    {game.creatorName ?? "Unknown"}'s game
+              <div key={game.gameId} className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => onSelectGame(game.gameId)}
+                  className="flex-1 flex items-center gap-3 px-4 py-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors text-left min-w-0"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-slate-200 truncate">
+                      {game.creatorName ?? "Unknown"}'s game
+                    </div>
+                    <div className="text-xs text-slate-500 mt-0.5">
+                      {game.questioners.length} questioner
+                      {game.questioners.length !== 1 ? "s" : ""} · {totalRounds}{" "}
+                      round{totalRounds !== 1 ? "s" : ""}
+                    </div>
                   </div>
-                  <div className="text-xs text-slate-500 mt-0.5">
-                    {game.questioners.length} questioner
-                    {game.questioners.length !== 1 ? "s" : ""} · {totalRounds}{" "}
-                    round{totalRounds !== 1 ? "s" : ""}
-                  </div>
-                </div>
-                {statusBadge(game)}
-              </button>
+                  {statusBadge(game)}
+                </button>
+                {canDelete && (
+                  <button
+                    type="button"
+                    onClick={() => onDeleteGame(game.gameId)}
+                    title="Delete game"
+                    className="shrink-0 h-9 w-9 rounded-xl border border-white/10 bg-white/5 text-rose-400 hover:bg-rose-600/20 hover:border-rose-500/30 transition-colors flex items-center justify-center text-lg"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
             );
           })}
         </div>
@@ -1264,6 +1293,7 @@ function GameLobby({
 export function GamePanel({
   gameState,
   mySocketId,
+  isRoomHost,
   createGame,
   addRounds,
   removeRounds,
@@ -1304,6 +1334,7 @@ export function GamePanel({
       <GameView
         game={selectedGame}
         mySocketId={mySocketId}
+        isRoomHost={isRoomHost}
         onAddRounds={(rounds) => addRounds(selectedGame.gameId, rounds)}
         onRemoveRounds={() => removeRounds(selectedGame.gameId)}
         onStart={() => startSession(selectedGame.gameId)}
@@ -1326,11 +1357,12 @@ export function GamePanel({
     <GameLobby
       games={gameState.games}
       mySocketId={mySocketId}
+      isRoomHost={isRoomHost}
       onSelectGame={setSelectedGameId}
       onCreateGame={(rounds) => {
         createGame(rounds);
-        // The new gameId will come back via game_state, auto-select it
       }}
+      onDeleteGame={(gameId) => resetGame(gameId)}
     />
   );
 }

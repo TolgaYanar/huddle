@@ -292,12 +292,13 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
     nextRound: room.nextRound,
     endSession: room.endSession,
     resetGame: room.resetGame,
-    mySocketId: userId,
+    mySocketId: room.socket?.id || userId,
   });
 
   const gameProps = {
     gameState: game.gameState,
-    mySocketId: userId,
+    mySocketId: room.socket?.id || userId,
+    isRoomHost: roomState.hostId === userId,
     createGame: game.createGame,
     addRounds: game.addRounds,
     removeRounds: game.removeRounds,

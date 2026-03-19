@@ -36,7 +36,7 @@ const USERNAME_REQUIREMENTS = [
   },
   {
     id: "chars",
-    label: "Only lowercase letters, numbers, underscore",
+    label: "Letters, numbers, underscore only",
     test: (u: string) => /^[a-z0-9_]*$/.test(u),
   },
 ];
@@ -45,31 +45,25 @@ function RequirementCheck({ met, label }: { met: boolean; label: string }) {
   return (
     <div className="flex items-center gap-2 text-xs">
       <div
-        className={`w-4 h-4 rounded flex items-center justify-center transition-colors ${
+        className={`w-4 h-4 rounded flex items-center justify-center transition-colors shrink-0 ${
           met
-            ? "bg-emerald-500/20 border border-emerald-500/40 text-emerald-400"
-            : "bg-white/5 border border-white/10 text-slate-500"
+            ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-400"
+            : "bg-white/4 border border-white/8 text-slate-600"
         }`}
       >
         {met ? (
           <svg
-            className="w-3 h-3"
+            className="w-2.5 h-2.5"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
             strokeWidth={3}
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M5 13l4 4L19 7"
-            />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
           </svg>
         ) : null}
       </div>
-      <span className={met ? "text-emerald-400" : "text-slate-500"}>
-        {label}
-      </span>
+      <span className={met ? "text-emerald-400" : "text-slate-500"}>{label}</span>
     </div>
   );
 }
@@ -90,10 +84,8 @@ function RegisterPageInner() {
 
   const usernameValid = USERNAME_REQUIREMENTS.every((r) => r.test(username));
   const passwordValid = PASSWORD_REQUIREMENTS.every((r) => r.test(password));
-  const passwordsMatch =
-    password === confirmPassword && confirmPassword.length > 0;
-  const canSubmit =
-    usernameValid && passwordValid && passwordsMatch && !loading;
+  const passwordsMatch = password === confirmPassword && confirmPassword.length > 0;
+  const canSubmit = usernameValid && passwordValid && passwordsMatch && !loading;
 
   const getErrorMessage = (err: unknown): string => {
     if (err && typeof err === "object" && "code" in err) {
@@ -107,6 +99,9 @@ function RegisterPageInner() {
       if (code === "invalid_password") {
         return "Password does not meet the requirements.";
       }
+      if (code === "db_unavailable") {
+        return "Server is temporarily unavailable. Please try again later.";
+      }
     }
     if (err && typeof err === "object" && "message" in err) {
       return String((err as { message?: unknown }).message);
@@ -115,44 +110,57 @@ function RegisterPageInner() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-linear-to-b from-slate-900 via-slate-950 to-black text-slate-200">
-      <header className="h-16 flex items-center justify-between px-6 lg:px-8 border-b border-white/10 backdrop-blur-md bg-black/30 sticky top-0 z-50">
+    <div className="min-h-screen flex flex-col bg-[#0a0a0f] text-slate-200 overflow-hidden">
+      {/* Background glow */}
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-150 h-150 rounded-full bg-indigo-600/10 blur-[120px]" />
+        <div className="absolute bottom-0 right-1/4 w-100 h-100 rounded-full bg-violet-600/8 blur-[100px]" />
+      </div>
+
+      <header className="relative z-10 h-16 flex items-center justify-between px-6 lg:px-8 border-b border-white/6 backdrop-blur-md bg-black/20">
         <Link
           href="/"
-          className="font-semibold text-lg sm:text-xl flex items-center gap-2 text-slate-50 tracking-tight"
+          className="font-semibold text-lg sm:text-xl flex items-center gap-2.5 text-white tracking-tight"
         >
           <picture>
             <source srcSet="/favicon.svg?v=2" type="image/svg+xml" />
             <img
               src="/favicon.svg?v=2"
               alt="WeHuddle"
-              width={24}
-              height={24}
-              className="h-6 w-6 rounded"
+              width={26}
+              height={26}
+              className="h-6 w-6 rounded-md"
             />
           </picture>
           <span>WeHuddle</span>
         </Link>
         <Link
           href={`/login?next=${encodeURIComponent(next)}`}
-          className="h-8 px-3 rounded-lg border border-white/10 bg-white/5 text-slate-200 text-xs font-medium hover:bg-white/10 transition-colors flex items-center"
+          className="h-8 px-4 rounded-lg border border-white/8 bg-white/4 text-slate-300 text-xs font-medium hover:bg-white/8 hover:text-white transition-all flex items-center"
         >
           Log in
         </Link>
       </header>
 
-      <main className="flex-1 flex items-center justify-center p-6">
-        <div className="w-full max-w-md">
-          <div className="backdrop-blur-md bg-white/5 rounded-2xl border border-white/10 p-5 sm:p-6">
-            <div className="font-semibold text-slate-50 text-lg">
-              Create an account
-            </div>
-            <div className="text-sm text-slate-400 mt-1">
-              Join Huddle to save your rooms and sync across devices.
+      <main className="relative z-10 flex-1 flex items-center justify-center p-6">
+        <div className="w-full max-w-sm">
+          {/* Card */}
+          <div className="rounded-2xl border border-white/8 bg-white/3 backdrop-blur-xl shadow-2xl shadow-black/40 p-7">
+            {/* Header */}
+            <div className="mb-6">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="h-9 w-9 rounded-xl bg-indigo-500/15 border border-indigo-500/20 flex items-center justify-center">
+                  <svg className="w-4 h-4 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                  </svg>
+                </div>
+              </div>
+              <h1 className="text-xl font-semibold text-white tracking-tight">Create an account</h1>
+              <p className="text-sm text-slate-400 mt-1">Join Huddle to save your rooms and sync across devices.</p>
             </div>
 
             <form
-              className="mt-5 grid gap-4"
+              className="grid gap-4"
               onSubmit={async (e) => {
                 e.preventDefault();
                 if (!canSubmit) return;
@@ -161,6 +169,7 @@ function RegisterPageInner() {
                 setLoading(true);
                 try {
                   await apiRegister(username.toLowerCase(), password);
+                  router.refresh();
                   router.push(next);
                 } catch (err) {
                   setError(getErrorMessage(err));
@@ -170,16 +179,12 @@ function RegisterPageInner() {
               }}
             >
               {/* Username field */}
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-slate-300">
-                  Username
-                </label>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-slate-400">Username</label>
                 <input
                   value={username}
                   onChange={(e) => {
-                    setUsername(
-                      e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "")
-                    );
+                    setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""));
                     setError(null);
                   }}
                   placeholder="your_username"
@@ -187,32 +192,26 @@ function RegisterPageInner() {
                   autoCapitalize="none"
                   autoCorrect="off"
                   spellCheck={false}
-                  className={`w-full bg-black/20 border rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 transition ${
+                  className={`w-full bg-white/4 border rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-2 transition-all hover:border-white/12 ${
                     username.length > 0
                       ? usernameValid
-                        ? "border-emerald-500/40 focus:ring-emerald-500/30 focus:border-emerald-500/40"
-                        : "border-rose-500/40 focus:ring-rose-500/30 focus:border-rose-500/40"
-                      : "border-white/10 focus:ring-indigo-500/30 focus:border-indigo-500/40"
+                        ? "border-emerald-500/35 focus:ring-emerald-500/20"
+                        : "border-rose-500/35 focus:ring-rose-500/20"
+                      : "border-white/8 focus:ring-indigo-500/25 focus:border-indigo-500/35"
                   }`}
                 />
                 {username.length > 0 && (
                   <div className="grid gap-1 mt-2">
                     {USERNAME_REQUIREMENTS.map((req) => (
-                      <RequirementCheck
-                        key={req.id}
-                        met={req.test(username)}
-                        label={req.label}
-                      />
+                      <RequirementCheck key={req.id} met={req.test(username)} label={req.label} />
                     ))}
                   </div>
                 )}
               </div>
 
               {/* Password field */}
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-slate-300">
-                  Password
-                </label>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-slate-400">Password</label>
                 <div className="relative">
                   <input
                     value={password}
@@ -225,12 +224,12 @@ function RegisterPageInner() {
                     placeholder="Create a strong password"
                     type={showPassword ? "text" : "password"}
                     autoComplete="new-password"
-                    className={`w-full bg-black/20 border rounded-xl px-4 py-2.5 pr-10 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 transition ${
+                    className={`w-full bg-white/4 border rounded-xl px-4 py-2.5 pr-10 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-2 transition-all hover:border-white/12 ${
                       password.length > 0
                         ? passwordValid
-                          ? "border-emerald-500/40 focus:ring-emerald-500/30 focus:border-emerald-500/40"
-                          : "border-amber-500/40 focus:ring-amber-500/30 focus:border-amber-500/40"
-                        : "border-white/10 focus:ring-indigo-500/30 focus:border-indigo-500/40"
+                          ? "border-emerald-500/35 focus:ring-emerald-500/20"
+                          : "border-amber-500/35 focus:ring-amber-500/20"
+                        : "border-white/8 focus:ring-indigo-500/25 focus:border-indigo-500/35"
                     }`}
                   />
                   <PasswordToggleButton show={showPassword} onToggle={() => setShowPassword((v) => !v)} />
@@ -238,21 +237,15 @@ function RegisterPageInner() {
                 {showRequirements && (
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2">
                     {PASSWORD_REQUIREMENTS.map((req) => (
-                      <RequirementCheck
-                        key={req.id}
-                        met={req.test(password)}
-                        label={req.label}
-                      />
+                      <RequirementCheck key={req.id} met={req.test(password)} label={req.label} />
                     ))}
                   </div>
                 )}
               </div>
 
               {/* Confirm Password field */}
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-slate-300">
-                  Confirm Password
-                </label>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-slate-400">Confirm Password</label>
                 <div className="relative">
                   <input
                     value={confirmPassword}
@@ -263,45 +256,33 @@ function RegisterPageInner() {
                     placeholder="Confirm your password"
                     type={showConfirmPassword ? "text" : "password"}
                     autoComplete="new-password"
-                    className={`w-full bg-black/20 border rounded-xl px-4 py-2.5 pr-10 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 transition ${
+                    className={`w-full bg-white/4 border rounded-xl px-4 py-2.5 pr-10 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-2 transition-all hover:border-white/12 ${
                       confirmPassword.length > 0
                         ? passwordsMatch
-                          ? "border-emerald-500/40 focus:ring-emerald-500/30 focus:border-emerald-500/40"
-                          : "border-rose-500/40 focus:ring-rose-500/30 focus:border-rose-500/40"
-                        : "border-white/10 focus:ring-indigo-500/30 focus:border-indigo-500/40"
+                          ? "border-emerald-500/35 focus:ring-emerald-500/20"
+                          : "border-rose-500/35 focus:ring-rose-500/20"
+                        : "border-white/8 focus:ring-indigo-500/25 focus:border-indigo-500/35"
                     }`}
                   />
                   <PasswordToggleButton show={showConfirmPassword} onToggle={() => setShowConfirmPassword((v) => !v)} />
                 </div>
                 {confirmPassword.length > 0 && !passwordsMatch && (
-                  <div className="text-xs text-rose-400 mt-1">
-                    Passwords do not match
-                  </div>
+                  <p className="text-xs text-rose-400 mt-1">Passwords do not match</p>
                 )}
                 {confirmPassword.length > 0 && passwordsMatch && (
-                  <div className="text-xs text-emerald-400 mt-1 flex items-center gap-1">
-                    <svg
-                      className="w-3 h-3"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={3}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M5 13l4 4L19 7"
-                      />
+                  <p className="text-xs text-emerald-400 mt-1 flex items-center gap-1">
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                     </svg>
                     Passwords match
-                  </div>
+                  </p>
                 )}
               </div>
 
               {error && (
-                <div className="text-sm text-rose-200 bg-rose-500/10 border border-rose-500/20 rounded-xl px-4 py-3 flex items-start gap-2">
+                <div className="text-sm text-rose-300 bg-rose-500/8 border border-rose-500/20 rounded-xl px-4 py-3 flex items-start gap-2.5">
                   <svg
-                    className="w-4 h-4 mt-0.5 flex-shrink-0"
+                    className="w-4 h-4 mt-0.5 shrink-0 text-rose-400"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -319,10 +300,10 @@ function RegisterPageInner() {
 
               <button
                 disabled={!canSubmit}
-                className={`h-11 w-full rounded-xl font-semibold text-sm transition-all ${
+                className={`h-11 w-full rounded-xl font-semibold text-sm transition-all mt-1 ${
                   canSubmit
-                    ? "bg-indigo-600 text-white hover:bg-indigo-500 active:scale-[0.98]"
-                    : "bg-slate-800 text-slate-500 cursor-not-allowed"
+                    ? "bg-indigo-600 text-white hover:bg-indigo-500 active:scale-[0.98] shadow-lg shadow-indigo-500/20"
+                    : "bg-white/4 text-slate-600 border border-white/6 cursor-not-allowed"
                 }`}
                 type="submit"
               >
@@ -350,22 +331,18 @@ function RegisterPageInner() {
                   "Create account"
                 )}
               </button>
-
-              <div className="text-xs text-slate-500 text-center">
-                Already have an account?{" "}
-                <Link
-                  href={`/login?next=${encodeURIComponent(next)}`}
-                  className="text-indigo-400 hover:text-indigo-300 underline underline-offset-2"
-                >
-                  Log in
-                </Link>
-              </div>
             </form>
           </div>
 
-          <p className="text-xs text-slate-500 text-center mt-4">
-            ⚠️ No password reset available yet. Please save your password
-            safely.
+          {/* Footer link */}
+          <p className="text-xs text-slate-500 text-center mt-5">
+            Already have an account?{" "}
+            <Link
+              href={`/login?next=${encodeURIComponent(next)}`}
+              className="text-indigo-400 hover:text-indigo-300 transition-colors"
+            >
+              Log in
+            </Link>
           </p>
         </div>
       </main>
@@ -377,8 +354,8 @@ export default function RegisterPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center bg-linear-to-b from-slate-900 via-slate-950 to-black text-slate-200">
-          <div className="text-sm text-slate-400">Loading…</div>
+        <div className="min-h-screen flex items-center justify-center bg-[#0a0a0f] text-slate-200">
+          <div className="text-sm text-slate-500">Loading…</div>
         </div>
       }
     >

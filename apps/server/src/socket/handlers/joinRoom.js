@@ -65,6 +65,21 @@ function attachJoinRoomHandler(io, state, socket, joinedRooms, deps) {
 
         // Always re-send room state so reconnecting clients can re-sync.
         emitRoomStateToSocket(state, socket, roomId);
+
+        // Ensure this socket is in participants for any active games
+        // (handles reconnection / late-join scenarios).
+        const gamesOnRejoin = state.roomGames.get(roomId);
+        if (gamesOnRejoin) {
+          for (const game of gamesOnRejoin.values()) {
+            if (
+              game.session.status === "active" &&
+              !game.session.participants.includes(socket.id)
+            ) {
+              game.session.participants.push(socket.id);
+            }
+          }
+        }
+
         emitGameStateTo(state, socket, roomId);
       } catch (err) {
         console.error("Failed to re-emit room snapshot", err);
@@ -163,6 +178,20 @@ function attachJoinRoomHandler(io, state, socket, joinedRooms, deps) {
 
     // Send current room state to this new joiner.
     emitRoomStateToSocket(state, socket, roomId);
+
+    // Ensure this socket is in participants for any active games (late-join fix).
+    const gamesOnJoin = state.roomGames.get(roomId);
+    if (gamesOnJoin) {
+      for (const game of gamesOnJoin.values()) {
+        if (
+          game.session.status === "active" &&
+          !game.session.participants.includes(socket.id)
+        ) {
+          game.session.participants.push(socket.id);
+        }
+      }
+    }
+
     emitGameStateTo(state, socket, roomId);
 
     // Send recent chat history for this room.

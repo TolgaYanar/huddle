@@ -38,44 +38,57 @@ function LoginPageInner() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-linear-to-b from-slate-900 via-slate-950 to-black text-slate-200">
-      <header className="h-16 flex items-center justify-between px-6 lg:px-8 border-b border-white/10 backdrop-blur-md bg-black/30 sticky top-0 z-50">
+    <div className="min-h-screen flex flex-col bg-[#0a0a0f] text-slate-200 overflow-hidden">
+      {/* Background glow */}
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-150 h-150 rounded-full bg-indigo-600/10 blur-[120px]" />
+        <div className="absolute bottom-0 right-1/4 w-100 h-100 rounded-full bg-violet-600/8 blur-[100px]" />
+      </div>
+
+      <header className="relative z-10 h-16 flex items-center justify-between px-6 lg:px-8 border-b border-white/6 backdrop-blur-md bg-black/20">
         <Link
           href="/"
-          className="font-semibold text-lg sm:text-xl flex items-center gap-2 text-slate-50 tracking-tight"
+          className="font-semibold text-lg sm:text-xl flex items-center gap-2.5 text-white tracking-tight"
         >
           <picture>
             <source srcSet="/favicon.svg?v=2" type="image/svg+xml" />
             <img
               src="/favicon.svg?v=2"
               alt="WeHuddle"
-              width={24}
-              height={24}
-              className="h-6 w-6 rounded"
+              width={26}
+              height={26}
+              className="h-6 w-6 rounded-md"
             />
           </picture>
           <span>WeHuddle</span>
         </Link>
         <Link
           href={`/register?next=${encodeURIComponent(next)}`}
-          className="h-8 px-3 rounded-lg border border-white/10 bg-white/5 text-slate-200 text-xs font-medium hover:bg-white/10 transition-colors flex items-center"
+          className="h-8 px-4 rounded-lg border border-white/8 bg-white/4 text-slate-300 text-xs font-medium hover:bg-white/8 hover:text-white transition-all flex items-center"
         >
           Register
         </Link>
       </header>
 
-      <main className="flex-1 flex items-center justify-center p-6">
-        <div className="w-full max-w-md">
-          <div className="backdrop-blur-md bg-white/5 rounded-2xl border border-white/10 p-5 sm:p-6">
-            <div className="font-semibold text-slate-50 text-lg">
-              Welcome back
-            </div>
-            <div className="text-sm text-slate-400 mt-1">
-              Log in to access your saved rooms.
+      <main className="relative z-10 flex-1 flex items-center justify-center p-6">
+        <div className="w-full max-w-sm">
+          {/* Card */}
+          <div className="rounded-2xl border border-white/8 bg-white/3 backdrop-blur-xl shadow-2xl shadow-black/40 p-7">
+            {/* Header */}
+            <div className="mb-6">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="h-9 w-9 rounded-xl bg-indigo-500/15 border border-indigo-500/20 flex items-center justify-center">
+                  <svg className="w-4 h-4 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </div>
+              </div>
+              <h1 className="text-xl font-semibold text-white tracking-tight">Welcome back</h1>
+              <p className="text-sm text-slate-400 mt-1">Log in to access your saved rooms.</p>
             </div>
 
             <form
-              className="mt-5 grid gap-4"
+              className="grid gap-4"
               onSubmit={async (e) => {
                 e.preventDefault();
                 if (!canSubmit) return;
@@ -84,6 +97,7 @@ function LoginPageInner() {
                 setLoading(true);
                 try {
                   await apiLogin(username.toLowerCase().trim(), password);
+                  router.refresh();
                   router.push(next);
                 } catch (err) {
                   setError(getErrorMessage(err));
@@ -93,10 +107,8 @@ function LoginPageInner() {
               }}
             >
               {/* Username field */}
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-slate-300">
-                  Username
-                </label>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-slate-400">Username</label>
                 <input
                   value={username}
                   onChange={(e) => {
@@ -110,15 +122,13 @@ function LoginPageInner() {
                   autoCapitalize="none"
                   autoCorrect="off"
                   spellCheck={false}
-                  className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500/40 transition"
+                  className="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/25 focus:border-indigo-500/35 hover:border-white/12 transition-all"
                 />
               </div>
 
               {/* Password field */}
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-slate-300">
-                  Password
-                </label>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-slate-400">Password</label>
                 <div className="relative">
                   <input
                     value={password}
@@ -129,16 +139,16 @@ function LoginPageInner() {
                     placeholder="Enter your password"
                     type={showPassword ? "text" : "password"}
                     autoComplete="current-password"
-                    className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 pr-10 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500/40 transition"
+                    className="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-2.5 pr-10 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/25 focus:border-indigo-500/35 hover:border-white/12 transition-all"
                   />
                   <PasswordToggleButton show={showPassword} onToggle={() => setShowPassword((v) => !v)} />
                 </div>
               </div>
 
               {error && (
-                <div className="text-sm text-rose-200 bg-rose-500/10 border border-rose-500/20 rounded-xl px-4 py-3 flex items-start gap-2">
+                <div className="text-sm text-rose-300 bg-rose-500/8 border border-rose-500/20 rounded-xl px-4 py-3 flex items-start gap-2.5">
                   <svg
-                    className="w-4 h-4 mt-0.5 flex-shrink-0"
+                    className="w-4 h-4 mt-0.5 shrink-0 text-rose-400"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -156,10 +166,10 @@ function LoginPageInner() {
 
               <button
                 disabled={!canSubmit}
-                className={`h-11 w-full rounded-xl font-semibold text-sm transition-all ${
+                className={`h-11 w-full rounded-xl font-semibold text-sm transition-all mt-1 ${
                   canSubmit
-                    ? "bg-indigo-600 text-white hover:bg-indigo-500 active:scale-[0.98]"
-                    : "bg-slate-800 text-slate-500 cursor-not-allowed"
+                    ? "bg-indigo-600 text-white hover:bg-indigo-500 active:scale-[0.98] shadow-lg shadow-indigo-500/20"
+                    : "bg-white/4 text-slate-600 border border-white/6 cursor-not-allowed"
                 }`}
                 type="submit"
               >
@@ -187,21 +197,18 @@ function LoginPageInner() {
                   "Log in"
                 )}
               </button>
-
-              <div className="text-xs text-slate-500 text-center">
-                Don&apos;t have an account?{" "}
-                <Link
-                  href={`/register?next=${encodeURIComponent(next)}`}
-                  className="text-indigo-400 hover:text-indigo-300 underline underline-offset-2"
-                >
-                  Create one
-                </Link>
-              </div>
             </form>
           </div>
 
-          <p className="text-xs text-slate-500 text-center mt-4">
-            ⚠️ Forgot your password? Password reset is not yet available.
+          {/* Footer link */}
+          <p className="text-xs text-slate-500 text-center mt-5">
+            Don&apos;t have an account?{" "}
+            <Link
+              href={`/register?next=${encodeURIComponent(next)}`}
+              className="text-indigo-400 hover:text-indigo-300 transition-colors"
+            >
+              Create one
+            </Link>
           </p>
         </div>
       </main>
@@ -213,8 +220,8 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center bg-linear-to-b from-slate-900 via-slate-950 to-black text-slate-200">
-          <div className="text-sm text-slate-400">Loading…</div>
+        <div className="min-h-screen flex items-center justify-center bg-[#0a0a0f] text-slate-200">
+          <div className="text-sm text-slate-500">Loading…</div>
         </div>
       }
     >
