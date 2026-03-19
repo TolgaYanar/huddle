@@ -46,11 +46,8 @@ export function GameModal({
             <span className="text-2xl">🎮</span>
             <div>
               <h2 className="text-lg font-bold text-slate-100">{title}</h2>
-              {gameProps.gameState.status === "active" && (
+              {gameProps.gameState.games.some((g) => g.status === "active") && (
                 <p className="text-xs text-sky-400 mt-0.5">Game in progress</p>
-              )}
-              {gameProps.gameState.status === "finished" && (
-                <p className="text-xs text-emerald-400 mt-0.5">Round finished</p>
               )}
             </div>
           </div>

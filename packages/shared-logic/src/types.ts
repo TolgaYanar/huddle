@@ -196,7 +196,7 @@ export interface GameWinner {
 
 export interface GameRound {
   category: string;
-  answer?: string; // only questioner or when finished
+  answer?: string; // only visible to current questioner or when round is finished
   answerMasked?: string[]; // absent when hideBlanks is on and no hints revealed
   hideBlanks: boolean;
   image: string;
@@ -212,20 +212,39 @@ export interface GameScoreEntry {
   wins: number;
 }
 
+export interface GameQuestioner {
+  socketId: string;
+  username: string | null;
+  totalRounds: number;
+  currentRoundIndex: number;
+  currentRound: GameRound | null;
+  isDone: boolean;
+  isActive: boolean;
+}
+
+export interface GameSession {
+  currentQuestionerIdx: number;
+  currentQuestionerId: string | null;
+  currentQuestionerName: string | null;
+  currentGuesserSocketId: string | null;
+  participants: string[];
+  participantUsernames: Record<string, string | null>;
+}
+
+export interface GameData {
+  gameId: string;
+  creatorId: string;
+  creatorName: string | null;
+  status: "staging" | "active" | "finished";
+  startedAt: number | null;
+  questioners: GameQuestioner[];
+  session: GameSession;
+  scoreboard: Record<string, GameScoreEntry>;
+}
+
 export interface GameStateData {
   roomId: string;
-  status: "idle" | "active" | "finished";
-  questionerId?: string;
-  questionerName?: string | null;
-  totalRounds?: number;
-  currentRoundIndex?: number;
-  currentRound?: GameRound | null;
-  turnOrder?: string[];
-  turnOrderUsernames?: Record<string, string | null>;
-  currentTurnIndex?: number;
-  currentTurnSocketId?: string | null;
-  scoreboard?: Record<string, GameScoreEntry>;
-  startedAt?: number;
+  games: GameData[];
 }
 
 export interface PlaylistItemPlayedData {

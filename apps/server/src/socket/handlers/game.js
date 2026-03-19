@@ -1,104 +1,60 @@
+const {
+  getActiveQuestioner,
+  getGuessers,
+  emitGameStateTo,
+  emitGameStateToRoom,
+} = require("../helpers/game");
+
 const GAME_CATEGORIES = [
-  "Brands",
-  "People",
-  "Places",
-  "Movies & TV",
-  "Music",
-  "Sports",
-  "Animals",
-  "Things",
-  "Other",
+  "Brands", "People", "Places", "Movies & TV",
+  "Music", "Sports", "Animals", "Things", "Other",
 ];
 
-// ─── Payload builder ──────────────────────────────────────────────────────────
-
-function buildRoundPayload(round, isQuestioner) {
-  const isFinished = round.status === "finished";
-  const blanksVisible =
-    isQuestioner || isFinished || !round.hideBlanks || round.hintsRevealed > 0;
-
-  return {
-    category: round.category,
-    answer: isQuestioner || isFinished ? round.answer : undefined,
-    answerMasked: blanksVisible ? round.answerMasked : undefined,
-    hideBlanks: round.hideBlanks,
-    image: round.image,
-    guesses: round.guesses,
-    winners: round.winners,
-    winnerUsernames: round.winnerUsernames,
-    hintsRevealed: round.hintsRevealed,
-    status: round.status,
-  };
+function makeGameId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
 
-function buildScoreboard(game, state) {
-  const scoreboard = {};
-  for (const round of game.rounds) {
-    for (const winnerId of round.winners) {
-      if (!scoreboard[winnerId]) {
-        scoreboard[winnerId] = {
-          username: state.socketIdToUsername.get(winnerId) || null,
-          wins: 0,
-        };
-      }
-      scoreboard[winnerId].wins++;
-    }
-  }
-  return scoreboard;
+function parseRounds(rounds) {
+  if (!Array.isArray(rounds) || rounds.length === 0) return null;
+  const clean = rounds
+    .slice(0, 10)
+    .map((r) => {
+      if (!r || typeof r.answer !== "string") return null;
+      const answer = r.answer.trim().slice(0, 100);
+      if (!answer) return null;
+      const category =
+        typeof r.category === "string" && GAME_CATEGORIES.includes(r.category)
+          ? r.category
+          : "Other";
+      const image =
+        typeof r.image === "string" && r.image.startsWith("http")
+          ? r.image
+          : "";
+      if (!image) return null;
+      return {
+        category,
+        answer,
+        answerMasked: Array.from(answer).map((c) => (c === " " ? " " : "_")),
+        hideBlanks: r.hideBlanks === true,
+        image,
+        guesses: [],
+        winners: [],
+        winnerUsernames: [],
+        hintsRevealed: 0,
+        status: "active",
+      };
+    })
+    .filter(Boolean);
+  return clean.length > 0 ? clean : null;
 }
 
-function buildGameStatePayload(state, roomId, forSocketId) {
-  const game = state.roomGame.get(roomId);
-  if (!game) return { roomId, status: "idle" };
-
-  const isQuestioner = forSocketId === game.questionerId;
-  const round = game.rounds[game.currentRoundIndex] || null;
-
-  const turnOrderUsernames = {};
-  for (const socketId of game.turnOrder) {
-    turnOrderUsernames[socketId] =
-      state.socketIdToUsername.get(socketId) || null;
-  }
-
-  const currentTurnSocketId =
-    game.turnOrder.length > 0
-      ? game.turnOrder[game.currentTurnIndex % game.turnOrder.length]
-      : null;
-
-  return {
-    roomId,
-    status: game.status,
-    questionerId: game.questionerId,
-    questionerName: game.questionerName,
-    totalRounds: game.rounds.length,
-    currentRoundIndex: game.currentRoundIndex,
-    currentRound: round ? buildRoundPayload(round, isQuestioner) : null,
-    turnOrder: game.turnOrder,
-    turnOrderUsernames,
-    currentTurnIndex: game.currentTurnIndex,
-    currentTurnSocketId,
-    scoreboard: buildScoreboard(game, state),
-    startedAt: game.startedAt,
-  };
+function getOrCreateRoomGames(state, roomId) {
+  if (!state.roomGames.has(roomId)) state.roomGames.set(roomId, new Map());
+  return state.roomGames.get(roomId);
 }
-
-function emitGameStateTo(state, socket, roomId) {
-  socket.emit("game_state", buildGameStatePayload(state, roomId, socket.id));
-}
-
-function emitGameStateToRoom(io, state, roomId) {
-  const room = io.sockets.adapter.rooms.get(roomId);
-  if (!room) return;
-  for (const socketId of room) {
-    const s = io.sockets.sockets.get(socketId);
-    if (s)
-      s.emit("game_state", buildGameStatePayload(state, roomId, socketId));
-  }
-}
-
-// ─── Handlers ─────────────────────────────────────────────────────────────────
 
 function attachGameHandlers(io, state, socket) {
+  // ── Get state ──────────────────────────────────────────────────────────────
   socket.on("game_get", (data) => {
     const { roomId } = data || {};
     if (!roomId || typeof roomId !== "string") return;
@@ -106,84 +62,142 @@ function attachGameHandlers(io, state, socket) {
     emitGameStateTo(state, socket, roomId);
   });
 
-  // Anyone in the room can start a game (defines all rounds upfront).
-  socket.on("game_start", (data) => {
+  // ── Create a new game (creator stages their own rounds) ────────────────────
+  socket.on("game_create", (data) => {
     const { roomId, rounds } = data || {};
     if (!roomId || typeof roomId !== "string") return;
     if (!socket.rooms.has(roomId)) return;
-    if (!Array.isArray(rounds) || rounds.length === 0) return;
 
-    const cleanRounds = rounds
-      .slice(0, 10)
-      .map((r) => {
-        if (!r || typeof r.answer !== "string") return null;
-        const answer = r.answer.trim().slice(0, 100);
-        if (!answer) return null;
-        const category =
-          typeof r.category === "string" &&
-          GAME_CATEGORIES.includes(r.category)
-            ? r.category
-            : "Other";
-        const image =
-          typeof r.image === "string" && r.image.startsWith("http")
-            ? r.image
-            : "";
-        if (!image) return null;
-        return {
-          category,
-          answer,
-          answerMasked: Array.from(answer).map((c) =>
-            c === " " ? " " : "_"
-          ),
-          hideBlanks: r.hideBlanks === true,
-          image,
-          guesses: [],
-          winners: [],
-          winnerUsernames: [],
-          hintsRevealed: 0,
-          status: "active",
-        };
-      })
-      .filter(Boolean);
-
-    if (cleanRounds.length === 0) return;
-
-    const room = io.sockets.adapter.rooms.get(roomId);
-    const turnOrder = room
-      ? [...room].filter((id) => id !== socket.id)
-      : [];
+    const cleanRounds = parseRounds(rounds);
+    if (!cleanRounds) return;
 
     const username = state.socketIdToUsername.get(socket.id) || null;
+    const gameId = makeGameId();
 
-    state.roomGame.set(roomId, {
-      questionerId: socket.id,
-      questionerName: username,
-      rounds: cleanRounds,
-      currentRoundIndex: 0,
-      turnOrder,
-      currentTurnIndex: 0,
-      status: "active",
-      startedAt: Date.now(),
-    });
+    const game = {
+      id: gameId,
+      creatorId: socket.id,
+      questioners: [
+        {
+          socketId: socket.id,
+          username,
+          rounds: cleanRounds,
+          currentRoundIndex: 0,
+        },
+      ],
+      session: {
+        currentQuestionerIdx: 0,
+        currentGuesserIdx: 0,
+        participants: [],
+        status: "staging",
+        startedAt: null,
+      },
+    };
+
+    getOrCreateRoomGames(state, roomId).set(gameId, game);
+    emitGameStateToRoom(io, state, roomId);
+  });
+
+  // ── Add/replace your rounds in an existing game ────────────────────────────
+  socket.on("game_add_rounds", (data) => {
+    const { roomId, gameId, rounds } = data || {};
+    if (!roomId || typeof roomId !== "string") return;
+    if (!socket.rooms.has(roomId)) return;
+
+    const games = state.roomGames.get(roomId);
+    if (!games) return;
+    const game = games.get(gameId);
+    if (!game || game.session.status !== "staging") return;
+
+    const cleanRounds = parseRounds(rounds);
+    if (!cleanRounds) return;
+
+    const username = state.socketIdToUsername.get(socket.id) || null;
+    const existing = game.questioners.findIndex(
+      (q) => q.socketId === socket.id
+    );
+    if (existing !== -1) {
+      game.questioners[existing] = {
+        socketId: socket.id,
+        username,
+        rounds: cleanRounds,
+        currentRoundIndex: 0,
+      };
+    } else {
+      game.questioners.push({
+        socketId: socket.id,
+        username,
+        rounds: cleanRounds,
+        currentRoundIndex: 0,
+      });
+    }
 
     emitGameStateToRoom(io, state, roomId);
   });
 
-  socket.on("game_guess", (data) => {
-    const { roomId, guess } = data || {};
+  // ── Remove your rounds from a game (non-creators only) ────────────────────
+  socket.on("game_remove_rounds", (data) => {
+    const { roomId, gameId } = data || {};
     if (!roomId || typeof roomId !== "string") return;
     if (!socket.rooms.has(roomId)) return;
 
-    const game = state.roomGame.get(roomId);
-    if (!game || game.status !== "active") return;
+    const games = state.roomGames.get(roomId);
+    if (!games) return;
+    const game = games.get(gameId);
+    if (!game || game.session.status !== "staging") return;
+    if (socket.id === game.creatorId) return; // creator deletes the whole game instead
 
-    const round = game.rounds[game.currentRoundIndex];
+    const idx = game.questioners.findIndex((q) => q.socketId === socket.id);
+    if (idx !== -1) game.questioners.splice(idx, 1);
+
+    emitGameStateToRoom(io, state, roomId);
+  });
+
+  // ── Start the session (creator only) ──────────────────────────────────────
+  socket.on("session_start", (data) => {
+    const { roomId, gameId } = data || {};
+    if (!roomId || typeof roomId !== "string") return;
+    if (!socket.rooms.has(roomId)) return;
+
+    const games = state.roomGames.get(roomId);
+    if (!games) return;
+    const game = games.get(gameId);
+    if (!game || game.session.status !== "staging") return;
+    if (socket.id !== game.creatorId) return;
+    if (game.questioners.length === 0) return;
+
+    const room = io.sockets.adapter.rooms.get(roomId);
+    game.session.participants = room ? [...room] : [socket.id];
+    game.session.status = "active";
+    game.session.startedAt = Date.now();
+    game.session.currentQuestionerIdx = 0;
+    game.session.currentGuesserIdx = 0;
+
+    emitGameStateToRoom(io, state, roomId);
+  });
+
+  // ── Guess ──────────────────────────────────────────────────────────────────
+  socket.on("game_guess", (data) => {
+    const { roomId, gameId, guess } = data || {};
+    if (!roomId || typeof roomId !== "string") return;
+    if (!socket.rooms.has(roomId)) return;
+
+    const games = state.roomGames.get(roomId);
+    if (!games) return;
+    const game = games.get(gameId);
+    if (!game || game.session.status !== "active") return;
+
+    const questioner = getActiveQuestioner(game);
+    if (!questioner) return;
+
+    const round = questioner.rounds[questioner.currentRoundIndex];
     if (!round || round.status !== "active") return;
-    if (game.turnOrder.length === 0) return;
 
-    const currentPlayerId =
-      game.turnOrder[game.currentTurnIndex % game.turnOrder.length];
-    if (socket.id !== currentPlayerId) return;
+    const guessers = getGuessers(game);
+    if (guessers.length === 0) return;
+
+    const currentGuesser = guessers[game.session.currentGuesserIdx % guessers.length];
+    if (socket.id !== currentGuesser) return;
 
     const cleanGuess =
       typeof guess === "string" ? guess.trim().slice(0, 100) : "";
@@ -206,34 +220,32 @@ function attachGameHandlers(io, state, socket) {
       round.winnerUsernames.push({ socketId: socket.id, username });
     }
 
-    game.currentTurnIndex++;
+    game.session.currentGuesserIdx++;
 
-    // Auto-end round if every player has guessed correctly
-    if (
-      game.turnOrder.length > 0 &&
-      round.winners.length >= game.turnOrder.length
-    ) {
+    // Auto-end round when all guessers have guessed correctly
+    if (guessers.length > 0 && round.winners.length >= guessers.length) {
       round.status = "finished";
       round.answerMasked = Array.from(round.answer);
-      // Auto-end game if this was the last round
-      if (game.currentRoundIndex >= game.rounds.length - 1) {
-        game.status = "finished";
-      }
     }
 
     emitGameStateToRoom(io, state, roomId);
   });
 
+  // ── Reveal hint (current active questioner only) ───────────────────────────
   socket.on("game_hint", (data) => {
-    const { roomId } = data || {};
+    const { roomId, gameId } = data || {};
     if (!roomId || typeof roomId !== "string") return;
     if (!socket.rooms.has(roomId)) return;
 
-    const game = state.roomGame.get(roomId);
-    if (!game || game.status !== "active") return;
-    if (socket.id !== game.questionerId) return;
+    const games = state.roomGames.get(roomId);
+    if (!games) return;
+    const game = games.get(gameId);
+    if (!game || game.session.status !== "active") return;
 
-    const round = game.rounds[game.currentRoundIndex];
+    const questioner = getActiveQuestioner(game);
+    if (!questioner || questioner.socketId !== socket.id) return;
+
+    const round = questioner.rounds[questioner.currentRoundIndex];
     if (!round || round.status !== "active") return;
 
     const answerChars = Array.from(round.answer);
@@ -248,74 +260,43 @@ function attachGameHandlers(io, state, socket) {
     emitGameStateToRoom(io, state, roomId);
   });
 
+  // ── Skip current guesser's turn (active questioner or creator) ─────────────
   socket.on("game_skip_turn", (data) => {
-    const { roomId } = data || {};
+    const { roomId, gameId } = data || {};
     if (!roomId || typeof roomId !== "string") return;
     if (!socket.rooms.has(roomId)) return;
 
-    const game = state.roomGame.get(roomId);
-    if (!game || game.status !== "active") return;
-    if (socket.id !== game.questionerId) return;
+    const games = state.roomGames.get(roomId);
+    if (!games) return;
+    const game = games.get(gameId);
+    if (!game || game.session.status !== "active") return;
 
-    game.currentTurnIndex++;
+    const questioner = getActiveQuestioner(game);
+    if (!questioner) return;
+    if (socket.id !== questioner.socketId && socket.id !== game.creatorId)
+      return;
+
+    game.session.currentGuesserIdx++;
     emitGameStateToRoom(io, state, roomId);
   });
 
-  // Questioner ends the current round (reveals answer, shows results).
+  // ── End the current round (active questioner or creator) ──────────────────
   socket.on("game_end_round", (data) => {
-    const { roomId } = data || {};
+    const { roomId, gameId } = data || {};
     if (!roomId || typeof roomId !== "string") return;
     if (!socket.rooms.has(roomId)) return;
 
-    const game = state.roomGame.get(roomId);
-    if (!game || game.status !== "active") return;
-    if (socket.id !== game.questionerId) return;
+    const games = state.roomGames.get(roomId);
+    if (!games) return;
+    const game = games.get(gameId);
+    if (!game || game.session.status !== "active") return;
 
-    const round = game.rounds[game.currentRoundIndex];
-    if (!round) return;
+    const questioner = getActiveQuestioner(game);
+    if (!questioner) return;
+    if (socket.id !== questioner.socketId && socket.id !== game.creatorId)
+      return;
 
-    round.status = "finished";
-    round.answerMasked = Array.from(round.answer);
-
-    if (game.currentRoundIndex >= game.rounds.length - 1) {
-      game.status = "finished";
-    }
-
-    emitGameStateToRoom(io, state, roomId);
-  });
-
-  // Questioner advances to the next round.
-  socket.on("game_next_round", (data) => {
-    const { roomId } = data || {};
-    if (!roomId || typeof roomId !== "string") return;
-    if (!socket.rooms.has(roomId)) return;
-
-    const game = state.roomGame.get(roomId);
-    if (!game) return;
-    if (socket.id !== game.questionerId) return;
-
-    game.currentRoundIndex++;
-    game.currentTurnIndex = 0;
-
-    if (game.currentRoundIndex >= game.rounds.length) {
-      game.status = "finished";
-    }
-
-    emitGameStateToRoom(io, state, roomId);
-  });
-
-  // End entire game immediately.
-  socket.on("game_end", (data) => {
-    const { roomId } = data || {};
-    if (!roomId || typeof roomId !== "string") return;
-    if (!socket.rooms.has(roomId)) return;
-
-    const game = state.roomGame.get(roomId);
-    if (!game) return;
-    if (socket.id !== game.questionerId) return;
-
-    game.status = "finished";
-    const round = game.rounds[game.currentRoundIndex];
+    const round = questioner.rounds[questioner.currentRoundIndex];
     if (round) {
       round.status = "finished";
       round.answerMasked = Array.from(round.answer);
@@ -324,16 +305,88 @@ function attachGameHandlers(io, state, socket) {
     emitGameStateToRoom(io, state, roomId);
   });
 
-  socket.on("game_reset", (data) => {
-    const { roomId } = data || {};
+  // ── Advance to next round / next questioner (active questioner or creator) ──
+  socket.on("game_next_round", (data) => {
+    const { roomId, gameId } = data || {};
     if (!roomId || typeof roomId !== "string") return;
     if (!socket.rooms.has(roomId)) return;
 
-    const game = state.roomGame.get(roomId);
-    if (!game) return;
-    if (game.status === "active" && socket.id !== game.questionerId) return;
+    const games = state.roomGames.get(roomId);
+    if (!games) return;
+    const game = games.get(gameId);
+    if (!game || game.session.status !== "active") return;
 
-    state.roomGame.delete(roomId);
+    const questioner = getActiveQuestioner(game);
+    if (!questioner) return;
+    if (socket.id !== questioner.socketId && socket.id !== game.creatorId)
+      return;
+
+    questioner.currentRoundIndex++;
+    game.session.currentGuesserIdx = 0;
+
+    // If this questioner is done, find the next one with rounds remaining
+    if (questioner.currentRoundIndex >= questioner.rounds.length) {
+      let found = false;
+      for (let i = 1; i <= game.questioners.length; i++) {
+        const nextIdx =
+          (game.session.currentQuestionerIdx + i) % game.questioners.length;
+        if (
+          game.questioners[nextIdx].currentRoundIndex <
+          game.questioners[nextIdx].rounds.length
+        ) {
+          game.session.currentQuestionerIdx = nextIdx;
+          game.session.currentGuesserIdx = 0;
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        game.session.status = "finished";
+      }
+    }
+
+    emitGameStateToRoom(io, state, roomId);
+  });
+
+  // ── End the session (creator only) ────────────────────────────────────────
+  socket.on("session_end", (data) => {
+    const { roomId, gameId } = data || {};
+    if (!roomId || typeof roomId !== "string") return;
+    if (!socket.rooms.has(roomId)) return;
+
+    const games = state.roomGames.get(roomId);
+    if (!games) return;
+    const game = games.get(gameId);
+    if (!game) return;
+    if (socket.id !== game.creatorId) return;
+
+    game.session.status = "finished";
+    const questioner = getActiveQuestioner(game);
+    if (questioner) {
+      const round = questioner.rounds[questioner.currentRoundIndex];
+      if (round && round.status !== "finished") {
+        round.status = "finished";
+        round.answerMasked = Array.from(round.answer);
+      }
+    }
+
+    emitGameStateToRoom(io, state, roomId);
+  });
+
+  // ── Delete/reset a game (creator, or anyone if finished) ──────────────────
+  socket.on("game_reset", (data) => {
+    const { roomId, gameId } = data || {};
+    if (!roomId || typeof roomId !== "string") return;
+    if (!socket.rooms.has(roomId)) return;
+
+    const games = state.roomGames.get(roomId);
+    if (!games) return;
+    const game = games.get(gameId);
+    if (!game) return;
+    if (game.session.status === "active" && socket.id !== game.creatorId)
+      return;
+
+    games.delete(gameId);
     emitGameStateToRoom(io, state, roomId);
   });
 }

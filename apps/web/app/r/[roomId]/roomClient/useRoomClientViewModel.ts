@@ -281,16 +281,35 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
   const game = useGame({
     onGameState: room.onGameState,
     requestGameState: room.requestGameState,
-    startGame: room.startGame,
+    createGame: room.createGame,
+    addRounds: room.addRounds,
+    removeRounds: room.removeRounds,
+    startSession: room.startSession,
     submitGuess: room.submitGuess,
     revealHint: room.revealHint,
     skipTurn: room.skipTurn,
     endRound: room.endRound,
     nextRound: room.nextRound,
-    endGame: room.endGame,
+    endSession: room.endSession,
     resetGame: room.resetGame,
     mySocketId: userId,
   });
+
+  const gameProps = {
+    gameState: game.gameState,
+    mySocketId: userId,
+    createGame: game.createGame,
+    addRounds: game.addRounds,
+    removeRounds: game.removeRounds,
+    startSession: game.startSession,
+    submitGuess: game.submitGuess,
+    revealHint: game.revealHint,
+    skipTurn: game.skipTurn,
+    endRound: game.endRound,
+    nextRound: game.nextRound,
+    endSession: game.endSession,
+    resetGame: game.resetGame,
+  };
 
   const activitySidebarProps = {
     roomId,
@@ -303,31 +322,14 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
     chatText: playback.activity.chatText,
     setChatText: playback.activity.setChatText,
     handleSendChat: playback.activity.handleSendChat,
-    gameProps: {
-      gameState: game.gameState,
-      mySocketId: userId,
-      isMyTurn: game.isMyTurn,
-      amQuestioner: game.amQuestioner,
-      guessInput: game.guessInput,
-      setGuessInput: game.setGuessInput,
-      isSetupOpen: game.isSetupOpen,
-      setIsSetupOpen: game.setIsSetupOpen,
-      handleSubmitGuess: game.handleSubmitGuess,
-      handleStartGame: game.handleStartGame,
-      revealHint: game.revealHint,
-      skipTurn: game.skipTurn,
-      endRound: game.endRound,
-      nextRound: game.nextRound,
-      endGame: game.endGame,
-      resetGame: game.resetGame,
-    },
+    gameProps,
     onOpenGame: setOpenGameId,
   };
 
   const gameModalProps = {
     openGameId,
     onClose: () => setOpenGameId(null),
-    gameProps: activitySidebarProps.gameProps,
+    gameProps,
   };
 
   return {

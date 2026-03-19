@@ -17,8 +17,8 @@ function createSocketState() {
     // Wheel
     roomWheel: new Map(),
 
-    // Games
-    roomGame: new Map(),
+    // Games: Map<roomId, Map<gameId, game>>
+    roomGames: new Map(),
 
     // Playlists
     roomPlaylistActive: new Map(),

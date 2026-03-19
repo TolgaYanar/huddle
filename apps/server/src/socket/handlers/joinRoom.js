@@ -8,6 +8,7 @@ const { emitPlaylistStateTo } = require("../helpers/playlists");
 const { emitRoomStateToSocket } = require("../helpers/sync");
 const { emitChatHistoryToSocket } = require("../helpers/chat");
 const { emitActivityHistory } = require("../helpers/activity");
+const { emitGameStateTo } = require("../helpers/game");
 
 function attachJoinRoomHandler(io, state, socket, joinedRooms, deps) {
   socket.on("join_room", async (payload) => {
@@ -64,6 +65,7 @@ function attachJoinRoomHandler(io, state, socket, joinedRooms, deps) {
 
         // Always re-send room state so reconnecting clients can re-sync.
         emitRoomStateToSocket(state, socket, roomId);
+        emitGameStateTo(state, socket, roomId);
       } catch (err) {
         console.error("Failed to re-emit room snapshot", err);
       }
@@ -161,6 +163,7 @@ function attachJoinRoomHandler(io, state, socket, joinedRooms, deps) {
 
     // Send current room state to this new joiner.
     emitRoomStateToSocket(state, socket, roomId);
+    emitGameStateTo(state, socket, roomId);
 
     // Send recent chat history for this room.
     await emitChatHistoryToSocket(deps, state, socket, roomId);

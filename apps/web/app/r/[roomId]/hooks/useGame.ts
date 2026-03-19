@@ -1,42 +1,48 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { GameRoundInput, GameStateData } from "shared-logic";
 
 export function useGame({
   onGameState,
   requestGameState,
-  startGame,
+  createGame,
+  addRounds,
+  removeRounds,
+  startSession,
   submitGuess,
   revealHint,
   skipTurn,
   endRound,
   nextRound,
-  endGame,
+  endSession,
   resetGame,
   mySocketId,
 }: {
   onGameState: (cb: (data: GameStateData) => void) => () => void;
   requestGameState: () => void;
-  startGame: (rounds: GameRoundInput[]) => void;
-  submitGuess: (guess: string) => void;
-  revealHint: () => void;
-  skipTurn: () => void;
-  endRound: () => void;
-  nextRound: () => void;
-  endGame: () => void;
-  resetGame: () => void;
+  createGame: (rounds: GameRoundInput[]) => void;
+  addRounds: (gameId: string, rounds: GameRoundInput[]) => void;
+  removeRounds: (gameId: string) => void;
+  startSession: (gameId: string) => void;
+  submitGuess: (gameId: string, guess: string) => void;
+  revealHint: (gameId: string) => void;
+  skipTurn: (gameId: string) => void;
+  endRound: (gameId: string) => void;
+  nextRound: (gameId: string) => void;
+  endSession: (gameId: string) => void;
+  resetGame: (gameId: string) => void;
   mySocketId: string;
 }) {
   const [gameState, setGameState] = useState<GameStateData>({
     roomId: "",
-    status: "idle",
+    games: [],
   });
-  const [guessInput, setGuessInput] = useState("");
-  const [isSetupOpen, setIsSetupOpen] = useState(false);
   const mountedRef = useRef(true);
 
   useEffect(() => {
     mountedRef.current = true;
-    return () => { mountedRef.current = false; };
+    return () => {
+      mountedRef.current = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -47,52 +53,19 @@ export function useGame({
     return cleanup;
   }, [onGameState, requestGameState]);
 
-  // Reset guess input on turn change or round change
-  useEffect(() => {
-    setGuessInput("");
-  }, [gameState.currentTurnIndex, gameState.currentRoundIndex, gameState.status]);
-
-  const isMyTurn =
-    gameState.status === "active" &&
-    gameState.currentRound?.status === "active" &&
-    gameState.currentTurnSocketId === mySocketId;
-
-  const amQuestioner =
-    mySocketId !== "" && gameState.questionerId === mySocketId;
-
-  const handleSubmitGuess = useCallback(
-    (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!guessInput.trim()) return;
-      submitGuess(guessInput.trim());
-      setGuessInput("");
-    },
-    [guessInput, submitGuess],
-  );
-
-  const handleStartGame = useCallback(
-    (rounds: GameRoundInput[]) => {
-      startGame(rounds);
-      setIsSetupOpen(false);
-    },
-    [startGame],
-  );
-
   return {
     gameState,
-    guessInput,
-    setGuessInput,
-    isMyTurn,
-    amQuestioner,
-    isSetupOpen,
-    setIsSetupOpen,
-    handleSubmitGuess,
-    handleStartGame,
+    createGame,
+    addRounds,
+    removeRounds,
+    startSession,
+    submitGuess,
     revealHint,
     skipTurn,
     endRound,
     nextRound,
-    endGame,
+    endSession,
     resetGame,
+    mySocketId,
   };
 }

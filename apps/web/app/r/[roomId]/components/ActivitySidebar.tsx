@@ -61,9 +61,9 @@ export function ActivitySidebar(props: {
 
   const [activeTab, setActiveTab] = useState<Tab>("activity");
 
-  const hasActiveGame =
-    gameProps.gameState.status === "active" ||
-    gameProps.gameState.status === "finished";
+  const hasActiveGame = gameProps.gameState.games.some(
+    (g) => g.status === "active" || g.status === "finished",
+  );
 
   return (
     <aside className="backdrop-blur-md bg-white/5 rounded-2xl border border-white/10 flex flex-col overflow-hidden min-h-0 max-h-[calc(100vh-4rem-3rem)] lg:max-h-[calc(100vh-4rem-4rem)] lg:col-start-3 lg:row-start-1">
