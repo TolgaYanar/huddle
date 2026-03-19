@@ -170,7 +170,9 @@ export function useWebRTCPeers<MediaState>(
 
       pc.onconnectionstatechange = () => {
         const s = pc.connectionState;
-        if (s === "failed" || s === "disconnected" || s === "closed") {
+        // "disconnected" is transient — ICE can self-recover, so don't tear
+        // down the peer. Only close on permanent failure or explicit close.
+        if (s === "failed" || s === "closed") {
           closePeer(peerId);
         }
       };

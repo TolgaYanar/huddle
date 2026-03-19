@@ -4,7 +4,11 @@ export function syncTracksToPeer(
 ) {
   const localStream = ensureLocalStream();
   if (!localStream) return;
-  const localTracks = localStream.getTracks();
+  // Skip tracks that have already ended (e.g. screen share stopped by the
+  // browser before React state cleanup has run).
+  const localTracks = localStream.getTracks().filter(
+    (t) => t.readyState !== "ended",
+  );
 
   // Remove senders whose tracks are no longer present.
   for (const sender of pc.getSenders()) {
@@ -31,7 +35,7 @@ export function syncTracksToPeer(
       if (!sender) {
         pc.addTrack(track, localStream);
       } else if (sender.track?.id !== track.id) {
-        sender.replaceTrack(track);
+        sender.replaceTrack(track).catch(() => {});
       }
     }
 
@@ -40,7 +44,7 @@ export function syncTracksToPeer(
       if (!sender) {
         pc.addTrack(track, localStream);
       } else if (sender.track?.id !== track.id) {
-        sender.replaceTrack(track);
+        sender.replaceTrack(track).catch(() => {});
       }
     }
   }
