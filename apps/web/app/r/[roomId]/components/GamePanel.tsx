@@ -426,7 +426,7 @@ function RoundSetupForm({
       <RoundEditor
         key={activeIdx}
         index={activeIdx}
-        round={rounds[activeIdx]}
+        round={rounds[activeIdx]!}
         onChange={(r) => updateRound(activeIdx, r)}
         onRemove={() => removeRound(activeIdx)}
         canRemove={rounds.length > 1}
