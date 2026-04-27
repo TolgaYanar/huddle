@@ -21,6 +21,12 @@ function createSocketState() {
     // Games: Map<roomId, Map<gameId, game>>
     roomGames: new Map(),
 
+    // Cup Spider games: Map<roomId, Map<gameId, cupGame>>
+    roomCupGames: new Map(),
+
+    // Per-cup-game turn timer handles: Map<gameId, Timeout>
+    cupGameTurnTimers: new Map(),
+
     // Playlists
     roomPlaylistActive: new Map(),
 

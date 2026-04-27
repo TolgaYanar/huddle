@@ -288,6 +288,173 @@ export interface GameStateData {
   games: GameData[];
 }
 
+// ── Cup Spider game ──────────────────────────────────────────────────────────
+
+export type CupGameStatus = "lobby" | "placing" | "playing" | "finished";
+
+/**
+ * The 5 good cards reward the drawer; the 5 bad cards punish them. The deck is
+ * sampled uniformly random — no depletion, no luck balancing — so every draw
+ * is the same coin flip even after a long streak.
+ */
+export type CupGameCardKind =
+  // Bad: drawer takes consequences immediately
+  | "flipPlusOne"
+  | "flipPlusTwo"
+  | "flipRow"
+  | "flipBlock"
+  | "skipYourTurn"
+  // Good: drawer chooses target / cup / spider
+  | "forceFlip"
+  | "stealTurn"
+  | "peek"
+  | "relocate"
+  | "shield";
+
+export type CupGameCardCategory = "good" | "bad";
+
+/**
+ * When a card needs more input from the drawer (pick a cup, pick a target,
+ * etc.), the server records `pendingCard` so the UI knows what selector to
+ * show. Resolved via a single `cup_game_resolve_card` event whose payload
+ * shape depends on `awaiting`.
+ */
+export type CupGameAwaiting =
+  | "pickCup" // flipPlusOne / flipPlusTwo / peek
+  | "pickRow" // flipRow
+  | "pickBlock" // flipBlock — index of top-left cell of a 2×2 block
+  | "pickTarget" // stealTurn / forceFlip step 1
+  | "pickTargetCup" // forceFlip step 2 (cup the target will flip)
+  | "pickRelocateSrc" // relocate step 1 (drawer picks one of their own spiders)
+  | "pickRelocateDst"; // relocate step 2 (empty cup destination)
+
+export interface CupGamePendingCard {
+  kind: CupGameCardKind;
+  category: CupGameCardCategory;
+  drawerSocketId: string;
+  awaiting: CupGameAwaiting;
+  /** Forced flips remaining after the next pick (for flipPlusTwo). */
+  remainingFlips?: number;
+  /** Locked-in target after step 1 of forceFlip. */
+  targetSocketId?: string;
+  /** Locked-in source cup after step 1 of relocate. */
+  srcCupIndex?: number;
+}
+
+export interface CupGameCup {
+  index: number;
+  status: "hidden" | "flipped";
+  /** Only set once flipped. */
+  revealedAs?: "empty" | "spider";
+  /** Only set when revealedAs === "spider" and the cup is flipped. */
+  ownerSocketId?: string;
+  /**
+   * Server only sends `mineSpider: true` to the owner of an unflipped spider
+   * cup so they can remember their own placements without leaking others'.
+   */
+  mineSpider?: boolean;
+}
+
+export interface CupGamePlayer {
+  socketId: string;
+  username: string | null;
+  lives: number;
+  /** True when this player is out of lives. */
+  eliminated: boolean;
+  /** During placing: spiders the player has placed so far. */
+  spidersPlaced: number;
+  /** Max spiders this player is allowed to place (= startingLives at game start). */
+  spiderBudget: number;
+  /** True once the player has locked their placement and is ready to play. */
+  isPlacementLocked: boolean;
+  /** True when the player still has at least one shield charge stockpiled. */
+  hasShield: boolean;
+  /** True if the player's next turn will be auto-skipped (from skipYourTurn / stealTurn). */
+  skipNextTurn: boolean;
+  /** Joined the room mid-game; allowed to spectate but not to play this round. */
+  isSpectator: boolean;
+}
+
+export interface CupGameConfig {
+  /** Starting lives. Also the max number of spiders a player can place. */
+  startingLives: number;
+  rows: number;
+  cols: number;
+  /** Per-turn timer in seconds; null = no timer. */
+  turnTimerSeconds: number | null;
+}
+
+export interface CupGameSession {
+  status: CupGameStatus;
+  /** Order of socketIds for turn rotation; only includes alive non-spectator players. */
+  turnOrder: string[];
+  currentTurnSocketId: string | null;
+  pendingCard: CupGamePendingCard | null;
+  /** Absolute server-time ms at which the current turn auto-ends. */
+  turnDeadline: number | null;
+  /** Server clock used by clients to estimate offset (same scheme as Guess It). */
+  serverNow: number;
+  /** Winner socketId once status === "finished" (null on draw — multiple alive at all-spiders-found). */
+  winnerSocketId: string | null;
+  /** Set when the game ended without a single winner — list of socketIds tied for the most lives. */
+  drawWinnerSocketIds?: string[];
+  /** Bumped every time the server publishes a new flip/draw event so clients can play one-shot effects without diffing arrays. */
+  effectSeq: number;
+  /** Most recent visible event for clients to animate. Replaced every state push. */
+  lastEvent: CupGameEvent | null;
+}
+
+/** One-shot side effect a client may want to play (flip animation, hurt sound, etc.). */
+export type CupGameEvent =
+  | { kind: "flip"; cupIndex: number; revealedAs: "empty" | "spider"; flipperSocketId: string; ownerSocketId?: string; hit: boolean; shielded: boolean }
+  | { kind: "draw"; drawerSocketId: string; cardKind: CupGameCardKind; category: CupGameCardCategory }
+  | { kind: "shield"; drawerSocketId: string }
+  | { kind: "skip"; targetSocketId: string; reason: "skipYourTurn" | "stealTurn" | "scheduled" }
+  | { kind: "relocate"; ownerSocketId: string; fromCupIndex: number; toCupIndex: number }
+  | { kind: "peek"; drawerSocketId: string; cupIndex: number; revealedAs: "empty" | "spider" }
+  | { kind: "eliminate"; socketId: string }
+  | { kind: "win"; socketId: string }
+  | { kind: "draw_end"; reason: "all_spiders_found" };
+
+export interface CupGameData {
+  gameId: string;
+  creatorSocketId: string;
+  creatorName: string | null;
+  config: CupGameConfig;
+  cups: CupGameCup[];
+  players: CupGamePlayer[];
+  session: CupGameSession;
+  startedAt: number | null;
+  endedAt: number | null;
+}
+
+export interface CupGameStateData {
+  roomId: string;
+  games: CupGameData[];
+}
+
+export interface CreateCupGameOptions {
+  startingLives?: number;
+  /** "compact" | "standard" | "large" — server picks rows×cols accordingly. */
+  gridSize?: "compact" | "standard" | "large";
+  turnTimerSeconds?: number | null;
+}
+
+/**
+ * Payload shape for the unified `cup_game_resolve_card` event. The server
+ * cross-checks against `pendingCard.awaiting` and ignores any unexpected
+ * fields. Sending an extra payload keeps the wire-format simple at the cost of
+ * a slightly looser schema — that's the right tradeoff here.
+ */
+export interface CupGameResolvePayload {
+  cupIndex?: number;
+  rowIndex?: number;
+  blockTopLeftCupIndex?: number;
+  targetSocketId?: string;
+  fromCupIndex?: number;
+  toCupIndex?: number;
+}
+
 export type TimerStatus = "idle" | "running" | "paused" | "finished";
 
 export interface TimerStateData {

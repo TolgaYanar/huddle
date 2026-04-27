@@ -1,0 +1,77 @@
+/* Cup flip — quick lift + horizontal half-rotate, then settle. */
+@keyframes cup-flip-animate {
+  0% { transform: translateY(0) rotateX(0); }
+  35% { transform: translateY(-8px) rotateX(70deg) scale(1.08); }
+  70% { transform: translateY(-4px) rotateX(0deg) scale(1.06); }
+  100% { transform: translateY(0) rotateX(0) scale(1); }
+}
+.cup-flip-animate {
+  animation: cup-flip-animate 380ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Hit shake — fast horizontal tremor when a spider was found here. */
+@keyframes cup-hit-shake {
+  0%, 100% { transform: translate(0, 0); }
+  10% { transform: translate(-4px, 0); }
+  25% { transform: translate(4px, 1px); }
+  40% { transform: translate(-3px, -1px); }
+  55% { transform: translate(3px, 0); }
+  70% { transform: translate(-2px, 1px); }
+  85% { transform: translate(2px, 0); }
+}
+.cup-hit-shake { animation: cup-hit-shake 420ms ease-in-out; }
+
+/* Shielded — gentle blue pulse instead of red shake. */
+@keyframes cup-shielded {
+  0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.6); }
+  100% { box-shadow: 0 0 0 16px rgba(59, 130, 246, 0); }
+}
+.cup-shielded { animation: cup-shielded 600ms ease-out; }
+
+/* Heart-pop — burst on the avatar when the player took a hit. */
+@keyframes cup-heart-pop {
+  0% { transform: scale(0.5); opacity: 0; }
+  20% { transform: scale(1.2); opacity: 1; }
+  60% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(0.7); opacity: 0; }
+}
+.cup-heart-pop { animation: cup-heart-pop 700ms ease-out forwards; }
+
+/* Screen shake — used on the main panel when the local player gets hurt. */
+@keyframes cup-panel-shake {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(-3px, 1px); }
+  40% { transform: translate(3px, -1px); }
+  60% { transform: translate(-2px, 1px); }
+  80% { transform: translate(2px, 0); }
+}
+.cup-panel-shake { animation: cup-panel-shake 380ms ease-in-out; }
+
+/* Card draw — flip a card in. */
+@keyframes cup-card-flip-in {
+  0% { transform: rotateY(180deg) scale(0.8); opacity: 0; }
+  60% { transform: rotateY(0) scale(1.05); opacity: 1; }
+  100% { transform: rotateY(0) scale(1); opacity: 1; }
+}
+.cup-card-flip-in {
+  animation: cup-card-flip-in 520ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  transform-style: preserve-3d;
+  perspective: 800px;
+}
+
+/* Card hover wiggle while the deck is interactable. */
+@keyframes cup-deck-bob {
+  0%, 100% { transform: translateY(0) rotate(-1deg); }
+  50% { transform: translateY(-2px) rotate(1deg); }
+}
+.cup-deck-bob { animation: cup-deck-bob 2200ms ease-in-out infinite; }
+
+/* Spider scuttle on flipped cup — shimmy the icon a couple of times. */
+@keyframes cup-spider-scuttle {
+  0% { transform: translate(-6px, 0) rotate(-8deg); }
+  25% { transform: translate(4px, -1px) rotate(6deg); }
+  50% { transform: translate(-3px, 1px) rotate(-6deg); }
+  75% { transform: translate(2px, -1px) rotate(4deg); }
+  100% { transform: translate(0, 0) rotate(0); }
+}
+.cup-spider-scuttle { animation: cup-spider-scuttle 600ms ease-in-out; }

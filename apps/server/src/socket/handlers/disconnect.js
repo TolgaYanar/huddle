@@ -1,5 +1,6 @@
 const { emitRoomUsersToRoom } = require("../helpers/users");
 const { cleanupDisconnectFromGames } = require("../helpers/gameTimer");
+const { cleanupDisconnectFromCupGames } = require("../helpers/cupGame");
 
 function attachDisconnectHandler(io, state, socket, joinedRooms, deps) {
   socket.on("disconnect", () => {
@@ -29,6 +30,11 @@ function attachDisconnectHandler(io, state, socket, joinedRooms, deps) {
         cleanupDisconnectFromGames(io, state, roomId, socket.id);
       } catch (err) {
         console.error("Failed to clean up games on disconnect:", err.message);
+      }
+      try {
+        cleanupDisconnectFromCupGames(io, state, roomId, socket.id);
+      } catch (err) {
+        console.error("Failed to clean up cup games on disconnect:", err.message);
       }
 
       socket.to(roomId).emit("user_left", { socketId: socket.id, username });

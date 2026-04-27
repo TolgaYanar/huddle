@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import type { GamePanelProps } from "./GamePanel";
+import type { CupGamePanelProps } from "./cupGame/CupGamePanel";
 
 const AVAILABLE_GAMES: {
   id: string;
@@ -15,6 +16,13 @@ const AVAILABLE_GAMES: {
     description:
       "Post clue images, others guess the answer turn by turn. Reveal hints letter by letter.",
     emoji: "🔍",
+  },
+  {
+    id: "cup-spider",
+    name: "Cup Spider",
+    description:
+      "Hide spiders under cups, take turns flipping. Push your luck on cards — 5 good, 5 bad.",
+    emoji: "🥤",
   },
 ];
 
@@ -84,6 +92,7 @@ export function ActivitySidebar(props: {
   addReaction: (messageId: string, emoji: string) => void;
 
   gameProps: GamePanelProps;
+  cupGameProps: CupGamePanelProps;
   onOpenGame: (gameId: string) => void;
 }) {
   const {
@@ -100,6 +109,7 @@ export function ActivitySidebar(props: {
     reactions,
     addReaction,
     gameProps,
+    cupGameProps,
     onOpenGame,
   } = props;
 
@@ -108,6 +118,12 @@ export function ActivitySidebar(props: {
 
   const hasActiveGame = gameProps.gameState.games.some(
     (g) => g.status === "active" || g.status === "finished",
+  );
+  const hasActiveCupGame = cupGameProps.cupGameState.games.some(
+    (g) =>
+      g.session.status === "playing" ||
+      g.session.status === "placing" ||
+      g.session.status === "finished",
   );
 
   return (
@@ -360,6 +376,11 @@ export function ActivitySidebar(props: {
                       </span>
                       {g.id === "guess-it" && hasActiveGame && (
                         <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-sky-600/30 text-sky-300 border border-sky-600/30">
+                          Active
+                        </span>
+                      )}
+                      {g.id === "cup-spider" && hasActiveCupGame && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-fuchsia-600/30 text-fuchsia-300 border border-fuchsia-600/30">
                           Active
                         </span>
                       )}

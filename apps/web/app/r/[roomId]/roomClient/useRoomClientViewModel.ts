@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRoom } from "shared-logic";
 import { useGame } from "../hooks/useGame";
+import { useCupGame } from "../hooks/useCupGame";
 import {
   useFullscreen,
   usePushToTalkBinding,
@@ -381,6 +382,41 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
     resetGame: game.resetGame,
   };
 
+  const cupGame = useCupGame({
+    socket: room.socket as unknown as Parameters<typeof useCupGame>[0]["socket"],
+    onCupGameState: room.onCupGameState,
+    requestCupGameState: room.requestCupGameState,
+    createCupGame: room.createCupGame,
+    updateCupGameConfig: room.updateCupGameConfig,
+    startCupGamePlacement: room.startCupGamePlacement,
+    toggleCupGameSpider: room.toggleCupGameSpider,
+    lockCupGamePlacement: room.lockCupGamePlacement,
+    unlockCupGamePlacement: room.unlockCupGamePlacement,
+    flipCup: room.flipCup,
+    drawCupGameCard: room.drawCupGameCard,
+    resolveCupGameCard: room.resolveCupGameCard,
+    cancelCupGameCard: room.cancelCupGameCard,
+    resetCupGame: room.resetCupGame,
+    mySocketId: room.socket?.id || userId,
+  });
+
+  const cupGameProps = {
+    cupGameState: cupGame.cupGameState,
+    mySocketId: room.socket?.id || userId,
+    isRoomHost: roomState.hostId === userId,
+    createCupGame: cupGame.createCupGame,
+    updateCupGameConfig: cupGame.updateCupGameConfig,
+    startCupGamePlacement: cupGame.startCupGamePlacement,
+    toggleCupGameSpider: cupGame.toggleCupGameSpider,
+    lockCupGamePlacement: cupGame.lockCupGamePlacement,
+    unlockCupGamePlacement: cupGame.unlockCupGamePlacement,
+    flipCup: cupGame.flipCup,
+    drawCupGameCard: cupGame.drawCupGameCard,
+    resolveCupGameCard: cupGame.resolveCupGameCard,
+    cancelCupGameCard: cupGame.cancelCupGameCard,
+    resetCupGame: cupGame.resetCupGame,
+  };
+
   const activitySidebarProps = {
     roomId,
     userId,
@@ -396,6 +432,7 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
     reactions: playback.activity.reactions,
     addReaction: playback.activity.addReaction,
     gameProps,
+    cupGameProps,
     onOpenGame: setOpenGameId,
   };
 
@@ -403,6 +440,7 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
     openGameId,
     onClose: () => setOpenGameId(null),
     gameProps,
+    cupGameProps,
   };
 
   const reconnectBannerProps = {

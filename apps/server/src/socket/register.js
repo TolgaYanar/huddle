@@ -18,6 +18,7 @@ const { attachActivityHandlers } = require("./handlers/activity");
 const { attachSyncHandlers } = require("./handlers/syncVideo");
 const { attachDisconnectHandler } = require("./handlers/disconnect");
 const { attachGameHandlers } = require("./handlers/game");
+const { attachCupGameHandlers } = require("./handlers/cupGame");
 const { attachUsernameHandlers } = require("./handlers/username");
 const { attachReactionHandlers } = require("./handlers/reactions");
 
@@ -65,6 +66,7 @@ function registerSocket(io, deps) {
     attachSyncHandlers(io, state, socket, deps);
 
     attachGameHandlers(io, state, socket);
+    attachCupGameHandlers(io, state, socket);
     attachUsernameHandlers(io, state, socket);
     attachReactionHandlers(io, state, socket);
 

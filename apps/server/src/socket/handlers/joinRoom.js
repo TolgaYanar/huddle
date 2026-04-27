@@ -10,6 +10,10 @@ const { emitRoomStateToSocket, restoreRoomStateFromDB } = require("../helpers/sy
 const { emitChatHistoryToSocket } = require("../helpers/chat");
 const { emitActivityHistory } = require("../helpers/activity");
 const { emitGameStateTo } = require("../helpers/game");
+const {
+  emitCupGameStateTo,
+  ensurePlayer: ensureCupGamePlayer,
+} = require("../helpers/cupGame");
 
 function attachJoinRoomHandler(io, state, socket, joinedRooms, deps) {
   socket.on("join_room", async (payload) => {
@@ -91,6 +95,17 @@ function attachJoinRoomHandler(io, state, socket, joinedRooms, deps) {
         }
 
         emitGameStateTo(state, socket, roomId);
+
+        // Likewise for cup-spider games — late joiners enter as spectators
+        // mid-session, but get a fresh seat in any pre-start lobby.
+        const cupGamesOnRejoin = state.roomCupGames.get(roomId);
+        if (cupGamesOnRejoin) {
+          const username = state.socketIdToUsername.get(socket.id) || null;
+          for (const game of cupGamesOnRejoin.values()) {
+            ensureCupGamePlayer(game, socket.id, username);
+          }
+        }
+        emitCupGameStateTo(state, socket, roomId);
       } catch (err) {
         console.error("Failed to re-emit room snapshot", err);
       }
@@ -210,6 +225,16 @@ function attachJoinRoomHandler(io, state, socket, joinedRooms, deps) {
     }
 
     emitGameStateTo(state, socket, roomId);
+
+    // Same treatment for cup-spider games on a fresh join.
+    const cupGamesOnJoin = state.roomCupGames.get(roomId);
+    if (cupGamesOnJoin) {
+      const username = state.socketIdToUsername.get(socket.id) || null;
+      for (const game of cupGamesOnJoin.values()) {
+        ensureCupGamePlayer(game, socket.id, username);
+      }
+    }
+    emitCupGameStateTo(state, socket, roomId);
 
     // Send recent chat history for this room.
     await emitChatHistoryToSocket(deps, state, socket, roomId);

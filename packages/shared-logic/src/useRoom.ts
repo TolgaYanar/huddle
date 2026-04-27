@@ -5,6 +5,7 @@ import { SERVER_URL } from "./serverUrl";
 import type {
   ActivityHistoryData,
   ChatHistoryData,
+  CupGameStateData,
   GameStateData,
   PlaylistStateData,
   RoomPasswordRequiredData,
@@ -17,6 +18,7 @@ import type {
 } from "./types";
 import { useActivityApi } from "./useRoom/activity";
 import { useChatApi } from "./useRoom/chat";
+import { useCupGameApi } from "./useRoom/cupGame";
 import { useGameApi } from "./useRoom/game";
 import { usePlaylistsApi } from "./useRoom/playlists";
 import { type PendingSyncEvent, useSyncApi } from "./useRoom/sync";
@@ -46,6 +48,7 @@ export const useRoom = (roomId: string, userId: string) => {
   const latestWheelSpunRef = useRef<WheelSpunData | null>(null);
   const latestPlaylistStateRef = useRef<PlaylistStateData | null>(null);
   const latestGameStateRef = useRef<GameStateData | null>(null);
+  const latestCupGameStateRef = useRef<CupGameStateData | null>(null);
   const latestTimerStateRef = useRef<TimerStateData | null>(null);
 
   const pendingSyncEventsRef = useRef<PendingSyncEvent[]>([]);
@@ -82,6 +85,7 @@ export const useRoom = (roomId: string, userId: string) => {
       latestWheelSpunRef.current = null;
       latestPlaylistStateRef.current = null;
       latestGameStateRef.current = null;
+      latestCupGameStateRef.current = null;
       latestTimerStateRef.current = null;
     };
 
@@ -129,6 +133,10 @@ export const useRoom = (roomId: string, userId: string) => {
       latestGameStateRef.current = data;
     };
 
+    const handleCupGameState = (data: CupGameStateData) => {
+      latestCupGameStateRef.current = data;
+    };
+
     const handleTimerState = (data: TimerStateData) => {
       latestTimerStateRef.current = data;
     };
@@ -144,6 +152,7 @@ export const useRoom = (roomId: string, userId: string) => {
     socket.on("wheel_spun", handleWheelSpun);
     socket.on("playlist_state", handlePlaylistState);
     socket.on("game_state", handleGameState);
+    socket.on("cup_game_state", handleCupGameState);
     socket.on("timer_state", handleTimerState);
 
     socket.on("connect_error", (err) => {
@@ -232,6 +241,7 @@ export const useRoom = (roomId: string, userId: string) => {
       socket.off("wheel_spun", handleWheelSpun);
       socket.off("playlist_state", handlePlaylistState);
       socket.off("game_state", handleGameState);
+      socket.off("cup_game_state", handleCupGameState);
       socket.off("timer_state", handleTimerState);
 
       // Best-effort: tell server we left the room so others update immediately.
@@ -293,6 +303,12 @@ export const useRoom = (roomId: string, userId: string) => {
     latestGameStateRef,
   });
 
+  const cupGameApi = useCupGameApi({
+    roomId,
+    socketRef,
+    latestCupGameStateRef,
+  });
+
   const timerApi = useTimerApi({
     roomId,
     socketRef,
@@ -322,6 +338,7 @@ export const useRoom = (roomId: string, userId: string) => {
     ...webrtcApi,
     ...playlistsApi,
     ...gameApi,
+    ...cupGameApi,
     ...timerApi,
     socket: socketRef.current,
   };

@@ -4,24 +4,42 @@ import React from "react";
 
 import { Modal } from "../../../components/Modal";
 import { GamePanel, type GamePanelProps } from "./GamePanel";
+import { CupGamePanel, type CupGamePanelProps } from "./cupGame/CupGamePanel";
 
 const GAME_TITLES: Record<string, string> = {
   "guess-it": "Guess It!",
+  "cup-spider": "Cup Spider",
+};
+
+const GAME_EMOJIS: Record<string, string> = {
+  "guess-it": "🎮",
+  "cup-spider": "🥤",
 };
 
 export function GameModal({
   openGameId,
   onClose,
   gameProps,
+  cupGameProps,
 }: {
   openGameId: string | null;
   onClose: () => void;
   gameProps: GamePanelProps;
+  cupGameProps: CupGamePanelProps;
 }) {
   if (!openGameId) return null;
 
   const title = GAME_TITLES[openGameId] ?? "Game";
+  const emoji = GAME_EMOJIS[openGameId] ?? "🎮";
   const titleId = "game-modal-title";
+
+  const guessActive = gameProps.gameState.games.some((g) => g.status === "active");
+  const cupActive = cupGameProps.cupGameState.games.some(
+    (g) => g.session.status === "playing" || g.session.status === "placing",
+  );
+  const showActiveBadge =
+    (openGameId === "guess-it" && guessActive) ||
+    (openGameId === "cup-spider" && cupActive);
 
   return (
     <Modal
@@ -34,13 +52,13 @@ export function GameModal({
       <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 shrink-0">
         <div className="flex items-center gap-3">
           <span className="text-2xl" aria-hidden>
-            🎮
+            {emoji}
           </span>
           <div>
             <h2 id={titleId} className="text-lg font-bold text-slate-100">
               {title}
             </h2>
-            {gameProps.gameState.games.some((g) => g.status === "active") && (
+            {showActiveBadge && (
               <p className="text-xs text-sky-400 mt-0.5">Game in progress</p>
             )}
           </div>
@@ -58,6 +76,7 @@ export function GameModal({
       {/* Content */}
       <div className="flex-1 min-h-0 overflow-y-auto p-6">
         {openGameId === "guess-it" && <GamePanel {...gameProps} />}
+        {openGameId === "cup-spider" && <CupGamePanel {...cupGameProps} />}
       </div>
     </Modal>
   );
