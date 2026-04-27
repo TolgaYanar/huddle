@@ -13,8 +13,10 @@ function attachChatHandlers(io, state, socket, deps, isSocketInRoom) {
   socket.on("request_chat_history", async (rawRoom) => {
     const roomId = normalizeRoomId(rawRoom);
     if (!roomId) return;
-    // Chat is private to room members.
-    if (!isSocketInRoom(roomId, socket.id)) return;
+    // No strict membership check — clients (incl. the netflix-party
+    // extension) emit this immediately after join_room, which awaits a
+    // DB load before actually joining. The previous strict guard raced
+    // and returned an empty history.
     await emitChatHistoryToSocket(deps, state, socket, roomId);
   });
 

@@ -10,8 +10,12 @@ function attachSyncHandlers(io, state, socket, deps) {
   socket.on("request_room_state", (rawRoom) => {
     const roomId = normalizeRoomId(rawRoom);
     if (!roomId) return;
-    // Only members of a room may read its current playback state.
-    if (!socket.rooms.has(roomId)) return;
+    // No membership guard here: clients commonly emit join_room and
+    // request_room_state back-to-back on connect, and join_room awaits a
+    // DB load before socket.join() actually runs. A strict membership
+    // check would race against that and silently drop the request.
+    // Room state (current video URL + timestamp) is also low-sensitivity;
+    // the room password is the real privacy gate for future events.
     emitRoomStateToSocket(state, socket, roomId);
   });
 
