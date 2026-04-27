@@ -36,7 +36,11 @@ export function SettingsMenu({
   return (
     <div className="relative" ref={ref}>
       <button
+        type="button"
         onClick={() => setOpen((v) => !v)}
+        aria-haspopup="dialog"
+        aria-expanded={open ? "true" : "false"}
+        aria-label="Player settings"
         className="h-9 w-9 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-slate-200 transition-colors"
         title="Settings"
       >
@@ -50,6 +54,7 @@ export function SettingsMenu({
           </div>
 
           <button
+            type="button"
             onClick={() => {
               onSeek(Math.max(0, currentTime - 5));
               setOpen(false);
@@ -60,6 +65,7 @@ export function SettingsMenu({
             ⏪ Back 5 seconds
           </button>
           <button
+            type="button"
             onClick={() => {
               onSeek(Math.min(duration || Infinity, currentTime + 5));
               setOpen(false);
@@ -70,6 +76,7 @@ export function SettingsMenu({
             ⏩ Forward 5 seconds
           </button>
           <button
+            type="button"
             onClick={() => {
               onSeek(0);
               setOpen(false);

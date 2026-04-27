@@ -29,6 +29,7 @@ export function WaitingToSync(props: {
 
       <div className="flex flex-col gap-3">
         <button
+          type="button"
           onClick={onStartCountdownSync}
           className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-medium px-6 py-3 rounded-lg transition-colors"
         >
@@ -37,6 +38,7 @@ export function WaitingToSync(props: {
         </button>
 
         <button
+          type="button"
           onClick={onOpenNetflix}
           className="flex items-center gap-2 text-zinc-400 hover:text-white text-sm transition-colors"
         >

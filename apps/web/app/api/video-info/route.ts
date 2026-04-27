@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 
+import { createRouteRateLimiter } from "../_lib/rateLimit";
+import { extractYouTubeVideoId } from "../_lib/youtube";
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const limiter = createRouteRateLimiter({ windowMs: 60_000, max: 60 });
+const MAX_URL_LENGTH = 2048;
 
 type VideoInfoResponse =
   | {
@@ -19,45 +25,6 @@ type VideoInfoResponse =
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null;
-}
-
-// Parse YouTube video ID from various URL formats
-function extractYouTubeVideoId(url: string): string | null {
-  try {
-    const urlObj = new URL(url);
-
-    // youtu.be/VIDEO_ID
-    if (urlObj.hostname === "youtu.be") {
-      return urlObj.pathname.slice(1).split(/[?&#]/)[0] || null;
-    }
-
-    // youtube.com/watch?v=VIDEO_ID
-    if (urlObj.hostname.includes("youtube.com")) {
-      // /watch?v=VIDEO_ID
-      const vParam = urlObj.searchParams.get("v");
-      if (vParam) return vParam;
-
-      // /embed/VIDEO_ID
-      const embedMatch = urlObj.pathname.match(/\/embed\/([^/?&#]+)/);
-      if (embedMatch) return embedMatch[1] ?? null;
-
-      // /v/VIDEO_ID
-      const vMatch = urlObj.pathname.match(/\/v\/([^/?&#]+)/);
-      if (vMatch) return vMatch[1] ?? null;
-
-      // /shorts/VIDEO_ID
-      const shortsMatch = urlObj.pathname.match(/\/shorts\/([^/?&#]+)/);
-      if (shortsMatch) return shortsMatch[1] ?? null;
-
-      // /live/VIDEO_ID
-      const liveMatch = urlObj.pathname.match(/\/live\/([^/?&#]+)/);
-      if (liveMatch) return liveMatch[1] ?? null;
-    }
-
-    return null;
-  } catch {
-    return null;
-  }
 }
 
 // Extract Twitch channel/video info from URL
@@ -370,8 +337,11 @@ async function getKickInfo(channel: string): Promise<VideoInfoResponse> {
 }
 
 export async function GET(req: Request) {
+  const r = limiter(req);
+  if (!r.allowed) return r.response;
+
   const { searchParams } = new URL(req.url);
-  const url = (searchParams.get("url") ?? "").trim();
+  const url = (searchParams.get("url") ?? "").trim().slice(0, MAX_URL_LENGTH);
 
   if (!url) {
     return NextResponse.json<VideoInfoResponse>(

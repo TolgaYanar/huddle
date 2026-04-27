@@ -94,6 +94,8 @@ export function DeviceControls(props: {
         <button
           type="button"
           onClick={() => setMicEnabled((v) => !v)}
+          aria-pressed={micEnabled ? "true" : "false"}
+          aria-label={micEnabled ? "Turn off microphone" : "Turn on microphone"}
           className={`flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl border text-xs font-medium transition-colors ${
             micEnabled
               ? "bg-sky-500/15 border-sky-500/30 text-sky-300"
@@ -112,6 +114,8 @@ export function DeviceControls(props: {
         <button
           type="button"
           onClick={() => setCamEnabled((v) => !v)}
+          aria-pressed={camEnabled ? "true" : "false"}
+          aria-label={camEnabled ? "Turn off camera" : "Turn on camera"}
           className={`flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl border text-xs font-medium transition-colors ${
             camEnabled
               ? "bg-indigo-500/15 border-indigo-500/30 text-indigo-300"
@@ -130,6 +134,8 @@ export function DeviceControls(props: {
         <button
           type="button"
           onClick={() => setScreenEnabled((v) => !v)}
+          aria-pressed={screenEnabled ? "true" : "false"}
+          aria-label={screenEnabled ? "Stop sharing screen" : "Share screen"}
           className={`flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl border text-xs font-medium transition-colors ${
             screenEnabled
               ? "bg-rose-500/15 border-rose-500/30 text-rose-300"

@@ -80,8 +80,10 @@ export function VideoControls({
     return (
       <div className={`flex items-center gap-2 ${className}`}>
         <button
+          type="button"
           onClick={isPlaying ? onPause : onPlay}
           disabled={!canControl}
+          aria-label={isPlaying ? "Pause" : "Play"}
           className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 flex items-center justify-center text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           title={effectiveDisabledReason}
         >
@@ -118,8 +120,10 @@ export function VideoControls({
         <div className="flex items-center gap-2">
           {/* Skip Back */}
           <button
+            type="button"
             onClick={() => onSeek(Math.max(0, currentTime - 10))}
             disabled={!canControl || !capabilities.canSeek}
+            aria-label="Skip back 10 seconds"
             className="h-9 w-9 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             title="Back 10s"
           >
@@ -128,8 +132,10 @@ export function VideoControls({
 
           {/* Play/Pause */}
           <button
+            type="button"
             onClick={isPlaying ? onPause : onPlay}
             disabled={!canControl}
+            aria-label={isPlaying ? "Pause" : "Play"}
             className="h-11 w-11 rounded-xl bg-white text-slate-900 hover:bg-slate-100 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg"
             title={effectiveDisabledReason || (isPlaying ? "Pause" : "Play")}
           >
@@ -144,10 +150,12 @@ export function VideoControls({
 
           {/* Skip Forward */}
           <button
+            type="button"
             onClick={() =>
               onSeek(Math.min(duration || Infinity, currentTime + 10))
             }
             disabled={!canControl || !capabilities.canSeek}
+            aria-label="Skip forward 10 seconds"
             className="h-9 w-9 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             title="Forward 10s"
           >
@@ -186,18 +194,22 @@ export function VideoControls({
           {/* More seek options */}
           <div className="hidden sm:flex items-center gap-1">
             <button
+              type="button"
               onClick={() => onSeek(Math.max(0, currentTime - 30))}
               disabled={!canControl || !capabilities.canSeek}
+              aria-label="Skip back 30 seconds"
               className="h-8 px-2.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               title="Back 30s"
             >
               -30s
             </button>
             <button
+              type="button"
               onClick={() =>
                 onSeek(Math.min(duration || Infinity, currentTime + 30))
               }
               disabled={!canControl || !capabilities.canSeek}
+              aria-label="Skip forward 30 seconds"
               className="h-8 px-2.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               title="Forward 30s"
             >
@@ -208,7 +220,9 @@ export function VideoControls({
           {/* Fullscreen Button */}
           {onFullscreen && (
             <button
+              type="button"
               onClick={onFullscreen}
+              aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
               className="h-9 w-9 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-slate-200 transition-colors"
               title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
             >

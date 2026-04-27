@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 
+import { createRouteRateLimiter } from "../_lib/rateLimit";
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+// Each call may paginate up to 10 times against the YouTube API. 10/min/IP.
+const limiter = createRouteRateLimiter({ windowMs: 60_000, max: 10 });
+const MAX_URL_LENGTH = 2048;
 
 type YouTubePlaylistItem = {
   videoId: string;
@@ -76,6 +82,9 @@ function extractPlaylistId(url: string): string | null {
 }
 
 export async function GET(req: Request) {
+  const r = limiter(req);
+  if (!r.allowed) return r.response;
+
   const apiKey = process.env.YOUTUBE_API_KEY;
   if (!apiKey) {
     return NextResponse.json<YouTubePlaylistResponse>(
@@ -89,7 +98,9 @@ export async function GET(req: Request) {
     searchParams.get("playlistId") ??
     searchParams.get("url") ??
     ""
-  ).trim();
+  )
+    .trim()
+    .slice(0, MAX_URL_LENGTH);
 
   if (!urlOrId) {
     return NextResponse.json<YouTubePlaylistResponse>(

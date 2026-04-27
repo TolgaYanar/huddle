@@ -80,6 +80,7 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
       else window.localStorage.removeItem("huddle:username");
     } catch { /* ignore */ }
     room.setUsername(trimmed);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [room.setUsername]);
 
   useEffect(() => {

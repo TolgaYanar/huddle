@@ -10,7 +10,11 @@ import {
   apiLogout,
   type AuthUser,
 } from "./lib/api";
-import { readRoomHistory, type RoomHistoryEntry } from "./lib/roomHistory";
+import {
+  clearRoomHistory,
+  readRoomHistory,
+  type RoomHistoryEntry,
+} from "./lib/roomHistory";
 
 function timeAgo(ms: number): string {
   const diff = Date.now() - ms;
@@ -178,10 +182,11 @@ export function HomeClient() {
                     <button
                       type="button"
                       onClick={() => {
-                        try { window.localStorage.removeItem("huddle:roomHistory"); } catch { /* ignore */ }
+                        clearRoomHistory();
                         setRoomHistory([]);
                       }}
                       className="text-xs text-slate-600 hover:text-slate-400 transition-colors"
+                      aria-label="Clear recent rooms"
                     >
                       Clear
                     </button>

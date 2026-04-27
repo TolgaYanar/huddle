@@ -187,6 +187,7 @@ export function useRoomCatchup({
     window.setTimeout(() => {
       tryApplyPendingRoomCatchup();
     }, 350);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     applyingRemoteSyncRef,
     lastUserPauseAtRef,

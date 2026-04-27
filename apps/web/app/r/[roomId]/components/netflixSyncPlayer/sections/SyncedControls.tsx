@@ -57,7 +57,9 @@ export function SyncedControls(props: {
 
         <div className="flex items-center justify-center gap-4">
           <button
+            type="button"
             onClick={() => onSeekDelta(-10)}
+            aria-label="Skip back 10 seconds"
             className="p-2 hover:bg-zinc-800 rounded-lg transition-colors"
             title="Back 10s"
           >
@@ -65,7 +67,9 @@ export function SyncedControls(props: {
           </button>
 
           <button
+            type="button"
             onClick={onTogglePlay}
+            aria-label={isPaused ? "Play" : "Pause"}
             className="p-4 bg-white hover:bg-zinc-200 rounded-full transition-colors"
           >
             {isPaused ? (
@@ -76,7 +80,9 @@ export function SyncedControls(props: {
           </button>
 
           <button
+            type="button"
             onClick={() => onSeekDelta(10)}
+            aria-label="Skip forward 10 seconds"
             className="p-2 hover:bg-zinc-800 rounded-lg transition-colors"
             title="Forward 10s"
           >
@@ -87,6 +93,7 @@ export function SyncedControls(props: {
 
       <div className="flex items-center gap-3">
         <button
+          type="button"
           onClick={onCopyTimestamp}
           className="flex items-center gap-2 text-zinc-400 hover:text-white text-sm transition-colors px-3 py-2 rounded-lg hover:bg-zinc-800"
         >
@@ -99,6 +106,7 @@ export function SyncedControls(props: {
         </button>
 
         <button
+          type="button"
           onClick={onResync}
           className="flex items-center gap-2 text-zinc-400 hover:text-white text-sm transition-colors px-3 py-2 rounded-lg hover:bg-zinc-800"
         >
@@ -107,6 +115,7 @@ export function SyncedControls(props: {
         </button>
 
         <button
+          type="button"
           onClick={onOpenNetflix}
           className="flex items-center gap-2 text-zinc-400 hover:text-white text-sm transition-colors px-3 py-2 rounded-lg hover:bg-zinc-800"
         >

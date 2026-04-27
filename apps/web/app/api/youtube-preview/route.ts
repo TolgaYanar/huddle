@@ -1,29 +1,12 @@
 import { NextResponse } from "next/server";
 
+import { createRouteRateLimiter } from "../_lib/rateLimit";
+import { extractYouTubeVideoId } from "../_lib/youtube";
+
 export const runtime = "nodejs";
 
-function extractYouTubeVideoId(inputUrl: string): string | null {
-  const url = inputUrl.trim();
-  if (!url) return null;
-
-  // Supports:
-  // - https://www.youtube.com/watch?v=VIDEOID
-  // - https://youtu.be/VIDEOID
-  // - https://www.youtube.com/embed/VIDEOID
-  // - https://www.youtube.com/shorts/VIDEOID
-  const patterns = [
-    /(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/,
-    /youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/,
-    /youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/,
-  ];
-
-  for (const re of patterns) {
-    const m = url.match(re);
-    const id = m?.[1];
-    if (id) return id;
-  }
-  return null;
-}
+const limiter = createRouteRateLimiter({ windowMs: 60_000, max: 60 });
+const MAX_URL_LENGTH = 2048;
 
 function parseIso8601DurationToSeconds(iso: string): number | null {
   // e.g. PT1H2M3S, PT4M, PT50S
@@ -38,6 +21,9 @@ function parseIso8601DurationToSeconds(iso: string): number | null {
 }
 
 export async function GET(req: Request) {
+  const r = limiter(req);
+  if (!r.allowed) return r.response;
+
   const apiKey = process.env.YOUTUBE_API_KEY;
   if (!apiKey) {
     // No key configured: don't error loudly; client will fall back.
@@ -48,7 +34,7 @@ export async function GET(req: Request) {
   }
 
   const { searchParams } = new URL(req.url);
-  const url = searchParams.get("url") ?? "";
+  const url = (searchParams.get("url") ?? "").slice(0, MAX_URL_LENGTH);
   const videoId = extractYouTubeVideoId(url);
 
   if (!videoId) {

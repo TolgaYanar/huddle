@@ -5,7 +5,7 @@ const os = require("os");
 
 require("dotenv").config();
 
-const { vLog } = require("./src/logging");
+const { vLog, requestId } = require("./src/logging");
 const {
   parseAllowedOrigins,
   readBooleanEnv,
@@ -13,6 +13,7 @@ const {
   createCorsOptions,
 } = require("./src/cors");
 const { initPrisma } = require("./src/prisma");
+const { securityHeaders } = require("./src/security");
 
 const {
   SESSION_COOKIE_NAME,
@@ -50,9 +51,37 @@ const corsOptions = createCorsOptions({
   methods: ["GET", "POST", "DELETE", "OPTIONS"],
 });
 
+app.disable("x-powered-by");
+app.use(requestId());
+app.use(securityHeaders());
+
+// Lightweight request-duration log line for non-health endpoints.
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on("finish", () => {
+    if (req.path === "/health") return;
+    const ms = Date.now() - start;
+    const line = `${req.method} ${req.path} ${res.statusCode} ${ms}ms`;
+    if (res.statusCode >= 500) req.log.error(line);
+    else if (res.statusCode >= 400) req.log.warn(line);
+    else req.log.info(line);
+  });
+  next();
+});
+
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 app.use(express.json({ limit: "1mb" }));
+
+if (
+  process.env.NODE_ENV === "production" &&
+  allowedOrigins.length === 0 &&
+  !allowExtensionOrigins
+) {
+  console.warn(
+    "[security] CORS_ORIGINS is empty in production — all origins will be reflected. Set CORS_ORIGINS to a comma-separated allowlist.",
+  );
+}
 
 const prismaState = initPrisma({ vLog });
 const getPrisma = () => prismaState.prisma;

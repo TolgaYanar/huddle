@@ -114,6 +114,7 @@ export function PlaylistPanel({
       <div className="flex items-center justify-between p-4 border-b border-white/10 bg-white/5">
         <h3 className="font-semibold text-slate-50">Playlists</h3>
         <button
+          type="button"
           onClick={onClose}
           className="p-1 text-slate-400 hover:text-slate-200 transition"
           title="Close playlist panel"
@@ -154,14 +155,18 @@ export function PlaylistPanel({
 
           <div className="flex items-center gap-2">
             <button
+              type="button"
               onClick={onPlayPrevious}
+              aria-label="Previous video"
               className="p-1.5 text-slate-400 hover:text-slate-200 transition"
               title="Previous"
             >
               <SkipPrevIcon />
             </button>
             <button
+              type="button"
               onClick={onPlayNext}
+              aria-label="Next video"
               className="p-1.5 text-slate-400 hover:text-slate-200 transition"
               title="Next"
             >
@@ -188,7 +193,9 @@ export function PlaylistPanel({
         {playlists.map((playlist) => (
           <button
             key={playlist.id}
+            type="button"
             onClick={() => handleSelectPlaylist(playlist.id)}
+            aria-pressed={selectedPlaylistId === playlist.id ? "true" : "false"}
             className={`px-3 py-1.5 text-sm rounded-lg whitespace-nowrap transition ${
               selectedPlaylistId === playlist.id
                 ? "bg-sky-500/20 text-sky-300 border border-sky-500/30"
@@ -197,11 +204,14 @@ export function PlaylistPanel({
           >
             {playlist.name}
             {playlist.id === activePlaylistId && (
-              <span className="ml-1 text-xs text-sky-400">●</span>
+              <span className="ml-1 text-xs text-sky-400" aria-label="Active">
+                ●
+              </span>
             )}
           </button>
         ))}
         <button
+          type="button"
           onClick={() => setIsCreating(true)}
           className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-white/5 rounded-lg transition"
           title="Create playlist"
@@ -259,6 +269,7 @@ export function PlaylistPanel({
                 {selectedPlaylistId !== activePlaylistId &&
                   selectedPlaylist.items.length > 0 && (
                     <button
+                      type="button"
                       onClick={() => onSetActive(selectedPlaylistId)}
                       className="px-2 py-1 text-xs bg-sky-600 hover:bg-sky-500 text-white rounded-lg transition"
                     >
@@ -266,6 +277,7 @@ export function PlaylistPanel({
                     </button>
                   )}
                 <button
+                  type="button"
                   onClick={() => setSettingsPlaylistId(selectedPlaylistId)}
                   className="p-1.5 text-slate-400 hover:text-slate-200 transition"
                   title="Playlist settings"
@@ -279,6 +291,7 @@ export function PlaylistPanel({
             <div className="flex gap-2">
               {onOpenAddVideos && (
                 <button
+                  type="button"
                   onClick={onOpenAddVideos}
                   className="flex-1 p-2 text-sm text-slate-200 bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 hover:border-indigo-500/50 rounded-lg transition flex items-center justify-center gap-2"
                 >
@@ -288,6 +301,7 @@ export function PlaylistPanel({
               )}
               {currentVideoUrl && onAddCurrentVideo && (
                 <button
+                  type="button"
                   onClick={onAddCurrentVideo}
                   className="flex-1 p-2 text-sm text-slate-400 hover:text-slate-200 border border-dashed border-white/20 hover:border-white/40 rounded-lg transition flex items-center justify-center gap-2"
                   title="Add the currently playing video"
@@ -341,6 +355,7 @@ export function PlaylistPanel({
             No playlists yet.
             <br />
             <button
+              type="button"
               onClick={() => setIsCreating(true)}
               className="text-sky-400 hover:text-sky-300 mt-2 transition"
             >

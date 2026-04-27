@@ -81,12 +81,18 @@ function registerAuthRoutes(
     };
   }
 
+  // Use req.log when present (request-id middleware), fall back to console.
+  function logErr(req, msg, err) {
+    const log = req.log?.error || console.error;
+    log(msg, err);
+  }
+
   app.get("/api/auth/me", async (req, res) => {
     try {
       const user = await getAuthUser(req);
       return res.json({ user });
     } catch (err) {
-      console.error("/api/auth/me failed:", err);
+      logErr(req, "/api/auth/me failed:", err);
       return res.status(500).json({ error: "server_error" });
     }
   });
@@ -104,7 +110,7 @@ function registerAuthRoutes(
       if (err && err.code === "P2002") {
         return res.status(409).json({ error: "username_taken" });
       }
-      console.error("/api/auth/register failed:", err);
+      logErr(req, "/api/auth/register failed:", err);
       return res.status(500).json({ error: "server_error" });
     }
   });
@@ -119,7 +125,7 @@ function registerAuthRoutes(
       setSessionCookie(req, res, result.token);
       return res.json({ user: result.user });
     } catch (err) {
-      console.error("/api/auth/login failed:", err);
+      logErr(req, "/api/auth/login failed:", err);
       return res.status(500).json({ error: "server_error" });
     }
   });
@@ -137,7 +143,7 @@ function registerAuthRoutes(
       if (err && err.code === "P2002") {
         return res.status(409).json({ error: "username_taken" });
       }
-      console.error("/api/auth/register-token failed:", err);
+      logErr(req, "/api/auth/register-token failed:", err);
       return res.status(500).json({ error: "server_error" });
     }
   });
@@ -151,7 +157,7 @@ function registerAuthRoutes(
       if (result.err) return res.status(result.err.status).json(result.err.body);
       return res.json({ user: result.user, token: result.token, expiresAt: result.expiresAt });
     } catch (err) {
-      console.error("/api/auth/login-token failed:", err);
+      logErr(req, "/api/auth/login-token failed:", err);
       return res.status(500).json({ error: "server_error" });
     }
   });
@@ -180,7 +186,7 @@ function registerAuthRoutes(
       clearSessionCookie(req, res);
       return res.json({ ok: true });
     } catch (err) {
-      console.error("/api/auth/logout failed:", err);
+      logErr(req, "/api/auth/logout failed:", err);
       clearSessionCookie(req, res);
       return res.json({ ok: true });
     }

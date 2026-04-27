@@ -29,6 +29,9 @@ function validateRoomId(raw) {
   const roomId = String(raw || "").trim();
   if (!roomId) return null;
   if (roomId.length > 200) return null;
+  // Must be URL-safe: letters, digits, underscore, hyphen.
+  // Mirrors the client-side normalization in the web home page.
+  if (!/^[a-zA-Z0-9_-]+$/.test(roomId)) return null;
   return roomId;
 }
 

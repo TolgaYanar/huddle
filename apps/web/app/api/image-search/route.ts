@@ -1,9 +1,19 @@
 import { type NextRequest, NextResponse } from "next/server";
 
+import { createRouteRateLimiter } from "../_lib/rateLimit";
+
 const IMAGE_EXTENSIONS = /\.(jpe?g|png|gif|webp|svg)$/i;
+const MAX_QUERY_LENGTH = 200;
+const limiter = createRouteRateLimiter({ windowMs: 60_000, max: 60 });
 
 export async function GET(request: NextRequest) {
-  const q = request.nextUrl.searchParams.get("q")?.trim();
+  const r = limiter(request);
+  if (!r.allowed) return r.response;
+
+  const q = request.nextUrl.searchParams
+    .get("q")
+    ?.trim()
+    .slice(0, MAX_QUERY_LENGTH);
   if (!q) return NextResponse.json({ images: [] });
 
   try {

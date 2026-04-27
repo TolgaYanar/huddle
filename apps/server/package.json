@@ -7,7 +7,7 @@
     "db:deploy": "prisma db push",
     "dev": "node --watch-path=index.js --watch-path=src index.js",
     "start": "node index.js",
-    "test": "node --test src/auth/__tests__/*.test.js src/socket/helpers/__tests__/*.test.js"
+    "test": "node --test src/auth/__tests__/*.test.js src/socket/helpers/__tests__/*.test.js src/__tests__/*.test.js"
   },
   "dependencies": {
     "@prisma/client": "^6.11.0",

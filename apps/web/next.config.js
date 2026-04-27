@@ -2,10 +2,31 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   transpilePackages: ["shared-logic", "@repo/ui"],
+  poweredByHeader: false,
   // Socket.IO WebSocket upgrades cannot follow redirects.
   // Vercel/Next may normalize trailing slashes with a 308 which breaks the
   // Engine.IO websocket handshake on `/socket.io/`.
   skipTrailingSlashRedirect: true,
+  async headers() {
+    // Apply baseline security headers to every page response.
+    // /socket.io and /api/* are matched by rewrites (beforeFiles) and forwarded
+    // to the upstream server before headers() runs, so these only affect the
+    // Next.js HTML/asset responses.
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "X-DNS-Prefetch-Control", value: "off" },
+          {
+            key: "Permissions-Policy",
+            value: "camera=(self), microphone=(self), geolocation=()",
+          },
+        ],
+      },
+    ];
+  },
   async rewrites() {
     const rawTarget =
       process.env.API_PROXY_TARGET ||

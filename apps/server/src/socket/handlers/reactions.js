@@ -1,11 +1,21 @@
+const { createSocketRateLimiter } = require("../helpers/socketRateLimit");
+
 const ALLOWED_EMOJIS = new Set(["👍", "❤️", "😂", "😮", "😢", "🔥"]);
 
 function attachReactionHandlers(io, state, socket) {
+  // Per-socket rate limit: max 20 reaction toggles per 5s.
+  // Plenty for normal use; blocks "rapid-fire toggle" abuse that floods
+  // every room member with reaction_updated broadcasts.
+  const limiter = createSocketRateLimiter({ windowMs: 5000, max: 20 });
+
   socket.on("add_reaction", (data) => {
     const { roomId, messageId, emoji } = data || {};
     if (!roomId || typeof roomId !== "string") return;
     if (!messageId || typeof messageId !== "string") return;
     if (!emoji || !ALLOWED_EMOJIS.has(emoji)) return;
+    // Only allow reactions from sockets that have joined the room.
+    if (!socket.rooms.has(roomId)) return;
+    if (!limiter()) return;
 
     if (!state.roomReactions.has(roomId)) {
       state.roomReactions.set(roomId, new Map());

@@ -2,8 +2,15 @@ import { NextResponse } from "next/server";
 import dns from "node:dns/promises";
 import net from "node:net";
 
+import { createRouteRateLimiter } from "../_lib/rateLimit";
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+// Outbound HTTP fetch to arbitrary URLs — most expensive route. 30/min/IP.
+const limiter = createRouteRateLimiter({ windowMs: 60_000, max: 30 });
+
+const MAX_URL_LENGTH = 2048;
 
 type UrlPreviewResponse =
   | {
@@ -18,6 +25,9 @@ type UrlPreviewResponse =
     };
 
 export async function GET(req: Request) {
+  const r = limiter(req);
+  if (!r.allowed) return r.response;
+
   try {
     const { searchParams } = new URL(req.url);
     const raw = searchParams.get("url");
@@ -25,6 +35,12 @@ export async function GET(req: Request) {
     if (!raw) {
       return NextResponse.json<UrlPreviewResponse>(
         { ok: false, error: "Missing url" },
+        { status: 400 }
+      );
+    }
+    if (raw.length > MAX_URL_LENGTH) {
+      return NextResponse.json<UrlPreviewResponse>(
+        { ok: false, error: "URL too long" },
         { status: 400 }
       );
     }

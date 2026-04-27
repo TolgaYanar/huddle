@@ -1,4 +1,6 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
+
+import { useClipboard } from "../../../lib/useClipboard";
 
 export function useInviteLink(roomId: string, isClient: boolean) {
   return useMemo(() => {
@@ -9,18 +11,12 @@ export function useInviteLink(roomId: string, isClient: boolean) {
 }
 
 export function useCopyInvite(inviteLink: string) {
-  const [copied, setCopied] = useState(false);
+  const { copy, copied } = useClipboard();
 
   const copyInvite = useCallback(async () => {
     if (!inviteLink) return;
-    try {
-      await navigator.clipboard.writeText(inviteLink);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1200);
-    } catch {
-      // no-op
-    }
-  }, [inviteLink]);
+    await copy(inviteLink);
+  }, [copy, inviteLink]);
 
   return { copied, copyInvite };
 }

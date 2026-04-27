@@ -215,7 +215,7 @@ function ImagePicker({
           </div>
           {error && <p className="text-xs text-rose-400">{error}</p>}
           <p className="text-xs text-slate-600">
-            Right-click any image on the web → "Copy image address"
+            Right-click any image on the web → &ldquo;Copy image address&rdquo;
           </p>
         </>
       )}
@@ -254,13 +254,11 @@ function ImagePicker({
 // ─── Round editor (single active round) ──────────────────────────────────────
 
 function RoundEditor({
-  index,
   round,
   onChange,
   onRemove,
   canRemove,
 }: {
-  index?: number;
   round: GameRoundInput;
   onChange: (round: GameRoundInput) => void;
   onRemove: () => void;
@@ -475,7 +473,6 @@ function RoundSetupForm({
       {/* Active round editor — key resets ImagePicker state when switching */}
       <RoundEditor
         key={activeIdx}
-        index={activeIdx}
         round={rounds[activeIdx]!}
         onChange={(r) => updateRound(activeIdx, r)}
         onRemove={() => removeRound(activeIdx)}
@@ -628,7 +625,7 @@ function ActiveRoundView({
 
       {amActiveQuestioner && round.hideBlanks && round.hintsRevealed === 0 && (
         <p className="text-center text-xs text-amber-400/60">
-          Players see "Answer hidden" until first hint
+          Players see &ldquo;Answer hidden&rdquo; until first hint
         </p>
       )}
       {round.hintsRevealed > 0 && (
@@ -1104,7 +1101,7 @@ function GameView({
         ← Back
       </button>
       <div className="flex-1 text-sm font-medium text-slate-300 truncate">
-        {game.creatorName ?? "Unknown"}'s game
+        {game.creatorName ?? "Unknown"}&rsquo;s game
       </div>
       {canManage && game.status === "active" && (
         <button
@@ -1297,7 +1294,7 @@ function GameLobby({
                 >
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-slate-200 truncate">
-                      {game.creatorName ?? "Unknown"}'s game
+                      {game.creatorName ?? "Unknown"}&rsquo;s game
                     </div>
                     <div className="text-xs text-slate-500 mt-0.5">
                       {game.questioners.length} questioner

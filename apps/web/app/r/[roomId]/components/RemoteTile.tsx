@@ -131,8 +131,9 @@ export function RemoteTile({
           }}
           className="h-9 w-9 inline-flex items-center justify-center rounded-xl border border-white/20 bg-black/60 text-slate-50 text-sm hover:bg-white/10 transition-colors"
           title="Fullscreen"
+          aria-label={`Toggle fullscreen for ${label}`}
         >
-          ⛶
+          <span aria-hidden="true">⛶</span>
         </button>
 
         <span className="text-[11px] px-2 py-1 rounded-full bg-black/40 border border-white/10 text-slate-300">

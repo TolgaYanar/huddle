@@ -36,6 +36,7 @@ export function PlaylistSettingsForm({
           Playlist Settings
         </h4>
         <button
+          type="button"
           onClick={onClose}
           className="text-slate-400 hover:text-slate-200"
           title="Close settings"
@@ -95,12 +96,14 @@ export function PlaylistSettingsForm({
 
       <div className="flex gap-2 justify-between pt-2 border-t border-white/10">
         <button
+          type="button"
           onClick={onDelete}
           className="px-3 py-1.5 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition flex items-center gap-1"
         >
           <TrashIcon /> Delete
         </button>
         <button
+          type="button"
           onClick={handleSave}
           className="px-3 py-1.5 text-sm bg-sky-600 hover:bg-sky-500 text-white rounded-lg transition"
         >

@@ -40,8 +40,10 @@ export function VolumeControl({
       onMouseLeave={handleVolumeMouseLeave}
     >
       <button
+        type="button"
         onClick={onToggleMute}
         disabled={!canMute}
+        aria-label={displayMuted ? "Unmute" : "Mute"}
         className="h-9 w-9 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         title={displayMuted ? "Unmute" : "Mute"}
       >

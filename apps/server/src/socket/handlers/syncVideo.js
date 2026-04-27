@@ -10,6 +10,8 @@ function attachSyncHandlers(io, state, socket, deps) {
   socket.on("request_room_state", (rawRoom) => {
     const roomId = normalizeRoomId(rawRoom);
     if (!roomId) return;
+    // Only members of a room may read its current playback state.
+    if (!socket.rooms.has(roomId)) return;
     emitRoomStateToSocket(state, socket, roomId);
   });
 
@@ -17,6 +19,8 @@ function attachSyncHandlers(io, state, socket, deps) {
   socket.on("sync_video", async (data) => {
     const roomId = normalizeRoomId(data);
     if (!roomId) return;
+    // Only members of a room may broadcast sync events to it.
+    if (!socket.rooms.has(roomId)) return;
 
     const {
       action,

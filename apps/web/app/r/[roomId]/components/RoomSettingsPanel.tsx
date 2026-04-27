@@ -2,6 +2,8 @@
 
 import React from "react";
 
+import { PasswordToggleButton } from "../../../components/PasswordToggleButton";
+
 export type RoomSettingsPanelProps = {
   isOpen: boolean;
   onClose: () => void;
@@ -45,6 +47,16 @@ export function RoomSettingsPanel({
     setNameInput(roomName ?? "");
   }, [roomName, isOpen]);
 
+  // Close on Escape.
+  React.useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const getDisplayName = (id: string) =>
@@ -58,17 +70,29 @@ export function RoomSettingsPanel({
       <div
         className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
         onClick={onClose}
+        aria-hidden="true"
       />
 
       {/* Panel */}
-      <div className="fixed inset-y-0 right-0 z-50 w-80 max-w-full flex flex-col bg-slate-900/95 border-l border-white/10 shadow-2xl">
+      <aside
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="room-settings-title"
+        className="fixed inset-y-0 right-0 z-50 w-80 max-w-full flex flex-col bg-slate-900/95 border-l border-white/10 shadow-2xl"
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
-          <span className="text-sm font-semibold text-slate-100">Room settings</span>
+          <h2
+            id="room-settings-title"
+            className="text-sm font-semibold text-slate-100"
+          >
+            Room settings
+          </h2>
           <button
             type="button"
             onClick={onClose}
             className="h-7 w-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-200 hover:bg-white/10 transition-colors"
+            aria-label="Close room settings"
           >
             ✕
           </button>
@@ -126,27 +150,28 @@ export function RoomSettingsPanel({
               </span>
             </h3>
             <div className="flex gap-2">
-              <input
-                value={passwordInput}
-                onChange={(e) => setPasswordInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && passwordInput.trim()) {
-                    onSetRoomPassword(passwordInput.trim());
-                    setPasswordInput("");
+              <div className="relative flex-1">
+                <input
+                  value={passwordInput}
+                  onChange={(e) => setPasswordInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && passwordInput.trim()) {
+                      onSetRoomPassword(passwordInput.trim());
+                      setPasswordInput("");
+                    }
+                  }}
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="new-password"
+                  placeholder={
+                    hasRoomPassword ? "New password…" : "Set a password…"
                   }
-                }}
-                type={showPassword ? "text" : "password"}
-                placeholder={hasRoomPassword ? "New password…" : "Set a password…"}
-                className="flex-1 h-9 rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-slate-100 placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-indigo-500/40"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((v) => !v)}
-                className="h-9 w-9 rounded-xl border border-white/10 bg-white/5 text-slate-400 hover:text-slate-200 text-xs transition-colors"
-                title={showPassword ? "Hide" : "Show"}
-              >
-                {showPassword ? "●" : "○"}
-              </button>
+                  className="w-full h-9 rounded-xl border border-white/10 bg-white/5 px-3 pr-10 text-sm text-slate-100 placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-indigo-500/40"
+                />
+                <PasswordToggleButton
+                  show={showPassword}
+                  onToggle={() => setShowPassword((v) => !v)}
+                />
+              </div>
               <button
                 type="button"
                 disabled={!passwordInput.trim()}
@@ -276,7 +301,7 @@ export function RoomSettingsPanel({
             </ul>
           </section>
         </div>
-      </div>
+      </aside>
     </>
   );
 }

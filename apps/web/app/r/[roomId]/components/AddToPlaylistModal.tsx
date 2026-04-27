@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useEffect } from "react";
 import type { Playlist } from "shared-logic";
+import { Modal } from "../../../components/Modal";
 import { getYouTubeStartTime, formatStartTime } from "../lib/video";
 
 interface AddToPlaylistModalProps {
@@ -128,33 +129,24 @@ export function AddToPlaylistModal({
     setIsCreatingPlaylist(false);
   }, [newPlaylistName, onCreatePlaylist]);
 
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onClose();
-      }
-    },
-    [onClose]
-  );
+  if (!videoUrl) return null;
 
-  if (!isOpen || !videoUrl) return null;
+  const titleId = "add-to-playlist-title";
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
-      onClick={onClose}
-      onKeyDown={handleKeyDown}
+    <Modal
+      open={isOpen}
+      onClose={onClose}
+      labelledBy={titleId}
+      panelClassName="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden"
     >
-      <div
-        className="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-white/10">
-          <h3 className="text-lg font-semibold text-slate-50">
+          <h3 id={titleId} className="text-lg font-semibold text-slate-50">
             Add to Playlist
           </h3>
           <button
+            type="button"
             onClick={onClose}
             className="p-1 text-slate-400 hover:text-slate-200 transition"
             title="Close modal"
@@ -207,6 +199,7 @@ export function AddToPlaylistModal({
               <div className="text-center py-4">
                 <p className="text-sm text-slate-500 mb-2">No playlists yet</p>
                 <button
+                  type="button"
                   onClick={() => setIsCreatingPlaylist(true)}
                   className="text-sm text-sky-400 hover:text-sky-300 transition"
                 >
@@ -222,6 +215,7 @@ export function AddToPlaylistModal({
                   return (
                     <button
                       key={playlist.id}
+                      type="button"
                       onClick={() =>
                         !isAdded && setSelectedPlaylistId(playlist.id)
                       }
@@ -272,12 +266,14 @@ export function AddToPlaylistModal({
                 />
                 <div className="flex gap-2 justify-end">
                   <button
+                    type="button"
                     onClick={() => setIsCreatingPlaylist(false)}
                     className="px-3 py-1.5 text-sm text-slate-400 hover:text-slate-200 transition"
                   >
                     Cancel
                   </button>
                   <button
+                    type="button"
                     onClick={handleCreatePlaylist}
                     disabled={!newPlaylistName.trim()}
                     className="px-3 py-1.5 text-sm bg-sky-600 hover:bg-sky-500 text-white rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
@@ -289,6 +285,7 @@ export function AddToPlaylistModal({
             ) : (
               playlists.length > 0 && (
                 <button
+                  type="button"
                   onClick={() => setIsCreatingPlaylist(true)}
                   className="mt-2 w-full p-2 text-sm text-slate-400 hover:text-slate-200 border border-dashed border-white/20 hover:border-white/40 rounded-lg transition flex items-center justify-center gap-2"
                 >
@@ -303,12 +300,14 @@ export function AddToPlaylistModal({
         {/* Footer */}
         <div className="flex items-center justify-end gap-2 p-4 border-t border-white/10 bg-black/20">
           <button
+            type="button"
             onClick={onClose}
             className="px-4 py-2 text-sm text-slate-400 hover:text-slate-200 transition"
           >
             Close
           </button>
           <button
+            type="button"
             onClick={handleAddToPlaylist}
             disabled={
               !selectedPlaylistId ||
@@ -320,7 +319,6 @@ export function AddToPlaylistModal({
             Add to Playlist
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

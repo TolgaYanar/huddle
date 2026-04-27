@@ -1,7 +1,15 @@
 import { NextResponse } from "next/server";
 
+import { createRouteRateLimiter } from "../_lib/rateLimit";
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+// Each request hits the YouTube Data API (search.list = 100 units of quota).
+// 30/min keeps a single bad client from draining the daily quota.
+const limiter = createRouteRateLimiter({ windowMs: 60_000, max: 30 });
+
+const MAX_QUERY_LENGTH = 200;
 
 type YouTubeSearchResponse =
   | {
@@ -65,6 +73,9 @@ function parsePrimaryLanguage(acceptLanguage: string | null): string | null {
 }
 
 export async function GET(req: Request) {
+  const r = limiter(req);
+  if (!r.allowed) return r.response;
+
   const apiKey = process.env.YOUTUBE_API_KEY;
   if (!apiKey) {
     return NextResponse.json<YouTubeSearchResponse>(
@@ -74,7 +85,7 @@ export async function GET(req: Request) {
   }
 
   const { searchParams } = new URL(req.url);
-  const q = (searchParams.get("q") ?? "").trim();
+  const q = (searchParams.get("q") ?? "").trim().slice(0, MAX_QUERY_LENGTH);
 
   if (!q) {
     return NextResponse.json<YouTubeSearchResponse>(

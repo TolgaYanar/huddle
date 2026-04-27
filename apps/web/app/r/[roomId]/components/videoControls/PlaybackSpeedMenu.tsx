@@ -25,7 +25,11 @@ export function PlaybackSpeedMenu({
   return (
     <div className="relative" ref={ref}>
       <button
+        type="button"
         onClick={() => setOpen((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open ? "true" : "false"}
+        aria-label={`Playback speed: ${playbackRate}x`}
         className="h-9 px-3 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 flex items-center gap-1.5 text-slate-200 text-sm font-medium transition-colors"
         title="Playback speed"
       >
@@ -33,13 +37,19 @@ export function PlaybackSpeedMenu({
       </button>
 
       {open && (
-        <div className="absolute bottom-full mb-2 right-0 min-w-30 bg-black/90 backdrop-blur-md rounded-xl border border-white/10 py-2 shadow-xl z-50">
+        <div
+          role="menu"
+          className="absolute bottom-full mb-2 right-0 min-w-30 bg-black/90 backdrop-blur-md rounded-xl border border-white/10 py-2 shadow-xl z-50"
+        >
           <div className="px-3 py-1.5 text-xs text-slate-400 uppercase tracking-wider">
             Speed
           </div>
           {speedOptions.map((speed) => (
             <button
               key={speed}
+              type="button"
+              role="menuitemradio"
+              aria-checked={playbackRate === speed ? "true" : "false"}
               onClick={() => {
                 onPlaybackRateChange(speed);
                 setOpen(false);

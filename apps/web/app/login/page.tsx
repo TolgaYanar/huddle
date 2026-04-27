@@ -122,6 +122,7 @@ function LoginPageInner() {
                   autoCapitalize="none"
                   autoCorrect="off"
                   spellCheck={false}
+                  autoFocus
                   className="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/25 focus:border-indigo-500/35 hover:border-white/12 transition-all"
                 />
               </div>

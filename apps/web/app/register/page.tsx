@@ -192,6 +192,7 @@ function RegisterPageInner() {
                   autoCapitalize="none"
                   autoCorrect="off"
                   spellCheck={false}
+                  autoFocus
                   className={`w-full bg-white/4 border rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-2 transition-all hover:border-white/12 ${
                     username.length > 0
                       ? usernameValid

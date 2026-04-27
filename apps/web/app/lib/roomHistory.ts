@@ -38,3 +38,11 @@ export function writeRoomHistory(roomId: string, name: string | null): void {
     // ignore
   }
 }
+
+export function clearRoomHistory(): void {
+  try {
+    window.localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // ignore
+  }
+}

@@ -2,6 +2,11 @@ function registerSavedRoomsRoutes(
   app,
   { getPrisma, requireAuth, validateRoomId },
 ) {
+  function logErr(req, msg, err) {
+    const log = req.log?.error || console.error;
+    log(msg, err);
+  }
+
   app.get("/api/saved-rooms", requireAuth, async (req, res) => {
     try {
       const userId = req.authUser.id;
@@ -12,7 +17,7 @@ function registerSavedRoomsRoutes(
       });
       return res.json({ rooms: saved });
     } catch (err) {
-      console.error("/api/saved-rooms failed:", err);
+      logErr(req, "/api/saved-rooms failed:", err);
       return res.status(500).json({ error: "server_error" });
     }
   });
@@ -32,7 +37,7 @@ function registerSavedRoomsRoutes(
 
       return res.json({ room: saved });
     } catch (err) {
-      console.error("POST /api/saved-rooms failed:", err);
+      logErr(req, "POST /api/saved-rooms failed:", err);
       return res.status(500).json({ error: "server_error" });
     }
   });
@@ -46,7 +51,7 @@ function registerSavedRoomsRoutes(
       await getPrisma().savedRoom.deleteMany({ where: { userId, roomId } });
       return res.json({ ok: true });
     } catch (err) {
-      console.error("DELETE /api/saved-rooms failed:", err);
+      logErr(req, "DELETE /api/saved-rooms failed:", err);
       return res.status(500).json({ error: "server_error" });
     }
   });

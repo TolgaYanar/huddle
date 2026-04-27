@@ -1,3 +1,5 @@
+const { createSocketRateLimiter } = require("../helpers/socketRateLimit");
+
 function attachWebRTCHandlers(io, state, socket, deps) {
   // --- WebRTC signaling (socket.io relays between peers) ---
   const isSocketInRoom = (roomId, socketId) => {
@@ -8,6 +10,14 @@ function attachWebRTCHandlers(io, state, socket, deps) {
       return false;
     }
   };
+
+  // Speaking events are emitted from voice-activity detection — typically
+  // every 50–200ms while talking. Bound to ~20/s to drop pathological floods
+  // without affecting normal use.
+  const speakingLimiter = createSocketRateLimiter({ windowMs: 1000, max: 20 });
+  // ICE candidate gathering normally produces under 50 candidates per peer
+  // connection. 200/10s is generous; anything past that is abuse.
+  const iceLimiter = createSocketRateLimiter({ windowMs: 10000, max: 200 });
 
   socket.on("webrtc_offer", (data) => {
     const { roomId, to, sdp } = data || {};
@@ -36,6 +46,7 @@ function attachWebRTCHandlers(io, state, socket, deps) {
     if (!candidate) return;
     if (!isSocketInRoom(roomId, socket.id) || !isSocketInRoom(roomId, to))
       return;
+    if (!iceLimiter()) return;
     io.to(to).emit("webrtc_ice", { roomId, from: socket.id, candidate });
   });
 
@@ -128,6 +139,7 @@ function attachWebRTCHandlers(io, state, socket, deps) {
     if (!roomId || typeof roomId !== "string") return;
     if (typeof speaking !== "boolean") return;
     if (!isSocketInRoom(roomId, socket.id)) return;
+    if (!speakingLimiter()) return;
     socket.to(roomId).emit("webrtc_speaking", {
       roomId,
       from: socket.id,

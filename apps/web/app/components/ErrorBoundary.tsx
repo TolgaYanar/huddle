@@ -112,6 +112,7 @@ function DefaultErrorFallback({
           >
             Try again
           </button>
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
           <a
             href="/"
             className="flex-1 h-9 rounded-xl border border-white/10 bg-white/5 text-slate-100 text-sm font-medium hover:bg-white/10 transition-colors flex items-center justify-center"

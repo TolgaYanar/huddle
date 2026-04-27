@@ -104,6 +104,7 @@ export function PlaylistItemRow({
       </div>
 
       <button
+        type="button"
         onClick={(e) => {
           e.stopPropagation();
           onRemove();

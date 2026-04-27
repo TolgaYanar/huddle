@@ -13,6 +13,8 @@ function attachChatHandlers(io, state, socket, deps, isSocketInRoom) {
   socket.on("request_chat_history", async (rawRoom) => {
     const roomId = normalizeRoomId(rawRoom);
     if (!roomId) return;
+    // Chat is private to room members.
+    if (!isSocketInRoom(roomId, socket.id)) return;
     await emitChatHistoryToSocket(deps, state, socket, roomId);
   });
 

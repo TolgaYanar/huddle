@@ -241,6 +241,7 @@ export function WebcamOverlay({
                 <button
                   type="button"
                   onClick={onCloseLocal}
+                  aria-label="Turn off my camera"
                   className="absolute top-1 right-1 h-6 w-6 rounded-full bg-black/70 hover:bg-black/90 text-white text-xs inline-flex items-center justify-center border border-white/20"
                   title="Turn off my camera"
                 >
@@ -271,6 +272,7 @@ export function WebcamOverlay({
 
         <button
           type="button"
+          aria-label="Resize camera thumbnails"
           className="absolute -bottom-1 -right-1 h-7 w-7 rounded-full border border-white/10 bg-black/50 text-slate-200 text-xs inline-flex items-center justify-center cursor-nwse-resize"
           title="Resize cameras"
           onPointerDown={(e) => {

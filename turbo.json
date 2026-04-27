@@ -1,7 +1,7 @@
 {
   "$schema": "https://turborepo.com/schema.json",
   "ui": "tui",
-  "globalEnv": ["YOUTUBE_API_KEY", "API_PROXY_TARGET"],
+  "globalEnv": ["YOUTUBE_API_KEY", "API_PROXY_TARGET", "NODE_ENV"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

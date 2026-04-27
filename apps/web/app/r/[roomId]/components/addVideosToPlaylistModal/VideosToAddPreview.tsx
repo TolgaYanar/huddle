@@ -36,18 +36,21 @@ export function VideosToAddPreview(props: {
         </div>
         <div className="flex gap-2">
           <button
+            type="button"
             onClick={selectAll}
             className="px-2 py-1 text-xs text-slate-400 hover:text-slate-200 transition"
           >
             Select All
           </button>
           <button
+            type="button"
             onClick={deselectAll}
             className="px-2 py-1 text-xs text-slate-400 hover:text-slate-200 transition"
           >
             Deselect All
           </button>
           <button
+            type="button"
             onClick={clearAll}
             className="px-2 py-1 text-xs text-rose-400 hover:text-rose-300 transition"
           >
@@ -66,7 +69,10 @@ export function VideosToAddPreview(props: {
             }`}
           >
             <button
+              type="button"
               onClick={() => toggleVideoSelection(video.id)}
+              aria-label={video.selected ? "Deselect video" : "Select video"}
+              aria-pressed={video.selected ? "true" : "false"}
               className={`shrink-0 w-5 h-5 rounded border flex items-center justify-center transition ${
                 video.selected
                   ? "bg-indigo-600 border-indigo-600 text-white"
@@ -107,7 +113,9 @@ export function VideosToAddPreview(props: {
             </div>
 
             <button
+              type="button"
               onClick={() => removeVideo(video.id)}
+              aria-label="Remove from list"
               className="shrink-0 p-1 text-slate-400 hover:text-rose-400 transition"
               title="Remove from list"
             >
