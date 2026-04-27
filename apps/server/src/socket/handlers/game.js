@@ -27,6 +27,22 @@ function makeGameId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
 
+// Cap the size of data-URL clue images we're willing to broadcast to every
+// player. 250 KB base64 ≈ 187 KB raw image — comfortably under socket.io's
+// 1 MB default payload limit even with several rounds.
+const MAX_IMAGE_FIELD_LENGTH = 250_000;
+const DATA_URL_RE = /^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]+$/;
+
+function sanitizeImageField(raw) {
+  if (typeof raw !== "string") return "";
+  const value = raw.trim();
+  if (!value) return "";
+  if (value.length > MAX_IMAGE_FIELD_LENGTH) return "";
+  if (/^https?:\/\//i.test(value)) return value;
+  if (DATA_URL_RE.test(value)) return value;
+  return "";
+}
+
 function parseRounds(rounds) {
   if (!Array.isArray(rounds) || rounds.length === 0) return null;
   const clean = rounds
@@ -39,10 +55,7 @@ function parseRounds(rounds) {
         typeof r.category === "string" && GAME_CATEGORIES.includes(r.category)
           ? r.category
           : "Other";
-      const image =
-        typeof r.image === "string" && r.image.startsWith("http")
-          ? r.image
-          : "";
+      const image = sanitizeImageField(r.image);
       return {
         category,
         answer,

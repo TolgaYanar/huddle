@@ -1,27 +1,27 @@
 /**
- * Forgiving answer matching for the Guess It! game.
+ * Answer matching for the Guess It! game.
  *
- * Players type fast and the canonical answer is rarely exactly what they'd
- * type (capitalisation, punctuation, articles, accents, fat-fingered typos).
- * Strict string equality marks too many real correct guesses as wrong, which
- * is the #1 frustration. This helper returns true when a guess matches the
- * answer in a way a human would consider correct.
+ * Design rule: forgive *presentation* differences, but require the player
+ * to actually type the answer. Typos do NOT count as correct — they
+ * surface as a "so close" near-miss instead, which lets the guesser see
+ * they were on the right track and (if it's still their turn) try again.
  *
- * Rules (applied to both sides):
+ * Normalisation (applied to both sides) — this is what we *do* forgive:
  *   - lowercase
  *   - strip diacritics (café → cafe)
  *   - remove leading "the ", "a ", "an "
  *   - remove non-alphanumeric (drop punctuation; keep spaces)
  *   - collapse runs of whitespace
  *
- * After normalisation:
- *   - exact match → correct
- *   - Levenshtein ≤ 1 for ≥6-char answers → correct (one fat-fingered typo)
- *   - Levenshtein ≤ 2 for ≥12-char answers → correct (two typos)
+ * A guess counts as correct iff the normalised guess equals the
+ * normalised answer. Anything else — including single-letter typos,
+ * deletions, insertions, transpositions — is wrong. The accepting of
+ * those was a UX gift but had a worse failure mode (`hyundai` ≈ `hyuntai`
+ * read as correct), so we removed it.
  *
- * `nearMiss(g, a)` returns true for wrong guesses that came close: lets the
- * UI render a "so close!" badge. Tighter than the match thresholds so we
- * don't spam the badge for every random word.
+ * `isNearMiss` returns true for *wrong* guesses that came visually close,
+ * so the UI can render an encouraging amber pill alongside red rejected
+ * guesses. Tightness scales with answer length.
  */
 
 function normalizeForMatch(s) {
@@ -63,9 +63,10 @@ function isCorrectGuess(guess, answer) {
   const a = normalizeForMatch(answer);
   if (!g || !a) return false;
   if (g === a) return true;
-  if (a.length >= 6 && levenshtein(g, a) <= 1) return true;
-  if (a.length >= 12 && levenshtein(g, a) <= 2) return true;
-  return false;
+  // Fallback: also try the "compact" form (whitespace removed) so that
+  // hyphen/space presentation differences match — `WALL-E` vs `Wall E`
+  // both compact to `walle`. Internal spelling still has to match.
+  return g.replace(/\s+/g, "") === a.replace(/\s+/g, "");
 }
 
 function isNearMiss(guess, answer) {

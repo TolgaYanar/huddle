@@ -10,6 +10,8 @@ import type {
   GameStateData,
 } from "shared-logic";
 
+import { ImageEditor } from "./imageEditor/ImageEditor";
+
 const CATEGORIES = [
   "Brands", "People", "Places", "Movies & TV",
   "Music", "Sports", "Animals", "Things", "Other",
@@ -102,12 +104,17 @@ function ImagePicker({
   selected: string;
   onSelect: (url: string) => void;
 }) {
-  const [tab, setTab] = useState<"search" | "url">("search");
+  type Tab = "ai" | "search" | "url";
+  const [tab, setTab] = useState<Tab>("ai");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<ImageResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [urlInput, setUrlInput] = useState("");
   const [error, setError] = useState("");
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResult, setAiResult] = useState<string | null>(null);
+  const [editorOpen, setEditorOpen] = useState(false);
 
   const search = useCallback(async () => {
     if (!query.trim()) return;
@@ -131,6 +138,36 @@ function ImagePicker({
     }
   }, [query]);
 
+  const generate = useCallback(async () => {
+    const prompt = aiPrompt.trim();
+    if (!prompt) return;
+    setAiLoading(true);
+    setError("");
+    setAiResult(null);
+    try {
+      // Fresh seed each click so identical prompts still produce a new
+      // image — players who don't like the first try can re-roll.
+      const seed = Math.floor(Math.random() * 1_000_000_000);
+      const res = await fetch(
+        `/api/image-generate?prompt=${encodeURIComponent(prompt)}&seed=${seed}`,
+      );
+      const data = (await res.json()) as {
+        ok: boolean;
+        url?: string;
+        reason?: string;
+      };
+      if (!data.ok || !data.url) {
+        setError("Couldn't generate that image. Try a different prompt.");
+        return;
+      }
+      setAiResult(data.url);
+    } catch {
+      setError("Couldn't reach the image generator. Try again in a moment.");
+    } finally {
+      setAiLoading(false);
+    }
+  }, [aiPrompt]);
+
   const applyUrl = () => {
     const url = urlInput.trim();
     if (!url.startsWith("http")) {
@@ -141,10 +178,16 @@ function ImagePicker({
     setError("");
   };
 
+  const tabLabel: Record<Tab, string> = {
+    ai: "✨ AI",
+    search: "Search web",
+    url: "Paste URL",
+  };
+
   return (
     <div className="flex flex-col gap-3">
       <div className="flex gap-1 bg-black/30 p-1 rounded-xl">
-        {(["search", "url"] as const).map((t) => (
+        {(["ai", "search", "url"] as const).map((t) => (
           <button
             key={t}
             type="button"
@@ -158,10 +201,74 @@ function ImagePicker({
                 : "text-slate-500 hover:text-slate-300"
             }`}
           >
-            {t === "search" ? "Search web" : "Paste URL"}
+            {tabLabel[t]}
           </button>
         ))}
       </div>
+
+      {tab === "ai" && (
+        <>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={aiPrompt}
+              onChange={(e) => setAiPrompt(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && generate()}
+              placeholder="Describe the image — e.g. red dragon eating ice cream"
+              maxLength={240}
+              className="flex-1 bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-sky-500/25"
+            />
+            <button
+              type="button"
+              onClick={generate}
+              disabled={aiLoading || !aiPrompt.trim()}
+              className="px-4 py-2 rounded-xl bg-sky-600 text-white text-sm font-medium hover:bg-sky-500 transition-colors disabled:opacity-50"
+            >
+              {aiLoading ? "…" : "Generate"}
+            </button>
+          </div>
+          {error && <p className="text-xs text-rose-400">{error}</p>}
+          {aiLoading && (
+            <p className="text-xs text-slate-500 italic">
+              Painting your image… this can take 10–20 seconds.
+            </p>
+          )}
+          {aiResult && !aiLoading && (
+            <div className="flex flex-col gap-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={aiResult}
+                alt="Generated"
+                className="w-full max-h-64 object-contain rounded-xl border border-white/10 bg-black/30"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={generate}
+                  disabled={aiLoading}
+                  className="flex-1 px-3 py-2 rounded-xl border border-white/10 bg-white/5 text-slate-200 text-sm hover:bg-white/10 transition-colors disabled:opacity-50"
+                >
+                  Re-roll
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onSelect(aiResult)}
+                  className="flex-1 px-3 py-2 rounded-xl bg-sky-600 text-white text-sm font-semibold hover:bg-sky-500 transition-colors"
+                >
+                  Use this image
+                </button>
+              </div>
+            </div>
+          )}
+          {!aiResult && !aiLoading && !error && (
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Type a description and we&apos;ll generate an image. Works as
+              search too — &ldquo;apple logo&rdquo;, &ldquo;Eiffel Tower at
+              sunset&rdquo;, etc.
+            </p>
+          )}
+        </>
+      )}
 
       {tab === "search" && (
         <>
@@ -245,19 +352,41 @@ function ImagePicker({
           />
           <div className="flex-1 min-w-0">
             <div className="text-xs text-emerald-400 font-medium">
-              Image selected ✓
+              {selected.startsWith("data:")
+                ? "Edited image ✓"
+                : "Image selected ✓"}
             </div>
-            <div className="text-xs text-slate-500 truncate">{selected}</div>
+            <div className="text-xs text-slate-500 truncate">
+              {selected.startsWith("data:") ? "Local edit" : selected}
+            </div>
           </div>
           <button
             type="button"
+            onClick={() => setEditorOpen(true)}
+            aria-label="Edit image"
+            className="text-xs text-sky-400 hover:text-sky-300 px-2 py-1 rounded-lg border border-sky-500/30 bg-sky-500/10 hover:bg-sky-500/20 transition-colors"
+          >
+            ✎ Edit
+          </button>
+          <button
+            type="button"
             onClick={() => onSelect("")}
+            aria-label="Remove image"
             className="text-slate-500 hover:text-slate-300 text-lg px-1"
           >
             ×
           </button>
         </div>
       )}
+
+      <ImageEditor
+        src={editorOpen ? selected : null}
+        onClose={() => setEditorOpen(false)}
+        onSave={(dataUrl) => {
+          onSelect(dataUrl);
+          setEditorOpen(false);
+        }}
+      />
     </div>
   );
 }

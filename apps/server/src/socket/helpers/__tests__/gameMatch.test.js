@@ -49,11 +49,15 @@ test("isCorrectGuess accepts leading article on either side", () => {
   assert.equal(isCorrectGuess("a clockwork orange", "clockwork orange"), true);
 });
 
-test("isCorrectGuess accepts a single typo on ≥6-char answers", () => {
-  assert.equal(isCorrectGuess("picaso", "picasso"), true); // 1 missing letter
-  assert.equal(isCorrectGuess("eifel tower", "Eiffel Tower"), true);
-  // Short answers don't get the typo allowance — too risky.
-  assert.equal(isCorrectGuess("apl", "apple"), false);
+test("isCorrectGuess REJECTS typos (deletions, insertions, transpositions, substitutions)", () => {
+  // Players must actually type the answer to score. Typos are flagged as
+  // near-miss in the UI, not credited as correct.
+  assert.equal(isCorrectGuess("picaso", "picasso"), false); // delete
+  assert.equal(isCorrectGuess("picassso", "picasso"), false); // insert
+  assert.equal(isCorrectGuess("telsa", "tesla"), false); // transposition
+  assert.equal(isCorrectGuess("appel", "apple"), false); // transposition
+  assert.equal(isCorrectGuess("hyuntai", "hyundai"), false); // substitution
+  assert.equal(isCorrectGuess("eiffel towar", "Eiffel Tower"), false); // even on long
 });
 
 test("isCorrectGuess rejects clearly wrong guesses", () => {
@@ -63,11 +67,17 @@ test("isCorrectGuess rejects clearly wrong guesses", () => {
 });
 
 test("isNearMiss flags close-but-wrong guesses", () => {
-  assert.equal(isNearMiss("picsso", "Picasso"), true);
+  // The typos that USED to count as correct should now light up the
+  // amber "so close" badge, so players know they were on the right track.
+  assert.equal(isNearMiss("picaso", "picasso"), true);
+  assert.equal(isNearMiss("picassso", "picasso"), true);
+  assert.equal(isNearMiss("telsa", "tesla"), true);
+  assert.equal(isNearMiss("hyuntai", "hyundai"), true);
   assert.equal(isNearMiss("eifel towr", "Eiffel Tower"), true);
+
   assert.equal(isNearMiss("banana", "apple"), false);
-  // Exact match is not a near miss
+  // Exact match is not a near miss.
   assert.equal(isNearMiss("Picasso", "Picasso"), false);
-  // Very short answers don't trigger near-miss
+  // Very short answers don't trigger near-miss.
   assert.equal(isNearMiss("ax", "ab"), false);
 });
