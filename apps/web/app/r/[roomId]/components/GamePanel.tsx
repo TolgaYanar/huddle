@@ -153,14 +153,20 @@ function ImagePicker({
       );
       const data = (await res.json()) as {
         ok: boolean;
-        url?: string;
+        dataUrl?: string;
         reason?: string;
+        hint?: string;
       };
-      if (!data.ok || !data.url) {
-        setError("Couldn't generate that image. Try a different prompt.");
+      if (!data.ok || !data.dataUrl) {
+        setError(
+          data.hint ||
+            (data.reason === "upstream_busy"
+              ? "The image service is overloaded right now. Try again in a few seconds."
+              : "Couldn't generate that image. Try a different prompt."),
+        );
         return;
       }
-      setAiResult(data.url);
+      setAiResult(data.dataUrl);
     } catch {
       setError("Couldn't reach the image generator. Try again in a moment.");
     } finally {
@@ -229,9 +235,37 @@ function ImagePicker({
           </div>
           {error && <p className="text-xs text-rose-400">{error}</p>}
           {aiLoading && (
-            <p className="text-xs text-slate-500 italic">
-              Painting your image… this can take 10–20 seconds.
-            </p>
+            <div
+              className="flex flex-col items-center justify-center gap-2 w-full h-48 rounded-xl border border-white/10 bg-black/30"
+              aria-live="polite"
+            >
+              <svg
+                className="w-7 h-7 animate-spin text-sky-400"
+                viewBox="0 0 24 24"
+                aria-hidden
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  fill="none"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8v3a5 5 0 00-5 5H4z"
+                />
+              </svg>
+              <span className="text-sm text-slate-300 font-medium">
+                Painting your image…
+              </span>
+              <span className="text-xs text-slate-500">
+                Can take 10–30 seconds.
+              </span>
+            </div>
           )}
           {aiResult && !aiLoading && (
             <div className="flex flex-col gap-2">
