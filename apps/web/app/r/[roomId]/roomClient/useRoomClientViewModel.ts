@@ -358,6 +358,7 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
     endRound: room.endRound,
     nextRound: room.nextRound,
     endSession: room.endSession,
+    setObserver: room.setObserver,
     resetGame: room.resetGame,
     mySocketId: room.socket?.id || userId,
   });
@@ -376,6 +377,7 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
     endRound: game.endRound,
     nextRound: game.nextRound,
     endSession: game.endSession,
+    setObserver: game.setObserver,
     resetGame: game.resetGame,
   };
 

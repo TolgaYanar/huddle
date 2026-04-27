@@ -173,6 +173,15 @@ export interface PlaylistStateData {
   currentItemIndex?: number;
 }
 
+/** Options the creator can pass when starting a new game. */
+export interface CreateGameOptions {
+  /**
+   * Seconds before the current guesser auto-skips. `null` (or omitted) means
+   * "no timer". The server clamps to a sensible range.
+   */
+  turnTimerSeconds?: number | null;
+}
+
 // Game types
 export interface GameRoundInput {
   category: string;
@@ -186,12 +195,24 @@ export interface GameGuess {
   username: string | null;
   guess: string;
   correct: boolean;
+  /**
+   * True when the guess is wrong but very close to the answer (within a small
+   * Levenshtein distance, scaled to answer length). Lets the UI show a
+   * "so close!" indicator instead of just plain wrong.
+   */
+  nearMiss?: boolean;
   turnNumber: number;
 }
 
 export interface GameWinner {
   socketId: string;
   username: string | null;
+  /**
+   * Points awarded for this win. Baked in at the moment of correct guess
+   * (decreases as the questioner reveals more hints), so faster guessers
+   * earn more.
+   */
+  points?: number;
 }
 
 export interface GameRound {
@@ -209,7 +230,13 @@ export interface GameRound {
 
 export interface GameScoreEntry {
   username: string | null;
+  /** Number of rounds the player won (one per correct guess). */
   wins: number;
+  /**
+   * Total points: sum of per-win `GameWinner.points` (lower for hint-revealed
+   * answers). Use this for ranking.
+   */
+  score: number;
 }
 
 export interface GameQuestioner {
@@ -229,6 +256,20 @@ export interface GameSession {
   currentGuesserSocketId: string | null;
   participants: string[];
   participantUsernames: Record<string, string | null>;
+  /** Socket ids that have opted out of being a guesser ("watch only"). */
+  observers: string[];
+  /**
+   * Configured turn timer in seconds. `null` means "no timer". Set at game
+   * creation and unchanged thereafter.
+   */
+  turnTimerSeconds: number | null;
+  /**
+   * Absolute server-time ms at which the current guesser's turn auto-skips.
+   * `null` when no turn is in flight (staging, finished, between rounds).
+   */
+  turnDeadline: number | null;
+  /** Server's clock at the moment this payload was built — for client-side offset estimation. */
+  serverNow: number;
 }
 
 export interface GameData {

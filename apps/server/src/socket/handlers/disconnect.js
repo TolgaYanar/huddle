@@ -1,4 +1,5 @@
 const { emitRoomUsersToRoom } = require("../helpers/users");
+const { cleanupDisconnectFromGames } = require("../helpers/gameTimer");
 
 function attachDisconnectHandler(io, state, socket, joinedRooms, deps) {
   socket.on("disconnect", () => {
@@ -21,6 +22,13 @@ function attachDisconnectHandler(io, state, socket, joinedRooms, deps) {
       if (map) {
         map.delete(socket.id);
         if (map.size === 0) state.roomMediaState.delete(roomId);
+      }
+
+      // Drop the socket from any active games and rotate the turn if needed.
+      try {
+        cleanupDisconnectFromGames(io, state, roomId, socket.id);
+      } catch (err) {
+        console.error("Failed to clean up games on disconnect:", err.message);
       }
 
       socket.to(roomId).emit("user_left", { socketId: socket.id, username });

@@ -5,6 +5,18 @@ const {
   emitGameStateTo,
   emitGameStateToRoom,
 } = require("../helpers/game");
+const { isCorrectGuess, isNearMiss } = require("../helpers/gameMatch");
+const {
+  parseTurnTimer,
+  cancelTurnTimer,
+  scheduleTurnTimer,
+} = require("../helpers/gameTimer");
+
+// Turn-cost-per-hint: 0 hints → 1.0 pts, 1 → 0.75, 2 → 0.5, 3+ → 0.25.
+function pointsForWin(hintsRevealed) {
+  const h = Number.isFinite(hintsRevealed) ? Math.max(0, hintsRevealed) : 0;
+  return Math.max(0.25, 1 - 0.25 * h);
+}
 
 const GAME_CATEGORIES = [
   "Brands", "People", "Places", "Movies & TV",
@@ -78,6 +90,8 @@ function attachGameHandlers(io, state, socket) {
     const username = state.socketIdToUsername.get(socket.id) || null;
     const gameId = makeGameId();
 
+    const turnTimerSeconds = parseTurnTimer(data?.turnTimerSeconds);
+
     const game = {
       id: gameId,
       creatorId: socket.id,
@@ -93,8 +107,11 @@ function attachGameHandlers(io, state, socket) {
         currentQuestionerIdx: 0,
         currentGuesserIdx: 0,
         participants: [],
+        observers: [],
         status: "staging",
         startedAt: null,
+        turnTimerSeconds,
+        turnDeadline: null,
       },
     };
 
@@ -177,6 +194,7 @@ function attachGameHandlers(io, state, socket) {
     game.session.currentQuestionerIdx = 0;
     game.session.currentGuesserIdx = 0;
 
+    scheduleTurnTimer(io, state, roomId, gameId);
     emitGameStateToRoom(io, state, roomId);
   });
 
@@ -208,20 +226,27 @@ function attachGameHandlers(io, state, socket) {
     if (!cleanGuess) return;
 
     const username = state.socketIdToUsername.get(socket.id) || null;
-    const isCorrect =
-      cleanGuess.toLowerCase() === round.answer.toLowerCase();
+    const isCorrect = isCorrectGuess(cleanGuess, round.answer);
+    const nearMiss = !isCorrect && isNearMiss(cleanGuess, round.answer);
 
     round.guesses.push({
       socketId: socket.id,
       username,
       guess: cleanGuess,
       correct: isCorrect,
+      nearMiss,
       turnNumber: round.guesses.length,
     });
 
     if (isCorrect && !round.winners.includes(socket.id)) {
       round.winners.push(socket.id);
-      round.winnerUsernames.push({ socketId: socket.id, username });
+      // Bake in the score *at the moment of winning*, before any further
+      // hints are revealed. Faster guessers earn more.
+      round.winnerUsernames.push({
+        socketId: socket.id,
+        username,
+        points: pointsForWin(round.hintsRevealed || 0),
+      });
     }
 
     game.session.currentGuesserIdx++;
@@ -232,6 +257,7 @@ function attachGameHandlers(io, state, socket) {
       round.answerMasked = Array.from(round.answer);
     }
 
+    scheduleTurnTimer(io, state, roomId, gameId);
     emitGameStateToRoom(io, state, roomId);
   });
 
@@ -284,6 +310,7 @@ function attachGameHandlers(io, state, socket) {
     ) return;
 
     game.session.currentGuesserIdx++;
+    scheduleTurnTimer(io, state, roomId, gameId);
     emitGameStateToRoom(io, state, roomId);
   });
 
@@ -312,6 +339,7 @@ function attachGameHandlers(io, state, socket) {
       round.answerMasked = Array.from(round.answer);
     }
 
+    scheduleTurnTimer(io, state, roomId, gameId);
     emitGameStateToRoom(io, state, roomId);
   });
 
@@ -354,6 +382,7 @@ function attachGameHandlers(io, state, socket) {
       game.session.status = "finished";
     }
 
+    scheduleTurnTimer(io, state, roomId, gameId);
     emitGameStateToRoom(io, state, roomId);
   });
 
@@ -379,6 +408,48 @@ function attachGameHandlers(io, state, socket) {
       }
     }
 
+    cancelTurnTimer(state, gameId);
+    game.session.turnDeadline = null;
+    emitGameStateToRoom(io, state, roomId);
+  });
+
+  // ── Observer toggle (self) ────────────────────────────────────────────────
+  // Lets a player opt out of being a guesser without leaving the room. The
+  // active questioner can't be an observer (would block the round).
+  socket.on("game_set_observer", (data) => {
+    const { roomId, gameId, observer } = data || {};
+    if (!roomId || typeof roomId !== "string") return;
+    if (!socket.rooms.has(roomId)) return;
+    if (typeof observer !== "boolean") return;
+
+    const games = state.roomGames.get(roomId);
+    if (!games) return;
+    const game = games.get(gameId);
+    if (!game) return;
+
+    if (!Array.isArray(game.session.observers)) game.session.observers = [];
+    const observers = game.session.observers;
+
+    if (observer) {
+      // Active questioner can't go observer-only mid-round.
+      const aq = getActiveQuestioner(game);
+      if (game.session.status === "active" && aq && aq.socketId === socket.id) {
+        return;
+      }
+      if (!observers.includes(socket.id)) observers.push(socket.id);
+      // If the current guesser just opted out, advance.
+      if (
+        game.session.status === "active" &&
+        getCurrentGuesserSocketId(game) === socket.id
+      ) {
+        game.session.currentGuesserIdx++;
+      }
+    } else {
+      const idx = observers.indexOf(socket.id);
+      if (idx !== -1) observers.splice(idx, 1);
+    }
+
+    scheduleTurnTimer(io, state, roomId, gameId);
     emitGameStateToRoom(io, state, roomId);
   });
 
@@ -398,6 +469,7 @@ function attachGameHandlers(io, state, socket) {
       !isHost(state, roomId, socket.id)
     ) return;
 
+    cancelTurnTimer(state, gameId);
     games.delete(gameId);
     emitGameStateToRoom(io, state, roomId);
   });

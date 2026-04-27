@@ -2,7 +2,11 @@ import { useCallback } from "react";
 import type { MutableRefObject } from "react";
 import type { Socket } from "socket.io-client";
 
-import type { GameRoundInput, GameStateData } from "../types";
+import type {
+  CreateGameOptions,
+  GameRoundInput,
+  GameStateData,
+} from "../types";
 
 export function useGameApi({
   roomId,
@@ -21,10 +25,14 @@ export function useGameApi({
 
   // Create a new game (caller becomes creator + first questioner)
   const createGame = useCallback(
-    (rounds: GameRoundInput[]) => {
+    (rounds: GameRoundInput[], options?: CreateGameOptions) => {
       const socket = socketRef.current;
       if (!socket?.connected) return;
-      socket.emit("game_create", { roomId, rounds });
+      socket.emit("game_create", {
+        roomId,
+        rounds,
+        turnTimerSeconds: options?.turnTimerSeconds ?? null,
+      });
     },
     [roomId, socketRef],
   );
@@ -114,6 +122,16 @@ export function useGameApi({
     [roomId, socketRef],
   );
 
+  // Toggle "watch only" for self in this game
+  const setObserver = useCallback(
+    (gameId: string, observer: boolean) => {
+      const socket = socketRef.current;
+      if (!socket?.connected) return;
+      socket.emit("game_set_observer", { roomId, gameId, observer });
+    },
+    [roomId, socketRef],
+  );
+
   // Delete/reset a game
   const resetGame = useCallback(
     (gameId: string) => {
@@ -156,6 +174,7 @@ export function useGameApi({
     endRound,
     nextRound,
     endSession,
+    setObserver,
     resetGame,
     onGameState,
   };

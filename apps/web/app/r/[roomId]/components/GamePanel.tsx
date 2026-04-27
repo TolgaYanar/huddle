@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import type {
+  CreateGameOptions,
   GameData,
   GameQuestioner,
   GameRound,
@@ -14,13 +15,22 @@ const CATEGORIES = [
   "Music", "Sports", "Animals", "Things", "Other",
 ];
 
+// Turn-timer choices surfaced in the setup form. null means "no timer".
+const TURN_TIMER_OPTIONS: { label: string; value: number | null }[] = [
+  { label: "Off", value: null },
+  { label: "20s", value: 20 },
+  { label: "30s", value: 30 },
+  { label: "60s", value: 60 },
+  { label: "90s", value: 90 },
+];
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type GamePanelProps = {
   gameState: GameStateData;
   mySocketId: string;
   isRoomHost: boolean;
-  createGame: (rounds: GameRoundInput[]) => void;
+  createGame: (rounds: GameRoundInput[], options?: CreateGameOptions) => void;
   addRounds: (gameId: string, rounds: GameRoundInput[]) => void;
   removeRounds: (gameId: string) => void;
   startSession: (gameId: string) => void;
@@ -30,6 +40,7 @@ export type GamePanelProps = {
   endRound: (gameId: string) => void;
   nextRound: (gameId: string) => void;
   endSession: (gameId: string) => void;
+  setObserver: (gameId: string, observer: boolean) => void;
   resetGame: (gameId: string) => void;
 };
 
@@ -391,18 +402,22 @@ function RoundEditor({
 function RoundSetupForm({
   title,
   submitLabel,
+  showCreatorOptions,
   onSubmit,
   onCancel,
 }: {
   title: string;
   submitLabel: string;
-  onSubmit: (rounds: GameRoundInput[]) => void;
+  /** When true, render game-level creator options (turn timer). */
+  showCreatorOptions?: boolean;
+  onSubmit: (rounds: GameRoundInput[], options?: CreateGameOptions) => void;
   onCancel: () => void;
 }) {
   const [rounds, setRounds] = useState<GameRoundInput[]>([
     { category: "Brands", answer: "", image: "", hideBlanks: false },
   ]);
   const [activeIdx, setActiveIdx] = useState(0);
+  const [turnTimerSeconds, setTurnTimerSeconds] = useState<number | null>(null);
 
   const addRound = () => {
     if (rounds.length >= 10) return;
@@ -479,6 +494,45 @@ function RoundSetupForm({
         canRemove={rounds.length > 1}
       />
 
+      {/* Game-level options (creator only — these are baked into the game,
+          not into individual rounds) */}
+      {showCreatorOptions && (
+        <div className="flex flex-col gap-2 rounded-2xl border border-white/10 bg-white/3 p-4">
+          <div className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
+            Game settings
+          </div>
+          <div className="flex items-center gap-3">
+            <label
+              htmlFor="game-turn-timer"
+              className="text-xs text-slate-400 shrink-0"
+            >
+              Turn timer
+            </label>
+            <select
+              id="game-turn-timer"
+              value={turnTimerSeconds ?? ""}
+              onChange={(e) =>
+                setTurnTimerSeconds(
+                  e.target.value === "" ? null : Number(e.target.value),
+                )
+              }
+              className="flex-1 bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/25"
+            >
+              {TURN_TIMER_OPTIONS.map((o) => (
+                <option key={o.label} value={o.value ?? ""}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <p className="text-[11px] text-slate-500 leading-relaxed">
+            When the timer expires, the current guesser auto-skips. Hints
+            also cost points — full score for guessing without hints, less for
+            each letter the questioner reveals.
+          </p>
+        </div>
+      )}
+
       {/* Actions */}
       <div className="flex gap-3">
         <button
@@ -491,7 +545,12 @@ function RoundSetupForm({
         <button
           type="button"
           disabled={validRounds.length === 0}
-          onClick={() => onSubmit(validRounds)}
+          onClick={() =>
+            onSubmit(
+              validRounds,
+              showCreatorOptions ? { turnTimerSeconds } : undefined,
+            )
+          }
           className="flex-1 py-2.5 rounded-xl bg-sky-600 text-white text-sm font-semibold hover:bg-sky-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {submitLabel} ({validRounds.length})
@@ -538,6 +597,147 @@ function AnswerBlanks({
         ),
       )}
     </div>
+  );
+}
+
+// ─── Turn queue strip ─────────────────────────────────────────────────────────
+//
+// Visualises the guessing rotation: who's up now, who's waiting, who already
+// got it, plus observers. The order reflects how the server picks the next
+// guesser — it's the participant list filtered by observers, with the active
+// questioner skipped.
+
+function TurnQueue({
+  game,
+  round,
+  mySocketId,
+}: {
+  game: GameData;
+  round: GameRound;
+  mySocketId: string;
+}) {
+  const activeQuestionerId = game.session.currentQuestionerId;
+  const observers = new Set(game.session.observers ?? []);
+  const winners = new Set(round.winners);
+  const currentGuesserId = game.session.currentGuesserSocketId;
+
+  // Keep participant order; split into guessers vs observers.
+  const guessers = (game.session.participants ?? []).filter(
+    (id) => id !== activeQuestionerId && !observers.has(id),
+  );
+  const observerList = (game.session.participants ?? []).filter((id) =>
+    observers.has(id),
+  );
+
+  if (guessers.length === 0 && observerList.length === 0) return null;
+
+  const renderPill = (id: string, kind: "guesser" | "observer") => {
+    const name = game.session.participantUsernames[id] ?? id.slice(0, 6);
+    const isMe = id === mySocketId;
+    const won = winners.has(id);
+    const isCurrent = id === currentGuesserId && !won;
+
+    let cls =
+      "px-2.5 py-1 rounded-full text-xs font-medium border whitespace-nowrap shrink-0 transition-colors ";
+    let icon = "";
+    if (kind === "observer") {
+      cls += "border-white/10 bg-white/5 text-slate-500 italic";
+      icon = "👁 ";
+    } else if (isCurrent) {
+      cls +=
+        "border-sky-400/60 bg-sky-500/25 text-sky-100 ring-2 ring-sky-400/30";
+      icon = "🎯 ";
+    } else if (won) {
+      cls += "border-emerald-500/40 bg-emerald-500/15 text-emerald-300";
+      icon = "✓ ";
+    } else {
+      cls += "border-white/10 bg-white/5 text-slate-300";
+    }
+
+    return (
+      <span key={id} className={cls} title={isMe ? "You" : name}>
+        {icon}
+        {isMe ? "You" : name}
+      </span>
+    );
+  };
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">
+        Turn order
+      </div>
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 -mb-1">
+        {guessers.map((id) => renderPill(id, "guesser"))}
+        {observerList.length > 0 && (
+          <>
+            {guessers.length > 0 && (
+              <span className="shrink-0 text-slate-600 px-1">·</span>
+            )}
+            {observerList.map((id) => renderPill(id, "observer"))}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Turn countdown ───────────────────────────────────────────────────────────
+//
+// Reads the absolute server-time deadline from the game payload, accounts
+// for clock skew via serverNow, and renders a ticking seconds-left badge
+// next to the turn banner. Renders nothing when the game has no timer or no
+// active turn.
+
+function useSecondsLeft(turnDeadline: number | null, serverNow: number) {
+  const offset = serverNow ? Date.now() - serverNow : 0;
+  const compute = () => {
+    if (!turnDeadline) return null;
+    return Math.max(0, Math.ceil((turnDeadline - (Date.now() - offset)) / 1000));
+  };
+  const [value, setValue] = useState<number | null>(compute);
+  useEffect(() => {
+    if (!turnDeadline) {
+      setValue(null);
+      return;
+    }
+    setValue(compute());
+    const id = window.setInterval(() => setValue(compute()), 250);
+    return () => window.clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [turnDeadline, serverNow]);
+  return value;
+}
+
+function TurnCountdown({
+  turnDeadline,
+  serverNow,
+  isMyTurn,
+}: {
+  turnDeadline: number | null;
+  serverNow: number;
+  isMyTurn: boolean;
+}) {
+  const seconds = useSecondsLeft(turnDeadline, serverNow);
+  if (seconds === null) return null;
+
+  const danger = seconds <= 5;
+  const warning = !danger && seconds <= 10;
+  const cls = danger
+    ? "border-rose-500/40 bg-rose-500/15 text-rose-200"
+    : warning
+      ? "border-amber-500/40 bg-amber-500/15 text-amber-200"
+      : "border-white/10 bg-white/5 text-slate-300";
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-mono font-semibold border tabular-nums ${cls} ${
+        danger ? "animate-pulse" : ""
+      }`}
+      aria-label={`${seconds} seconds left${isMyTurn ? " — your turn" : ""}`}
+    >
+      ⏱ {seconds}s
+    </span>
   );
 }
 
@@ -623,6 +823,9 @@ function ActiveRoundView({
       {/* Answer blanks */}
       <AnswerBlanks masked={round.answerMasked} hidden={blanksHidden} />
 
+      {/* Turn queue */}
+      <TurnQueue game={game} round={round} mySocketId={mySocketId} />
+
       {amActiveQuestioner && round.hideBlanks && round.hintsRevealed === 0 && (
         <p className="text-center text-xs text-amber-400/60">
           Players see &ldquo;Answer hidden&rdquo; until first hint
@@ -637,21 +840,29 @@ function ActiveRoundView({
 
       {/* Turn indicator */}
       <div
-        className={`text-center text-sm font-medium py-2 rounded-xl ${
+        className={`flex items-center justify-center gap-2 font-semibold py-3 px-3 rounded-xl border transition-colors ${
           isMyTurn
-            ? "bg-sky-600/20 text-sky-300"
+            ? "bg-sky-500/20 text-sky-200 border-sky-500/50 text-base ring-2 ring-sky-500/30 shadow-lg shadow-sky-500/10"
             : iAmWinner
-              ? "bg-emerald-600/20 text-emerald-300"
-              : "bg-white/5 text-slate-400"
+              ? "bg-emerald-600/20 text-emerald-300 border-emerald-600/30 text-sm"
+              : "bg-white/5 text-slate-400 border-white/5 text-sm"
         }`}
+        aria-live="polite"
       >
-        {iAmWinner
-          ? "You guessed it! Waiting for others…"
-          : isMyTurn
-            ? "Your turn to guess!"
-            : amActiveQuestioner
-              ? `Waiting for ${currentGuesserName} to guess…`
-              : `${currentGuesserName}'s turn`}
+        <span className="text-center">
+          {iAmWinner
+            ? "✓ You guessed it! Waiting for others…"
+            : isMyTurn
+              ? "🎯 Your turn — type your guess"
+              : amActiveQuestioner
+                ? `Waiting for ${currentGuesserName} to guess…`
+                : `${currentGuesserName}'s turn`}
+        </span>
+        <TurnCountdown
+          turnDeadline={game.session?.turnDeadline ?? null}
+          serverNow={game.session?.serverNow ?? Date.now()}
+          isMyTurn={isMyTurn}
+        />
       </div>
 
       {/* Guess input */}
@@ -678,15 +889,26 @@ function ActiveRoundView({
       {/* Questioner / creator controls */}
       {(amActiveQuestioner || amCreator) && (
         <div className="grid grid-cols-2 gap-2">
-          {amActiveQuestioner && (
-            <button
-              type="button"
-              onClick={onRevealHint}
-              className="py-2.5 rounded-xl border border-amber-500/30 bg-amber-600/10 text-amber-300 text-sm font-medium hover:bg-amber-600/20 transition-colors"
-            >
-              Reveal a letter
-            </button>
-          )}
+          {amActiveQuestioner && (() => {
+            const lettersRemaining = (round.answerMasked ?? []).filter(
+              (c) => c === "_",
+            ).length;
+            return (
+              <button
+                type="button"
+                onClick={onRevealHint}
+                disabled={lettersRemaining === 0}
+                className="py-2.5 rounded-xl border border-amber-500/30 bg-amber-600/10 text-amber-300 text-sm font-medium hover:bg-amber-600/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Reveal a letter
+                {lettersRemaining > 0 && (
+                  <span className="ml-1 text-xs text-amber-400/70">
+                    ({lettersRemaining} left)
+                  </span>
+                )}
+              </button>
+            );
+          })()}
           <button
             type="button"
             onClick={onSkipTurn}
@@ -712,20 +934,33 @@ function ActiveRoundView({
             {[...round.guesses].reverse().map((g, i) => (
               <div
                 key={i}
-                className={`flex items-center justify-between text-sm px-3 py-1.5 rounded-xl ${
+                className={`flex items-center justify-between gap-2 text-sm px-3 py-1.5 rounded-xl ${
                   g.correct
                     ? "bg-emerald-600/15 border border-emerald-600/20"
-                    : "bg-white/5 border border-white/5"
+                    : g.nearMiss
+                      ? "bg-amber-600/10 border border-amber-600/25"
+                      : "bg-white/5 border border-white/5"
                 }`}
               >
-                <span className="text-slate-400">{g.username ?? "Unknown"}</span>
+                <span className="text-slate-400 truncate">
+                  {g.username ?? "Unknown"}
+                </span>
                 <span
                   className={
-                    g.correct ? "text-emerald-300 font-medium" : "text-slate-300"
+                    g.correct
+                      ? "text-emerald-300 font-medium"
+                      : g.nearMiss
+                        ? "text-amber-300"
+                        : "text-slate-300"
                   }
                 >
                   {g.guess}
                   {g.correct && " ✓"}
+                  {!g.correct && g.nearMiss && (
+                    <span className="ml-1.5 text-[10px] uppercase tracking-wider text-amber-400">
+                      so close
+                    </span>
+                  )}
                 </span>
               </div>
             ))}
@@ -866,9 +1101,18 @@ function FinalScoreboard({
     (sum, q) => sum + q.totalRounds,
     0,
   );
-  const scores = Object.entries(game.scoreboard).sort(
-    ([, a], [, b]) => b.wins - a.wins,
-  );
+  const scores = Object.entries(game.scoreboard).sort(([, a], [, b]) => {
+    const sa = typeof a.score === "number" ? a.score : a.wins;
+    const sb = typeof b.score === "number" ? b.score : b.wins;
+    if (sb !== sa) return sb - sa;
+    return b.wins - a.wins;
+  });
+
+  const fmtScore = (n: number) => {
+    if (Number.isInteger(n)) return String(n);
+    // Trim trailing zeros, max 2 decimals.
+    return Number(n.toFixed(2)).toString();
+  };
 
   return (
     <div className="flex flex-col gap-6 py-2">
@@ -887,28 +1131,43 @@ function FinalScoreboard({
           <div className="text-xs text-slate-500 font-medium uppercase tracking-wider">
             Scoreboard
           </div>
-          {scores.map(([socketId, entry], i) => (
-            <div
-              key={socketId}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${
-                i === 0
-                  ? "bg-amber-600/10 border-amber-500/30"
-                  : "bg-white/5 border-white/5"
-              }`}
-            >
-              <span className="text-lg">
-                {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}.`}
-              </span>
-              <span className="flex-1 font-medium text-slate-200">
-                {entry.username ?? "Unknown"}
-              </span>
-              <span
-                className={`text-sm font-bold ${i === 0 ? "text-amber-300" : "text-slate-400"}`}
+          {scores.map(([socketId, entry], i) => {
+            const pts =
+              typeof entry.score === "number" ? entry.score : entry.wins;
+            return (
+              <div
+                key={socketId}
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${
+                  i === 0
+                    ? "bg-amber-600/10 border-amber-500/30"
+                    : "bg-white/5 border-white/5"
+                }`}
               >
-                {entry.wins} / {totalRounds}
-              </span>
-            </div>
-          ))}
+                <span className="text-lg">
+                  {i === 0
+                    ? "🥇"
+                    : i === 1
+                      ? "🥈"
+                      : i === 2
+                        ? "🥉"
+                        : `${i + 1}.`}
+                </span>
+                <span className="flex-1 font-medium text-slate-200">
+                  {entry.username ?? "Unknown"}
+                </span>
+                <span
+                  className={`text-sm font-bold tabular-nums ${
+                    i === 0 ? "text-amber-300" : "text-slate-400"
+                  }`}
+                >
+                  {fmtScore(pts)} pts
+                </span>
+                <span className="text-xs text-slate-500 tabular-nums shrink-0">
+                  {entry.wins}/{totalRounds}
+                </span>
+              </div>
+            );
+          })}
         </div>
       ) : (
         <div className="text-center text-slate-500">
@@ -1070,6 +1329,7 @@ function GameView({
   onEndRound,
   onNextRound,
   onEndSession,
+  onSetObserver,
   onReset,
   onBack,
 }: {
@@ -1085,11 +1345,17 @@ function GameView({
   onEndRound: () => void;
   onNextRound: () => void;
   onEndSession: () => void;
+  onSetObserver: (observer: boolean) => void;
   onReset: () => void;
   onBack: () => void;
 }) {
   const isCreator = game.creatorId === mySocketId;
   const canManage = isCreator || isRoomHost;
+  const observers = new Set(game.session?.observers ?? []);
+  const iAmObserver = observers.has(mySocketId);
+  const iAmActiveQuestioner =
+    game.session?.currentQuestionerId === mySocketId &&
+    game.status === "active";
 
   const header = (
     <div className="flex items-center gap-3 mb-5">
@@ -1103,6 +1369,27 @@ function GameView({
       <div className="flex-1 text-sm font-medium text-slate-300 truncate">
         {game.creatorName ?? "Unknown"}&rsquo;s game
       </div>
+      {/* Watch-only toggle: hidden during finished sessions and for the
+          currently-active questioner (can't observe while it's your round). */}
+      {game.status !== "finished" && !iAmActiveQuestioner && (
+        <button
+          type="button"
+          onClick={() => onSetObserver(!iAmObserver)}
+          aria-pressed={iAmObserver ? "true" : "false"}
+          title={
+            iAmObserver
+              ? "Re-join the guessing rotation"
+              : "Stop being a guesser — keep watching"
+          }
+          className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${
+            iAmObserver
+              ? "border-amber-500/30 bg-amber-600/15 text-amber-200 hover:bg-amber-600/25"
+              : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"
+          }`}
+        >
+          {iAmObserver ? "👁 Watch only" : "🎮 Playing"}
+        </button>
+      )}
       {canManage && game.status === "active" && (
         <button
           type="button"
@@ -1149,21 +1436,39 @@ function GameView({
       {/* Questioner tabs */}
       {game.questioners.length > 1 && (
         <div className="flex gap-1 bg-black/30 p-1 rounded-xl mb-4 overflow-x-auto">
-          {game.questioners.map((q) => (
-            <div
-              key={q.socketId}
-              className={`flex-1 min-w-max px-3 py-1.5 rounded-lg text-xs font-medium text-center transition-colors ${
-                q.isActive
-                  ? "bg-sky-600 text-white"
-                  : q.isDone
-                    ? "text-slate-600 line-through"
-                    : "text-slate-400"
-              }`}
-            >
-              {q.username ?? "Unknown"}
-              {q.isActive && <span className="ml-1 text-sky-200">●</span>}
-            </div>
-          ))}
+          {game.questioners.map((q) => {
+            const progressLabel = `${Math.min(q.currentRoundIndex + (q.isDone ? 0 : 1), q.totalRounds)}/${q.totalRounds}`;
+            return (
+              <div
+                key={q.socketId}
+                className={`flex-1 min-w-max px-3 py-1.5 rounded-lg text-xs font-medium text-center transition-colors flex items-center justify-center gap-1.5 ${
+                  q.isActive
+                    ? "bg-sky-600 text-white"
+                    : q.isDone
+                      ? "text-slate-600 line-through"
+                      : "text-slate-400"
+                }`}
+              >
+                <span className="truncate">{q.username ?? "Unknown"}</span>
+                <span
+                  className={`shrink-0 text-[10px] ${
+                    q.isActive
+                      ? "text-sky-100"
+                      : q.isDone
+                        ? "text-slate-600"
+                        : "text-slate-500"
+                  }`}
+                >
+                  {progressLabel}
+                </span>
+                {q.isActive && (
+                  <span className="text-sky-200" aria-hidden>
+                    ●
+                  </span>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -1217,7 +1522,10 @@ function GameLobby({
   mySocketId: string;
   isRoomHost: boolean;
   onSelectGame: (gameId: string) => void;
-  onCreateGame: (rounds: GameRoundInput[]) => void;
+  onCreateGame: (
+    rounds: GameRoundInput[],
+    options?: CreateGameOptions,
+  ) => void;
   onDeleteGame: (gameId: string) => void;
 }) {
   const [creatingGame, setCreatingGame] = useState(false);
@@ -1227,8 +1535,9 @@ function GameLobby({
       <RoundSetupForm
         title="Create game — your rounds"
         submitLabel="Create game"
-        onSubmit={(rounds) => {
-          onCreateGame(rounds);
+        showCreatorOptions
+        onSubmit={(rounds, options) => {
+          onCreateGame(rounds, options);
           setCreatingGame(false);
         }}
         onCancel={() => setCreatingGame(false)}
@@ -1270,12 +1579,45 @@ function GameLobby({
       </div>
 
       {games.length === 0 ? (
-        <div className="flex flex-col items-center gap-5 py-10 text-center">
+        <div className="flex flex-col items-center gap-4 py-6">
           <div className="text-5xl">🔍</div>
-          <div className="text-sm text-slate-500 max-w-xs leading-relaxed">
-            Create a game — define your rounds, let others join as questioners
-            with their own rounds, then start playing!
+          <div className="w-full rounded-2xl border border-white/10 bg-white/5 p-4">
+            <div className="text-sm font-semibold text-slate-100 mb-2">
+              How to play
+            </div>
+            <ol className="text-xs text-slate-400 leading-relaxed space-y-1.5 list-decimal pl-4">
+              <li>
+                <span className="text-slate-200 font-medium">Pick rounds.</span>{" "}
+                For each round set a category, the secret answer, and an
+                optional clue image.
+              </li>
+              <li>
+                <span className="text-slate-200 font-medium">Invite friends.</span>{" "}
+                Other players in this room can join as additional questioners
+                with their own rounds.
+              </li>
+              <li>
+                <span className="text-slate-200 font-medium">Take turns.</span>{" "}
+                Guessers go one by one. The questioner can reveal letters as
+                hints, skip a stuck guesser, or end the round.
+              </li>
+              <li>
+                <span className="text-slate-200 font-medium">Win it.</span>{" "}
+                Every correct guess earns a point. Highest score wins.
+              </li>
+            </ol>
+            <div className="mt-3 pt-3 border-t border-white/10 text-[11px] text-slate-500">
+              Typos and punctuation are forgiven — &ldquo;the matrix&rdquo; matches
+              &ldquo;Matrix&rdquo;, &ldquo;cafe&rdquo; matches &ldquo;café&rdquo;.
+            </div>
           </div>
+          <button
+            type="button"
+            onClick={() => setCreatingGame(true)}
+            className="px-5 py-2.5 rounded-xl bg-sky-600 text-white text-sm font-semibold hover:bg-sky-500 transition-colors"
+          >
+            Create your first game
+          </button>
         </div>
       ) : (
         <div className="flex flex-col gap-2">
@@ -1339,6 +1681,7 @@ export function GamePanel({
   endRound,
   nextRound,
   endSession,
+  setObserver,
   resetGame,
 }: GamePanelProps) {
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
@@ -1379,6 +1722,9 @@ export function GamePanel({
         onEndRound={() => endRound(selectedGame.gameId)}
         onNextRound={() => nextRound(selectedGame.gameId)}
         onEndSession={() => endSession(selectedGame.gameId)}
+        onSetObserver={(observer) =>
+          setObserver(selectedGame.gameId, observer)
+        }
         onReset={() => {
           resetGame(selectedGame.gameId);
           setSelectedGameId(null);
@@ -1394,8 +1740,8 @@ export function GamePanel({
       mySocketId={mySocketId}
       isRoomHost={isRoomHost}
       onSelectGame={setSelectedGameId}
-      onCreateGame={(rounds) => {
-        createGame(rounds);
+      onCreateGame={(rounds, options) => {
+        createGame(rounds, options);
       }}
       onDeleteGame={(gameId) => resetGame(gameId)}
     />

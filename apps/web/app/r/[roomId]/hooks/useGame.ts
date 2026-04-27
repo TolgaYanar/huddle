@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import type { GameRoundInput, GameStateData } from "shared-logic";
+import type {
+  CreateGameOptions,
+  GameRoundInput,
+  GameStateData,
+} from "shared-logic";
 
 export function useGame({
   onGameState,
@@ -14,12 +18,13 @@ export function useGame({
   endRound,
   nextRound,
   endSession,
+  setObserver,
   resetGame,
   mySocketId,
 }: {
   onGameState: (cb: (data: GameStateData) => void) => () => void;
   requestGameState: () => void;
-  createGame: (rounds: GameRoundInput[]) => void;
+  createGame: (rounds: GameRoundInput[], options?: CreateGameOptions) => void;
   addRounds: (gameId: string, rounds: GameRoundInput[]) => void;
   removeRounds: (gameId: string) => void;
   startSession: (gameId: string) => void;
@@ -29,6 +34,7 @@ export function useGame({
   endRound: (gameId: string) => void;
   nextRound: (gameId: string) => void;
   endSession: (gameId: string) => void;
+  setObserver: (gameId: string, observer: boolean) => void;
   resetGame: (gameId: string) => void;
   mySocketId: string;
 }) {
@@ -65,6 +71,7 @@ export function useGame({
     endRound,
     nextRound,
     endSession,
+    setObserver,
     resetGame,
     mySocketId,
   };

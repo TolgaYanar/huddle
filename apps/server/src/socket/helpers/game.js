@@ -5,7 +5,10 @@ function getActiveQuestioner(game) {
 function getGuessers(game) {
   const aq = getActiveQuestioner(game);
   if (!aq) return [];
-  return game.session.participants.filter((id) => id !== aq.socketId);
+  const observers = new Set(game.session.observers || []);
+  return game.session.participants.filter(
+    (id) => id !== aq.socketId && !observers.has(id),
+  );
 }
 
 function getCurrentGuesserSocketId(game) {
@@ -55,14 +58,37 @@ function buildGamePayload(state, game, forSocketId) {
   const scoreboard = {};
   for (const q of game.questioners) {
     for (const round of q.rounds) {
-      for (const winnerId of round.winners) {
-        if (!scoreboard[winnerId]) {
-          scoreboard[winnerId] = {
-            username: state.socketIdToUsername.get(winnerId) || null,
+      // Prefer the richer winnerUsernames list (carries the per-win points
+      // baked in at the moment of guessing). Fall back to the bare
+      // winners[] array for backwards-compat with rounds in flight.
+      const enriched = Array.isArray(round.winnerUsernames)
+        ? round.winnerUsernames
+        : [];
+      const winnersList =
+        enriched.length > 0
+          ? enriched
+          : (round.winners || []).map((socketId) => ({
+              socketId,
+              username: state.socketIdToUsername.get(socketId) || null,
+              points: 1,
+            }));
+
+      for (const w of winnersList) {
+        const id = w.socketId;
+        if (!id) continue;
+        if (!scoreboard[id]) {
+          scoreboard[id] = {
+            username:
+              state.socketIdToUsername.get(id) || w.username || null,
             wins: 0,
+            score: 0,
           };
         }
-        scoreboard[winnerId].wins++;
+        scoreboard[id].wins++;
+        scoreboard[id].score +=
+          typeof w.points === "number" && Number.isFinite(w.points)
+            ? w.points
+            : 1;
       }
     }
   }
@@ -96,6 +122,12 @@ function buildGamePayload(state, game, forSocketId) {
       currentGuesserSocketId,
       participants: game.session.participants,
       participantUsernames,
+      observers: Array.isArray(game.session.observers)
+        ? [...game.session.observers]
+        : [],
+      turnTimerSeconds: game.session.turnTimerSeconds ?? null,
+      turnDeadline: game.session.turnDeadline ?? null,
+      serverNow: Date.now(),
     },
     scoreboard,
   };
