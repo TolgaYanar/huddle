@@ -30,9 +30,10 @@ const IMAGE_EXTENSIONS = /\.(jpe?g|png|gif|webp|svg)$/i;
 const MAX_QUERY_LENGTH = 200;
 const limiter = createRouteRateLimiter({ windowMs: 60_000, max: 60 });
 
+// Wikipedia explicitly requires a UA with contact info per their policy:
+// https://meta.wikimedia.org/wiki/User-Agent_policy
 const FETCH_HEADERS = {
-  // Wikipedia/Wikimedia request a real UA per their guidelines.
-  "user-agent": "wehuddle/1.0 (https://wehuddle.tv) — image search",
+  "user-agent": "wehuddle/1.0 (image search) https://wehuddle.tv",
   accept: "application/json",
 };
 
@@ -43,9 +44,13 @@ interface ImageHit {
   source: "wikipedia" | "wikimedia";
 }
 
-async function searchWikipedia(query: string): Promise<ImageHit[]> {
-  // Step 1 — opensearch returns up to N matching article titles ranked by
-  // popularity. Lets us recover the right page for fuzzy spellings.
+// Errors are collected and surfaced in the response so production failures
+// are debuggable without redeploying. Each entry tags which source and call
+// failed.
+async function searchWikipedia(
+  query: string,
+  errors: string[],
+): Promise<ImageHit[]> {
   const opensearchUrl =
     `https://en.wikipedia.org/w/api.php?` +
     new URLSearchParams({
@@ -54,7 +59,6 @@ async function searchWikipedia(query: string): Promise<ImageHit[]> {
       limit: "5",
       namespace: "0",
       format: "json",
-      origin: "*",
     }).toString();
 
   let titles: string[] = [];
@@ -63,19 +67,22 @@ async function searchWikipedia(query: string): Promise<ImageHit[]> {
       headers: FETCH_HEADERS,
       cache: "no-store",
     });
-    if (!res.ok) return [];
+    if (!res.ok) {
+      errors.push(`wikipedia/opensearch:HTTP_${res.status}`);
+      return [];
+    }
     const data = (await res.json()) as unknown;
     if (Array.isArray(data) && Array.isArray(data[1])) {
       titles = data[1].filter((t): t is string => typeof t === "string");
     }
-  } catch {
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    errors.push(`wikipedia/opensearch:${msg}`);
     return [];
   }
 
   if (titles.length === 0) return [];
 
-  // Step 2 — fetch each summary in parallel. The REST summary endpoint is
-  // cached and very fast (10-50ms each).
   const summaries = await Promise.all(
     titles.slice(0, 5).map(async (title): Promise<ImageHit | null> => {
       const url = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(
@@ -86,7 +93,10 @@ async function searchWikipedia(query: string): Promise<ImageHit[]> {
           headers: FETCH_HEADERS,
           cache: "no-store",
         });
-        if (!res.ok) return null;
+        if (!res.ok) {
+          errors.push(`wikipedia/summary:${title}:HTTP_${res.status}`);
+          return null;
+        }
         const body = (await res.json()) as {
           title?: string;
           thumbnail?: { source?: string };
@@ -101,7 +111,9 @@ async function searchWikipedia(query: string): Promise<ImageHit[]> {
           title: body.title ?? title,
           source: "wikipedia",
         };
-      } catch {
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        errors.push(`wikipedia/summary:${title}:${msg}`);
         return null;
       }
     }),
@@ -110,25 +122,33 @@ async function searchWikipedia(query: string): Promise<ImageHit[]> {
   return summaries.filter((s): s is ImageHit => s !== null);
 }
 
-async function searchWikimediaCommons(query: string): Promise<ImageHit[]> {
+async function searchWikimediaCommons(
+  query: string,
+  errors: string[],
+): Promise<ImageHit[]> {
   try {
     const params = new URLSearchParams({
       action: "query",
       generator: "search",
       gsrsearch: query,
-      gsrnamespace: "6", // File namespace
+      gsrnamespace: "6",
       gsrlimit: "12",
       prop: "imageinfo",
       iiprop: "url|thumburl|mime",
       iiurlwidth: "300",
       format: "json",
-      origin: "*",
     });
-    const res = await fetch(`https://commons.wikimedia.org/w/api.php?${params}`, {
-      headers: FETCH_HEADERS,
-      cache: "no-store",
-    });
-    if (!res.ok) return [];
+    const res = await fetch(
+      `https://commons.wikimedia.org/w/api.php?${params}`,
+      {
+        headers: FETCH_HEADERS,
+        cache: "no-store",
+      },
+    );
+    if (!res.ok) {
+      errors.push(`wikimedia:HTTP_${res.status}`);
+      return [];
+    }
     const data = (await res.json()) as {
       query?: {
         pages?: Record<
@@ -159,7 +179,9 @@ async function searchWikimediaCommons(query: string): Promise<ImageHit[]> {
         ];
       })
       .slice(0, 12);
-  } catch {
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    errors.push(`wikimedia:${msg}`);
     return [];
   }
 }
@@ -174,11 +196,13 @@ export async function GET(request: NextRequest) {
     .slice(0, MAX_QUERY_LENGTH);
   if (!q) return NextResponse.json({ images: [] });
 
+  const errors: string[] = [];
+
   // Run both sources in parallel. Wikipedia is usually the better hit for
   // proper nouns, so it leads in the merged list.
   const [wikipediaHits, commonsHits] = await Promise.all([
-    searchWikipedia(q),
-    searchWikimediaCommons(q),
+    searchWikipedia(q, errors),
+    searchWikimediaCommons(q, errors),
   ]);
 
   // Dedupe by URL (Wikipedia summary thumbnails are sometimes the same as
@@ -193,5 +217,18 @@ export async function GET(request: NextRequest) {
     if (merged.length >= 18) break;
   }
 
-  return NextResponse.json({ images: merged });
+  // When everything failed, surface why. Helps us diagnose
+  // egress/UA issues without redeploying with logs.
+  if (merged.length === 0 && errors.length > 0) {
+    return NextResponse.json({
+      images: [],
+      error: "search_failed",
+      errors,
+    });
+  }
+
+  return NextResponse.json({
+    images: merged,
+    ...(errors.length > 0 ? { errors } : {}),
+  });
 }

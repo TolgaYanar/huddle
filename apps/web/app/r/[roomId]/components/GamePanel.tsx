@@ -130,10 +130,19 @@ function ImagePicker({
       const data = (await res.json()) as {
         images: ImageResult[];
         error?: string;
+        errors?: string[];
       };
-      if (data.error)
+      const hits = data.images ?? [];
+      setResults(hits);
+
+      if (hits.length === 0 && data.errors && data.errors.length > 0) {
+        // Surface the upstream failure reason so we know what to fix.
+        setError(`Search failed: ${data.errors.join("; ")}`);
+      } else if (data.error && hits.length === 0) {
         setError("Search failed — try a different query or paste a URL");
-      setResults(data.images ?? []);
+      } else if (hits.length === 0) {
+        setError("No images found — try a different name or use ✨ AI");
+      }
     } catch {
       setError("Search failed — try a different query or paste a URL");
     } finally {
