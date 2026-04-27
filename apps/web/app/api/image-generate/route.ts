@@ -119,33 +119,52 @@ export async function GET(req: Request) {
   upstream.searchParams.set("model", MODEL);
   upstream.searchParams.set("seed", String(seed));
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  // Pollinations is fronted by Cloudflare. Their WAF can reject odd
+  // User-Agents from server-side callers, so we present as a regular
+  // browser. We also retry once on transient network failure (cold-start
+  // DNS / TLS hiccups inside Vercel's lambdas are not uncommon).
+  const headers = {
+    "user-agent":
+      "Mozilla/5.0 (compatible; wehuddle/1.0; +https://wehuddle.tv)",
+    accept: "image/*,*/*;q=0.8",
+  };
 
-  let res: Response;
-  try {
-    res = await fetch(upstream.toString(), {
-      signal: controller.signal,
-      cache: "no-store",
-      headers: {
-        "user-agent":
-          "wehuddle-game/1.0 (+https://wehuddle.tv) — clue image generator",
-      },
-    });
-  } catch (err) {
-    clearTimeout(timeout);
-    if (err instanceof DOMException && err.name === "AbortError") {
+  let res: Response | null = null;
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+    try {
+      res = await fetch(upstream.toString(), {
+        signal: controller.signal,
+        cache: "no-store",
+        headers,
+      });
+      clearTimeout(timeout);
+      break;
+    } catch (err) {
+      clearTimeout(timeout);
+      lastError = err;
+      // Don't burn the rest of our budget retrying after a long timeout.
+      if (err instanceof DOMException && err.name === "AbortError") break;
+      if (attempt === 0) await new Promise((r) => setTimeout(r, 600));
+    }
+  }
+
+  if (!res) {
+    if (lastError instanceof DOMException && lastError.name === "AbortError") {
       return jsonError(
         "timeout",
         "The image service took too long. Try again.",
       );
     }
+    const msg =
+      lastError instanceof Error ? lastError.message : String(lastError);
     return jsonError(
       "network",
-      "Couldn't reach the image service. Try again in a moment.",
+      `Couldn't reach the image service: ${msg}. Try again in a moment.`,
     );
   }
-  clearTimeout(timeout);
 
   if (res.status === 429 || res.status === 503) {
     return jsonError(
