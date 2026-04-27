@@ -104,8 +104,11 @@ function ImagePicker({
   selected: string;
   onSelect: (url: string) => void;
 }) {
-  type Tab = "ai" | "search" | "url";
-  const [tab, setTab] = useState<Tab>("ai");
+  type Tab = "search" | "ai" | "url";
+  // Default to "search" — Wikipedia returns the canonical image for any
+  // proper noun (brand, place, person) and that's what most clues
+  // actually need. AI is the better tool only for creative prompts.
+  const [tab, setTab] = useState<Tab>("search");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<ImageResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -196,15 +199,15 @@ function ImagePicker({
   };
 
   const tabLabel: Record<Tab, string> = {
+    search: "🔍 Search",
     ai: "✨ AI",
-    search: "Search web",
     url: "Paste URL",
   };
 
   return (
     <div className="flex flex-col gap-3">
       <div className="flex gap-1 bg-black/30 p-1 rounded-xl">
-        {(["ai", "search", "url"] as const).map((t) => (
+        {(["search", "ai", "url"] as const).map((t) => (
           <button
             key={t}
             type="button"
@@ -307,9 +310,10 @@ function ImagePicker({
           )}
           {!aiResult && !aiLoading && !error && (
             <p className="text-xs text-slate-600 leading-relaxed">
-              Type a description and we&apos;ll generate an image. Works as
-              search too — &ldquo;apple logo&rdquo;, &ldquo;Eiffel Tower at
-              sunset&rdquo;, etc.
+              Describe an imaginary scene — &ldquo;red dragon eating ice
+              cream&rdquo;. For real-world things (brands, places, people),
+              use the 🔍 Search tab — AI doesn&apos;t reliably draw real
+              logos or famous people.
             </p>
           )}
         </>
@@ -323,7 +327,7 @@ function ImagePicker({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && search()}
-              placeholder="e.g. Apple logo, Eiffel Tower…"
+              placeholder="Brand, place, or person — e.g. Hyundai, Eiffel Tower"
               className="flex-1 bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-sky-500/25"
             />
             <button
@@ -349,8 +353,9 @@ function ImagePicker({
             </div>
           )}
           {results.length === 0 && !loading && !error && (
-            <p className="text-xs text-slate-600 text-center py-4">
-              Search for images to use as a clue
+            <p className="text-xs text-slate-600 text-center py-4 leading-relaxed">
+              Type a brand, place, or person — we&apos;ll find the canonical
+              picture from Wikipedia. For made-up things use the ✨ AI tab.
             </p>
           )}
         </>
