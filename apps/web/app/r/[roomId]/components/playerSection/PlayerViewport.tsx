@@ -45,6 +45,7 @@ export function PlayerViewport({
   isConnected,
 
   mediaProps,
+  extraOverlay,
 }: {
   playerContainerRef: React.RefObject<HTMLDivElement | null>;
   togglePlayerFullscreen: () => void;
@@ -78,6 +79,8 @@ export function PlayerViewport({
   isConnected: boolean;
 
   mediaProps: React.ComponentProps<typeof PlayerMediaRenderer>;
+  /** Optional overlay rendered inside the player container, above the iframe. */
+  extraOverlay?: React.ReactNode;
 }) {
   return (
     <div
@@ -185,6 +188,8 @@ export function PlayerViewport({
       />
 
       <PlayerMediaRenderer {...mediaProps} />
+
+      {extraOverlay}
     </div>
   );
 }

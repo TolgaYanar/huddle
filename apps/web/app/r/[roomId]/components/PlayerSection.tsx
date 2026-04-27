@@ -5,6 +5,7 @@ import React from "react";
 import { VideoControls } from "./VideoControls";
 import { VideoSourceCard } from "./playerSection/VideoSourceCard";
 import { PlayerViewport } from "./playerSection/PlayerViewport";
+import { UnmuteHint } from "./playerSection/UnmuteHint";
 import { makePlayerMediaProps } from "./playerSection/makePlayerMediaProps";
 import { useDirectFileElementSync } from "./playerSection/useDirectFileElementSync";
 import { usePlayerConfig } from "./playerSection/usePlayerConfig";
@@ -105,7 +106,7 @@ export function PlayerSection({
   handleSendChat,
   onVideoEnded,
 }: PlayerSectionProps) {
-  const { playerConfig } = usePlayerConfig(normalizedUrl);
+  const { playerConfig } = usePlayerConfig(normalizedUrl, roomPlaybackAnchorRef);
 
   const clearLoadTimeout = React.useCallback(() => {
     if (loadTimeoutRef.current) {
@@ -286,6 +287,16 @@ export function PlayerSection({
         handleSendChat={handleSendChat}
         isConnected={isConnected}
         mediaProps={mediaProps}
+        extraOverlay={
+          <UnmuteHint
+            muted={effectiveMuted}
+            playerReady={playerReady}
+            videoState={videoState}
+            onUnmute={
+              audioSyncEnabled === false ? toggleLocalMute : toggleMute
+            }
+          />
+        }
       />
 
       <VideoControls

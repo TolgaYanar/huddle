@@ -8,11 +8,15 @@ import {
 import { USER_PAUSE_INTENT_WINDOW_MS } from "../../hooks/useVideoPlayer/constants";
 
 // Max retry attempts before giving up on a pending catchup.
-const CATCHUP_MAX_ATTEMPTS = 10;
+// YouTube iframes can take 5–8 seconds to become seekable on slow connections,
+// and each retry is ~350ms apart, so we want enough attempts to cover that
+// window plus a margin for hiccups.
+const CATCHUP_MAX_ATTEMPTS = 30;
 // Acceptable drift (seconds) before we consider the player close enough.
 const CATCHUP_ACCEPTABLE_DRIFT_S = 2.5;
 // How long (ms) to keep retrying a catchup after a player load.
-const CATCHUP_RETRY_WINDOW_MS = 4000;
+// Was 4s — too short for slow YouTube iframe loads, leaving late joiners stuck.
+const CATCHUP_RETRY_WINDOW_MS = 12000;
 // Player position considered "at the beginning" (seconds).
 const CATCHUP_AT_BEGINNING_THRESHOLD_S = 3;
 // Target position considered "far ahead" — worth a forced seek from beginning (seconds).
