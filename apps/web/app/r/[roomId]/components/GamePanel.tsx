@@ -151,24 +151,35 @@ function ImagePicker({
       const res = await fetch(
         `/api/image-generate?prompt=${encodeURIComponent(prompt)}&seed=${seed}`,
       );
-      const data = (await res.json()) as {
-        ok: boolean;
+      // Best-effort JSON parse — Vercel can serve a non-JSON body when its
+      // own gateway gives up before our function returns.
+      const data = (await res.json().catch(() => null)) as {
+        ok?: boolean;
         dataUrl?: string;
         reason?: string;
         hint?: string;
-      };
-      if (!data.ok || !data.dataUrl) {
+      } | null;
+
+      if (!data) {
         setError(
-          data.hint ||
-            (data.reason === "upstream_busy"
-              ? "The image service is overloaded right now. Try again in a few seconds."
-              : "Couldn't generate that image. Try a different prompt."),
+          res.status >= 500
+            ? `The image generator timed out (HTTP ${res.status}). Try again — it's often quick on the second try.`
+            : `Image generator returned an unexpected response (HTTP ${res.status}).`,
         );
         return;
       }
+
+      if (!data.ok || !data.dataUrl) {
+        // Prefer the server's friendly hint, but always include the reason
+        // code so error feedback is debuggable if something new breaks.
+        const reasonTag = data.reason ? ` (${data.reason})` : "";
+        setError((data.hint || "Couldn't generate that image.") + reasonTag);
+        return;
+      }
       setAiResult(data.dataUrl);
-    } catch {
-      setError("Couldn't reach the image generator. Try again in a moment.");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "unknown";
+      setError(`Couldn't reach the image generator (${msg}).`);
     } finally {
       setAiLoading(false);
     }

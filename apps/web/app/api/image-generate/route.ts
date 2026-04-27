@@ -4,6 +4,9 @@ import { createRouteRateLimiter } from "../_lib/rateLimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// Vercel hobby supports up to 60s when explicitly requested. Pollinations
+// generations can take 20-30s, so the default 10s killed the function.
+export const maxDuration = 60;
 
 /**
  * Server-side proxy for AI image generation. Today the upstream is
@@ -28,9 +31,16 @@ const MAX_PROMPT_LENGTH = 240;
 const MAX_BYTES = 240_000;
 // Pollinations sometimes takes 30+ seconds for the first generation of a
 // new prompt (it's queued behind whatever else its workers are doing).
-const FETCH_TIMEOUT_MS = 60_000;
+// Cap below Vercel's maxDuration so we get a clean timeout error rather
+// than a forced kill.
+const FETCH_TIMEOUT_MS = 55_000;
 // Pixel dimensions — 512² × JPEG ≈ 60–180 KB, well within our budget.
 const IMAGE_DIM = 512;
+// Pollinations exposes a few models. `turbo` is fast (~5-10s), lower
+// quality. `flux` is higher quality (~15-30s) but more often times out.
+// For game clue images, "almost always works" beats "occasionally
+// stunning" — default to turbo.
+const MODEL = "turbo";
 
 // Tiny LRU keyed by `prompt|seed`. Survives across requests within a single
 // Vercel lambda instance lifetime; cold starts naturally clear it.
@@ -89,12 +99,15 @@ export async function GET(req: Request) {
   const cacheKey = `${promptRaw}|${seed}`;
   const cached = cacheGet(cacheKey);
   if (cached) {
-    return NextResponse.json({
-      ok: true,
-      dataUrl: cached.dataUrl,
-      prompt: promptRaw,
-      cached: true,
-    });
+    return NextResponse.json(
+      {
+        ok: true,
+        dataUrl: cached.dataUrl,
+        prompt: promptRaw,
+        cached: true,
+      },
+      { headers: { "Cache-Control": "no-store" } },
+    );
   }
 
   const upstream = new URL(
@@ -103,7 +116,7 @@ export async function GET(req: Request) {
   upstream.searchParams.set("width", String(IMAGE_DIM));
   upstream.searchParams.set("height", String(IMAGE_DIM));
   upstream.searchParams.set("nologo", "true");
-  upstream.searchParams.set("model", "flux"); // higher-quality default
+  upstream.searchParams.set("model", MODEL);
   upstream.searchParams.set("seed", String(seed));
 
   const controller = new AbortController();
@@ -169,10 +182,18 @@ export async function GET(req: Request) {
 
   cacheSet(cacheKey, dataUrl);
 
-  return NextResponse.json({
-    ok: true,
-    dataUrl,
-    prompt: promptRaw,
-    cached: false,
-  });
+  return NextResponse.json(
+    {
+      ok: true,
+      dataUrl,
+      prompt: promptRaw,
+      cached: false,
+    },
+    {
+      headers: {
+        // Don't let Vercel/edge caches serve a stale body on retry.
+        "Cache-Control": "no-store",
+      },
+    },
+  );
 }
