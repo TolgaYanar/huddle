@@ -631,8 +631,11 @@ function RoundSetupForm({
   const validRounds = rounds.filter(isRoundValid);
 
   return (
+    // 2-column on lg+: round chips + game settings + actions on the left,
+    // the heavy round editor (with ImagePicker) on the right where it has
+    // room to breathe. Single column on smaller screens.
     <div className="flex flex-col gap-4">
-      {/* Header */}
+      {/* Header always full-width */}
       <div className="flex items-center justify-between">
         <div className="text-base font-semibold text-slate-100">{title}</div>
         <div className="text-xs text-slate-500">
@@ -640,109 +643,119 @@ function RoundSetupForm({
         </div>
       </div>
 
-      {/* Round chips */}
-      <div className="flex items-center gap-2 flex-wrap">
-        {rounds.map((r, i) => (
-          <button
-            key={i}
-            type="button"
-            onClick={() => setActiveIdx(i)}
-            title={r.answer.trim() || `Round ${i + 1}`}
-            className={`w-10 h-10 rounded-full text-sm font-bold transition-all ${
-              i === activeIdx
-                ? isRoundValid(r)
-                  ? "bg-sky-500 text-white ring-2 ring-sky-400/40 ring-offset-1 ring-offset-[#1a1a2e]"
-                  : "bg-white/15 text-white ring-2 ring-white/25 ring-offset-1 ring-offset-[#1a1a2e]"
-                : isRoundValid(r)
-                  ? "bg-sky-600/30 text-sky-300 hover:bg-sky-600/50"
-                  : "bg-white/8 text-slate-500 hover:bg-white/12 hover:text-slate-300"
-            }`}
-          >
-            {isRoundValid(r) ? "✓" : i + 1}
-          </button>
-        ))}
-        {rounds.length < 10 && (
-          <button
-            type="button"
-            onClick={addRound}
-            title="Add round"
-            className="w-10 h-10 rounded-full border border-dashed border-white/20 text-slate-500 text-lg hover:border-sky-500/50 hover:text-sky-400 transition-colors"
-          >
-            +
-          </button>
-        )}
-      </div>
-
-      {/* Active round editor — key resets ImagePicker state when switching */}
-      <RoundEditor
-        key={activeIdx}
-        round={rounds[activeIdx]!}
-        onChange={(r) => updateRound(activeIdx, r)}
-        onRemove={() => removeRound(activeIdx)}
-        canRemove={rounds.length > 1}
-      />
-
-      {/* Game-level options (creator only — these are baked into the game,
-          not into individual rounds) */}
-      {showCreatorOptions && (
-        <div className="flex flex-col gap-2 rounded-2xl border border-white/10 bg-white/3 p-4">
-          <div className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
-            Game settings
+      <div className="grid grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)] gap-4 lg:gap-5">
+        {/* LEFT — round selector + game settings + actions */}
+        <div className="flex flex-col gap-3 lg:sticky lg:top-0 lg:self-start">
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-2">
+              Rounds ({rounds.length}/10)
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              {rounds.map((r, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setActiveIdx(i)}
+                  title={r.answer.trim() || `Round ${i + 1}`}
+                  className={`w-10 h-10 rounded-full text-sm font-bold transition-all ${
+                    i === activeIdx
+                      ? isRoundValid(r)
+                        ? "bg-sky-500 text-white ring-2 ring-sky-400/40 ring-offset-1 ring-offset-[#1a1a2e]"
+                        : "bg-white/15 text-white ring-2 ring-white/25 ring-offset-1 ring-offset-[#1a1a2e]"
+                      : isRoundValid(r)
+                        ? "bg-sky-600/30 text-sky-300 hover:bg-sky-600/50"
+                        : "bg-white/8 text-slate-500 hover:bg-white/12 hover:text-slate-300"
+                  }`}
+                >
+                  {isRoundValid(r) ? "✓" : i + 1}
+                </button>
+              ))}
+              {rounds.length < 10 && (
+                <button
+                  type="button"
+                  onClick={addRound}
+                  title="Add round"
+                  aria-label="Add round"
+                  className="w-10 h-10 rounded-full border border-dashed border-white/20 text-slate-500 text-lg hover:border-sky-500/50 hover:text-sky-400 transition-colors"
+                >
+                  +
+                </button>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            <label
-              htmlFor="game-turn-timer"
-              className="text-xs text-slate-400 shrink-0"
+
+          {showCreatorOptions && (
+            <div className="flex flex-col gap-2 rounded-2xl border border-white/10 bg-white/3 p-4">
+              <div className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                Game settings
+              </div>
+              <div className="flex items-center gap-3">
+                <label
+                  htmlFor="game-turn-timer"
+                  className="text-xs text-slate-400 shrink-0"
+                >
+                  Turn timer
+                </label>
+                <select
+                  id="game-turn-timer"
+                  value={turnTimerSeconds ?? ""}
+                  onChange={(e) =>
+                    setTurnTimerSeconds(
+                      e.target.value === "" ? null : Number(e.target.value),
+                    )
+                  }
+                  className="flex-1 bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/25"
+                >
+                  {TURN_TIMER_OPTIONS.map((o) => (
+                    <option key={o.label} value={o.value ?? ""}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                When the timer expires the current guesser auto-skips. Hints
+                cost points — full score for guessing without hints, less for
+                each letter revealed.
+              </p>
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="flex-1 py-2.5 rounded-xl border border-white/10 bg-white/5 text-slate-300 text-sm hover:bg-white/10 transition-colors"
             >
-              Turn timer
-            </label>
-            <select
-              id="game-turn-timer"
-              value={turnTimerSeconds ?? ""}
-              onChange={(e) =>
-                setTurnTimerSeconds(
-                  e.target.value === "" ? null : Number(e.target.value),
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={validRounds.length === 0}
+              onClick={() =>
+                onSubmit(
+                  validRounds,
+                  showCreatorOptions ? { turnTimerSeconds } : undefined,
                 )
               }
-              className="flex-1 bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/25"
+              className="flex-1 py-2.5 rounded-xl bg-sky-600 text-white text-sm font-semibold hover:bg-sky-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {TURN_TIMER_OPTIONS.map((o) => (
-                <option key={o.label} value={o.value ?? ""}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+              {submitLabel} ({validRounds.length})
+            </button>
           </div>
-          <p className="text-[11px] text-slate-500 leading-relaxed">
-            When the timer expires, the current guesser auto-skips. Hints
-            also cost points — full score for guessing without hints, less for
-            each letter the questioner reveals.
-          </p>
         </div>
-      )}
 
-      {/* Actions */}
-      <div className="flex gap-3">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="flex-1 py-2.5 rounded-xl border border-white/10 bg-white/5 text-slate-300 text-sm hover:bg-white/10 transition-colors"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          disabled={validRounds.length === 0}
-          onClick={() =>
-            onSubmit(
-              validRounds,
-              showCreatorOptions ? { turnTimerSeconds } : undefined,
-            )
-          }
-          className="flex-1 py-2.5 rounded-xl bg-sky-600 text-white text-sm font-semibold hover:bg-sky-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {submitLabel} ({validRounds.length})
-        </button>
+        {/* RIGHT — active round editor (key resets ImagePicker state when
+            switching between rounds). */}
+        <div className="min-w-0">
+          <RoundEditor
+            key={activeIdx}
+            round={rounds[activeIdx]!}
+            onChange={(r) => updateRound(activeIdx, r)}
+            onRemove={() => removeRound(activeIdx)}
+            canRemove={rounds.length > 1}
+          />
+        </div>
       </div>
     </div>
   );
@@ -975,187 +988,233 @@ function ActiveRoundView({
   };
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-slate-400">
-            Round {questioner.currentRoundIndex + 1} of {questioner.totalRounds}
-          </span>
-          <span className="text-xs px-2 py-0.5 rounded-lg bg-sky-600/20 text-sky-300 border border-sky-600/30">
-            {round.category}
+    // 2-column on lg+: clue/input on the left, guesses always visible on
+    // the right so newly-submitted guesses don't push out of view.
+    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-4 lg:gap-5">
+      {/* LEFT COLUMN */}
+      <div className="flex flex-col gap-4 min-w-0">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-slate-400">
+              Round {questioner.currentRoundIndex + 1} of{" "}
+              {questioner.totalRounds}
+            </span>
+            <span className="text-xs px-2 py-0.5 rounded-lg bg-sky-600/20 text-sky-300 border border-sky-600/30">
+              {round.category}
+            </span>
+          </div>
+          <span className="text-xs text-slate-500">
+            by {questioner.username ?? "Unknown"}
           </span>
         </div>
-        <span className="text-xs text-slate-500">
-          by {questioner.username ?? "Unknown"}
-        </span>
-      </div>
 
-      {/* Clue image */}
-      {round.image ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={round.image}
-          alt="Clue"
-          className="w-full max-h-72 object-contain rounded-2xl border border-white/10 bg-black/20"
-          onError={(e) => {
-            (e.target as HTMLImageElement).style.display = "none";
-          }}
-        />
-      ) : (
-        <div className="flex items-center justify-center h-24 rounded-2xl border border-dashed border-white/10 bg-white/3">
-          <span className="text-sm text-slate-600">Text-only round — no image clue</span>
-        </div>
-      )}
-
-      {/* Answer blanks */}
-      <AnswerBlanks masked={round.answerMasked} hidden={blanksHidden} />
-
-      {/* Turn queue */}
-      <TurnQueue game={game} round={round} mySocketId={mySocketId} />
-
-      {amActiveQuestioner && round.hideBlanks && round.hintsRevealed === 0 && (
-        <p className="text-center text-xs text-amber-400/60">
-          Players see &ldquo;Answer hidden&rdquo; until first hint
-        </p>
-      )}
-      {round.hintsRevealed > 0 && (
-        <p className="text-center text-xs text-amber-400">
-          {round.hintsRevealed} hint{round.hintsRevealed === 1 ? "" : "s"}{" "}
-          revealed
-        </p>
-      )}
-
-      {/* Turn indicator */}
-      <div
-        className={`flex items-center justify-center gap-2 font-semibold py-3 px-3 rounded-xl border transition-colors ${
-          isMyTurn
-            ? "bg-sky-500/20 text-sky-200 border-sky-500/50 text-base ring-2 ring-sky-500/30 shadow-lg shadow-sky-500/10"
-            : iAmWinner
-              ? "bg-emerald-600/20 text-emerald-300 border-emerald-600/30 text-sm"
-              : "bg-white/5 text-slate-400 border-white/5 text-sm"
-        }`}
-        aria-live="polite"
-      >
-        <span className="text-center">
-          {iAmWinner
-            ? "✓ You guessed it! Waiting for others…"
-            : isMyTurn
-              ? "🎯 Your turn — type your guess"
-              : amActiveQuestioner
-                ? `Waiting for ${currentGuesserName} to guess…`
-                : `${currentGuesserName}'s turn`}
-        </span>
-        <TurnCountdown
-          turnDeadline={game.session?.turnDeadline ?? null}
-          serverNow={game.session?.serverNow ?? Date.now()}
-          isMyTurn={isMyTurn}
-        />
-      </div>
-
-      {/* Guess input */}
-      {!amActiveQuestioner && isMyTurn && !iAmWinner && (
-        <form onSubmit={handleSubmit} className="flex gap-2">
-          <input
-            type="text"
-            value={guessInput}
-            onChange={(e) => setGuessInput(e.target.value)}
-            placeholder="Your answer…"
-            autoFocus
-            className="flex-1 bg-black/40 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500/25"
+        {/* Clue image — capped tighter on lg so the rest fits without scroll */}
+        {round.image ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={round.image}
+            alt="Clue"
+            className="w-full max-h-64 lg:max-h-80 object-contain rounded-2xl border border-white/10 bg-black/20"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = "none";
+            }}
           />
-          <button
-            type="submit"
-            disabled={!guessInput.trim()}
-            className="px-4 py-2 rounded-xl bg-sky-600 text-white text-sm font-semibold hover:bg-sky-500 transition-colors disabled:opacity-50"
-          >
-            Guess
-          </button>
-        </form>
-      )}
+        ) : (
+          <div className="flex items-center justify-center h-24 rounded-2xl border border-dashed border-white/10 bg-white/3">
+            <span className="text-sm text-slate-600">
+              Text-only round — no image clue
+            </span>
+          </div>
+        )}
 
-      {/* Questioner / creator controls */}
-      {(amActiveQuestioner || amCreator) && (
-        <div className="grid grid-cols-2 gap-2">
-          {amActiveQuestioner && (() => {
-            const lettersRemaining = (round.answerMasked ?? []).filter(
-              (c) => c === "_",
-            ).length;
-            return (
-              <button
-                type="button"
-                onClick={onRevealHint}
-                disabled={lettersRemaining === 0}
-                className="py-2.5 rounded-xl border border-amber-500/30 bg-amber-600/10 text-amber-300 text-sm font-medium hover:bg-amber-600/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                Reveal a letter
-                {lettersRemaining > 0 && (
-                  <span className="ml-1 text-xs text-amber-400/70">
-                    ({lettersRemaining} left)
-                  </span>
-                )}
-              </button>
-            );
-          })()}
-          <button
-            type="button"
-            onClick={onSkipTurn}
-            className="py-2.5 rounded-xl border border-white/10 bg-white/5 text-slate-300 text-sm hover:bg-white/10 transition-colors"
-          >
-            Skip turn
-          </button>
-          <button
-            type="button"
-            onClick={onEndRound}
-            className={`${amActiveQuestioner ? "col-span-2" : "col-span-full"} py-2.5 rounded-xl border border-rose-500/30 bg-rose-600/10 text-rose-300 text-sm font-medium hover:bg-rose-600/20 transition-colors`}
-          >
-            End round (reveal answer)
-          </button>
+        {/* Answer blanks */}
+        <AnswerBlanks masked={round.answerMasked} hidden={blanksHidden} />
+
+        {/* Turn queue */}
+        <TurnQueue game={game} round={round} mySocketId={mySocketId} />
+
+        {amActiveQuestioner &&
+          round.hideBlanks &&
+          round.hintsRevealed === 0 && (
+            <p className="text-center text-xs text-amber-400/60">
+              Players see &ldquo;Answer hidden&rdquo; until first hint
+            </p>
+          )}
+        {round.hintsRevealed > 0 && (
+          <p className="text-center text-xs text-amber-400">
+            {round.hintsRevealed} hint{round.hintsRevealed === 1 ? "" : "s"}{" "}
+            revealed
+          </p>
+        )}
+
+        {/* Turn indicator */}
+        <div
+          className={`flex items-center justify-center gap-2 font-semibold py-3 px-3 rounded-xl border transition-colors ${
+            isMyTurn
+              ? "bg-sky-500/20 text-sky-200 border-sky-500/50 text-base ring-2 ring-sky-500/30 shadow-lg shadow-sky-500/10"
+              : iAmWinner
+                ? "bg-emerald-600/20 text-emerald-300 border-emerald-600/30 text-sm"
+                : "bg-white/5 text-slate-400 border-white/5 text-sm"
+          }`}
+          aria-live="polite"
+        >
+          <span className="text-center">
+            {iAmWinner
+              ? "✓ You guessed it! Waiting for others…"
+              : isMyTurn
+                ? "🎯 Your turn — type your guess"
+                : amActiveQuestioner
+                  ? `Waiting for ${currentGuesserName} to guess…`
+                  : `${currentGuesserName}'s turn`}
+          </span>
+          <TurnCountdown
+            turnDeadline={game.session?.turnDeadline ?? null}
+            serverNow={game.session?.serverNow ?? Date.now()}
+            isMyTurn={isMyTurn}
+          />
         </div>
-      )}
 
-      {/* Recent guesses */}
-      {round.guesses.length > 0 && (
-        <div className="flex flex-col gap-2">
-          <div className="text-xs text-slate-500 font-medium">Guesses</div>
-          <div className="flex flex-col gap-1 max-h-36 overflow-y-auto">
-            {[...round.guesses].reverse().map((g, i) => (
-              <div
-                key={i}
-                className={`flex items-center justify-between gap-2 text-sm px-3 py-1.5 rounded-xl ${
+        {/* Guess input */}
+        {!amActiveQuestioner && isMyTurn && !iAmWinner && (
+          <form onSubmit={handleSubmit} className="flex gap-2">
+            <input
+              type="text"
+              value={guessInput}
+              onChange={(e) => setGuessInput(e.target.value)}
+              placeholder="Your answer…"
+              autoFocus
+              className="flex-1 bg-black/40 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500/25"
+            />
+            <button
+              type="submit"
+              disabled={!guessInput.trim()}
+              className="px-4 py-2 rounded-xl bg-sky-600 text-white text-sm font-semibold hover:bg-sky-500 transition-colors disabled:opacity-50"
+            >
+              Guess
+            </button>
+          </form>
+        )}
+
+        {/* Questioner / creator controls */}
+        {(amActiveQuestioner || amCreator) && (
+          <div className="grid grid-cols-2 gap-2">
+            {amActiveQuestioner &&
+              (() => {
+                const lettersRemaining = (round.answerMasked ?? []).filter(
+                  (c) => c === "_",
+                ).length;
+                return (
+                  <button
+                    type="button"
+                    onClick={onRevealHint}
+                    disabled={lettersRemaining === 0}
+                    className="py-2.5 rounded-xl border border-amber-500/30 bg-amber-600/10 text-amber-300 text-sm font-medium hover:bg-amber-600/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    Reveal a letter
+                    {lettersRemaining > 0 && (
+                      <span className="ml-1 text-xs text-amber-400/70">
+                        ({lettersRemaining} left)
+                      </span>
+                    )}
+                  </button>
+                );
+              })()}
+            <button
+              type="button"
+              onClick={onSkipTurn}
+              className="py-2.5 rounded-xl border border-white/10 bg-white/5 text-slate-300 text-sm hover:bg-white/10 transition-colors"
+            >
+              Skip turn
+            </button>
+            <button
+              type="button"
+              onClick={onEndRound}
+              className={`${amActiveQuestioner ? "col-span-2" : "col-span-full"} py-2.5 rounded-xl border border-rose-500/30 bg-rose-600/10 text-rose-300 text-sm font-medium hover:bg-rose-600/20 transition-colors`}
+            >
+              End round (reveal answer)
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* RIGHT COLUMN — guesses panel, always visible on lg+ */}
+      <GuessesPanel
+        guesses={round.guesses}
+        emptyHint={
+          isMyTurn
+            ? "Submit your guess — it'll show up here right away."
+            : "No guesses yet."
+        }
+      />
+    </div>
+  );
+}
+
+// ─── Guesses panel ────────────────────────────────────────────────────────────
+//
+// Reused by ActiveRoundView (right column) and RoundResultsView (post-round
+// recap). Newest guess on top so the just-submitted one is always visible.
+
+function GuessesPanel({
+  guesses,
+  emptyHint,
+}: {
+  guesses: GameRound["guesses"];
+  emptyHint?: string;
+}) {
+  return (
+    <aside className="flex flex-col gap-2 rounded-2xl border border-white/10 bg-black/20 p-3 lg:sticky lg:top-0 lg:self-start lg:max-h-[calc(92vh-7rem)] min-h-0">
+      <div className="flex items-center justify-between">
+        <div className="text-xs text-slate-400 font-medium uppercase tracking-wider">
+          Guesses
+        </div>
+        <div className="text-[10px] text-slate-600 tabular-nums">
+          {guesses.length}
+        </div>
+      </div>
+      {guesses.length === 0 ? (
+        <p className="text-xs text-slate-600 leading-relaxed py-2">
+          {emptyHint ?? "No guesses yet."}
+        </p>
+      ) : (
+        <div className="flex flex-col gap-1 overflow-y-auto pr-1 -mr-1 min-h-0">
+          {[...guesses].reverse().map((g, i) => (
+            <div
+              key={i}
+              className={`flex items-center justify-between gap-2 text-sm px-3 py-1.5 rounded-xl ${
+                g.correct
+                  ? "bg-emerald-600/15 border border-emerald-600/20"
+                  : g.nearMiss
+                    ? "bg-amber-600/10 border border-amber-600/25"
+                    : "bg-white/5 border border-white/5"
+              }`}
+            >
+              <span className="text-slate-400 truncate min-w-0">
+                {g.username ?? "Unknown"}
+              </span>
+              <span
+                className={`text-right truncate ${
                   g.correct
-                    ? "bg-emerald-600/15 border border-emerald-600/20"
+                    ? "text-emerald-300 font-medium"
                     : g.nearMiss
-                      ? "bg-amber-600/10 border border-amber-600/25"
-                      : "bg-white/5 border border-white/5"
+                      ? "text-amber-300"
+                      : "text-slate-300"
                 }`}
               >
-                <span className="text-slate-400 truncate">
-                  {g.username ?? "Unknown"}
-                </span>
-                <span
-                  className={
-                    g.correct
-                      ? "text-emerald-300 font-medium"
-                      : g.nearMiss
-                        ? "text-amber-300"
-                        : "text-slate-300"
-                  }
-                >
-                  {g.guess}
-                  {g.correct && " ✓"}
-                  {!g.correct && g.nearMiss && (
-                    <span className="ml-1.5 text-[10px] uppercase tracking-wider text-amber-400">
-                      so close
-                    </span>
-                  )}
-                </span>
-              </div>
-            ))}
-          </div>
+                {g.guess}
+                {g.correct && " ✓"}
+                {!g.correct && g.nearMiss && (
+                  <span className="ml-1.5 text-[10px] uppercase tracking-wider text-amber-400">
+                    so close
+                  </span>
+                )}
+              </span>
+            </div>
+          ))}
         </div>
       )}
-    </div>
+    </aside>
   );
 }
 
@@ -1184,88 +1243,83 @@ function RoundResultsView({
   const hasMore = remainingCurrent > 0 || remainingOthers > 0;
 
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex items-center justify-between text-xs text-slate-500">
-        <span>
-          Round {questioner.currentRoundIndex + 1} of {questioner.totalRounds}{" "}
-          — {questioner.username ?? "Unknown"}
-        </span>
-        <span className="px-2 py-0.5 rounded-lg bg-white/5">{round.category}</span>
-      </div>
-
-      {round.image && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={round.image}
-          alt="Clue"
-          className="w-full max-h-52 object-contain rounded-2xl border border-white/10 bg-black/20"
-          onError={(e) => {
-            (e.target as HTMLImageElement).style.display = "none";
-          }}
-        />
-      )}
-
-      <div className="text-center">
-        <div className="text-xs text-slate-500 mb-1">Answer</div>
-        <div className="text-2xl font-bold text-sky-300">{round.answer}</div>
-      </div>
-
-      {round.winnerUsernames.length > 0 ? (
-        <div className="flex flex-wrap gap-2 justify-center">
-          {round.winnerUsernames.map((w) => (
-            <span
-              key={w.socketId}
-              className="px-3 py-1 rounded-full bg-emerald-600/20 text-emerald-300 text-sm border border-emerald-600/30"
-            >
-              {w.username ?? "Unknown"} ✓
-            </span>
-          ))}
+    // Same 2-column pattern as ActiveRoundView so the post-round recap
+    // doesn't suddenly reflow. Image + answer + winners on the left, the
+    // full round-history of guesses on the right (using the shared
+    // GuessesPanel — winners and near-misses keep their colour coding).
+    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-4 lg:gap-5">
+      <div className="flex flex-col gap-5 min-w-0">
+        <div className="flex items-center justify-between text-xs text-slate-500">
+          <span>
+            Round {questioner.currentRoundIndex + 1} of{" "}
+            {questioner.totalRounds} — {questioner.username ?? "Unknown"}
+          </span>
+          <span className="px-2 py-0.5 rounded-lg bg-white/5">
+            {round.category}
+          </span>
         </div>
-      ) : (
-        <div className="text-center text-sm text-slate-500">
-          Nobody guessed it
-        </div>
-      )}
 
-      {round.guesses.length > 0 && (
-        <div className="flex flex-col gap-1 max-h-32 overflow-y-auto">
-          {[...round.guesses].reverse().map((g, i) => (
-            <div
-              key={i}
-              className={`flex items-center justify-between text-sm px-3 py-1.5 rounded-xl ${
-                g.correct
-                  ? "bg-emerald-600/15 border border-emerald-600/20"
-                  : "bg-white/5 border border-white/5"
-              }`}
-            >
-              <span className="text-slate-400">{g.username ?? "Unknown"}</span>
+        {round.image && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={round.image}
+            alt="Clue"
+            className="w-full max-h-52 lg:max-h-72 object-contain rounded-2xl border border-white/10 bg-black/20"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = "none";
+            }}
+          />
+        )}
+
+        <div className="text-center">
+          <div className="text-xs text-slate-500 mb-1">Answer</div>
+          <div className="text-2xl font-bold text-sky-300">{round.answer}</div>
+        </div>
+
+        {round.winnerUsernames.length > 0 ? (
+          <div className="flex flex-wrap gap-2 justify-center">
+            {round.winnerUsernames.map((w) => (
               <span
-                className={
-                  g.correct ? "text-emerald-300 font-medium" : "text-slate-300"
+                key={w.socketId}
+                className="px-3 py-1 rounded-full bg-emerald-600/20 text-emerald-300 text-sm border border-emerald-600/30"
+                title={
+                  typeof w.points === "number"
+                    ? `${w.points} pts`
+                    : undefined
                 }
               >
-                {g.guess}
-                {g.correct && " ✓"}
+                {w.username ?? "Unknown"} ✓
+                {typeof w.points === "number" && w.points !== 1 && (
+                  <span className="ml-1.5 text-xs text-emerald-400/70">
+                    +{Number(w.points.toFixed(2))}
+                  </span>
+                )}
               </span>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        ) : (
+          <div className="text-center text-sm text-slate-500">
+            Nobody guessed it
+          </div>
+        )}
 
-      {canAdvance && (
-        <button
-          type="button"
-          onClick={onNextRound}
-          className="w-full py-3 rounded-xl bg-sky-600 text-white text-sm font-semibold hover:bg-sky-500 transition-colors"
-        >
-          {hasMore ? "Next round →" : "See final scores →"}
-        </button>
-      )}
-      {!canAdvance && (
-        <p className="text-center text-xs text-slate-500">
-          Waiting for {questioner.username ?? "the questioner"} to continue…
-        </p>
-      )}
+        {canAdvance && (
+          <button
+            type="button"
+            onClick={onNextRound}
+            className="w-full py-3 rounded-xl bg-sky-600 text-white text-sm font-semibold hover:bg-sky-500 transition-colors"
+          >
+            {hasMore ? "Next round →" : "See final scores →"}
+          </button>
+        )}
+        {!canAdvance && (
+          <p className="text-center text-xs text-slate-500">
+            Waiting for {questioner.username ?? "the questioner"} to continue…
+          </p>
+        )}
+      </div>
+
+      <GuessesPanel guesses={round.guesses} emptyHint="Nobody guessed." />
     </div>
   );
 }
@@ -1808,7 +1862,9 @@ function GameLobby({
           </button>
         </div>
       ) : (
-        <div className="flex flex-col gap-2">
+        // Stack on small screens; side-by-side cards on lg+ since each
+        // card is short and the lobby has plenty of horizontal room.
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
           {games.map((game) => {
             const totalRounds = game.questioners.reduce(
               (s, q) => s + q.totalRounds,

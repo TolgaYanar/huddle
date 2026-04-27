@@ -28,7 +28,7 @@ export function GameModal({
       open={openGameId !== null}
       onClose={onClose}
       labelledBy={titleId}
-      panelClassName="relative z-10 w-full max-w-3xl max-h-[90vh] flex flex-col rounded-2xl border border-white/10 bg-slate-900/95 backdrop-blur-xl shadow-2xl"
+      panelClassName="relative z-10 w-full max-w-5xl max-h-[92vh] flex flex-col rounded-2xl border border-white/10 bg-slate-900/95 backdrop-blur-xl shadow-2xl"
     >
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 shrink-0">
