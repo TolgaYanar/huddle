@@ -3,10 +3,12 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "build": "prisma generate && prisma db push",
-    "db:deploy": "prisma db push",
+    "build": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:reset": "prisma migrate reset",
     "dev": "node --watch-path=index.js --watch-path=src index.js",
-    "start": "node index.js",
+    "start": "prisma migrate deploy && node index.js",
     "test": "node --test src/auth/__tests__/*.test.js src/socket/helpers/__tests__/*.test.js src/__tests__/*.test.js"
   },
   "dependencies": {
