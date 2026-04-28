@@ -5,16 +5,44 @@ import React from "react";
 import type { CupGameCup } from "shared-logic";
 
 export type CupRole =
-  | "idle" // hidden, not interactive (someone else's turn)
-  | "selectable" // hidden, current player can flip / pick
-  | "mineSpider" // hidden, you placed your own spider here (during play)
-  | "placement-empty" // placement phase: no spider here
-  | "placement-mine" // placement phase: your spider here
-  | "placement-disabled" // placement phase: someone else's spider OR locked
-  | "block-corner" // hover-preview for 2×2 pick
-  | "row-target" // hover-preview for row pick
-  | "relocate-src" // chosen as relocate source
-  | "relocate-dst-eligible"; // valid relocate destination
+  | "idle"
+  | "selectable"
+  | "mineSpider"
+  | "placement-empty"
+  | "placement-mine"
+  | "placement-disabled"
+  | "block-corner"
+  | "row-target"
+  | "relocate-src"
+  | "relocate-dst-eligible";
+
+/**
+ * A cup is rendered as a stack of CSS layers:
+ *   - <floor>     : drop shadow on the imaginary table
+ *   - <cup>       : the trapezoidal body (gradient + lighting)
+ *     - <rim>     : raised dome at the top (the cup is inverted, mouth-down)
+ *     - <gloss>   : highlight stripe down the left for depth
+ *     - <marker>  : optional 🕷 badge on cups you placed yourself
+ *   - <reveal>    : what's underneath, shown when status === "flipped"
+ *
+ * `transform-style: preserve-3d` + a perspective-set parent does the rest.
+ * On flip we lift, tilt, and fade the cup out while the reveal eases in.
+ */
+
+const ROLE_PALETTE: Record<CupRole, { top: string; bottom: string; rim: string; shadow: string; ring?: string }> = {
+  // Default cup — saturated red plastic, carnival-game vibe.
+  idle: { top: "#ff8a6b", bottom: "#a13322", rim: "#b94027", shadow: "rgba(0,0,0,0.5)" },
+  selectable: { top: "#ffb18a", bottom: "#c14a30", rim: "#d8553a", shadow: "rgba(255,140,90,0.55)", ring: "0 0 0 2px rgba(255,180,140,0.55), 0 0 22px -4px rgba(255,160,110,0.6)" },
+  // Your own hidden spider — purple to remember.
+  mineSpider: { top: "#e879f9", bottom: "#7c2d92", rim: "#a02db6", shadow: "rgba(232,121,249,0.45)", ring: "0 0 0 2px rgba(232,121,249,0.55)" },
+  "placement-empty": { top: "#ff8a6b", bottom: "#a13322", rim: "#b94027", shadow: "rgba(0,0,0,0.5)" },
+  "placement-mine": { top: "#e879f9", bottom: "#7c2d92", rim: "#a02db6", shadow: "rgba(232,121,249,0.5)", ring: "0 0 0 2px rgba(232,121,249,0.6)" },
+  "placement-disabled": { top: "#9aa3b2", bottom: "#3f4756", rim: "#5a6273", shadow: "rgba(0,0,0,0.4)" },
+  "block-corner": { top: "#fcd34d", bottom: "#a16207", rim: "#b45309", shadow: "rgba(252,211,77,0.5)", ring: "0 0 0 2px rgba(252,211,77,0.55)" },
+  "row-target": { top: "#fcd34d", bottom: "#a16207", rim: "#b45309", shadow: "rgba(252,211,77,0.4)" },
+  "relocate-src": { top: "#f0abfc", bottom: "#86198f", rim: "#a21caf", shadow: "rgba(240,171,252,0.6)", ring: "0 0 0 3px rgba(240,171,252,0.7)" },
+  "relocate-dst-eligible": { top: "#86efac", bottom: "#166534", rim: "#15803d", shadow: "rgba(134,239,172,0.45)", ring: "0 0 0 2px rgba(134,239,172,0.5)" },
+};
 
 export function Cup({
   cup,
@@ -35,38 +63,19 @@ export function Cup({
   const isSpider = isFlipped && cup.revealedAs === "spider";
 
   const interactive =
-    role === "selectable" ||
-    role === "block-corner" ||
-    role === "row-target" ||
-    role === "placement-empty" ||
-    role === "placement-mine" ||
-    role === "relocate-src" ||
-    role === "relocate-dst-eligible" ||
-    role === "mineSpider";
+    !isFlipped && (
+      role === "selectable" ||
+      role === "block-corner" ||
+      role === "row-target" ||
+      role === "placement-empty" ||
+      role === "placement-mine" ||
+      role === "relocate-src" ||
+      role === "relocate-dst-eligible" ||
+      role === "mineSpider"
+    );
 
-  // Frame styling per role on the hidden side.
-  const frameClass = (() => {
-    if (isFlipped) {
-      return isSpider
-        ? "border-rose-500/60 bg-rose-950/60 shadow-[0_0_24px_-4px_rgba(244,63,94,0.6)]"
-        : "border-emerald-500/40 bg-emerald-950/40";
-    }
-    if (role === "placement-mine" || role === "mineSpider")
-      return "border-fuchsia-400/70 bg-fuchsia-900/40 shadow-[0_0_18px_-6px_rgba(232,121,249,0.6)]";
-    if (role === "placement-disabled")
-      return "border-white/5 bg-slate-900/40";
-    if (role === "selectable")
-      return "border-sky-400/30 bg-slate-800/70 hover:border-sky-300/70 hover:bg-slate-700/70 hover:scale-[1.04] active:scale-[0.97]";
-    if (role === "block-corner")
-      return "border-amber-400/60 bg-amber-900/40 hover:border-amber-300";
-    if (role === "row-target")
-      return "border-amber-400/60 bg-amber-900/30";
-    if (role === "relocate-src")
-      return "border-fuchsia-400 bg-fuchsia-900/60 ring-2 ring-fuchsia-400/40";
-    if (role === "relocate-dst-eligible")
-      return "border-emerald-400/50 bg-slate-800/60 hover:border-emerald-300/80 hover:bg-emerald-900/30";
-    return "border-white/10 bg-slate-900/50";
-  })();
+  const palette = ROLE_PALETTE[role] ?? ROLE_PALETTE.idle;
+  const showMineMarker = !isFlipped && (role === "placement-mine" || role === "mineSpider" || role === "relocate-src");
 
   return (
     <button
@@ -81,35 +90,66 @@ export function Cup({
           : `Cup ${cup.index + 1}`
       }
       className={[
-        "relative aspect-square rounded-xl border transition-all duration-150 select-none",
-        "flex items-center justify-center",
-        "[transform-style:preserve-3d]",
-        recentlyFlipped ? "cup-flip-animate" : "",
-        hitOnFlip ? "cup-hit-shake" : "",
-        shieldedOnFlip ? "cup-shielded" : "",
-        frameClass,
-        interactive ? "cursor-pointer" : "cursor-default",
+        "cup-stage",
+        interactive ? "cup-stage-interactive" : "",
+        recentlyFlipped ? "cup-stage-flipping" : "",
       ].join(" ")}
     >
-      {/* Hidden face */}
+      {/* Floor shadow */}
+      <span
+        className="cup-floor-shadow"
+        style={{ background: `radial-gradient(ellipse, ${palette.shadow}, transparent 70%)` }}
+        aria-hidden
+      />
+
+      {/* The 3D cup itself (hidden once flipped). */}
       {!isFlipped && (
-        <span className="text-2xl sm:text-3xl select-none" aria-hidden>
-          🥤
-        </span>
-      )}
-      {!isFlipped && (role === "placement-mine" || role === "mineSpider") && (
         <span
-          className="absolute -top-1 -right-1 text-base bg-fuchsia-500/90 text-white rounded-full w-5 h-5 inline-flex items-center justify-center shadow"
+          className={[
+            "cup-3d",
+            role === "idle" || role === "placement-disabled" ? "" : "cup-3d-bob",
+            hitOnFlip ? "cup-hit-shake" : "",
+            shieldedOnFlip ? "cup-shielded" : "",
+          ].join(" ")}
           aria-hidden
         >
-          🕷
+          {/* Body — trapezoidal cup walls */}
+          <span
+            className="cup-body"
+            style={{
+              background: `linear-gradient(180deg, ${palette.top} 0%, ${palette.bottom} 100%)`,
+              boxShadow: palette.ring,
+            }}
+          >
+            {/* Side gloss highlight */}
+            <span className="cup-gloss" />
+            {/* Side shading */}
+            <span className="cup-side-shade" />
+          </span>
+          {/* Top dome (bottom of the inverted cup, now facing up) */}
+          <span
+            className="cup-rim"
+            style={{
+              background: `radial-gradient(ellipse at 35% 35%, rgba(255,255,255,0.45), transparent 55%), linear-gradient(180deg, ${palette.top} 0%, ${palette.rim} 100%)`,
+            }}
+          />
+          {/* Mine marker */}
+          {showMineMarker && (
+            <span className="cup-mine-marker" aria-hidden>
+              🕷
+            </span>
+          )}
         </span>
       )}
 
-      {/* Flipped face */}
+      {/* Reveal — only mounted once the cup has flipped, animates in. */}
       {isFlipped && (
-        <span className="text-2xl sm:text-3xl drop-shadow-md" aria-hidden>
-          {isSpider ? "🕷️" : "·"}
+        <span className={`cup-reveal ${isSpider ? "cup-reveal-spider" : "cup-reveal-empty"}`} aria-hidden>
+          {isSpider ? (
+            <span className="cup-spider-icon">🕷️</span>
+          ) : (
+            <span className="cup-empty-icon">·</span>
+          )}
         </span>
       )}
     </button>

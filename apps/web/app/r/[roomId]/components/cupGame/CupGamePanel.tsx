@@ -44,7 +44,7 @@ const CARD_META: Record<
   stealTurn: { emoji: "😴", label: "Steal a Turn", blurb: "Pick a player. Their next turn is skipped.", category: "good" },
   peek: { emoji: "👁️", label: "Peek", blurb: "Secretly look under one cup.", category: "good" },
   relocate: { emoji: "🔄", label: "Relocate", blurb: "Move one of your spiders to a new empty cup.", category: "good" },
-  shield: { emoji: "🛡️", label: "Shield", blurb: "Your next hit is ignored.", category: "good" },
+  mirror: { emoji: "🪞", label: "Mirror", blurb: "Next spider you'd flip hits its owner instead of you.", category: "good" },
 };
 
 type PeekResult = { cupIndex: number; revealedAs: "empty" | "spider"; ownerSocketId: string | null };
@@ -75,6 +75,10 @@ function CupGameInner(props: CupGamePanelProps & { game: CupGameData; mySocketId
   const [panelShakeKey, setPanelShakeKey] = useState(0);
   const [heartPopOnSocket, setHeartPopOnSocket] = useState<string | null>(null);
   const [drawnCard, setDrawnCard] = useState<{ kind: CupGameCardKind; category: "good" | "bad"; key: number } | null>(null);
+  // bigCard = the same card, but pinned to render the centered hero overlay
+  // for ~1.3s on every fresh draw. Cleared by a timeout so the next state
+  // push doesn't re-summon it.
+  const [bigCard, setBigCard] = useState<{ kind: CupGameCardKind; category: "good" | "bad"; key: number } | null>(null);
   const [peekResult, setPeekResult] = useState<PeekResult | null>(null);
   const [muted, setMutedState] = useState(isSoundMuted());
 
@@ -90,10 +94,20 @@ function CupGameInner(props: CupGamePanelProps & { game: CupGameData; mySocketId
         playSound("cupFlip");
         if (evt.revealedAs === "spider") {
           setTimeout(() => playSound("spider"), 70);
-          if (evt.shielded) {
+          if (evt.mirroredTo) {
+            // Mirror reflected the spider back to its owner. Cup itself
+            // pulses with the deflect animation (re-using the shielded
+            // visual since both signal "the flipper is unharmed"). The hit
+            // animation lands on the spider's owner, not the flipper.
             setShieldedFlippedCup(evt.cupIndex);
             setTimeout(() => setShieldedFlippedCup(null), 700);
             setTimeout(() => playSound("shielded"), 110);
+            setTimeout(() => playSound("hurt"), 320);
+            if (evt.mirroredTo === mySocketId) {
+              setPanelShakeKey((k) => k + 1);
+            }
+            setHeartPopOnSocket(evt.mirroredTo);
+            setTimeout(() => setHeartPopOnSocket(null), 720);
           } else if (evt.hit) {
             setHitFlippedCup(evt.cupIndex);
             setTimeout(() => setHitFlippedCup(null), 480);
@@ -111,11 +125,14 @@ function CupGameInner(props: CupGamePanelProps & { game: CupGameData; mySocketId
       }
       case "draw": {
         playSound("draw");
-        setDrawnCard({ kind: evt.cardKind, category: evt.category, key: seq });
+        const card = { kind: evt.cardKind, category: evt.category, key: seq };
+        setDrawnCard(card);
+        setBigCard(card);
+        setTimeout(() => setBigCard(null), 1300);
         setTimeout(() => playSound(evt.category === "good" ? "good" : "bad"), 220);
         break;
       }
-      case "shield": {
+      case "mirror": {
         playSound("shielded");
         break;
       }
@@ -171,7 +188,11 @@ function CupGameInner(props: CupGamePanelProps & { game: CupGameData; mySocketId
   const me = game.players.find((p) => p.socketId === mySocketId) || null;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 relative">
+      {/* Big "you drew this" overlay — sits above the playing view for ~1.3s */}
+      {bigCard && status === "playing" && (
+        <BigCardOverlay key={bigCard.key} card={bigCard} />
+      )}
       {/* Header */}
       <CupGameHeader
         game={game}
@@ -232,10 +253,10 @@ function CupGameHeader({
   onReset?: () => void;
 }) {
   const phaseBadge = (() => {
-    if (game.session.status === "lobby") return { text: "Lobby", color: "bg-sky-500/20 text-sky-300 border-sky-400/30" };
-    if (game.session.status === "placing") return { text: "Placing spiders", color: "bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-400/30" };
-    if (game.session.status === "playing") return { text: "Playing", color: "bg-emerald-500/20 text-emerald-300 border-emerald-400/30" };
-    return { text: "Finished", color: "bg-slate-500/20 text-slate-300 border-slate-400/30" };
+    if (game.session.status === "lobby") return { text: "Setting up", color: "bg-sky-500/20 text-sky-300 border-sky-400/30" };
+    if (game.session.status === "placing") return { text: "Hiding spiders", color: "bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-400/30" };
+    if (game.session.status === "playing") return { text: "In play", color: "bg-emerald-500/20 text-emerald-300 border-emerald-400/30" };
+    return { text: "Game over", color: "bg-slate-500/20 text-slate-300 border-slate-400/30" };
   })();
   return (
     <div className="flex items-center justify-between gap-3">
@@ -244,7 +265,7 @@ function CupGameHeader({
           {phaseBadge.text}
         </span>
         <span className="text-slate-400">
-          {game.config.rows}×{game.config.cols} grid · {game.config.startingLives} lives
+          {game.config.rows}×{game.config.cols} board · {game.config.startingLives} {game.config.startingLives === 1 ? "life" : "lives"} each
         </span>
       </div>
       <div className="flex items-center gap-2">
@@ -260,7 +281,7 @@ function CupGameHeader({
           <button
             type="button"
             onClick={() => {
-              if (confirm("Reset / delete this game?")) onReset();
+              if (confirm("End this game and clear the board?")) onReset();
             }}
             className="h-8 px-3 text-xs rounded-lg border border-rose-400/30 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20"
           >
@@ -285,18 +306,21 @@ function CupGameLobby(props: CupGamePanelProps) {
           <span className="text-3xl" aria-hidden>🥤</span>
           <div>
             <h3 className="text-lg font-bold text-slate-100">Cup Spider</h3>
-            <p className="text-xs text-slate-400">Hide spiders, take turns flipping cups, push your luck on cards.</p>
+            <p className="text-xs text-slate-400">A push-your-luck party game: hide spiders under cups, take turns flipping, and gamble on cards when you don&rsquo;t want to flip.</p>
           </div>
         </div>
         <ul className="text-xs text-slate-300/90 mt-3 space-y-1.5 list-disc pl-5">
-          <li>Each player hides 0–{lives} spiders under cups during placement.</li>
-          <li>On your turn, flip a cup OR draw a card (5 good, 5 bad — uniform random).</li>
-          <li>If you flip a spider, you lose a life. Last with lives wins.</li>
+          <li>Before the game starts, each player secretly hides up to {lives} spider{lives === 1 ? "" : "s"} under cups they choose.</li>
+          <li>On your turn, do one thing: flip a cup, or draw a card from the deck. Drawing replaces your flip.</li>
+          <li>Flip a cup with a spider and you lose 1 life. Spider owners are safe — only the flipper takes the hit.</li>
+          <li>The deck has 5 good cards (peek, mirror, force someone else to flip…) and 5 bad cards (forced flips, skip turn). Each draw is a fresh 50/50.</li>
+          <li>Last player with lives left wins.</li>
         </ul>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-          <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1.5">Lives</div>
+          <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">Lives per player</div>
+          <div className="text-[10px] text-slate-500 mb-1.5">Also caps how many spiders each player can hide.</div>
           <div className="flex items-center gap-1">
             {[1, 2, 3, 4, 5].map((n) => (
               <button
@@ -316,27 +340,35 @@ function CupGameLobby(props: CupGamePanelProps) {
           </div>
         </div>
         <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-          <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1.5">Grid</div>
+          <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">Board size</div>
+          <div className="text-[10px] text-slate-500 mb-1.5">Larger boards = safer flips, longer games.</div>
           <div className="flex items-center gap-1">
-            {(["compact", "standard", "large"] as const).map((g) => (
+            {(
+              [
+                { value: "compact", label: "Small" },
+                { value: "standard", label: "Medium" },
+                { value: "large", label: "Large" },
+              ] as const
+            ).map((g) => (
               <button
-                key={g}
+                key={g.value}
                 type="button"
-                onClick={() => setGridSize(g)}
-                className={`flex-1 h-8 rounded-lg text-xs border transition-colors capitalize ${
-                  gridSize === g
+                onClick={() => setGridSize(g.value)}
+                className={`flex-1 h-8 rounded-lg text-xs border transition-colors ${
+                  gridSize === g.value
                     ? "border-sky-400/60 bg-sky-500/20 text-sky-200"
                     : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"
                 }`}
-                aria-pressed={gridSize === g ? "true" : "false"}
+                aria-pressed={gridSize === g.value ? "true" : "false"}
               >
-                {g}
+                {g.label}
               </button>
             ))}
           </div>
         </div>
         <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-          <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1.5">Turn timer</div>
+          <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">Time per turn</div>
+          <div className="text-[10px] text-slate-500 mb-1.5">Auto-skips slow players. Set to none for casual play.</div>
           <div className="flex items-center gap-1">
             {([20, 30, 60, null] as const).map((t) => (
               <button
@@ -350,7 +382,7 @@ function CupGameLobby(props: CupGamePanelProps) {
                 }`}
                 aria-pressed={timer === t ? "true" : "false"}
               >
-                {t === null ? "Off" : `${t}s`}
+                {t === null ? "No limit" : `${t}s`}
               </button>
             ))}
           </div>
@@ -367,7 +399,7 @@ function CupGameLobby(props: CupGamePanelProps) {
         }
         className="h-11 px-4 rounded-xl border border-emerald-400/30 bg-emerald-500/15 text-emerald-200 text-sm font-semibold hover:bg-emerald-500/25 transition"
       >
-        Create lobby
+        Open the table
       </button>
     </div>
   );
@@ -398,19 +430,19 @@ function LobbyView(props: CupGamePanelProps & { game: CupGameData }) {
         >
           {isCreator
             ? eligible.length < 2
-              ? "Waiting for at least 2 players…"
-              : "Begin placement"
-            : "Waiting for the host to begin…"}
+              ? "Need at least 2 players to start"
+              : "Start hiding spiders"
+            : "Waiting for the host to start the game…"}
         </button>
       </div>
       <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-        <h4 className="text-sm font-semibold text-slate-100 mb-2">How it works</h4>
+        <h4 className="text-sm font-semibold text-slate-100 mb-2">How to play</h4>
         <ol className="text-xs text-slate-300 space-y-1.5 list-decimal pl-4">
-          <li>When the host begins, every player hides 0–{game.config.startingLives} spiders under cups.</li>
-          <li>On your turn, flip a cup or draw a card.</li>
-          <li>Flipping a spider costs you a life — the owner is safe (unless they flipped it themselves).</li>
-          <li>5 good cards reward you (peek, shield, force a target, etc.); 5 bad cards punish (forced flips, skip).</li>
-          <li>Last player with lives wins. If all spiders are found first, most-lives-left wins.</li>
+          <li>When the host starts the game, each player secretly hides up to {game.config.startingLives} spider{game.config.startingLives === 1 ? "" : "s"} under cups they choose.</li>
+          <li>On your turn you do one thing: flip a cup, or draw a card from the deck.</li>
+          <li>Flipping a cup with a spider costs the flipper 1 life. The spider&rsquo;s owner is safe — unless they were the one who flipped it.</li>
+          <li>The deck is 5 helpful cards (peek, mirror, target someone else…) and 5 punishing ones (forced flips, skip turn). Each draw is a fresh 50/50.</li>
+          <li>Last player with any lives left wins. If every spider gets found first, whoever has the most lives wins.</li>
         </ol>
       </div>
     </div>
@@ -426,8 +458,12 @@ function ConfigEditor({
 }) {
   return (
     <div className="rounded-xl border border-white/10 bg-white/5 p-3 flex flex-col gap-3">
+      <div className="text-[11px] text-slate-400 font-medium">
+        Host settings — change anything before starting.
+      </div>
       <div>
-        <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1.5">Lives</div>
+        <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">Lives per player</div>
+        <div className="text-[10px] text-slate-500 mb-1.5">Also caps how many spiders each player can hide.</div>
         <div className="flex gap-1">
           {[1, 2, 3, 4, 5].map((n) => (
             <button
@@ -447,22 +483,30 @@ function ConfigEditor({
         </div>
       </div>
       <div>
-        <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1.5">Grid</div>
+        <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">Board size</div>
+        <div className="text-[10px] text-slate-500 mb-1.5">Larger boards = safer flips, longer games.</div>
         <div className="flex gap-1">
-          {(["compact", "standard", "large"] as const).map((g) => (
+          {(
+            [
+              { value: "compact", label: "Small" },
+              { value: "standard", label: "Medium" },
+              { value: "large", label: "Large" },
+            ] as const
+          ).map((g) => (
             <button
-              key={g}
+              key={g.value}
               type="button"
-              onClick={() => onChange({ gridSize: g })}
-              className="flex-1 h-8 rounded-lg text-xs border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 capitalize"
+              onClick={() => onChange({ gridSize: g.value })}
+              className="flex-1 h-8 rounded-lg text-xs border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"
             >
-              {g}
+              {g.label}
             </button>
           ))}
         </div>
       </div>
       <div>
-        <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1.5">Turn timer</div>
+        <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">Time per turn</div>
+        <div className="text-[10px] text-slate-500 mb-1.5">Auto-skips slow players. Set to none for casual play.</div>
         <div className="flex gap-1">
           {([20, 30, 60, null] as const).map((t) => (
             <button
@@ -476,7 +520,7 @@ function ConfigEditor({
               }`}
               aria-pressed={game.config.turnTimerSeconds === t ? "true" : "false"}
             >
-              {t === null ? "Off" : `${t}s`}
+              {t === null ? "No limit" : `${t}s`}
             </button>
           ))}
         </div>
@@ -508,10 +552,10 @@ function PlacingView(props: CupGamePanelProps & { game: CupGameData }) {
     <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px] gap-4 lg:gap-5">
       <div className="flex flex-col gap-3">
         <div className="rounded-xl border border-fuchsia-400/20 bg-fuchsia-500/10 px-4 py-3 text-sm text-fuchsia-200">
-          <strong>Place your spiders.</strong> You can hide up to{" "}
-          <span className="font-semibold">{me?.spiderBudget ?? 0}</span>. You&rsquo;ve placed{" "}
+          <strong>Hide your spiders.</strong> Tap any cups to put a spider underneath — up to{" "}
+          <span className="font-semibold">{me?.spiderBudget ?? 0}</span>. So far you&rsquo;ve hidden{" "}
           <span className="font-semibold">{me?.spidersPlaced ?? 0}</span>{" "}
-          ({remaining} remaining). Memorize where they are — your own cups don&rsquo;t hurt anyone but you, if you flip one yourself.
+          ({remaining} left to place). Your spiders only hurt other players who flip them — but try to remember where they are, so you don&rsquo;t flip your own.
         </div>
         <CupGrid
           cols={game.config.cols}
@@ -536,7 +580,7 @@ function PlacingView(props: CupGamePanelProps & { game: CupGameData }) {
                 : "border-emerald-400/30 bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/25"
             }`}
           >
-            {me.isPlacementLocked ? "Unlock my placement" : "I'm ready"}
+            {me.isPlacementLocked ? "Change my spiders" : "Done — I'm ready"}
           </button>
         )}
       </div>
@@ -697,9 +741,15 @@ function PlayingView(
           <button
             type="button"
             onClick={() => props.drawCupGameCard(game.gameId)}
-            className="h-12 rounded-xl border border-fuchsia-400/40 bg-gradient-to-br from-fuchsia-500/20 to-purple-500/15 text-fuchsia-100 text-sm font-semibold hover:from-fuchsia-500/30 hover:to-purple-500/20 transition cup-deck-bob"
+            className="cup-deck-button cup-deck-bob"
+            aria-label="Push your luck — draw a card"
           >
-            🎴 Push your luck — draw a card
+            <span className="cup-deck-back-2" aria-hidden />
+            <span className="cup-deck-back-1" aria-hidden />
+            <span className="cup-deck-front" aria-hidden>
+              <span className="cup-deck-back-emoji">🎴</span>
+            </span>
+            <span className="cup-deck-label">Push your luck — draw a card</span>
           </button>
         )}
         {pending && iAmDrawer && (pending.awaiting === "pickRow" || pending.awaiting === "pickBlock" || pending.awaiting === "pickRelocateSrc" || pending.awaiting === "pickRelocateDst" || pending.awaiting === "pickTarget" || pending.awaiting === "pickTargetCup") && (
@@ -785,8 +835,8 @@ function TurnBanner({
             · {turnPlayer.lives} {turnPlayer.lives === 1 ? "life" : "lives"} left
           </span>
         )}
-        {me?.hasShield && myTurn && (
-          <span className="text-xs px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-200 border border-sky-400/30">🛡 Shield up</span>
+        {me?.hasMirror && myTurn && (
+          <span className="text-xs px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-200 border border-sky-400/30">🪞 Mirror up</span>
         )}
       </div>
       {game.session.turnDeadline && (
@@ -840,67 +890,71 @@ function CupGrid({
   if (onRowClick && rows) {
     // Render row-pick buttons next to each row.
     return (
-      <div
-        className="grid gap-2 select-none"
-        style={{
-          gridTemplateColumns: `auto repeat(${cols}, minmax(0, 1fr))`,
-        }}
-      >
-        {Array.from({ length: rows }).map((_, r) => (
-          <React.Fragment key={r}>
-            <button
-              type="button"
-              onClick={() => onRowClick(r)}
-              className="h-12 px-2 rounded-xl border border-amber-400/40 bg-amber-500/10 text-amber-200 text-xs font-semibold hover:bg-amber-500/20"
-            >
-              Row {r + 1}
-            </button>
-            {Array.from({ length: cols }).map((_, c) => {
-              const idx = r * cols + c;
-              return (
-                <Cup
-                  key={idx}
-                  cup={cups[idx]!}
-                  role={roles[idx]!}
-                  recentlyFlipped={recentFlippedCup === idx}
-                  hitOnFlip={hitFlippedCup === idx}
-                  shieldedOnFlip={shieldedFlippedCup === idx}
-                />
-              );
-            })}
-          </React.Fragment>
-        ))}
+      <div className="cup-felt-table">
+        <div
+          className="cup-grid grid gap-2 select-none"
+          style={{
+            gridTemplateColumns: `auto repeat(${cols}, minmax(0, 1fr))`,
+          }}
+        >
+          {Array.from({ length: rows }).map((_, r) => (
+            <React.Fragment key={r}>
+              <button
+                type="button"
+                onClick={() => onRowClick(r)}
+                className="h-12 px-2 rounded-xl border border-amber-400/40 bg-amber-500/10 text-amber-200 text-xs font-semibold hover:bg-amber-500/20"
+              >
+                Row {r + 1}
+              </button>
+              {Array.from({ length: cols }).map((_, c) => {
+                const idx = r * cols + c;
+                return (
+                  <Cup
+                    key={idx}
+                    cup={cups[idx]!}
+                    role={roles[idx]!}
+                    recentlyFlipped={recentFlippedCup === idx}
+                    hitOnFlip={hitFlippedCup === idx}
+                    shieldedOnFlip={shieldedFlippedCup === idx}
+                  />
+                );
+              })}
+            </React.Fragment>
+          ))}
+        </div>
       </div>
     );
   }
   return (
-    <div
-      className="grid gap-2 sm:gap-3 select-none"
-      style={{
-        gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
-      }}
-    >
-      {cups.map((cup) => {
-        const role = roles[cup.index]!;
-        const handle = () => {
-          if (onBlockClick && role === "block-corner") {
-            onBlockClick(cup.index);
-          } else {
-            onCupClick(cup.index);
-          }
-        };
-        return (
-          <Cup
-            key={cup.index}
-            cup={cup}
-            role={role}
-            onClick={handle}
-            recentlyFlipped={recentFlippedCup === cup.index}
-            hitOnFlip={hitFlippedCup === cup.index}
-            shieldedOnFlip={shieldedFlippedCup === cup.index}
-          />
-        );
-      })}
+    <div className="cup-felt-table">
+      <div
+        className="cup-grid grid gap-2 sm:gap-3 select-none"
+        style={{
+          gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+        }}
+      >
+        {cups.map((cup) => {
+          const role = roles[cup.index]!;
+          const handle = () => {
+            if (onBlockClick && role === "block-corner") {
+              onBlockClick(cup.index);
+            } else {
+              onCupClick(cup.index);
+            }
+          };
+          return (
+            <Cup
+              key={cup.index}
+              cup={cup}
+              role={role}
+              onClick={handle}
+              recentlyFlipped={recentFlippedCup === cup.index}
+              hitOnFlip={hitFlippedCup === cup.index}
+              shieldedOnFlip={shieldedFlippedCup === cup.index}
+            />
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -948,7 +1002,7 @@ function PlayerList({
                     {p.isPlacementLocked && " ✓"}
                   </span>
                 )}
-                {p.hasShield && <span className="text-xs">🛡</span>}
+                {p.hasMirror && <span className="text-xs" title="Mirror up — next spider hit reflects to its owner">🪞</span>}
                 {p.skipNextTurn && <span className="text-xs">💤</span>}
                 {p.isSpectator && (
                   <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-500/20 text-slate-300 border border-slate-400/30">
@@ -1030,9 +1084,10 @@ function FinishedView(props: CupGamePanelProps & { game: CupGameData }) {
     .filter(Boolean) as CupGamePlayer[];
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px] gap-4 lg:gap-5">
+    <div className="relative grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px] gap-4 lg:gap-5">
+      {(winner || drawWinners.length > 0) && <Confetti />}
       <div className="flex flex-col gap-4">
-        <div className="rounded-xl border border-amber-400/40 bg-gradient-to-br from-amber-500/15 to-orange-500/10 p-6 text-center">
+        <div className="relative overflow-hidden rounded-xl border border-amber-400/40 bg-gradient-to-br from-amber-500/15 to-orange-500/10 p-6 text-center">
           <div className="text-5xl mb-2" aria-hidden>🏆</div>
           {winner ? (
             <>
@@ -1078,6 +1133,76 @@ function FinishedView(props: CupGamePanelProps & { game: CupGameData }) {
           New game
         </button>
       </div>
+    </div>
+  );
+}
+
+// ── Big card overlay (centered, ~1.3s on every fresh draw) ─────────────────
+
+function BigCardOverlay({
+  card,
+}: {
+  card: { kind: CupGameCardKind; category: "good" | "bad"; key: number };
+}) {
+  const meta = CARD_META[card.kind];
+  return (
+    <div className="cup-bigcard-backdrop" aria-live="polite">
+      <div className={`cup-bigcard cup-bigcard-${card.category}`}>
+        <div className="cup-bigcard-inner">
+          <div className="cup-bigcard-emoji" aria-hidden>{meta.emoji}</div>
+          <div className="cup-bigcard-label">{meta.label}</div>
+          <div className="cup-bigcard-blurb">{meta.blurb}</div>
+          <div className="cup-bigcard-tag">{card.category === "good" ? "Helpful" : "Punishment"}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Confetti — sprayed when the game ends ─────────────────────────────────
+
+function Confetti() {
+  // Stable per-mount randomness so the storm looks deliberate, not flickery.
+  const pieces = React.useMemo(
+    () =>
+      Array.from({ length: 56 }, (_, i) => {
+        const hue = Math.floor(Math.random() * 360);
+        return {
+          id: i,
+          left: Math.random() * 100,
+          delay: Math.random() * 0.6,
+          duration: 2.2 + Math.random() * 1.6,
+          drift: -22 + Math.random() * 44,
+          rotateStart: Math.random() * 360,
+          rotateEnd: 540 + Math.random() * 720,
+          color: `hsl(${hue}, 80%, 60%)`,
+          width: 6 + Math.random() * 6,
+          height: 10 + Math.random() * 8,
+        };
+      }),
+    [],
+  );
+  return (
+    <div className="cup-confetti" aria-hidden>
+      {pieces.map((p) => (
+        <span
+          key={p.id}
+          className="cup-confetti-piece"
+          style={
+            {
+              left: `${p.left}%`,
+              width: `${p.width}px`,
+              height: `${p.height}px`,
+              background: p.color,
+              animationDelay: `${p.delay}s`,
+              animationDuration: `${p.duration}s`,
+              "--cup-confetti-drift": `${p.drift}vw`,
+              "--cup-confetti-rot-start": `${p.rotateStart}deg`,
+              "--cup-confetti-rot-end": `${p.rotateEnd}deg`,
+            } as React.CSSProperties
+          }
+        />
+      ))}
     </div>
   );
 }

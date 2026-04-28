@@ -12,7 +12,7 @@
  *     players: [{
  *       socketId, username, lives, eliminated,
  *       spidersPlaced, spiderBudget, isPlacementLocked,
- *       hasShield, skipNextTurn, isSpectator,
+ *       hasMirror, skipNextTurn, isSpectator,
  *       mySpiderCups: Set<cupIndex>,  // mirror of spiderOwnerByCup, indexed by player
  *     }],
  *     turnOrder: [socketId, ...],  // alive non-spectator
@@ -42,7 +42,7 @@ const CARDS = [
   { kind: "stealTurn", category: "good" },
   { kind: "peek", category: "good" },
   { kind: "relocate", category: "good" },
-  { kind: "shield", category: "good" },
+  { kind: "mirror", category: "good" },
 ];
 
 const MIN_LIVES = 1;
@@ -101,7 +101,7 @@ function makePlayer(socketId, username, startingLives, isSpectator = false) {
     spidersPlaced: 0,
     spiderBudget: startingLives,
     isPlacementLocked: false,
-    hasShield: false,
+    hasMirror: false,
     skipNextTurn: false,
     isSpectator,
     mySpiderCups: new Set(),
@@ -218,19 +218,42 @@ function drawCard(game) {
   return CARDS[idx];
 }
 
-function applyHit(game, victimSocketId) {
+/**
+ * Resolve a spider hit on `victimSocketId`.
+ *
+ * If the victim has a Mirror charge AND the spider's owner is someone else,
+ * the Mirror is consumed and the *owner* takes the hit instead. Self-flips
+ * are exempt — you can't reflect a hit you caused yourself, so the Mirror
+ * stays up and the flipper takes the hit normally.
+ *
+ * Returns { hit, mirroredTo }:
+ *   - hit       — true when the victim actually lost a life
+ *   - mirroredTo — set when the hit was redirected; the spider's owner is
+ *                  the one who lost a life
+ */
+function applyHit(game, victimSocketId, spiderOwnerSocketId) {
   const p = getPlayer(game, victimSocketId);
-  if (!p || p.eliminated) return { hit: false, shielded: false };
-  if (p.hasShield) {
-    p.hasShield = false;
-    return { hit: false, shielded: true };
+  if (!p || p.eliminated) return { hit: false, mirroredTo: null };
+
+  if (p.hasMirror && spiderOwnerSocketId && spiderOwnerSocketId !== victimSocketId) {
+    p.hasMirror = false;
+    const owner = getPlayer(game, spiderOwnerSocketId);
+    if (owner && !owner.eliminated) {
+      owner.lives = Math.max(0, owner.lives - 1);
+      if (owner.lives <= 0) {
+        owner.eliminated = true;
+        pushEvent(game, { kind: "eliminate", socketId: spiderOwnerSocketId });
+      }
+    }
+    return { hit: false, mirroredTo: spiderOwnerSocketId };
   }
+
   p.lives = Math.max(0, p.lives - 1);
   if (p.lives <= 0) {
     p.eliminated = true;
     pushEvent(game, { kind: "eliminate", socketId: victimSocketId });
   }
-  return { hit: true, shielded: false };
+  return { hit: true, mirroredTo: null };
 }
 
 function flipCupLowLevel(game, cupIndex, flipperSocketId) {
@@ -247,9 +270,9 @@ function flipCupLowLevel(game, cupIndex, flipperSocketId) {
     if (owner) owner.mySpiderCups.delete(cupIndex);
     game.spiderOwnerByCup.delete(cupIndex);
   }
-  let result = { hit: false, shielded: false };
+  let result = { hit: false, mirroredTo: null };
   if (wasSpider) {
-    result = applyHit(game, flipperSocketId);
+    result = applyHit(game, flipperSocketId, ownerSocketId);
   }
   pushEvent(game, {
     kind: "flip",
@@ -258,7 +281,7 @@ function flipCupLowLevel(game, cupIndex, flipperSocketId) {
     flipperSocketId,
     ownerSocketId: ownerSocketId || undefined,
     hit: result.hit,
-    shielded: result.shielded,
+    mirroredTo: result.mirroredTo || undefined,
   });
   return { wasSpider, ...result, ownerSocketId };
 }
@@ -339,7 +362,7 @@ function buildCupGamePayload(state, game, forSocketId) {
     spidersPlaced: p.spidersPlaced,
     spiderBudget: p.spiderBudget,
     isPlacementLocked: p.isPlacementLocked,
-    hasShield: p.hasShield,
+    hasMirror: p.hasMirror,
     skipNextTurn: p.skipNextTurn,
     isSpectator: p.isSpectator,
   }));

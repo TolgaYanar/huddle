@@ -148,16 +148,53 @@ function attachCupGameHandlers(io, state, socket) {
     if (!Number.isInteger(idx) || idx < 0 || idx >= game.cups.length) return;
 
     if (p.mySpiderCups.has(idx)) {
+      // Toggle off your own placement.
       p.mySpiderCups.delete(idx);
       game.spiderOwnerByCup.delete(idx);
       p.spidersPlaced = p.mySpiderCups.size;
     } else {
-      // Reject if cup already used by anyone else, or budget exhausted.
-      if (game.spiderOwnerByCup.has(idx)) return;
       if (p.mySpiderCups.size >= p.spiderBudget) return;
-      p.mySpiderCups.add(idx);
-      game.spiderOwnerByCup.set(idx, socket.id);
-      p.spidersPlaced = p.mySpiderCups.size;
+      if (game.spiderOwnerByCup.has(idx)) {
+        // Collision with another player's spider. We deliberately do NOT
+        // reject here — rejecting would leak the location of the other
+        // player's spider to whoever clicked. Instead, accept the click and
+        // randomly relocate one of the two spiders to a random empty cup.
+        // 50/50 between the new placer and the original owner so neither
+        // player can infer collisions from "what stayed where".
+        const otherOwnerSocketId = game.spiderOwnerByCup.get(idx);
+        const otherPlayer = getPlayer(game, otherOwnerSocketId);
+        const empties = [];
+        for (let i = 0; i < game.cups.length; i++) {
+          if (game.cups[i].status === "hidden" && !game.spiderOwnerByCup.has(i) && i !== idx) {
+            empties.push(i);
+          }
+        }
+        if (empties.length === 0) {
+          // No room to relocate. Silently no-op rather than reveal anything.
+          return;
+        }
+        const relocatedTo = empties[Math.floor(Math.random() * empties.length)];
+        if (Math.random() < 0.5 && otherPlayer) {
+          // The original owner gets relocated; new placer takes the cup.
+          otherPlayer.mySpiderCups.delete(idx);
+          otherPlayer.mySpiderCups.add(relocatedTo);
+          otherPlayer.spidersPlaced = otherPlayer.mySpiderCups.size;
+          game.spiderOwnerByCup.delete(idx);
+          game.spiderOwnerByCup.set(idx, socket.id);
+          game.spiderOwnerByCup.set(relocatedTo, otherOwnerSocketId);
+          p.mySpiderCups.add(idx);
+          p.spidersPlaced = p.mySpiderCups.size;
+        } else {
+          // The new placer gets relocated; original keeps the cup.
+          game.spiderOwnerByCup.set(relocatedTo, socket.id);
+          p.mySpiderCups.add(relocatedTo);
+          p.spidersPlaced = p.mySpiderCups.size;
+        }
+      } else {
+        p.mySpiderCups.add(idx);
+        game.spiderOwnerByCup.set(idx, socket.id);
+        p.spidersPlaced = p.mySpiderCups.size;
+      }
     }
 
     emitCupGameStateToRoom(io, state, roomId);
@@ -299,9 +336,9 @@ function attachCupGameHandlers(io, state, socket) {
     const drawer = getPlayer(game, socket.id);
 
     switch (card.kind) {
-      case "shield": {
-        if (drawer) drawer.hasShield = true;
-        pushEvent(game, { kind: "shield", drawerSocketId: socket.id });
+      case "mirror": {
+        if (drawer) drawer.hasMirror = true;
+        pushEvent(game, { kind: "mirror", drawerSocketId: socket.id });
         advanceTurn(game);
         scheduleCupTurnTimer(io, state, roomId, game.id);
         emitCupGameStateToRoom(io, state, roomId);

@@ -12,6 +12,22 @@ function isTyping(): boolean {
   return false;
 }
 
+/**
+ * Whenever a modal is open the user is interacting with it, not the video —
+ * so global player shortcuts (space = play/pause, arrows = seek, etc.) need
+ * to stay quiet. Without this guard, pressing space while a modal button is
+ * focused would re-activate the focused button AND pause the video, which is
+ * exactly the "the game UI keeps pausing my video" complaint.
+ *
+ * We rely on the shared Modal shell setting `role="dialog" aria-modal="true"`
+ * — that's the contract every dialog in the room view honors.
+ */
+function isModalOpen(): boolean {
+  return (
+    document.querySelector('[role="dialog"][aria-modal="true"]') !== null
+  );
+}
+
 export function useKeyboardShortcuts({
   enabled,
   canControlPlayback,
@@ -44,6 +60,7 @@ export function useKeyboardShortcuts({
 
     function onKeyDown(e: KeyboardEvent) {
       if (isTyping()) return;
+      if (isModalOpen()) return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
 
       switch (e.key) {

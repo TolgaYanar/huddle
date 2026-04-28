@@ -309,7 +309,7 @@ export type CupGameCardKind =
   | "stealTurn"
   | "peek"
   | "relocate"
-  | "shield";
+  | "mirror";
 
 export type CupGameCardCategory = "good" | "bad";
 
@@ -367,8 +367,13 @@ export interface CupGamePlayer {
   spiderBudget: number;
   /** True once the player has locked their placement and is ready to play. */
   isPlacementLocked: boolean;
-  /** True when the player still has at least one shield charge stockpiled. */
-  hasShield: boolean;
+  /**
+   * True when the player has a Mirror charge ready. The next time a spider
+   * would hit them, the spider's *owner* takes the hit instead and the
+   * Mirror is consumed. Self-flipping your own spider does not consume the
+   * Mirror (you can't reflect a hit you caused yourself).
+   */
+  hasMirror: boolean;
   /** True if the player's next turn will be auto-skipped (from skipYourTurn / stealTurn). */
   skipNextTurn: boolean;
   /** Joined the room mid-game; allowed to spectate but not to play this round. */
@@ -406,9 +411,22 @@ export interface CupGameSession {
 
 /** One-shot side effect a client may want to play (flip animation, hurt sound, etc.). */
 export type CupGameEvent =
-  | { kind: "flip"; cupIndex: number; revealedAs: "empty" | "spider"; flipperSocketId: string; ownerSocketId?: string; hit: boolean; shielded: boolean }
+  | {
+      kind: "flip";
+      cupIndex: number;
+      revealedAs: "empty" | "spider";
+      flipperSocketId: string;
+      ownerSocketId?: string;
+      hit: boolean;
+      /**
+       * If set, the flipper had a Mirror up and the spider hit was reflected
+       * to this socket id (the spider's owner). The flipper is unharmed; the
+       * `mirroredTo` player loses 1 life.
+       */
+      mirroredTo?: string;
+    }
   | { kind: "draw"; drawerSocketId: string; cardKind: CupGameCardKind; category: CupGameCardCategory }
-  | { kind: "shield"; drawerSocketId: string }
+  | { kind: "mirror"; drawerSocketId: string }
   | { kind: "skip"; targetSocketId: string; reason: "skipYourTurn" | "stealTurn" | "scheduled" }
   | { kind: "relocate"; ownerSocketId: string; fromCupIndex: number; toCupIndex: number }
   | { kind: "peek"; drawerSocketId: string; cupIndex: number; revealedAs: "empty" | "spider" }
