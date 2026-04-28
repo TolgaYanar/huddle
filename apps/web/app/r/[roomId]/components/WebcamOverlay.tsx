@@ -26,6 +26,12 @@ export function WebcamOverlay({
   onCloseLocal?: () => void;
 }) {
   const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
+  // Tracks which MediaStreamTrack each <video> currently has wired up. Letting
+  // the effect re-assign `srcObject` to a freshly-built MediaStream every time
+  // the parent re-renders (which happens on every `currentTime` tick while a
+  // video plays) made the camera tiles re-initialize and visibly freeze in
+  // fullscreen — keep a ref so we can bail when the track hasn't changed.
+  const wiredTracksRef = useRef<Map<string, MediaStreamTrack | null>>(new Map());
   const overlayRef = useRef<HTMLDivElement | null>(null);
 
   const [{ x, y }, setPos] = useState({ x: 12, y: 12 });
@@ -52,39 +58,50 @@ export function WebcamOverlay({
   const setVideoRef = (id: string) => (el: HTMLVideoElement | null) => {
     if (!el) {
       videoRefs.current.delete(id);
+      wiredTracksRef.current.delete(id);
       return;
     }
     videoRefs.current.set(id, el);
   };
 
   useEffect(() => {
-    const setStreamFor = (id: string, track: MediaStreamTrack | null) => {
+    // Idempotent: only touch the video's srcObject when the track itself
+    // actually changed. Replacing srcObject (even with a fresh MediaStream
+    // wrapping the same track) makes the element re-initialize, which is
+    // what was causing the camera tiles to freeze on every parent re-render
+    // in fullscreen.
+    const wireTrack = (id: string, track: MediaStreamTrack | null) => {
       const el = videoRefs.current.get(id);
       if (!el) return;
+      const wired = wiredTracksRef.current.get(id) ?? null;
+      if (wired === track) return;
       try {
         el.srcObject = track ? new MediaStream([track]) : null;
+        wiredTracksRef.current.set(id, track);
       } catch {
         // ignore
       }
     };
 
     if (!active) {
-      for (const el of videoRefs.current.values()) {
+      for (const [id, el] of videoRefs.current.entries()) {
+        if ((wiredTracksRef.current.get(id) ?? null) === null) continue;
         try {
           el.srcObject = null;
         } catch {
           // ignore
         }
+        wiredTracksRef.current.set(id, null);
       }
       return;
     }
 
-    setStreamFor("local", localCamTrack);
+    wireTrack("local", localCamTrack);
 
     for (const r of remotes) {
       const camEnabled = Boolean(r.media?.cam);
       if (!camEnabled) {
-        setStreamFor(r.id, null);
+        wireTrack(r.id, null);
         continue;
       }
 
@@ -101,7 +118,7 @@ export function WebcamOverlay({
       }
 
       track = track ?? tracks[0] ?? null;
-      setStreamFor(r.id, track);
+      wireTrack(r.id, track);
     }
   }, [active, localCamTrack, remotes]);
 

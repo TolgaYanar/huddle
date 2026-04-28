@@ -138,6 +138,12 @@ export function FullscreenChatOverlay({
 
   React.useEffect(() => {
     const onMove = (e: PointerEvent) => {
+      // Bail before any layout work if nothing is being dragged or resized.
+      // This listener is attached at the window level, so it'd otherwise
+      // force a getBoundingClientRect() on every cursor pixel — wasted
+      // layout flushes that show up as input lag while a video plays.
+      if (!isDraggingChatRef.current && !isResizingChatRef.current) return;
+
       const container = playerContainerRef.current;
       if (!container) return;
 

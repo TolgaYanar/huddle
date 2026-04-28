@@ -25,6 +25,11 @@ export function RemoteTile({
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  // Track which stream is currently wired so we don't reassign srcObject
+  // (and re-initialize the element) on every parent re-render when the
+  // underlying MediaStream hasn't actually changed.
+  const wiredVideoStreamRef = useRef<MediaStream | null>(null);
+  const wiredAudioStreamRef = useRef<MediaStream | null>(null);
 
   const toggleFullscreen = async () => {
     try {
@@ -54,7 +59,9 @@ export function RemoteTile({
 
   useEffect(() => {
     if (!videoRef.current) return;
+    if (wiredVideoStreamRef.current === stream) return;
     videoRef.current.srcObject = stream;
+    wiredVideoStreamRef.current = stream;
     // Autoplay can be flaky; try to start.
     videoRef.current.play().catch(() => {
       // ignore
@@ -63,7 +70,9 @@ export function RemoteTile({
 
   useEffect(() => {
     if (!audioRef.current) return;
+    if (wiredAudioStreamRef.current === stream) return;
     audioRef.current.srcObject = stream;
+    wiredAudioStreamRef.current = stream;
     // Audio autoplay may be blocked until user interaction.
     audioRef.current.play().catch(() => {
       // ignore
