@@ -338,6 +338,16 @@ function clearPendingCardIfDone(game) {
 // ── Per-viewer payload builder ───────────────────────────────────────────────
 
 function buildCupGamePayload(state, game, forSocketId) {
+  // `mineSpider` is only ever surfaced when this viewer is the drawer of a
+  // Relocate card that's currently awaiting source selection — that's the
+  // single moment they need to identify which cups are theirs. Outside of
+  // that, every hidden cup looks identical to every viewer (including the
+  // owner). Remembering your own placements is part of the game.
+  const isAwaitingMyRelocateSrc =
+    !!game.pendingCard &&
+    game.pendingCard.drawerSocketId === forSocketId &&
+    game.pendingCard.awaiting === "pickRelocateSrc";
+
   const cups = game.cups.map((cup) => {
     if (cup.status === "flipped") {
       return {
@@ -348,9 +358,10 @@ function buildCupGamePayload(state, game, forSocketId) {
       };
     }
     const out = { index: cup.index, status: "hidden" };
-    // Only the owner sees that *their own* hidden cup is loaded.
-    const ownerSid = game.spiderOwnerByCup.get(cup.index);
-    if (ownerSid && ownerSid === forSocketId) out.mineSpider = true;
+    if (isAwaitingMyRelocateSrc) {
+      const ownerSid = game.spiderOwnerByCup.get(cup.index);
+      if (ownerSid && ownerSid === forSocketId) out.mineSpider = true;
+    }
     return out;
   });
 

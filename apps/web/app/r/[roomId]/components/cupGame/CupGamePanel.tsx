@@ -76,11 +76,20 @@ function CupGameInner(props: CupGamePanelProps & { game: CupGameData; mySocketId
   const [heartPopOnSocket, setHeartPopOnSocket] = useState<string | null>(null);
   const [drawnCard, setDrawnCard] = useState<{ kind: CupGameCardKind; category: "good" | "bad"; key: number } | null>(null);
   // bigCard = the same card, but pinned to render the centered hero overlay
-  // for ~1.3s on every fresh draw. Cleared by a timeout so the next state
-  // push doesn't re-summon it.
+  // for the big-card duration on every fresh draw. Cleared by a timeout so
+  // the next state push doesn't re-summon it.
   const [bigCard, setBigCard] = useState<{ kind: CupGameCardKind; category: "good" | "bad"; key: number } | null>(null);
   const [peekResult, setPeekResult] = useState<PeekResult | null>(null);
   const [muted, setMutedState] = useState(isSoundMuted());
+
+  // Per-turn choice for *this* viewer: do we flip a cup or draw a card?
+  // Null until the local player picks; reset when the active turn rotates.
+  // Lives on the client only — picking "flip" doesn't reach the server, it
+  // just dismisses the choice banner so the cup grid becomes interactive.
+  const [myTurnAction, setMyTurnAction] = useState<"flip" | "draw" | null>(null);
+  useEffect(() => {
+    setMyTurnAction(null);
+  }, [game.session.currentTurnSocketId]);
 
   // ── Effect playback driven by `lastEvent` ────────────────────────────────
   const lastSeqRef = useRef(0);
@@ -128,8 +137,8 @@ function CupGameInner(props: CupGamePanelProps & { game: CupGameData; mySocketId
         const card = { kind: evt.cardKind, category: evt.category, key: seq };
         setDrawnCard(card);
         setBigCard(card);
-        setTimeout(() => setBigCard(null), 1300);
-        setTimeout(() => playSound(evt.category === "good" ? "good" : "bad"), 220);
+        setTimeout(() => setBigCard(null), 2700);
+        setTimeout(() => playSound(evt.category === "good" ? "good" : "bad"), 280);
         break;
       }
       case "mirror": {
@@ -229,6 +238,12 @@ function CupGameInner(props: CupGamePanelProps & { game: CupGameData; mySocketId
             peekResult={peekResult}
             dismissPeek={() => setPeekResult(null)}
             heartPopOnSocket={heartPopOnSocket}
+            myTurnAction={myTurnAction}
+            onPickFlip={() => setMyTurnAction("flip")}
+            onPickDraw={() => {
+              setMyTurnAction("draw");
+              props.drawCupGameCard(game.gameId);
+            }}
           />
         </div>
       )}
@@ -567,12 +582,10 @@ function PlacingView(props: CupGamePanelProps & { game: CupGameData }) {
   const { game, mySocketId } = props;
   const me = game.players.find((p) => p.socketId === mySocketId);
   const cupRoles: CupRole[] = useMemo(() => {
+    // Every hidden cup looks identical — even your own placements. Memorize
+    // them as you go; the only feedback is the "X / Y placed" counter.
     return game.cups.map((c) => {
       if (c.status === "flipped") return "idle";
-      if (c.mineSpider) return "placement-mine";
-      // We can't know which cup belongs to other players, but we can know
-      // whether *any* spider is there because the server tells us mineSpider
-      // only for ours. Other-player cups look like empty placement cells.
       if (me?.isPlacementLocked) return "placement-disabled";
       return "placement-empty";
     });
@@ -584,10 +597,11 @@ function PlacingView(props: CupGamePanelProps & { game: CupGameData }) {
     <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px] gap-4 lg:gap-5">
       <div className="flex flex-col gap-3">
         <div className="rounded-xl border border-fuchsia-400/20 bg-fuchsia-500/10 px-4 py-3 text-sm text-fuchsia-200">
-          <strong>Hide your spiders.</strong> Tap any cups to put a spider underneath — up to{" "}
-          <span className="font-semibold">{me?.spiderBudget ?? 0}</span>. So far you&rsquo;ve hidden{" "}
-          <span className="font-semibold">{me?.spidersPlaced ?? 0}</span>{" "}
-          ({remaining} left to place). Your spiders only hurt other players who flip them — but try to remember where they are, so you don&rsquo;t flip your own.
+          <strong>Hide your spiders.</strong> Tap up to{" "}
+          <span className="font-semibold">{me?.spiderBudget ?? 0}</span> cups to bury a spider under each. So far:{" "}
+          <span className="font-semibold">{me?.spidersPlaced ?? 0}</span> placed,{" "}
+          <span className="font-semibold">{remaining}</span> remaining.{" "}
+          <strong>Memorize them as you go</strong> — every cup looks identical, even your own. The counter is your only feedback. Tap a cup again to remove the spider you just placed there (you&rsquo;ll need to remember which one).
         </div>
         <CupGrid
           cols={game.config.cols}
@@ -633,6 +647,9 @@ function PlayingView(
     peekResult: PeekResult | null;
     dismissPeek: () => void;
     heartPopOnSocket: string | null;
+    myTurnAction: "flip" | "draw" | null;
+    onPickFlip: () => void;
+    onPickDraw: () => void;
   },
 ) {
   const {
@@ -646,17 +663,31 @@ function PlayingView(
     peekResult,
     dismissPeek,
     heartPopOnSocket,
+    myTurnAction,
+    onPickFlip,
+    onPickDraw,
   } = props;
 
   const myTurn = game.session.currentTurnSocketId === mySocketId;
   const pending = game.session.pendingCard;
   const iAmDrawer = pending && pending.drawerSocketId === mySocketId;
 
+  // The big two-pane choice covers the playing area only when it's truly
+  // *your* turn to act and you haven't picked yet. While a pending card is
+  // resolving, or it's someone else's turn, the choice doesn't make sense.
+  const showTurnChoice =
+    myTurn && !pending && me && !me.eliminated && myTurnAction === null;
+  // Once "flip" is picked, the cup grid becomes interactive normally. Until
+  // then (or if "draw" was picked instead), cups are read-only.
+  const cupsInteractable = !showTurnChoice && myTurnAction !== "draw";
+
   // Build per-cup roles
   const cupRoles: CupRole[] = useMemo(() => {
+    // All hidden cups look identical — including your own spiders. The
+    // server only marks `mineSpider` during the relocate source-pick step,
+    // and that's the only branch below that uses it.
     return game.cups.map((c) => {
       if (c.status === "flipped") return "idle";
-      if (c.mineSpider) return "mineSpider";
       if (iAmDrawer && pending) {
         if (pending.awaiting === "pickCup") {
           if (pending.kind === "peek") return "selectable";
@@ -674,10 +705,12 @@ function PlayingView(
         if (pending.awaiting === "pickTargetCup") return "selectable";
         return "idle";
       }
-      if (myTurn && !pending && me && !me.eliminated) return "selectable";
+      if (myTurn && !pending && me && !me.eliminated && cupsInteractable) {
+        return "selectable";
+      }
       return "idle";
     });
-  }, [game.cups, iAmDrawer, pending, myTurn, me]);
+  }, [game.cups, iAmDrawer, pending, myTurn, me, cupsInteractable]);
 
   const handleCupClick = (idx: number) => {
     if (pending && iAmDrawer) {
@@ -701,7 +734,7 @@ function PlayingView(
       }
       return;
     }
-    if (myTurn && !pending) {
+    if (myTurn && !pending && cupsInteractable) {
       props.flipCup(game.gameId, idx);
     }
   };
@@ -722,13 +755,17 @@ function PlayingView(
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px] gap-4 lg:gap-5">
       <div className="flex flex-col gap-3">
-        <TurnBanner
-          game={game}
-          me={me}
-          mySocketId={mySocketId}
-          pending={pending}
-          drawnCard={drawnCard}
-        />
+        {showTurnChoice ? (
+          <TurnChoiceBanner onPickFlip={onPickFlip} onPickDraw={onPickDraw} />
+        ) : (
+          <TurnBanner
+            game={game}
+            me={me}
+            mySocketId={mySocketId}
+            pending={pending}
+            drawnCard={drawnCard}
+          />
+        )}
         <CupGrid
           cols={game.config.cols}
           cups={game.cups}
@@ -769,19 +806,21 @@ function PlayingView(
           currentTurnSocketId={game.session.currentTurnSocketId}
           heartPopOnSocket={heartPopOnSocket}
         />
-        {myTurn && !pending && me && !me.eliminated && (
+        {myTurn && !pending && me && !me.eliminated && myTurnAction === "flip" && (
           <button
             type="button"
-            onClick={() => props.drawCupGameCard(game.gameId)}
+            onClick={() => {
+              onPickDraw();
+            }}
             className="cup-deck-button cup-deck-bob"
-            aria-label="Push your luck — draw a card"
+            aria-label="Actually, draw a card instead"
           >
             <span className="cup-deck-back-2" aria-hidden />
             <span className="cup-deck-back-1" aria-hidden />
             <span className="cup-deck-front" aria-hidden>
               <span className="cup-deck-back-emoji">🎴</span>
             </span>
-            <span className="cup-deck-label">Push your luck — draw a card</span>
+            <span className="cup-deck-label">Or draw a card instead</span>
           </button>
         )}
         {pending && iAmDrawer && (pending.awaiting === "pickRow" || pending.awaiting === "pickBlock" || pending.awaiting === "pickRelocateSrc" || pending.awaiting === "pickRelocateDst" || pending.awaiting === "pickTarget" || pending.awaiting === "pickTargetCup") && (
@@ -1143,13 +1182,11 @@ function FinishedView(props: CupGamePanelProps & { game: CupGameData }) {
           <div className="text-xs uppercase tracking-wider text-slate-400 font-semibold mb-2">
             Final grid
           </div>
+          {/* Final grid shows exactly what was uncovered during play. Cups
+              that were never flipped stay hidden. */}
           <CupGrid
             cols={game.config.cols}
-            cups={game.cups.map((c) => ({
-              ...c,
-              status: "flipped" as const,
-              revealedAs: c.status === "flipped" ? c.revealedAs : (c.mineSpider ? "spider" : "empty"),
-            }))}
+            cups={game.cups}
             roles={game.cups.map(() => "idle" as CupRole)}
             onCupClick={() => undefined}
           />
@@ -1169,7 +1206,60 @@ function FinishedView(props: CupGamePanelProps & { game: CupGameData }) {
   );
 }
 
-// ── Big card overlay (centered, ~1.3s on every fresh draw) ─────────────────
+// ── Turn choice banner — big two-pane "what's your move?" prompt ───────────
+
+function TurnChoiceBanner({
+  onPickFlip,
+  onPickDraw,
+}: {
+  onPickFlip: () => void;
+  onPickDraw: () => void;
+}) {
+  return (
+    <div className="cup-turn-choice">
+      <div className="cup-turn-choice-prompt">
+        <span className="cup-turn-choice-prompt-pulse" aria-hidden />
+        It&rsquo;s your turn — pick your move
+      </div>
+      <div className="cup-turn-choice-grid">
+        <button
+          type="button"
+          onClick={onPickFlip}
+          className="cup-turn-choice-pane cup-turn-choice-flip"
+          aria-label="Flip a cup"
+        >
+          <div className="cup-turn-choice-icon" aria-hidden>
+            <span className="cup-turn-choice-cup" />
+          </div>
+          <div className="cup-turn-choice-title">Flip a Cup</div>
+          <div className="cup-turn-choice-blurb">
+            Pick any covered cup. If a spider is under it, you lose 1 life.
+          </div>
+          <div className="cup-turn-choice-cta">Tap a cup →</div>
+        </button>
+        <button
+          type="button"
+          onClick={onPickDraw}
+          className="cup-turn-choice-pane cup-turn-choice-draw"
+          aria-label="Push your luck — draw a card"
+        >
+          <div className="cup-turn-choice-icon" aria-hidden>
+            <span className="cup-turn-choice-deck-back-2" />
+            <span className="cup-turn-choice-deck-back-1" />
+            <span className="cup-turn-choice-deck-front">🎴</span>
+          </div>
+          <div className="cup-turn-choice-title">Push Your Luck</div>
+          <div className="cup-turn-choice-blurb">
+            Draw a random card — 5 helpful, 5 punishing. Replaces your flip.
+          </div>
+          <div className="cup-turn-choice-cta">Draw now →</div>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Big card overlay (centered, ~2.7s on every fresh draw) ─────────────────
 
 function BigCardOverlay({
   card,
