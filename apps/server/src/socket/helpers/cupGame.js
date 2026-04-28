@@ -338,15 +338,20 @@ function clearPendingCardIfDone(game) {
 // ── Per-viewer payload builder ───────────────────────────────────────────────
 
 function buildCupGamePayload(state, game, forSocketId) {
-  // `mineSpider` is only ever surfaced when this viewer is the drawer of a
-  // Relocate card that's currently awaiting source selection — that's the
-  // single moment they need to identify which cups are theirs. Outside of
-  // that, every hidden cup looks identical to every viewer (including the
-  // owner). Remembering your own placements is part of the game.
+  // `mineSpider` surfaces in two situations:
+  //   1. During the placement phase — players need to see what they've put
+  //      down so they can plan and remember.
+  //   2. During the relocate source-pick step — the drawer needs to see
+  //      which cups are theirs to choose from.
+  //
+  // Once the game enters the playing phase, every hidden cup looks identical
+  // to every viewer (including the owner). That's the memory test.
+  const isPlacementPhase = game.status === "placing";
   const isAwaitingMyRelocateSrc =
     !!game.pendingCard &&
     game.pendingCard.drawerSocketId === forSocketId &&
     game.pendingCard.awaiting === "pickRelocateSrc";
+  const showMineHints = isPlacementPhase || isAwaitingMyRelocateSrc;
 
   const cups = game.cups.map((cup) => {
     if (cup.status === "flipped") {
@@ -358,7 +363,7 @@ function buildCupGamePayload(state, game, forSocketId) {
       };
     }
     const out = { index: cup.index, status: "hidden" };
-    if (isAwaitingMyRelocateSrc) {
+    if (showMineHints) {
       const ownerSid = game.spiderOwnerByCup.get(cup.index);
       if (ownerSid && ownerSid === forSocketId) out.mineSpider = true;
     }
