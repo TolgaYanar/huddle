@@ -252,6 +252,18 @@ function CupGameHeader({
   onToggleMute: () => void;
   onReset?: () => void;
 }) {
+  // Two-click confirmation kept in component state — using window.confirm()
+  // here would be picked up by the browser as a "blocking modal", which
+  // (especially on Safari) suspends iframe playback for the room video
+  // until the dialog is dismissed. An inline confirm avoids touching the
+  // video at all.
+  const [resetArmed, setResetArmed] = React.useState(false);
+  React.useEffect(() => {
+    if (!resetArmed) return;
+    const t = setTimeout(() => setResetArmed(false), 4000);
+    return () => clearTimeout(t);
+  }, [resetArmed]);
+
   const phaseBadge = (() => {
     if (game.session.status === "lobby") return { text: "Setting up", color: "bg-sky-500/20 text-sky-300 border-sky-400/30" };
     if (game.session.status === "placing") return { text: "Hiding spiders", color: "bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-400/30" };
@@ -277,16 +289,36 @@ function CupGameHeader({
         >
           {muted ? "🔇 Sound off" : "🔊 Sound on"}
         </button>
-        {onReset && (
+        {onReset && !resetArmed && (
           <button
             type="button"
-            onClick={() => {
-              if (confirm("End this game and clear the board?")) onReset();
-            }}
+            onClick={() => setResetArmed(true)}
             className="h-8 px-3 text-xs rounded-lg border border-rose-400/30 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20"
           >
             Reset
           </button>
+        )}
+        {onReset && resetArmed && (
+          <div className="flex items-center gap-1 rounded-lg border border-rose-400/40 bg-rose-500/10 px-2 py-1">
+            <span className="text-[11px] text-rose-200">End this game?</span>
+            <button
+              type="button"
+              onClick={() => {
+                onReset();
+                setResetArmed(false);
+              }}
+              className="h-6 px-2 text-[11px] rounded-md border border-rose-300/50 bg-rose-500/30 text-white hover:bg-rose-500/50 font-semibold"
+            >
+              Yes
+            </button>
+            <button
+              type="button"
+              onClick={() => setResetArmed(false)}
+              className="h-6 px-2 text-[11px] rounded-md border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10"
+            >
+              Cancel
+            </button>
+          </div>
         )}
       </div>
     </div>
