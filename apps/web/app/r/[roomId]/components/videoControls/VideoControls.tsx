@@ -4,11 +4,13 @@ import React from "react";
 
 import {
   ExitFullscreenIcon,
+  ExitTheatreIcon,
   FullscreenIcon,
   PauseIcon,
   PlayIcon,
   SkipBackIcon,
   SkipForwardIcon,
+  TheatreIcon,
   VolumeHighIcon,
   VolumeLowIcon,
   VolumeMuteIcon,
@@ -43,6 +45,8 @@ export function VideoControls({
   onPlaybackRateChange,
   onFullscreen,
   isFullscreen = false,
+  isTheatreMode = false,
+  onToggleTheatreMode,
   disabled = false,
   disabledReason,
   className = "",
@@ -216,6 +220,30 @@ export function VideoControls({
               +30s
             </button>
           </div>
+
+          {/* Theatre mode Button — hides the left call sidebar to widen the player. */}
+          {onToggleTheatreMode && (
+            <button
+              type="button"
+              onClick={onToggleTheatreMode}
+              aria-label={
+                isTheatreMode ? "Exit theatre mode" : "Enter theatre mode"
+              }
+              aria-pressed={isTheatreMode ? "true" : "false"}
+              className={`hidden lg:flex h-9 w-9 rounded-lg border items-center justify-center transition-colors ${
+                isTheatreMode
+                  ? "bg-indigo-500/20 border-indigo-500/40 text-indigo-200 hover:bg-indigo-500/30"
+                  : "bg-white/5 hover:bg-white/10 border-white/10 text-slate-200"
+              }`}
+              title={
+                isTheatreMode
+                  ? "Exit theatre mode (T)"
+                  : "Theatre mode — hide the call sidebar (T)"
+              }
+            >
+              {isTheatreMode ? <ExitTheatreIcon /> : <TheatreIcon />}
+            </button>
+          )}
 
           {/* Fullscreen Button */}
           {onFullscreen && (

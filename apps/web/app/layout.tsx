@@ -98,7 +98,11 @@ export default function RootLayout({
   };
 
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className="[color-scheme:dark]"
+    >
       <head>
         <script
           type="application/ld+json"
@@ -106,7 +110,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable}`}
+        className={`${geistSans.variable} ${geistMono.variable} bg-slate-950 text-slate-50 antialiased selection:bg-indigo-500/35 selection:text-slate-50 [font-feature-settings:'ss01','cv02','cv11']`}
         suppressHydrationWarning
       >
         <ErrorBoundary>{children}</ErrorBoundary>

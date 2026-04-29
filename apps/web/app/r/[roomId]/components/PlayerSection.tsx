@@ -105,6 +105,9 @@ export function PlayerSection({
   setChatText,
   handleSendChat,
   onVideoEnded,
+
+  isTheatreMode,
+  onToggleTheatreMode,
 }: PlayerSectionProps) {
   const { playerConfig } = usePlayerConfig(normalizedUrl, roomPlaybackAnchorRef);
 
@@ -255,7 +258,11 @@ export function PlayerSection({
   });
 
   return (
-    <section className="flex flex-col gap-6 lg:col-start-2 lg:row-start-1 lg:min-w-0">
+    <section
+      className={`flex flex-col gap-6 lg:row-start-1 lg:min-w-0 transition-[grid-column] duration-300 ${
+        isTheatreMode ? "lg:col-start-1" : "lg:col-start-2"
+      }`}
+    >
       <VideoSourceCard
         inputUrl={inputUrl}
         setInputUrl={setInputUrl}
@@ -322,6 +329,8 @@ export function PlayerSection({
         onPlaybackRateChange={handlePlaybackRateChange}
         onFullscreen={togglePlayerFullscreen}
         isFullscreen={isPlayerFullscreen}
+        isTheatreMode={isTheatreMode}
+        onToggleTheatreMode={onToggleTheatreMode}
         disabled={!isConnected || !canControlPlayback}
         disabledReason={
           isPrime

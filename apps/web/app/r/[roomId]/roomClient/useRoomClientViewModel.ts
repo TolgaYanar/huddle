@@ -29,6 +29,7 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [isCallCollapsed, setIsCallCollapsed] = useState(false);
   const [isActivityCollapsed, setIsActivityCollapsed] = useState(false);
+  const [isTheatreMode, setIsTheatreMode] = useState(false);
 
   const [echoCancellationEnabled, setEchoCancellationEnabled] = useState(true);
   const [noiseSuppressionEnabled, setNoiseSuppressionEnabled] = useState(true);
@@ -183,6 +184,7 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
     handleVolumeFromController: playback.video.handleVolumeFromController,
     toggleLocalMute: playback.video.toggleLocalMute,
     togglePlayerFullscreen: fullscreen.togglePlayerFullscreen,
+    toggleTheatreMode: () => setIsTheatreMode((v) => !v),
   });
 
   const handleOpenAddToPlaylist = useCallback(() => {
@@ -217,6 +219,8 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
     setChatText: playback.activity.setChatText,
     handleSendChat: playback.activity.handleSendChat,
     onVideoEnded: playback.handleVideoEnded,
+    isTheatreMode,
+    onToggleTheatreMode: () => setIsTheatreMode((v) => !v),
   });
 
   const playlistPanelProps = buildPlaylistPanelProps({
@@ -485,6 +489,7 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
     passwordModalProps,
     wheelPickerModalProps,
     isActivityCollapsed,
+    isTheatreMode,
     playerSectionProps,
     callSidebarProps,
     activitySidebarProps,

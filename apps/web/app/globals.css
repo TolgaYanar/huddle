@@ -1,35 +1,42 @@
 @import "tailwindcss";
 
-@layer base {
-  :root {
-    --background: 15 23 42; /* Slate 900 */
-    --foreground: 248 250 252; /* Slate 50 */
-  }
+/*
+ * Things below have no clean Tailwind utility equivalent:
+ *  - WebKit/Firefox custom scrollbar styling
+ *  - A unified :focus-visible ring that applies globally without having to
+ *    spread `focus-visible:ring-...` over every interactive element.
+ * Everything else (bg, selection color, font features, color-scheme, etc.)
+ * lives on <html>/<body> in app/layout.tsx as Tailwind classes.
+ */
 
-  body {
-    @apply bg-slate-950 text-slate-50 antialiased;
-  }
+:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px rgb(15 23 42),
+    0 0 0 4px rgb(99 102 241 / 0.6);
+  border-radius: 0.5rem;
 }
 
-@layer utilities {
-  .glass {
-    @apply bg-slate-900/70 backdrop-blur-md border border-white/10;
-  }
-
-  .glass-panel {
-    @apply bg-slate-800/50 backdrop-blur-sm border border-white/5;
-  }
-}
-
-/* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-transparent;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-slate-700 rounded-full hover:bg-slate-600;
+  background-color: rgb(148 163 184 / 0.18);
+  border-radius: 9999px;
+  transition: background-color 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(148 163 184 / 0.35);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(148 163 184 / 0.18) transparent;
 }

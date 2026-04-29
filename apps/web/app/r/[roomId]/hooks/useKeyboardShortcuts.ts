@@ -41,6 +41,7 @@ export function useKeyboardShortcuts({
   handleVolumeFromController,
   toggleLocalMute,
   togglePlayerFullscreen,
+  toggleTheatreMode,
 }: {
   enabled: boolean;
   canControlPlayback: boolean;
@@ -54,6 +55,7 @@ export function useKeyboardShortcuts({
   handleVolumeFromController: (volume: number, muted: boolean) => void;
   toggleLocalMute: () => void;
   togglePlayerFullscreen: () => void;
+  toggleTheatreMode?: () => void;
 }) {
   useEffect(() => {
     if (!enabled) return;
@@ -113,6 +115,13 @@ export function useKeyboardShortcuts({
           togglePlayerFullscreen();
           break;
         }
+        case "t":
+        case "T": {
+          if (!toggleTheatreMode) return;
+          e.preventDefault();
+          toggleTheatreMode();
+          break;
+        }
       }
     }
 
@@ -131,5 +140,6 @@ export function useKeyboardShortcuts({
     handleVolumeFromController,
     toggleLocalMute,
     togglePlayerFullscreen,
+    toggleTheatreMode,
   ]);
 }

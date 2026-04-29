@@ -107,9 +107,21 @@ export function HomeClient() {
   }, [user]);
 
   return (
-    <div className="min-h-screen flex flex-col bg-linear-to-b from-slate-900 via-slate-950 to-black text-slate-200">
-      <header className="h-16 flex items-center justify-between px-6 lg:px-8 border-b border-white/10 backdrop-blur-md bg-black/30 sticky top-0 z-50">
-        <div className="font-semibold text-lg sm:text-xl flex items-center gap-2 text-slate-50 tracking-tight">
+    <div className="relative min-h-screen flex flex-col bg-linear-to-b from-slate-900 via-slate-950 to-black text-slate-200 overflow-x-hidden">
+      {/* Ambient gradient mesh — purely decorative, sits behind everything */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
+      >
+        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[80rem] h-[40rem] rounded-full bg-indigo-500/20 blur-3xl" />
+        <div className="absolute top-1/3 -right-32 w-[28rem] h-[28rem] rounded-full bg-fuchsia-500/15 blur-3xl" />
+        <div className="absolute bottom-0 -left-32 w-[32rem] h-[32rem] rounded-full bg-sky-500/15 blur-3xl" />
+        {/* Subtle grain via radial gradient stops on a tiny mask */}
+        <div className="absolute inset-0 [background-image:radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.04),transparent_40%)]" />
+      </div>
+
+      <header className="h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8 border-b border-white/10 backdrop-blur-xl bg-slate-950/60 sticky top-0 z-50">
+        <div className="font-semibold text-lg sm:text-xl flex items-center gap-2 text-slate-50 tracking-tight group">
           <picture>
             <source srcSet="/favicon.svg?v=2" type="image/svg+xml" />
             <img
@@ -117,7 +129,7 @@ export function HomeClient() {
               alt="WeHuddle"
               width={24}
               height={24}
-              className="h-6 w-6 rounded"
+              className="h-6 w-6 rounded transition-transform group-hover:scale-110 group-hover:rotate-6"
             />
           </picture>
           <span>WeHuddle</span>
@@ -126,13 +138,13 @@ export function HomeClient() {
         <div className="flex items-center gap-2">
           {user ? (
             <>
-              <div className="hidden sm:flex items-center gap-2 text-xs border border-white/10 bg-black/20 rounded-full px-3 py-1 text-slate-300">
-                <span className="text-slate-400">@</span>
-                <span className="text-slate-200">{user.username}</span>
+              <div className="hidden sm:flex items-center gap-1.5 text-xs border border-white/10 bg-black/20 rounded-full px-3 py-1 text-slate-300">
+                <span className="text-slate-500">@</span>
+                <span className="text-slate-200 font-medium">{user.username}</span>
               </div>
               <button
                 type="button"
-                className="h-8 px-3 rounded-lg border border-white/10 bg-white/5 text-slate-200 text-xs font-medium hover:bg-white/10 transition-colors"
+                className="h-8 px-3 rounded-lg border border-white/10 bg-white/5 text-slate-300 text-xs font-medium hover:bg-white/10 hover:text-slate-100 transition-colors"
                 onClick={async () => {
                   try {
                     await apiLogout();
@@ -149,13 +161,13 @@ export function HomeClient() {
             <>
               <Link
                 href="/login"
-                className="h-8 px-3 rounded-lg border border-white/10 bg-white/5 text-slate-200 text-xs font-medium hover:bg-white/10 transition-colors"
+                className="h-8 px-3 rounded-lg border border-white/10 bg-white/5 text-slate-200 text-xs font-medium hover:bg-white/10 transition-colors inline-flex items-center"
               >
                 Log in
               </Link>
               <Link
                 href="/register"
-                className="h-8 px-3 rounded-lg border border-white/10 bg-white/5 text-slate-200 text-xs font-medium hover:bg-white/10 transition-colors"
+                className="h-8 px-3 rounded-lg border border-indigo-500/40 bg-indigo-500/10 text-indigo-200 text-xs font-medium hover:bg-indigo-500/20 transition-colors inline-flex items-center"
               >
                 Register
               </Link>
@@ -164,12 +176,40 @@ export function HomeClient() {
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col items-center justify-center p-6 gap-10">
+      <main className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 py-10 sm:py-16 gap-12">
+        {/* Hero */}
+        <div className="w-full max-w-2xl flex flex-col items-center text-center gap-3">
+          <span className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1 rounded-full border border-white/10 bg-white/5 text-slate-300">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
+            </span>
+            Live with friends — no install needed
+          </span>
+          <h1 className="font-semibold text-slate-50 text-3xl sm:text-4xl lg:text-5xl tracking-tight bg-clip-text bg-linear-to-b from-white to-slate-300 text-transparent">
+            Watch videos together,
+            <br />
+            <span className="bg-clip-text bg-linear-to-r from-indigo-300 via-fuchsia-300 to-sky-300 text-transparent">
+              perfectly in sync.
+            </span>
+          </h1>
+          <p className="text-sm sm:text-base text-slate-400 max-w-md">
+            Create a private room, share the link, and hit play together. Voice
+            and video chat, reactions, and games all built in.
+          </p>
+        </div>
+
         <div className="w-full max-w-xl">
-          <div className="backdrop-blur-md bg-white/5 rounded-2xl border border-white/10 p-5 sm:p-6">
-            <h1 className="font-semibold text-slate-50 text-xl">
-              Watch videos together in sync
-            </h1>
+          <div className="relative backdrop-blur-md bg-white/5 rounded-2xl border border-white/10 p-5 sm:p-6 shadow-2xl shadow-black/40">
+            {/* Subtle inner glow */}
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 rounded-2xl bg-linear-to-b from-white/5 to-transparent"
+            />
+            <div className="relative">
+            <h2 className="font-semibold text-slate-50 text-lg">
+              Start a watch party
+            </h2>
             <p className="text-sm text-slate-400 mt-1">
               Create a private room, share the link, and hit play together.
             </p>
@@ -198,7 +238,7 @@ export function HomeClient() {
                         <button
                           key={r.roomId}
                           type="button"
-                          className="w-full rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors text-left px-3 py-2 flex items-center gap-3"
+                          className="group/item w-full rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 transition-colors text-left px-3 py-2 flex items-center gap-3"
                           onClick={() => router.push(`/r/${r.roomId}`)}
                         >
                           <div className="flex-1 min-w-0">
@@ -211,9 +251,15 @@ export function HomeClient() {
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
                             {savedEntry && (
-                              <span className="text-xs text-indigo-300">Saved</span>
+                              <span className="inline-flex items-center gap-1 text-[10px] text-amber-300 font-medium px-1.5 py-0.5 rounded-full bg-amber-400/10 border border-amber-400/30">
+                                <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24">
+                                  <path d="M11.48 3.499a.75.75 0 011.04 0l2.84 2.751 3.83.557a.75.75 0 01.41 1.28l-2.77 2.7.65 3.81a.75.75 0 01-1.09.79L12 13.51l-3.39 1.78a.75.75 0 01-1.09-.79l.65-3.81-2.77-2.7a.75.75 0 01.41-1.28l3.83-.557 2.84-2.751z" />
+                                </svg>
+                                Saved
+                              </span>
                             )}
                             <span className="text-xs text-slate-500">{timeAgo(r.visitedAt)}</span>
+                            <span className="text-slate-600 group-hover/item:text-slate-400 group-hover/item:translate-x-0.5 transition-all">→</span>
                           </div>
                         </button>
                       );
@@ -242,12 +288,26 @@ export function HomeClient() {
 
               <button
                 type="button"
-                className="h-11 w-full rounded-xl font-semibold text-sm transition-colors bg-slate-50 text-slate-950 hover:bg-slate-50/90"
+                className="group relative h-12 w-full rounded-xl font-semibold text-sm transition-all bg-slate-50 text-slate-950 hover:bg-white hover:shadow-lg hover:shadow-indigo-500/20 active:scale-[0.99] inline-flex items-center justify-center gap-2"
                 onClick={() => {
                   router.push(`/r/${generateRoomId()}`);
                 }}
               >
+                <svg
+                  className="w-4 h-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2.25}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
                 Create a new room
+                <span className="text-slate-400 font-normal text-xs ml-1 hidden sm:inline">
+                  (instant link)
+                </span>
               </button>
 
               <div className="flex gap-2">
@@ -260,12 +320,16 @@ export function HomeClient() {
                       router.push(`/r/${normalizedJoin}`);
                     }
                   }}
-                  placeholder="Enter room name or paste invite link (/r/...)"
-                  className="flex-1 bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500/40 transition"
+                  placeholder="Enter room name or paste invite link…"
+                  className="flex-1 min-w-0 bg-black/30 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500/40 hover:border-white/20 transition"
                 />
                 <button
                   type="button"
-                  className="h-11 px-4 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  className={`h-11 px-5 rounded-xl border text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5 ${
+                    normalizedJoin
+                      ? "border-indigo-500/50 bg-indigo-500/20 text-indigo-100 hover:bg-indigo-500/30"
+                      : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"
+                  }`}
                   disabled={!normalizedJoin}
                   onClick={() => {
                     if (!normalizedJoin) return;
@@ -273,6 +337,17 @@ export function HomeClient() {
                   }}
                 >
                   Join
+                  <svg
+                    className="w-3.5 h-3.5"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M5 12h14M13 6l6 6-6 6" />
+                  </svg>
                 </button>
               </div>
 
@@ -282,11 +357,12 @@ export function HomeClient() {
                 account required.
               </div>
             </div>
+            </div>
           </div>
         </div>
 
         {/* Features section */}
-        <div className="w-full max-w-xl grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="w-full max-w-2xl grid grid-cols-1 sm:grid-cols-3 gap-3">
           {[
             {
               icon: (
@@ -316,22 +392,34 @@ export function HomeClient() {
               title: "Video & voice calls",
               description: "See and hear your friends while watching. No downloads required.",
             },
-          ].map(({ icon, title, description }) => (
+          ].map(({ icon, title, description }, i) => (
             <div
               key={title}
-              className="backdrop-blur-md bg-white/5 rounded-2xl border border-white/10 p-4 flex flex-col gap-2"
+              className="group/feat relative backdrop-blur-md bg-white/5 rounded-2xl border border-white/10 p-4 flex flex-col gap-2 hover:bg-white/[0.07] hover:border-white/20 transition-colors"
             >
-              <div className="text-indigo-400">{icon}</div>
-              <div className="text-sm font-medium text-slate-200">{title}</div>
+              <div
+                className={`w-9 h-9 rounded-xl flex items-center justify-center mb-1 transition-colors ${
+                  i === 0
+                    ? "bg-indigo-500/15 text-indigo-300 border border-indigo-500/20"
+                    : i === 1
+                      ? "bg-fuchsia-500/15 text-fuchsia-300 border border-fuchsia-500/20"
+                      : "bg-sky-500/15 text-sky-300 border border-sky-500/20"
+                }`}
+              >
+                {icon}
+              </div>
+              <div className="text-sm font-semibold text-slate-100">{title}</div>
               <div className="text-xs text-slate-400 leading-relaxed">{description}</div>
             </div>
           ))}
         </div>
       </main>
 
-      <footer className="py-4 px-6 border-t border-white/5 flex items-center justify-center gap-4 text-xs text-slate-500">
-        <Link href="/privacy" className="hover:text-slate-300 transition-colors">Privacy Policy</Link>
-        <span>·</span>
+      <footer className="py-5 px-6 border-t border-white/5 flex items-center justify-center gap-4 text-xs text-slate-500">
+        <Link href="/privacy" className="hover:text-slate-300 transition-colors">
+          Privacy Policy
+        </Link>
+        <span className="text-slate-700">·</span>
         <span>© {CURRENT_YEAR} WeHuddle</span>
       </footer>
     </div>

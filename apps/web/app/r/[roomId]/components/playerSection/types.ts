@@ -124,4 +124,7 @@ export type PlayerSectionProps = {
   chatText: string;
   setChatText: React.Dispatch<React.SetStateAction<string>>;
   handleSendChat: (e: React.FormEvent) => void;
+
+  isTheatreMode: boolean;
+  onToggleTheatreMode: () => void;
 };

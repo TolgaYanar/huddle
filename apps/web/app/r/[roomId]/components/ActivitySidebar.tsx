@@ -80,6 +80,8 @@ export function ActivitySidebar(props: {
   isActivityCollapsed: boolean;
   setIsActivityCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
 
+  isTheatreMode?: boolean;
+
   logs: ActivityLogEntry[];
   logsEndRef: React.RefObject<HTMLDivElement | null>;
   capitalize: (s: string) => string;
@@ -101,6 +103,7 @@ export function ActivitySidebar(props: {
     isConnected,
     isActivityCollapsed,
     setIsActivityCollapsed,
+    isTheatreMode = false,
     logs,
     logsEndRef,
     chatText,
@@ -127,7 +130,11 @@ export function ActivitySidebar(props: {
   );
 
   return (
-    <aside className="backdrop-blur-md bg-white/5 rounded-2xl border border-white/10 flex flex-col overflow-hidden min-h-0 max-h-[calc(100vh-4rem-3rem)] lg:max-h-[calc(100vh-4rem-4rem)] lg:col-start-3 lg:row-start-1">
+    <aside
+      className={`backdrop-blur-md bg-white/5 rounded-2xl border border-white/10 flex flex-col overflow-hidden min-h-0 max-h-[calc(100vh-4rem-3rem)] lg:max-h-[calc(100vh-4rem-4rem)] lg:row-start-1 ${
+        isTheatreMode ? "lg:col-start-2" : "lg:col-start-3"
+      }`}
+    >
       {/* Header */}
       <div
         className={`border-b border-white/10 bg-white/5 ${

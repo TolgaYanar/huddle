@@ -30,6 +30,7 @@ export type RoomClientViewProps = {
   wheelPickerModalProps: React.ComponentProps<typeof WheelPickerModal>;
 
   isActivityCollapsed: boolean;
+  isTheatreMode: boolean;
   playerSectionProps: React.ComponentProps<typeof PlayerSection>;
   callSidebarProps: React.ComponentProps<typeof CallSidebar>;
   activitySidebarProps: React.ComponentProps<typeof ActivitySidebar>;
@@ -59,6 +60,7 @@ export function RoomClientView({
   passwordModalProps,
   wheelPickerModalProps,
   isActivityCollapsed,
+  isTheatreMode,
   playerSectionProps,
   callSidebarProps,
   activitySidebarProps,
@@ -78,8 +80,26 @@ export function RoomClientView({
 
   const isReady = isClient && !passwordRequired;
 
+  const gridColsClass = isTheatreMode
+    ? isActivityCollapsed
+      ? "lg:grid-cols-[minmax(0,1fr)]"
+      : "lg:grid-cols-[minmax(0,1fr)_340px]"
+    : isActivityCollapsed
+      ? "lg:grid-cols-[280px_minmax(0,1fr)]"
+      : "lg:grid-cols-[280px_minmax(0,1fr)_340px]";
+
   return (
-    <div className="min-h-screen flex flex-col bg-linear-to-b from-slate-900 via-slate-950 to-black text-slate-200">
+    <div className="relative min-h-screen flex flex-col bg-linear-to-b from-slate-900 via-slate-950 to-black text-slate-200">
+      {/* Ambient background accent — kept behind everything else */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
+      >
+        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[80rem] h-[40rem] rounded-full bg-indigo-500/10 blur-3xl" />
+        <div className="absolute top-1/3 -right-32 w-[28rem] h-[28rem] rounded-full bg-fuchsia-500/10 blur-3xl" />
+        <div className="absolute bottom-0 -left-32 w-[32rem] h-[32rem] rounded-full bg-sky-500/10 blur-3xl" />
+      </div>
+
       {isReady && headerProps && (
         <RoomHeader roomId={roomId} {...headerProps} />
       )}
@@ -90,15 +110,16 @@ export function RoomClientView({
 
       {isReady && (
         <main
-          className={`flex-1 grid grid-cols-1 ${
-            isActivityCollapsed
-              ? "lg:grid-cols-[280px_minmax(0,1fr)]"
-              : "lg:grid-cols-[280px_minmax(0,1fr)_320px]"
-          } gap-4 px-6 lg:px-8 2xl:px-12 py-6 max-w-screen-2xl 2xl:max-w-none mx-auto w-full`}
+          className={`flex-1 grid grid-cols-1 ${gridColsClass} gap-4 px-4 sm:px-6 lg:px-8 2xl:px-12 py-4 sm:py-6 max-w-screen-2xl 2xl:max-w-none mx-auto w-full transition-[grid-template-columns] duration-300 ease-out`}
         >
-          <PlayerSection {...playerSectionProps} />
-          <CallSidebar {...callSidebarProps} />
-          <ActivitySidebar {...activitySidebarProps} />
+          <PlayerSection
+            {...playerSectionProps}
+          />
+          {!isTheatreMode && <CallSidebar {...callSidebarProps} />}
+          <ActivitySidebar
+            {...activitySidebarProps}
+            isTheatreMode={isTheatreMode}
+          />
         </main>
       )}
 

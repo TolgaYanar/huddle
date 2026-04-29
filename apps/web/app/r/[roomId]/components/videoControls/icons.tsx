@@ -59,3 +59,56 @@ export const ExitFullscreenIcon = () => (
     <path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z" />
   </svg>
 );
+
+export const TheatreIcon = () => (
+  <svg
+    className="w-5 h-5"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    strokeWidth={1.75}
+  >
+    <rect
+      x="3"
+      y="6"
+      width="18"
+      height="12"
+      rx="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      strokeLinecap="round"
+      d="M3 9.5h18M3 14.5h18"
+    />
+  </svg>
+);
+
+export const ExitTheatreIcon = () => (
+  <svg
+    className="w-5 h-5"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    strokeWidth={1.75}
+  >
+    <rect
+      x="3"
+      y="6"
+      width="18"
+      height="12"
+      rx="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <rect
+      x="6"
+      y="9"
+      width="12"
+      height="6"
+      rx="0.75"
+      fill="currentColor"
+      stroke="none"
+    />
+  </svg>
+);

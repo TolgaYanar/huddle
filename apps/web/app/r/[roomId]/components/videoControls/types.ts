@@ -50,6 +50,10 @@ export interface VideoControlsProps {
   onPlaybackRateChange: (rate: number) => void;
   onFullscreen?: () => void;
 
+  // Theatre mode (hides the left call sidebar to widen the player)
+  isTheatreMode?: boolean;
+  onToggleTheatreMode?: () => void;
+
   // Optional
   isFullscreen?: boolean;
   disabled?: boolean;

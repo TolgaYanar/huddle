@@ -46,6 +46,9 @@ export function buildPlayerSectionProps(args: {
   handleSendChat: (e: React.FormEvent) => void;
 
   onVideoEnded: () => void;
+
+  isTheatreMode: boolean;
+  onToggleTheatreMode: () => void;
 }): RoomClientViewProps["playerSectionProps"] {
   const {
     isClient,
@@ -68,6 +71,8 @@ export function buildPlayerSectionProps(args: {
     setChatText,
     handleSendChat,
     onVideoEnded,
+    isTheatreMode,
+    onToggleTheatreMode,
   } = args;
 
   return {
@@ -164,5 +169,8 @@ export function buildPlayerSectionProps(args: {
     chatText,
     setChatText,
     handleSendChat,
+
+    isTheatreMode,
+    onToggleTheatreMode,
   };
 }
