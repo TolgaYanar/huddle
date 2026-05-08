@@ -37,6 +37,18 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 
 /**
+ * True for the platforms whose playback we drive through ExoPlayer in this
+ * file (DIRECT files, UNKNOWN URLs that look mediaesque, HLS manifests, DASH
+ * manifests). Everything else delegates to a platform-specific WebView /
+ * iframe path elsewhere in the player branch.
+ */
+private fun PlatformType.isExoPlayerSource(): Boolean =
+    this == PlatformType.DIRECT ||
+        this == PlatformType.UNKNOWN ||
+        this == PlatformType.HLS ||
+        this == PlatformType.DASH
+
+/**
  * Video player component using ExoPlayer
  */
 @OptIn(UnstableApi::class)
@@ -88,7 +100,7 @@ fun VideoPlayerView(
     
     // Update media item when URL changes
     LaunchedEffect(url, platform) {
-        if (url.isNotBlank() && (platform == PlatformType.DIRECT || platform == PlatformType.UNKNOWN)) {
+        if (url.isNotBlank() && platform.isExoPlayerSource()) {
             try {
                 val mediaItem = MediaItem.fromUri(url)
                 exoPlayer.clearMediaItems()
@@ -106,7 +118,7 @@ fun VideoPlayerView(
     // Handle play/pause - only for ExoPlayer platforms
     LaunchedEffect(isPlaying, platform) {
         // Skip for YouTube, Twitch, Kick - they handle their own playback
-        if (platform != PlatformType.DIRECT && platform != PlatformType.UNKNOWN) {
+        if (!platform.isExoPlayerSource()) {
             return@LaunchedEffect
         }
         try {
@@ -127,7 +139,7 @@ fun VideoPlayerView(
     
     LaunchedEffect(currentTime, platform, lastRemoteSyncAt) {
         // Skip for YouTube, Twitch, Kick - they handle their own seeking
-        if (platform != PlatformType.DIRECT && platform != PlatformType.UNKNOWN) {
+        if (!platform.isExoPlayerSource()) {
             return@LaunchedEffect
         }
         if (currentTime >= 0) {
@@ -191,7 +203,7 @@ fun VideoPlayerView(
     
     // Handle volume - only for ExoPlayer platforms
     LaunchedEffect(volume, isMuted, platform) {
-        if (platform != PlatformType.DIRECT && platform != PlatformType.UNKNOWN) {
+        if (!platform.isExoPlayerSource()) {
             return@LaunchedEffect
         }
         try {
@@ -203,7 +215,7 @@ fun VideoPlayerView(
     
     // Handle playback speed - only for ExoPlayer platforms
     LaunchedEffect(playbackSpeed, platform) {
-        if (platform != PlatformType.DIRECT && platform != PlatformType.UNKNOWN) {
+        if (!platform.isExoPlayerSource()) {
             return@LaunchedEffect
         }
         try {
@@ -356,7 +368,31 @@ fun VideoPlayerView(
                 )
             }
             
-            platform == PlatformType.TWITCH || platform == PlatformType.KICK || platform == PlatformType.VIMEO -> {
+            // Tier 3 — DRM, can't embed inline. Show a placeholder telling
+            // the user to use the Huddle browser extension or open the source
+            // in its own app/tab. Mirrors the web's Tier3CtaCard.
+            platform == PlatformType.DISNEY_PLUS ||
+                platform == PlatformType.HBO ||
+                platform == PlatformType.HULU ||
+                platform == PlatformType.APPLE_TV_PLUS ||
+                platform == PlatformType.PARAMOUNT_PLUS ||
+                platform == PlatformType.PEACOCK -> {
+                EmbedNotSupportedPlaceholder(
+                    platform = platform,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+
+            platform == PlatformType.TWITCH ||
+                platform == PlatformType.KICK ||
+                platform == PlatformType.VIMEO ||
+                platform == PlatformType.DAILYMOTION ||
+                platform == PlatformType.WISTIA ||
+                platform == PlatformType.SOUNDCLOUD ||
+                platform == PlatformType.PEERTUBE ||
+                platform == PlatformType.SPOTIFY ||
+                platform == PlatformType.TIKTOK ||
+                platform == PlatformType.LOOM -> {
                 // Minimal in-app embed playback (controls not supported via sync yet)
                 StreamEmbedPlayerView(
                     url = url,
@@ -458,11 +494,80 @@ private fun StreamEmbedPlayerView(
         } else null
     }
 
+    fun buildDailymotionEmbedUrl(inputUrl: String): String? {
+        if (inputUrl.contains("geo.dailymotion.com/player")) return inputUrl
+        val idMatch =
+            Regex("""dailymotion\.com/video/([a-z0-9]+)""", RegexOption.IGNORE_CASE)
+                .find(inputUrl)
+                ?: Regex("""dai\.ly/([a-z0-9]+)""", RegexOption.IGNORE_CASE)
+                    .find(inputUrl)
+        val id = idMatch?.groupValues?.get(1) ?: return null
+        return "https://geo.dailymotion.com/player.html?video=$id&api=postMessage"
+    }
+
+    fun buildSoundCloudEmbedUrl(inputUrl: String): String? {
+        if (!inputUrl.contains("soundcloud.com", ignoreCase = true)) return null
+        if (inputUrl.contains("w.soundcloud.com/player/")) return inputUrl
+        val encoded = android.net.Uri.encode(inputUrl)
+        return "https://w.soundcloud.com/player/?url=$encoded&auto_play=false&visual=true"
+    }
+
+    fun buildLoomEmbedUrl(inputUrl: String): String? {
+        val m = Regex("""loom\.com/share/([0-9a-f]+)""", RegexOption.IGNORE_CASE)
+            .find(inputUrl)
+        val id = m?.groupValues?.get(1) ?: return null
+        return "https://www.loom.com/embed/$id"
+    }
+
+    fun buildPeerTubeEmbedUrl(inputUrl: String): String? {
+        val m = Regex(
+            """^(https?://[^/]+)/videos/(?:watch|embed)/([0-9a-f-]{36,})""",
+            RegexOption.IGNORE_CASE,
+        ).find(inputUrl) ?: return null
+        val origin = m.groupValues[1]
+        val id = m.groupValues[2]
+        return "$origin/videos/embed/$id?api=1&warningTitle=0"
+    }
+
+    fun buildWistiaEmbedUrl(inputUrl: String): String? {
+        val m = Regex(
+            """(?:wistia\.(?:com|net)|wi\.st)/(?:medias|embed)/(?:iframe/)?([^?]+)""",
+            RegexOption.IGNORE_CASE,
+        ).find(inputUrl)
+        val id = m?.groupValues?.get(1) ?: return null
+        return "https://fast.wistia.net/embed/iframe/$id?autoPlay=true"
+    }
+
+    fun buildSpotifyEmbedUrl(inputUrl: String): String? {
+        // open.spotify.com/<type>/<id> -> open.spotify.com/embed/<type>/<id>
+        val m = Regex(
+            """open\.spotify\.com/(track|album|playlist|episode|show|artist)/([A-Za-z0-9]+)""",
+            RegexOption.IGNORE_CASE,
+        ).find(inputUrl)
+        val type = m?.groupValues?.get(1) ?: return null
+        val id = m.groupValues[2]
+        return "https://open.spotify.com/embed/$type/$id"
+    }
+
+    fun buildTikTokEmbedUrl(inputUrl: String): String? {
+        val m = Regex("""tiktok\.com/(?:.+/video|@[^/]+/video|embed/v2|player/v1|share/video)/(\d+)""")
+            .find(inputUrl)
+        val id = m?.groupValues?.get(1) ?: return null
+        return "https://www.tiktok.com/player/v1/$id"
+    }
+
     val resolvedUrl = remember(url, platform) {
         when (platform) {
             PlatformType.TWITCH -> buildTwitchEmbedUrl(url)
             PlatformType.KICK -> buildKickEmbedUrl(url) ?: url
             PlatformType.VIMEO -> buildVimeoEmbedUrl(url)
+            PlatformType.DAILYMOTION -> buildDailymotionEmbedUrl(url)
+            PlatformType.SOUNDCLOUD -> buildSoundCloudEmbedUrl(url)
+            PlatformType.LOOM -> buildLoomEmbedUrl(url)
+            PlatformType.PEERTUBE -> buildPeerTubeEmbedUrl(url)
+            PlatformType.WISTIA -> buildWistiaEmbedUrl(url)
+            PlatformType.SPOTIFY -> buildSpotifyEmbedUrl(url)
+            PlatformType.TIKTOK -> buildTikTokEmbedUrl(url)
             else -> null
         }
     }

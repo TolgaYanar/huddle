@@ -4,13 +4,37 @@ package tv.wehuddle.app.data.model
  * Supported video platform types
  */
 enum class PlatformType {
+    // Tier 1 — full programmatic control via ExoPlayer or YouTube WebView.
     YOUTUBE,
+    DIRECT,
+    HLS,
+    DASH,
+
+    // Tier 1.5 — rendered as an iframe in the WebView path; full sync needs
+    // platform-specific JS-bridge work that isn't done yet on Android.
+    VIMEO,
+    DAILYMOTION,
+    WISTIA,
+    SOUNDCLOUD,
+    PEERTUBE,
+
+    // Tier 2 — embed only, no remote sync.
     TWITCH,
     KICK,
-    DIRECT,
+    SPOTIFY,
+    TIKTOK,
+    LOOM,
+
+    // Tier 3 — DRM, can't embed inline. Player swaps to a CTA card.
     PRIME,
     NETFLIX,
-    VIMEO,
+    DISNEY_PLUS,
+    HBO,
+    HULU,
+    APPLE_TV_PLUS,
+    PARAMOUNT_PLUS,
+    PEACOCK,
+
     UNKNOWN
 }
 
@@ -33,62 +57,54 @@ data class PlatformCapabilities(
  * Platform capabilities registry
  */
 object PlatformCapabilitiesRegistry {
+    private val FULL = PlatformCapabilities(
+        canPlay = true,
+        canPause = true,
+        canSeek = true,
+        canMute = true,
+        canChangeSpeed = true,
+        canChangeVolume = true,
+        canGetDuration = true,
+        canGetCurrentTime = true,
+        speedOptions = listOf(0.25f, 0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f),
+    )
+    private val FULL_WIDE = FULL.copy(
+        speedOptions = listOf(0.25f, 0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f, 2.5f, 3f),
+    )
+    private val NONE = PlatformCapabilities(
+        canPlay = false,
+        canPause = false,
+        canSeek = false,
+        canMute = false,
+        canChangeSpeed = false,
+        canChangeVolume = false,
+        canGetDuration = false,
+        canGetCurrentTime = false,
+        speedOptions = emptyList(),
+    )
+
     private val capabilities = mapOf(
-        PlatformType.YOUTUBE to PlatformCapabilities(
-            canPlay = true,
-            canPause = true,
-            canSeek = true,
-            canMute = true,
-            canChangeSpeed = true,
-            canChangeVolume = true,
-            canGetDuration = true,
-            canGetCurrentTime = true,
-            speedOptions = listOf(0.25f, 0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
-        ),
-        PlatformType.DIRECT to PlatformCapabilities(
-            canPlay = true,
-            canPause = true,
-            canSeek = true,
-            canMute = true,
-            canChangeSpeed = true,
-            canChangeVolume = true,
-            canGetDuration = true,
-            canGetCurrentTime = true,
-            speedOptions = listOf(0.25f, 0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f, 2.5f, 3f)
-        ),
-        PlatformType.TWITCH to PlatformCapabilities(
-            canPlay = false,
-            canPause = false,
-            canSeek = false,
-            canMute = false,
-            canChangeSpeed = false,
-            canChangeVolume = false,
-            canGetDuration = false,
-            canGetCurrentTime = false,
-            speedOptions = emptyList()
-        ),
-        PlatformType.KICK to PlatformCapabilities(
-            canPlay = false,
-            canPause = false,
-            canSeek = false,
-            canMute = false,
-            canChangeSpeed = false,
-            canChangeVolume = false,
-            canGetDuration = false,
-            canGetCurrentTime = false,
-            speedOptions = emptyList()
-        ),
-        PlatformType.PRIME to PlatformCapabilities(
-            canPlay = false,
-            canPause = false,
-            canSeek = false,
-            canMute = false,
-            canChangeSpeed = false,
-            canChangeVolume = false,
-            canGetDuration = false,
-            canGetCurrentTime = false,
-            speedOptions = emptyList()
-        ),
+        PlatformType.YOUTUBE to FULL,
+        PlatformType.DIRECT to FULL_WIDE,
+        PlatformType.HLS to FULL_WIDE,
+        PlatformType.DASH to FULL_WIDE,
+        // Tier 2 — embed-only: we render the iframe but don't drive it.
+        PlatformType.TWITCH to NONE,
+        PlatformType.KICK to NONE,
+        PlatformType.SPOTIFY to NONE,
+        PlatformType.TIKTOK to NONE,
+        PlatformType.LOOM to NONE,
+
+        // Tier 1.5 — rendered as iframes; full sync needs per-platform JS
+        // bridge work which the web app already has but Android doesn't yet.
+        PlatformType.VIMEO to NONE,
+        PlatformType.DAILYMOTION to NONE,
+        PlatformType.WISTIA to NONE,
+        PlatformType.SOUNDCLOUD to NONE,
+        PlatformType.PEERTUBE to NONE,
+
+        // Tier 3 — DRM, no inline embed.
+        PlatformType.PRIME to NONE,
         PlatformType.NETFLIX to PlatformCapabilities(
             canPlay = true,
             canPause = true,
@@ -98,24 +114,15 @@ object PlatformCapabilitiesRegistry {
             canChangeVolume = true,
             canGetDuration = true,
             canGetCurrentTime = true,
-            speedOptions = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f)
+            speedOptions = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f),
         ),
-        // Vimeo: rendered through the same WebView path as other iframe
-        // platforms; play/pause/seek work via the iframe Player API only when
-        // we wire it explicitly, so we mark the controllable bits as unsup-
-        // ported until that lands. Detection here is enough for the player
-        // branch to pick the iframe renderer instead of falling to ExoPlayer.
-        PlatformType.VIMEO to PlatformCapabilities(
-            canPlay = false,
-            canPause = false,
-            canSeek = false,
-            canMute = false,
-            canChangeSpeed = false,
-            canChangeVolume = false,
-            canGetDuration = false,
-            canGetCurrentTime = false,
-            speedOptions = emptyList()
-        ),
+        PlatformType.DISNEY_PLUS to NONE,
+        PlatformType.HBO to NONE,
+        PlatformType.HULU to NONE,
+        PlatformType.APPLE_TV_PLUS to NONE,
+        PlatformType.PARAMOUNT_PLUS to NONE,
+        PlatformType.PEACOCK to NONE,
+
         PlatformType.UNKNOWN to PlatformCapabilities(
             canPlay = true,
             canPause = true,
@@ -125,8 +132,8 @@ object PlatformCapabilitiesRegistry {
             canChangeVolume = true,
             canGetDuration = true,
             canGetCurrentTime = true,
-            speedOptions = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
-        )
+            speedOptions = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f),
+        ),
     )
 
     fun getCapabilities(platform: PlatformType): PlatformCapabilities {
@@ -145,13 +152,35 @@ fun detectPlatform(url: String): PlatformType {
     
     val lower = trimmedUrl.lowercase()
     return when {
+        // Tier 3 — DRM. Checked before any direct-file regex so a content URL
+        // hosted on e.g. netflix.com still routes to the CTA, not ExoPlayer.
         lower.contains("netflix.com") -> PlatformType.NETFLIX
+        lower.contains("primevideo") || lower.contains("amazon.com/gp/video") -> PlatformType.PRIME
+        lower.contains("disneyplus.com") -> PlatformType.DISNEY_PLUS
+        lower.contains("hbomax.com") || lower.contains("max.com") || lower.contains("play.hbomax.com") -> PlatformType.HBO
+        lower.contains("hulu.com") -> PlatformType.HULU
+        lower.contains("tv.apple.com") -> PlatformType.APPLE_TV_PLUS
+        lower.contains("paramountplus.com") -> PlatformType.PARAMOUNT_PLUS
+        lower.contains("peacocktv.com") -> PlatformType.PEACOCK
+
+        // Tier 1 / 1.5 / 2 — embed-friendly platforms.
         lower.contains("youtube.com") || lower.contains("youtu.be") -> PlatformType.YOUTUBE
+        lower.contains("vimeo.com") || lower.contains("player.vimeo.com") -> PlatformType.VIMEO
+        lower.contains("dailymotion.com") || lower.contains("dai.ly") -> PlatformType.DAILYMOTION
+        lower.contains("wistia.com") || lower.contains("wi.st") -> PlatformType.WISTIA
+        lower.contains("soundcloud.com") -> PlatformType.SOUNDCLOUD
+        lower.contains("open.spotify.com") || lower.contains("spotify.com") -> PlatformType.SPOTIFY
+        lower.contains("tiktok.com") -> PlatformType.TIKTOK
+        lower.contains("loom.com") -> PlatformType.LOOM
+        Regex("""/videos/(?:watch|embed)/[0-9a-f-]{36,}""", RegexOption.IGNORE_CASE).containsMatchIn(trimmedUrl) -> PlatformType.PEERTUBE
         lower.contains("twitch.tv") -> PlatformType.TWITCH
         lower.contains("kick.com") -> PlatformType.KICK
-        lower.contains("vimeo.com") || lower.contains("player.vimeo.com") -> PlatformType.VIMEO
-        lower.contains("primevideo") || lower.contains("amazon.com/gp/video") -> PlatformType.PRIME
-        Regex("""\.(mp4|webm|ogg|m3u8|mkv|avi|mov)(\?|#|$)""", RegexOption.IGNORE_CASE).containsMatchIn(trimmedUrl) -> PlatformType.DIRECT
+
+        // Streaming manifests.
+        Regex("""\.m3u8(\?|#|$)""", RegexOption.IGNORE_CASE).containsMatchIn(trimmedUrl) -> PlatformType.HLS
+        Regex("""\.mpd(\?|#|$)""", RegexOption.IGNORE_CASE).containsMatchIn(trimmedUrl) -> PlatformType.DASH
+
+        Regex("""\.(mp4|webm|ogg|ogv|mkv|avi|mov|m4v|m4a|mp3|wav|aac|flac)(\?|#|$)""", RegexOption.IGNORE_CASE).containsMatchIn(trimmedUrl) -> PlatformType.DIRECT
         // Check if URL looks like a direct video file (try to parse as URI)
         try {
             val uri = android.net.Uri.parse(trimmedUrl)
