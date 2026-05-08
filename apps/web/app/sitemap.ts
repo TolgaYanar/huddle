@@ -8,6 +8,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 1,
     },
     {
+      url: "https://wehuddle.tv/netflix",
+      changeFrequency: "monthly",
+      priority: 0.6,
+    },
+    {
       url: "https://wehuddle.tv/privacy",
       changeFrequency: "monthly",
       priority: 0.3,
