@@ -4,13 +4,9 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
-    "mobile": "npm --prefix apps\\mobile run start",
-    "mobile:clear": "npm --prefix apps\\mobile run start -- --clear",
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
-    "check-types": "turbo run check-types",
-    "android": "expo run:android",
-    "ios": "expo run:ios"
+    "check-types": "turbo run check-types"
   },
   "devDependencies": {
     "prettier": "^3.7.4",
@@ -26,13 +22,8 @@
     "packages/*"
   ],
   "dependencies": {
-    "base64-js": "^1.5.1",
-    "event-target-shim": "^6.0.2",
-    "webidl-conversions": "^8.0.0",
-    "expo": "~54.0.30",
     "react": "19.2.3",
-    "react-dom": "19.2.3",
-    "react-native": "0.81.5"
+    "react-dom": "19.2.3"
   },
   "overrides": {
     "react": "19.2.3",

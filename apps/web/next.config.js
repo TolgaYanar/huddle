@@ -1,7 +1,7 @@
 /* global process */
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  transpilePackages: ["shared-logic", "@repo/ui"],
+  transpilePackages: ["shared-logic"],
   poweredByHeader: false,
   // Socket.IO WebSocket upgrades cannot follow redirects.
   // Vercel/Next may normalize trailing slashes with a 308 which breaks the
