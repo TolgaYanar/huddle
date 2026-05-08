@@ -57,11 +57,21 @@ fun VideoPlayerView(
     modifier: Modifier = Modifier,
     lastRemoteSyncAt: Long = 0L,
     onUrlChange: ((String) -> Unit)? = null,
-    onBuffering: ((Boolean) -> Unit)? = null
+    onBuffering: ((Boolean) -> Unit)? = null,
+    // Fires when the underlying player goes paused for ≥4s while we still
+    // *think* it should be playing — caller should broadcast a pause so the
+    // rest of the room doesn't keep playing while this client is stuck on
+    // an audio-focus loss / OS pause / persistent buffer underrun.
+    onAutoPause: ((Double) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val platform = remember(url) { detectPlatform(url) }
-    
+    // The auto-pause / progress loop below runs in a single LaunchedEffect
+    // keyed on exoPlayer; it reads `isPlaying` over time, so capture it via
+    // rememberUpdatedState to avoid a stale-prop bug across recompositions.
+    val isPlayingState = androidx.compose.runtime.rememberUpdatedState(isPlaying)
+    val onAutoPauseState = androidx.compose.runtime.rememberUpdatedState(onAutoPause)
+
     // ExoPlayer for direct video URLs - recreate when URL changes
     val exoPlayer = remember(url) {
         ExoPlayer.Builder(context).build().apply {
@@ -145,9 +155,13 @@ fun VideoPlayerView(
                 
                 // CRITICAL: If currentTime is close to what we just reported via onProgress,
                 // this is our own feedback loop - don't seek!
-                // Use 2.0s threshold to account for reporting delay and normal playback
-                val isOwnFeedback = kotlin.math.abs(currentTime - lastReportedTime) < 2.0
-                
+                //
+                // Tightened from 2.0s -> 1.0s (#9): the previous window was generous
+                // enough that a remote seek of e.g. -1.5s could be misread as feedback
+                // if the remote-sync flag detection ever missed. Progress reports run
+                // every 500ms so 1.0s is still well above normal jitter.
+                val isOwnFeedback = kotlin.math.abs(currentTime - lastReportedTime) < 1.0
+
                 // Only skip seek if BOTH conditions are true:
                 // 1. Looks like our own feedback (close to last report)
                 // 2. Player position is close to target (no actual drift)
@@ -230,13 +244,23 @@ fun VideoPlayerView(
                 onBuffering?.invoke(false)
             }
         }
-        
+
         exoPlayer.addListener(listener)
-        
+
+        // Track how long the player has been *not* playing while we believe it
+        // should be — once that exceeds the threshold, treat it as a real pause
+        // (audio focus loss, OS interruption, persistent buffer underrun) and
+        // notify the caller so the rest of the room can pause too.
+        val autoPauseHoldMs = 4000L
+        var notPlayingSince: Long = 0L
+        var autoPauseFired = false
+
         try {
             // Report progress while playing
             while (true) {
-                if (exoPlayer.playbackState == Player.STATE_READY && exoPlayer.isPlaying) {
+                val playerThinksPlaying =
+                    exoPlayer.playbackState == Player.STATE_READY && exoPlayer.isPlaying
+                if (playerThinksPlaying) {
                     val position = exoPlayer.currentPosition / 1000.0
                     val duration = exoPlayer.duration / 1000.0
                     if (duration > 0) {
@@ -244,6 +268,25 @@ fun VideoPlayerView(
                         lastReportedTime = position
                         onProgress(position, duration)
                     }
+                    // Player is healthy — clear any pending auto-pause hold.
+                    notPlayingSince = 0L
+                    autoPauseFired = false
+                } else if (isPlayingState.value && onAutoPauseState.value != null && !autoPauseFired) {
+                    // Caller wanted us to be playing but the underlying player
+                    // disagrees. Start (or continue) the hold timer.
+                    val nowMs = System.currentTimeMillis()
+                    if (notPlayingSince == 0L) notPlayingSince = nowMs
+                    if (nowMs - notPlayingSince >= autoPauseHoldMs) {
+                        autoPauseFired = true
+                        val position = exoPlayer.currentPosition / 1000.0
+                        android.util.Log.d(
+                            "VideoPlayer",
+                            "Auto-pause detected (held ${nowMs - notPlayingSince}ms) at ${position}s"
+                        )
+                        onAutoPauseState.value?.invoke(position)
+                    }
+                } else {
+                    notPlayingSince = 0L
                 }
                 kotlinx.coroutines.delay(500)
             }
@@ -308,11 +351,12 @@ fun VideoPlayerView(
                     onProgress = onProgress,
                     onReady = onReady,
                     onError = onError,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
+                    lastRemoteSyncAt = lastRemoteSyncAt
                 )
             }
             
-            platform == PlatformType.TWITCH || platform == PlatformType.KICK -> {
+            platform == PlatformType.TWITCH || platform == PlatformType.KICK || platform == PlatformType.VIMEO -> {
                 // Minimal in-app embed playback (controls not supported via sync yet)
                 StreamEmbedPlayerView(
                     url = url,
@@ -400,10 +444,25 @@ private fun StreamEmbedPlayerView(
         return "https://player.kick.com/$channel"
     }
 
+    fun buildVimeoEmbedUrl(inputUrl: String): String? {
+        // Pull the numeric video ID out of vimeo.com/<id> or
+        // player.vimeo.com/video/<id>; fall back to the raw URL if it already
+        // points at the embed host.
+        val idMatch = Regex("""vimeo\.com/(?:video/)?(\d+)""", RegexOption.IGNORE_CASE)
+            .find(inputUrl)
+        val videoId = idMatch?.groupValues?.get(1)
+        return if (videoId != null) {
+            "https://player.vimeo.com/video/$videoId?autoplay=1"
+        } else if (inputUrl.contains("player.vimeo.com")) {
+            inputUrl
+        } else null
+    }
+
     val resolvedUrl = remember(url, platform) {
         when (platform) {
             PlatformType.TWITCH -> buildTwitchEmbedUrl(url)
             PlatformType.KICK -> buildKickEmbedUrl(url) ?: url
+            PlatformType.VIMEO -> buildVimeoEmbedUrl(url)
             else -> null
         }
     }

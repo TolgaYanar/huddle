@@ -10,6 +10,7 @@ enum class PlatformType {
     DIRECT,
     PRIME,
     NETFLIX,
+    VIMEO,
     UNKNOWN
 }
 
@@ -99,6 +100,22 @@ object PlatformCapabilitiesRegistry {
             canGetCurrentTime = true,
             speedOptions = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f)
         ),
+        // Vimeo: rendered through the same WebView path as other iframe
+        // platforms; play/pause/seek work via the iframe Player API only when
+        // we wire it explicitly, so we mark the controllable bits as unsup-
+        // ported until that lands. Detection here is enough for the player
+        // branch to pick the iframe renderer instead of falling to ExoPlayer.
+        PlatformType.VIMEO to PlatformCapabilities(
+            canPlay = false,
+            canPause = false,
+            canSeek = false,
+            canMute = false,
+            canChangeSpeed = false,
+            canChangeVolume = false,
+            canGetDuration = false,
+            canGetCurrentTime = false,
+            speedOptions = emptyList()
+        ),
         PlatformType.UNKNOWN to PlatformCapabilities(
             canPlay = true,
             canPause = true,
@@ -132,6 +149,7 @@ fun detectPlatform(url: String): PlatformType {
         lower.contains("youtube.com") || lower.contains("youtu.be") -> PlatformType.YOUTUBE
         lower.contains("twitch.tv") -> PlatformType.TWITCH
         lower.contains("kick.com") -> PlatformType.KICK
+        lower.contains("vimeo.com") || lower.contains("player.vimeo.com") -> PlatformType.VIMEO
         lower.contains("primevideo") || lower.contains("amazon.com/gp/video") -> PlatformType.PRIME
         Regex("""\.(mp4|webm|ogg|m3u8|mkv|avi|mov)(\?|#|$)""", RegexOption.IGNORE_CASE).containsMatchIn(trimmedUrl) -> PlatformType.DIRECT
         // Check if URL looks like a direct video file (try to parse as URI)

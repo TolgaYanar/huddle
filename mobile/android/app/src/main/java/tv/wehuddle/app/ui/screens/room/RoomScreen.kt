@@ -402,6 +402,11 @@ private fun TvWideRoomLayout(
                             },
                             onBuffering = { buffering ->
                                 viewModel.updateVideoState { it.copy(isBuffering = buffering) }
+                            },
+                            onAutoPause = { position ->
+                                // Player went paused on its own (audio focus loss, etc.);
+                                // tell the room so it doesn't keep playing without us.
+                                viewModel.onPause(position)
                             }
                         )
                     } else {
@@ -1383,6 +1388,9 @@ private fun VideoTabContent(
                         },
                         onBuffering = { buffering ->
                             viewModel.updateVideoState { it.copy(isBuffering = buffering) }
+                        },
+                        onAutoPause = { position ->
+                            viewModel.onPause(position)
                         }
                     )
 

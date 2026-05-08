@@ -45,11 +45,12 @@ fun YouTubePlayerView(
     onProgress: (Double, Double) -> Unit,
     onReady: () -> Unit,
     onError: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    lastRemoteSyncAt: Long = 0L
 ) {
     val context = LocalContext.current
     val videoId = remember(url) { extractYoutubeVideoId(url) }
-    
+
     var isLoading by remember { mutableStateOf(true) }
     var playerReady by remember { mutableStateOf(false) }
     var lastSeekTime by remember { mutableDoubleStateOf(-1.0) }
@@ -58,6 +59,19 @@ fun YouTubePlayerView(
     var lastReportedTimeMs by remember { mutableLongStateOf(0L) }  // When we reported (for feedback detection)
     var isUserSeeking by remember { mutableStateOf(false) }
     var hasError by remember { mutableStateOf(false) }
+    // Bumped whenever we issue a JS command to the iframe in response to a
+    // prop change. The JS bridge below uses this to suppress broadcasting
+    // play/pause that originated from those commands (otherwise we feedback-
+    // loop the room and ping-pong the timestamp at 0.)
+    var lastAppliedRemoteAtMs by remember { mutableLongStateOf(0L) }
+    val playerSyncSuppressionMs = 1500L
+    // The JS interface object is built inside `remember { ... }` and would
+    // otherwise capture `isPlaying` / `onPlay` / `onPause` once and never
+    // see prop updates. rememberUpdatedState gives the closure a stable
+    // handle whose `.value` is always the latest.
+    val isPlayingState = rememberUpdatedState(isPlaying)
+    val onPlayState = rememberUpdatedState(onPlay)
+    val onPauseState = rememberUpdatedState(onPause)
     
     // WebView instance
     val webView = remember {
@@ -156,11 +170,40 @@ fun YouTubePlayerView(
             fun onPlayerStateChange(state: Int) {
                 // YouTube player states:
                 // -1 (unstarted), 0 (ended), 1 (playing), 2 (paused), 3 (buffering), 5 (video cued)
-                // IMPORTANT:
-                // Do NOT call onPlay/onPause from here.
-                // Those callbacks send sync events to the server.
-                // If we echo server-driven play/pause back to the server, the room can get stuck
-                // repeatedly resetting to timestamp=0.
+                //
+                // Now broadcasts user-driven play/pause from the iframe's own
+                // controls (#10) — the room used to drift whenever someone
+                // tapped the YT controls instead of the Huddle ones because we
+                // skipped this entirely to avoid a feedback loop. We dedupe
+                // against the most recent prop-driven command via
+                // lastAppliedRemoteAtMs: if state changes within
+                // playerSyncSuppressionMs of issuing playVideo/pauseVideo/
+                // seekTo, treat the change as our own echo.
+                val nowMs = System.currentTimeMillis()
+                val withinSuppression =
+                    nowMs - lastAppliedRemoteAtMs < playerSyncSuppressionMs
+                when (state) {
+                    1 -> { // playing
+                        if (!withinSuppression && !isPlayingState.value) {
+                            android.util.Log.d(
+                                "YouTubePlayer",
+                                "Iframe -> play; broadcasting (lastApplied=${nowMs - lastAppliedRemoteAtMs}ms ago)"
+                            )
+                            onPlayState.value.invoke()
+                        }
+                    }
+                    2 -> { // paused
+                        if (!withinSuppression && isPlayingState.value) {
+                            android.util.Log.d(
+                                "YouTubePlayer",
+                                "Iframe -> pause; broadcasting (lastApplied=${nowMs - lastAppliedRemoteAtMs}ms ago)"
+                            )
+                            onPauseState.value.invoke()
+                        }
+                    }
+                    // 0 (ended), 3 (buffering), 5 (cued), -1 (unstarted): no-op
+                    else -> Unit
+                }
             }
             
             @JavascriptInterface
@@ -215,8 +258,12 @@ fun YouTubePlayerView(
     // Handle play/pause
     LaunchedEffect(isPlaying, playerReady) {
         if (!playerReady) return@LaunchedEffect
-        
+
         val command = if (isPlaying) "playVideo" else "pauseVideo"
+        // Mark the prop-driven command before issuing it so the iframe's
+        // resulting onPlayerStateChange callback recognises this as our own
+        // echo and doesn't re-broadcast.
+        lastAppliedRemoteAtMs = System.currentTimeMillis()
         webView.evaluateJavascript("try { $command(); } catch(e) {}", null)
     }
     
@@ -264,7 +311,11 @@ fun YouTubePlayerView(
         // Mark as seeking to prevent reporting this seek back to server
         isUserSeeking = true
         lastSeekTime = currentTime
-        
+        // Same suppression marker used by play/pause — the seek that follows
+        // can ripple through onPlayerStateChange (e.g. play -> buffering ->
+        // play) and we don't want to re-broadcast either edge.
+        lastAppliedRemoteAtMs = System.currentTimeMillis()
+
         webView.evaluateJavascript(
             "try { seekTo($currentTime); } catch(e) {}",
             null

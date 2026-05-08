@@ -54,11 +54,39 @@ class RoomRepository @Inject constructor(
     @Volatile
     private var hasReceivedInitialSync = false
     private var joinTimeMillis: Long = 0L
-    
+
     // Clock offset between server and device (serverTime - deviceTime)
     // Positive means device is behind server, negative means device is ahead
     @Volatile
     private var clockOffsetMs: Long = 0L
+
+    // User-intent windows. When the local user *just* pressed pause / seeked,
+    // a stale remote `play` / `seek` arriving immediately after must not undo
+    // their gesture. Web has the same guard via `lastUserPauseAtRef` /
+    // `lastManualSeekRef`. 5 s matches the web USER_PAUSE_INTENT_WINDOW_MS.
+    @Volatile
+    private var lastUserPauseAtMs: Long = 0L
+    @Volatile
+    private var lastUserSeekAtMs: Long = 0L
+    private val userIntentWindowMs: Long = 5000L
+
+    // Room anchor used by the periodic drift-correction loop (#5). The
+    // anchor is the *authoritative* server-known position at a known wall-
+    // clock instant. We extrapolate forward from it to compute where the
+    // player *should* be, and re-seek when the player has drifted too far.
+    // Distinct from videoState.currentTime, which gets refreshed every 500 ms
+    // by ExoPlayer's progress callback after the cooldown.
+    private data class RoomAnchor(
+        val time: Double,
+        val atMs: Long,
+        val isPlaying: Boolean,
+        val speed: Float,
+        val url: String,
+    )
+    @Volatile
+    private var roomAnchor: RoomAnchor? = null
+    private val driftCheckIntervalMs: Long = 2500L
+    private val driftCorrectionThresholdSec: Double = 3.0
     
     // Start event collection eagerly to avoid missing initial events
     private val eventCollectorJob = scope.launch {
@@ -66,7 +94,23 @@ class RoomRepository @Inject constructor(
             handleSocketEvent(event)
         }
     }
-    
+
+    // Periodic drift-correction loop (#5). Web has the equivalent in
+    // useRoomCatchup.syncToRoomTimeIfNeeded; without it, an Android client
+    // that buffers/falls behind has no positive code path that pulls them
+    // back in line — the existing 1500ms cooldown only blocks progress
+    // updates from overwriting sync; it never adds drift correction itself.
+    private val driftCorrectionJob = scope.launch {
+        while (true) {
+            kotlinx.coroutines.delay(driftCheckIntervalMs)
+            try {
+                checkAndCorrectDrift()
+            } catch (t: Throwable) {
+                Log.w(TAG, "Drift correction loop failed: ${t.message}")
+            }
+        }
+    }
+
     init {
         // Keep socket auth in sync with login/logout.
         scope.launch {
@@ -189,6 +233,43 @@ class RoomRepository @Inject constructor(
                 
                 // Only apply state changes from other users (we already applied our own)
                 if (!isFromSelf) {
+                    val nowMs = System.currentTimeMillis()
+                    // Respect the local user's recent intent: an inbound `play`
+                    // arriving right after they paused, or an inbound `seek`
+                    // arriving right after they manually seeked, must not undo
+                    // the gesture. We still log + advance non-conflicting bits.
+                    val userPausedRecently =
+                        nowMs - lastUserPauseAtMs < userIntentWindowMs
+                    val userSeekedRecently =
+                        nowMs - lastUserSeekAtMs < userIntentWindowMs
+                    val ignorePlayResume =
+                        event.data.action == SyncAction.play && userPausedRecently
+                    val ignoreSeekTime =
+                        event.data.action == SyncAction.seek && userSeekedRecently
+
+                    if (ignorePlayResume) {
+                        android.util.Log.d(
+                            "RoomRepo",
+                            "Suppressing remote play: user paused ${nowMs - lastUserPauseAtMs}ms ago"
+                        )
+                    }
+                    if (ignoreSeekTime) {
+                        android.util.Log.d(
+                            "RoomRepo",
+                            "Suppressing remote seek time: user seeked ${nowMs - lastUserSeekAtMs}ms ago"
+                        )
+                    }
+
+                    // Hoisted out of the _roomState.update lambda so the
+                    // post-update anchor refresh below can read it.
+                    val shouldUpdateSyncTime = when (event.data.action) {
+                        SyncAction.play,
+                        SyncAction.pause,
+                        SyncAction.change_url -> true
+                        SyncAction.seek -> !ignoreSeekTime
+                        else -> false
+                    }
+
                     _roomState.update { current ->
                         val nextWithAudioSync = event.data.audioSyncEnabled?.let { enabled ->
                             applyAudioSyncEnabled(current, enabled)
@@ -198,31 +279,22 @@ class RoomRepository @Inject constructor(
                         val nextCurrentTime = when (event.data.action) {
                             SyncAction.play,
                             SyncAction.pause,
-                            SyncAction.seek,
                             SyncAction.change_url -> event.data.timestamp
+                            SyncAction.seek -> if (ignoreSeekTime) current.videoState.currentTime else event.data.timestamp
                             SyncAction.set_mute,
                             SyncAction.set_speed,
                             SyncAction.set_volume,
                             SyncAction.set_audio_sync -> current.videoState.currentTime
-                        }
-                        
-                        // Determine if this sync event should trigger the cooldown
-                        // (prevent local progress from overwriting sync position)
-                        val shouldUpdateSyncTime = when (event.data.action) {
-                            SyncAction.play,
-                            SyncAction.pause,
-                            SyncAction.seek,
-                            SyncAction.change_url -> true
-                            else -> false
                         }
 
                         nextWithAudioSync.copy(
                             videoState = nextWithAudioSync.videoState.copy(
                                 url = nextUrl,
                                 currentTime = nextCurrentTime,
-                                // Preserve playing state on seek, change it only on play/pause
+                                // Preserve playing state on seek, change it only on play/pause.
+                                // If the user just paused, an inbound `play` is suppressed.
                                 isPlaying = when (event.data.action) {
-                                    SyncAction.play -> true
+                                    SyncAction.play -> if (ignorePlayResume) current.videoState.isPlaying else true
                                     SyncAction.pause -> false
                                     SyncAction.seek -> current.videoState.isPlaying
                                     SyncAction.change_url -> false
@@ -235,8 +307,23 @@ class RoomRepository @Inject constructor(
                                 isMuted = event.data.isMuted ?: current.videoState.isMuted,
                                 playbackSpeed = event.data.playbackSpeed ?: current.videoState.playbackSpeed,
                                 // Set lastRemoteSyncAt to prevent progress callback from overwriting
-                                lastRemoteSyncAt = if (shouldUpdateSyncTime) System.currentTimeMillis() else current.videoState.lastRemoteSyncAt
+                                lastRemoteSyncAt = if (shouldUpdateSyncTime) nowMs else current.videoState.lastRemoteSyncAt
                             )
+                        )
+                    }
+
+                    // Refresh the drift-correction anchor whenever a position-
+                    // changing event arrives. We use the *post-update* state so
+                    // the suppression flags above (ignoreSeekTime / ignorePlay-
+                    // Resume) are reflected.
+                    if (shouldUpdateSyncTime) {
+                        val st = _roomState.value
+                        roomAnchor = RoomAnchor(
+                            time = st.videoState.currentTime,
+                            atMs = nowMs,
+                            isPlaying = st.videoState.isPlaying,
+                            speed = st.videoState.playbackSpeed,
+                            url = st.videoState.url,
                         )
                     }
                 }
@@ -278,10 +365,13 @@ class RoomRepository @Inject constructor(
                     Log.d(TAG, "Clock sync: serverNow=$serverNow, deviceNow=$deviceNow, offset=${clockOffsetMs}ms (${clockOffsetMs/1000.0}s)")
                 }
                 
-                // Mark initial sync complete after receiving room state
-                // Delay slightly to let any seek/play actions complete
+                // Mark initial sync complete after receiving room state.
+                // Originally 600 ms, but combined with the 1000 ms timeSinceJoin
+                // floor below it gave a ~1.6 s window where a user's first
+                // play/pause silently dropped. 200 ms is enough to let the
+                // applied seek/play settle without making early input feel dead.
                 scope.launch {
-                    kotlinx.coroutines.delay(600)
+                    kotlinx.coroutines.delay(200)
                     hasReceivedInitialSync = true
                     Log.d(TAG, "Initial sync complete - playback events now allowed")
                 }
@@ -333,6 +423,16 @@ class RoomRepository @Inject constructor(
                             platform = detectPlatform(event.data.videoUrl ?: ""),
                             lastRemoteSyncAt = newSyncTime
                         )
+                    )
+
+                    // Establish / refresh the drift-correction anchor (#5)
+                    // from this snapshot.
+                    roomAnchor = RoomAnchor(
+                        time = finalTime,
+                        atMs = newSyncTime,
+                        isPlaying = base.videoState.isPlaying,
+                        speed = base.videoState.playbackSpeed,
+                        url = base.videoState.url,
                     )
 
                     if (event.data.audioSyncEnabled != null) {
@@ -523,6 +623,11 @@ class RoomRepository @Inject constructor(
         joinTimeMillis = 0L
         // Reset clock offset so new room gets fresh sync
         clockOffsetMs = 0L
+        // Drop the drift anchor and user-intent timestamps too — otherwise
+        // joining a different room would inherit stale guards.
+        roomAnchor = null
+        lastUserPauseAtMs = 0L
+        lastUserSeekAtMs = 0L
         resetState()
     }
     
@@ -549,7 +654,7 @@ class RoomRepository @Inject constructor(
         }
         
         // Guard: Don't broadcast play events until initial sync is complete
-        // This prevents new joiners from resetting room position
+        // This prevents new joiners from resetting room position.
         if (!hasReceivedInitialSync) {
             android.util.Log.w("RoomRepo", "sendPlayEvent: Blocked - waiting for initial sync")
             // Still update local state so player responds
@@ -558,17 +663,7 @@ class RoomRepository @Inject constructor(
             }
             return
         }
-        
-        // Additional guard: Block events within first second after joining
-        val timeSinceJoin = System.currentTimeMillis() - joinTimeMillis
-        if (timeSinceJoin < 1000 && joinTimeMillis > 0) {
-            android.util.Log.w("RoomRepo", "sendPlayEvent: Blocked - too soon after join ($timeSinceJoin ms)")
-            _roomState.update { current ->
-                current.copy(videoState = current.videoState.copy(isPlaying = true))
-            }
-            return
-        }
-        
+
         android.util.Log.d("RoomRepo", "sendPlayEvent: roomId=$roomId, timestamp=$timestamp")
         socketClient.sendSyncEvent(
             SyncData(
@@ -605,18 +700,11 @@ class RoomRepository @Inject constructor(
             }
             return
         }
-        
-        // Additional guard: Block events within first second after joining
-        val timeSinceJoin = System.currentTimeMillis() - joinTimeMillis
-        if (timeSinceJoin < 1000 && joinTimeMillis > 0) {
-            android.util.Log.w("RoomRepo", "sendPauseEvent: Blocked - too soon after join ($timeSinceJoin ms)")
-            _roomState.update { current ->
-                current.copy(videoState = current.videoState.copy(isPlaying = false))
-            }
-            return
-        }
-        
+
         android.util.Log.d("RoomRepo", "sendPauseEvent: roomId=$roomId, timestamp=$timestamp")
+        // Mark user pause-intent so we don't get auto-resumed by a stale
+        // remote `play` event racing this gesture.
+        lastUserPauseAtMs = System.currentTimeMillis()
         socketClient.sendSyncEvent(
             SyncData(
                 roomId = roomId,
@@ -648,7 +736,10 @@ class RoomRepository @Inject constructor(
             android.util.Log.w("RoomRepo", "sendSeekEvent: Blocked - waiting for initial sync")
             return
         }
-        
+
+        // Mark user seek-intent so a periodic drift correction or remote echo
+        // doesn't pull us back off the manually-chosen position immediately.
+        lastUserSeekAtMs = System.currentTimeMillis()
         socketClient.sendSyncEvent(
             SyncData(
                 roomId = roomId,
@@ -694,7 +785,7 @@ class RoomRepository @Inject constructor(
                     senderId = socketClient.socketId.value
                 )
             )
-            _roomState.update { 
+            _roomState.update {
                 it.copy(
                     videoState = it.videoState.copy(
                         url = url,
@@ -705,6 +796,15 @@ class RoomRepository @Inject constructor(
                     )
                 )
             }
+            // Drop the anchor for the previous URL so the drift loop doesn't
+            // try to seek the new video to the old position.
+            roomAnchor = RoomAnchor(
+                time = 0.0,
+                atMs = System.currentTimeMillis(),
+                isPlaying = false,
+                speed = _roomState.value.videoState.playbackSpeed,
+                url = url,
+            )
         }
     }
 
@@ -804,7 +904,54 @@ class RoomRepository @Inject constructor(
             socketClient.requestRoomState(roomId)
         }
     }
-    
+
+    /**
+     * Periodic drift-correction (#5).
+     *
+     * Compares the player's reported position against the extrapolated
+     * room-anchor position. When the player has fallen too far behind /
+     * advanced too far ahead, write the expected position back and bump
+     * lastRemoteSyncAt — the Compose-side LaunchedEffect in VideoPlayer
+     * recognises this as a remote sync and re-seeks the underlying player.
+     */
+    private fun checkAndCorrectDrift() {
+        val anchor = roomAnchor ?: return
+        val state = _roomState.value
+        if (state.roomId.isEmpty()) return
+        if (state.videoState.url != anchor.url) return
+        if (!anchor.isPlaying || !state.videoState.isPlaying) return
+
+        val now = System.currentTimeMillis()
+
+        // Respect user intent — they just paused or seeked, don't fight them.
+        if (now - lastUserPauseAtMs < userIntentWindowMs) return
+        if (now - lastUserSeekAtMs < userIntentWindowMs) return
+
+        // Don't correct while the room is still settling immediately after a
+        // remote sync arrived — the player will already be repositioning.
+        val timeSinceSync = now - state.videoState.lastRemoteSyncAt
+        if (timeSinceSync < 1500L) return
+
+        val elapsedSec = (now - anchor.atMs) / 1000.0
+        if (elapsedSec < 0) return
+        val expected = anchor.time + elapsedSec * anchor.speed
+        val drift = kotlin.math.abs(state.videoState.currentTime - expected)
+        if (drift <= driftCorrectionThresholdSec) return
+
+        Log.d(
+            TAG,
+            "Drift correction: player=${state.videoState.currentTime}s, expected=${expected}s, drift=${drift}s"
+        )
+        _roomState.update { current ->
+            current.copy(
+                videoState = current.videoState.copy(
+                    currentTime = expected,
+                    lastRemoteSyncAt = now,
+                )
+            )
+        }
+    }
+
     // Chat operations
     fun sendChatMessage(text: String) {
         val roomId = _roomState.value.roomId
