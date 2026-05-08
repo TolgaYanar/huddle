@@ -19,6 +19,7 @@ import { applyRoomState } from "./roomState";
 export function useActivityLogSubscriptions({
   roomId,
   userId,
+  socketId,
   playerRef,
   applyingRemoteSyncRef,
   lastUserPauseAtRef,
@@ -47,6 +48,7 @@ export function useActivityLogSubscriptions({
 }) {
   const remoteSyncResetTimeoutRef = useRef<number | null>(null);
   const lastAppliedRoomRevRef = useRef<number>(0);
+  const lastLoggedRevRef = useRef<number>(0);
   const lastResyncRequestAtRef = useRef<number>(0);
 
   const markApplyingRemoteSync = useCallback(
@@ -80,6 +82,7 @@ export function useActivityLogSubscriptions({
       applyRoomState({
         state,
         roomId,
+        socketId,
         playerRef,
         hasInitialSyncRef,
         lastAppliedRoomRevRef,
@@ -120,6 +123,7 @@ export function useActivityLogSubscriptions({
         userId,
         setLogs,
         lastAppliedRoomRevRef,
+        lastLoggedRevRef,
         lastResyncRequestAtRef,
         requestRoomState,
       });
@@ -153,6 +157,7 @@ export function useActivityLogSubscriptions({
     setRoomPlaybackAnchor,
     roomId,
     userId,
+    socketId,
     playerRef,
     lastUserPauseAtRef,
     hasInitialSyncRef,

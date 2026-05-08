@@ -7,6 +7,7 @@ import { useActivityLogSubscriptions } from "./useActivityLogSubscriptions";
 export function useActivityLog({
   roomId,
   userId,
+  socketId,
   isConnected,
   playerRef,
   applyingRemoteSyncRef,
@@ -60,6 +61,7 @@ export function useActivityLog({
   useActivityLogSubscriptions({
     roomId,
     userId,
+    socketId,
     isConnected,
     playerRef,
     applyingRemoteSyncRef,

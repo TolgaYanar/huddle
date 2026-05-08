@@ -9,28 +9,37 @@ export function handleSyncEvent({
   userId,
   setLogs,
   lastAppliedRoomRevRef,
+  lastLoggedRevRef,
   lastResyncRequestAtRef,
   requestRoomState,
 }: {
   data: SyncData;
   userId: string;
   setLogs: React.Dispatch<React.SetStateAction<LogEntry[]>>;
+  // The rev that the player state was last brought up to (driven by both
+  // receive_sync AND room_state via Math.max).
   lastAppliedRoomRevRef: React.MutableRefObject<number>;
+  // The rev that the activity log was last brought up to. Tracked separately
+  // so that an out-of-order room_state advancing applyRoomState doesn't trip
+  // the dedupe and drop the corresponding chat log line.
+  lastLoggedRevRef: React.MutableRefObject<number>;
   lastResyncRequestAtRef: React.MutableRefObject<number>;
   requestRoomState?: () => void;
 }) {
   const receivedAt = Date.now();
 
   if (typeof data.rev === "number" && Number.isFinite(data.rev)) {
-    const last = lastAppliedRoomRevRef.current;
+    const lastLogged = lastLoggedRevRef.current;
 
-    // Drop stale/out-of-order events.
-    if (data.rev <= last) {
+    // Drop stale/out-of-order events for the log.
+    if (data.rev <= lastLogged) {
       return;
     }
 
     // If there's a gap, we missed at least one event; request a fresh snapshot.
-    if (data.rev > last + 1) {
+    // Use the *applied* rev for gap detection — that's the rev the server
+    // believes we're up to, and the one a re-sync would refresh.
+    if (data.rev > lastAppliedRoomRevRef.current + 1) {
       if (
         requestRoomState &&
         receivedAt - lastResyncRequestAtRef.current > 1000
@@ -38,10 +47,16 @@ export function handleSyncEvent({
         lastResyncRequestAtRef.current = receivedAt;
         requestRoomState();
       }
+      // Still record this rev as logged so we don't keep re-requesting on
+      // every subsequent receive_sync.
+      lastLoggedRevRef.current = data.rev;
       return;
     }
 
-    lastAppliedRoomRevRef.current = data.rev;
+    lastLoggedRevRef.current = data.rev;
+    if (data.rev > lastAppliedRoomRevRef.current) {
+      lastAppliedRoomRevRef.current = data.rev;
+    }
   }
 
   const time = new Date().toLocaleTimeString([], {

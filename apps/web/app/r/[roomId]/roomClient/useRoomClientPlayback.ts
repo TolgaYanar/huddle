@@ -69,6 +69,7 @@ export function useRoomClientPlayback(args: {
   const activity = useActivityLog({
     roomId,
     userId,
+    socketId: room.socket?.id ?? userId,
     isConnected: room.isConnected,
     playerRef: video.playerRef,
     applyingRemoteSyncRef,

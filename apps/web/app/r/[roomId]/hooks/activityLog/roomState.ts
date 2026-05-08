@@ -9,6 +9,7 @@ import { USER_PAUSE_INTENT_WINDOW_MS } from "../useVideoPlayer/constants";
 export function applyRoomState({
   state,
   roomId,
+  socketId,
   playerRef,
   hasInitialSyncRef,
   lastAppliedRoomRevRef,
@@ -25,6 +26,7 @@ export function applyRoomState({
 }: {
   state: RoomStateData;
   roomId: string;
+  socketId?: string | null;
   playerRef: React.RefObject<unknown>;
   hasInitialSyncRef?: React.MutableRefObject<boolean>;
   lastAppliedRoomRevRef: React.MutableRefObject<number>;
@@ -114,8 +116,19 @@ export function applyRoomState({
     // Clamp to valid range — guards against stale updatedAt overshooting video end.
     target = Math.max(0, target);
 
-    // Only seek if significantly out of sync
-    if (Math.abs(current - target) > 2) {
+    // If this room_state echoes a broadcast we just sent ourselves, be much
+    // more permissive about drift before applying a corrective seek. Under
+    // server load the round-trip can put our local position several seconds
+    // ahead of the broadcast timestamp; the original 2 s threshold caused us
+    // to snap backwards on every broadcast, which felt like a stutter.
+    const isOwnEcho =
+      typeof socketId === "string" &&
+      socketId.length > 0 &&
+      typeof state.senderId === "string" &&
+      state.senderId === socketId;
+    const seekThreshold = isOwnEcho ? 7 : 2;
+
+    if (Math.abs(current - target) > seekThreshold) {
       seekToFromRef(playerRef, target);
     }
   }

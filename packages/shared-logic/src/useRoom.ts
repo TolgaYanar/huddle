@@ -187,6 +187,26 @@ export const useRoom = (roomId: string, userId: string) => {
       clearCachedRoomData();
     });
 
+    const flushPendingSyncEvents = () => {
+      const pending = pendingSyncEventsRef.current;
+      if (pending.length === 0) return;
+      pending.forEach((evt) => {
+        socket.emit("sync_video", {
+          roomId,
+          action: evt.action,
+          timestamp: evt.timestamp,
+          videoUrl: evt.videoUrl,
+          volume: evt.volume,
+          isMuted: evt.isMuted,
+          playbackSpeed: evt.playbackSpeed,
+          // Was missing before — set_audio_sync events queued during a
+          // disconnect would lose the audioSyncEnabled flag on replay.
+          audioSyncEnabled: evt.audioSyncEnabled,
+        });
+      });
+      pendingSyncEventsRef.current = [];
+    };
+
     socket.on("connect", () => {
       setIsConnected(true);
       setReconnectAttempt(0);
@@ -210,22 +230,22 @@ export const useRoom = (roomId: string, userId: string) => {
         password: password || undefined,
       });
 
-      // Flush any events the user triggered before we connected.
-      const pending = pendingSyncEventsRef.current;
-      if (pending.length > 0) {
-        pending.forEach((evt) => {
-          socket.emit("sync_video", {
-            roomId,
-            action: evt.action,
-            timestamp: evt.timestamp,
-            videoUrl: evt.videoUrl,
-            volume: evt.volume,
-            isMuted: evt.isMuted,
-            playbackSpeed: evt.playbackSpeed,
-          });
-        });
-        pendingSyncEventsRef.current = [];
-      }
+      // Defer the flush until the server has actually added us to the room
+      // (signalled by the first room_state push that follows join_room). The
+      // join_room handler awaits a DB load before calling socket.join(), so
+      // emitting sync_video immediately here used to race that and the server
+      // silently dropped the events because socket.rooms.has(roomId) was false.
+      const onceRoomState = () => {
+        if (window.clearTimeout) window.clearTimeout(flushFallbackTimer);
+        flushPendingSyncEvents();
+      };
+      socket.once("room_state", onceRoomState);
+      // Safety net: if room_state somehow doesn't arrive (e.g. password gate),
+      // try after 1.5s anyway. Worst case the server drops them again.
+      const flushFallbackTimer = setTimeout(() => {
+        socket.off("room_state", onceRoomState);
+        flushPendingSyncEvents();
+      }, 1500);
     });
 
     socket.connect();

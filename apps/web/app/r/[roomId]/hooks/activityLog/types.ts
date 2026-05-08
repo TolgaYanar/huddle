@@ -20,6 +20,11 @@ export type RoomPlaybackAnchor = {
 export type UseActivityLogProps = {
   roomId: string;
   userId: string;
+  // Best-effort socket id of *this* client. Used to recognise our own echo of
+  // a sync_video broadcast (server includes it in the receive_sync/room_state
+  // payloads as `senderId`) so we can avoid snapping our own timeline back
+  // when the server adds round-trip latency.
+  socketId?: string | null;
   isConnected: boolean;
   playerRef: React.RefObject<unknown>;
   applyingRemoteSyncRef: React.MutableRefObject<boolean>;
