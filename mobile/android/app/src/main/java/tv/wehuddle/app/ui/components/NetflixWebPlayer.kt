@@ -228,6 +228,36 @@ fun NetflixWebPlayer(
             )
         }
     }
+
+    // Handle playback rate. Was previously taken as a prop and silently
+    // ignored — meaning a room speed change from any other client wouldn't
+    // propagate to the Android Netflix WebView. Netflix accepts standard
+    // HTMLMediaElement.playbackRate; clamp to the same range Netflix exposes
+    // in its own UI (0.5x..1.5x) to avoid surprising the player.
+    LaunchedEffect(playbackSpeed, isVideoReady) {
+        if (isVideoReady && webView != null) {
+            val rate = playbackSpeed.coerceIn(0.5f, 1.5f)
+            webView?.evaluateJavascript(
+                "var v = (window.__huddleGetVideo?.() || window.__huddleVideo || document.querySelector('video')); if(v) v.playbackRate = $rate;",
+                null,
+            )
+        }
+    }
+
+    // Handle URL changes inside the same WebView. The factory only runs at
+    // mount, so without this LaunchedEffect a /watch/<id> change in the room
+    // never navigated and the WebView stayed stuck on the original title.
+    LaunchedEffect(watchUrl) {
+        val view = webView ?: return@LaunchedEffect
+        val current = view.url
+        if (current != watchUrl) {
+            // Reset the readiness flag so the LaunchedEffects above don't try
+            // to seek/play before the new page's <video> element is found.
+            isVideoReady = false
+            isLoading = true
+            view.loadUrl(watchUrl)
+        }
+    }
     
     // Auto-hide controls
     LaunchedEffect(showControls) {
