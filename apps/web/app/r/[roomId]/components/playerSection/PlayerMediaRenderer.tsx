@@ -3,20 +3,36 @@
 import React from "react";
 
 import { NetflixSyncPlayer } from "../NetflixSyncPlayer";
+import type { PlatformType } from "../videoControls/platform";
+import { DailymotionEmbed } from "./mediaRenderer/DailymotionEmbed";
 import { DirectFilePlayer } from "./mediaRenderer/DirectFilePlayer";
 import { KickEmbed } from "./mediaRenderer/KickEmbed";
+import { LoomEmbed } from "./mediaRenderer/LoomEmbed";
 import { MediaOverlays } from "./mediaRenderer/Overlays";
+import { PeerTubeEmbed } from "./mediaRenderer/PeerTubeEmbed";
 import { ReactPlayerRenderer } from "./mediaRenderer/ReactPlayerRenderer";
+import { SoundCloudEmbed } from "./mediaRenderer/SoundCloudEmbed";
+import { Tier3CtaCard } from "./mediaRenderer/Tier3CtaCard";
 import { TwitchEmbed } from "./mediaRenderer/TwitchEmbed";
 import { WebEmbed } from "./mediaRenderer/WebEmbed";
 import { YouTubeIFrameApiPlayer } from "./mediaRenderer/YouTubeIFrameApiPlayer";
 
 export function PlayerMediaRenderer({
   isClient,
+  platform,
   isKick,
   isTwitch,
   isPrime,
   isNetflix,
+  isTier3,
+  isDailymotion,
+  dailymotionEmbedSrc,
+  isSoundCloud,
+  soundCloudEmbedSrc,
+  isLoom,
+  loomEmbedSrc,
+  isPeerTube,
+  peerTubeEmbedSrc,
   isWebEmbed,
   isDirectFile,
   isYouTube,
@@ -76,10 +92,20 @@ export function PlayerMediaRenderer({
   isBuffering,
 }: {
   isClient: boolean;
+  platform: PlatformType;
   isKick: boolean;
   isTwitch: boolean;
   isPrime: boolean;
   isNetflix: boolean;
+  isTier3: boolean;
+  isDailymotion: boolean;
+  dailymotionEmbedSrc: string | null;
+  isSoundCloud: boolean;
+  soundCloudEmbedSrc: string | null;
+  isLoom: boolean;
+  loomEmbedSrc: string | null;
+  isPeerTube: boolean;
+  peerTubeEmbedSrc: string | null;
   isWebEmbed: boolean;
   isDirectFile: boolean;
   isYouTube: boolean;
@@ -142,10 +168,18 @@ export function PlayerMediaRenderer({
 }) {
   if (!isClient) return null;
 
+  // Tier-3 platforms (Disney+, HBO Max, Hulu, Apple TV+, Paramount+, Peacock)
+  // can't be embedded inline at all — show the install-extension CTA card
+  // instead of trying to render anything. Netflix has its own dedicated flow
+  // below; Prime keeps its existing blank-frame behaviour.
+  const showTier3Cta = isTier3 && !isNetflix && !isPrime;
+
   return (
     <>
       <div className="absolute inset-0">
-        {isKick ? (
+        {showTier3Cta ? (
+          <Tier3CtaCard platform={platform} url={normalizedUrl} />
+        ) : isKick ? (
           <KickEmbed
             src={kickEmbedSrc}
             fallbackKey={normalizedUrl}
@@ -182,6 +216,70 @@ export function PlayerMediaRenderer({
             onError={(err) => setPlayerError(err)}
             onDuration={handleDuration}
             className="absolute inset-0"
+          />
+        ) : isDailymotion && dailymotionEmbedSrc ? (
+          <DailymotionEmbed
+            ref={
+              playerRef as unknown as React.RefObject<
+                import("./mediaRenderer/DailymotionEmbed").DailymotionEmbedRef | null
+              >
+            }
+            src={dailymotionEmbedSrc}
+            isPlaying={videoState === "Playing"}
+            currentTime={currentTime}
+            volume={effectiveVolume}
+            muted={effectiveMuted}
+            applyingRemoteSyncRef={applyingRemoteSyncRef}
+            onPlay={handleUserPlay}
+            onPause={handlePause}
+            onSeek={handleUserSeek}
+            onProgress={handleProgress}
+            onDuration={handleDuration}
+            onReady={() => {
+              setPlayerReady(true);
+              setPlayerError(null);
+              setIsBuffering(false);
+              clearLoadTimeout();
+            }}
+            onError={(err) => handlePlayerError(err)}
+          />
+        ) : isSoundCloud && soundCloudEmbedSrc ? (
+          <SoundCloudEmbed
+            ref={
+              playerRef as unknown as React.RefObject<
+                import("./mediaRenderer/SoundCloudEmbed").SoundCloudEmbedRef | null
+              >
+            }
+            src={soundCloudEmbedSrc}
+            isPlaying={videoState === "Playing"}
+            currentTime={currentTime}
+            volume={effectiveVolume}
+            muted={effectiveMuted}
+            applyingRemoteSyncRef={applyingRemoteSyncRef}
+            onPlay={handleUserPlay}
+            onPause={handlePause}
+            onSeek={handleUserSeek}
+            onProgress={handleProgress}
+            onDuration={handleDuration}
+            onReady={() => {
+              setPlayerReady(true);
+              setPlayerError(null);
+              setIsBuffering(false);
+              clearLoadTimeout();
+            }}
+            onError={(err) => handlePlayerError(err)}
+          />
+        ) : isLoom && loomEmbedSrc ? (
+          <LoomEmbed
+            src={loomEmbedSrc}
+            fallbackKey={normalizedUrl}
+            onLoad={onEmbedLoad}
+          />
+        ) : isPeerTube && peerTubeEmbedSrc ? (
+          <PeerTubeEmbed
+            src={peerTubeEmbedSrc}
+            fallbackKey={normalizedUrl}
+            onLoad={onEmbedLoad}
           />
         ) : isWebEmbed ? (
           <WebEmbed

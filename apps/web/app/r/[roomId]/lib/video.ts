@@ -266,6 +266,23 @@ export function shouldEmbedWebpage(rawUrl: string) {
   if (isTwitchUrl(normalized)) return false;
   if (isDirectMediaUrl(normalized)) return false;
   if (isNetflixUrl(normalized)) return false;
+  // Platforms with their own dedicated embed renderers — see lib/embeds.ts.
+  // Without these guards `shouldEmbedWebpage` would return true for them and
+  // we'd render the page itself instead of the dedicated player.
+  if (/dailymotion\.com|dai\.ly/i.test(normalized)) return false;
+  if (/soundcloud\.com/i.test(normalized)) return false;
+  if (/loom\.com\/share\//i.test(normalized)) return false;
+  if (/wistia\.com|wi\.st/i.test(normalized)) return false;
+  if (/spotify\.com/i.test(normalized)) return false;
+  if (/tiktok\.com/i.test(normalized)) return false;
+  if (/\/videos\/(?:watch|embed)\/[0-9a-f-]{36,}/i.test(normalized)) return false; // PeerTube
+  // Tier-3 DRM platforms — we never embed these; the player swaps to a CTA.
+  if (
+    /(disneyplus|hbomax|max\.com|hulu\.com|tv\.apple\.com|paramountplus|peacocktv)/i.test(
+      normalized,
+    )
+  )
+    return false;
 
   // For everything else, try embedding the webpage.
   return true;

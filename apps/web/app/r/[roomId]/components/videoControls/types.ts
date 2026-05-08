@@ -1,10 +1,36 @@
+/**
+ * Every video / audio source we know how to recognise. The list expanded a lot
+ * — see `platform.ts` for what each one supports. Order doesn't matter here.
+ *
+ * Tier 1 — full programmatic control: youtube, vimeo, direct, hls, dash,
+ *   wistia, dailymotion, soundcloud, peertube.
+ * Tier 2 — embeds, no remote sync: twitch, kick, tiktok, spotify, loom.
+ * Tier 3 — DRM, cannot embed at all (require browser extension): netflix,
+ *   prime, disney_plus, hbo, hulu, apple_tv_plus, paramount_plus, peacock.
+ */
 export type PlatformType =
   | "youtube"
   | "twitch"
   | "kick"
   | "direct"
+  | "hls"
+  | "dash"
+  | "vimeo"
+  | "dailymotion"
+  | "wistia"
+  | "soundcloud"
+  | "spotify"
+  | "tiktok"
+  | "loom"
+  | "peertube"
   | "prime"
   | "netflix"
+  | "disney_plus"
+  | "hbo"
+  | "hulu"
+  | "apple_tv_plus"
+  | "paramount_plus"
+  | "peacock"
   | "unknown";
 
 export interface PlatformCapabilities {

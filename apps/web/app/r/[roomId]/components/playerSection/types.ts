@@ -3,6 +3,7 @@ import type * as React from "react";
 import type { WebRTCMediaState } from "shared-logic";
 
 import type { DraggedTilePayload } from "../../lib/dnd";
+import type { PlatformType } from "../videoControls/platform";
 
 export type StageView = {
   id: string;
@@ -53,10 +54,20 @@ export type PlayerSectionProps = {
   setCamEnabled: (enabled: boolean) => void;
 
   isClient: boolean;
+  platform: PlatformType;
   isKick: boolean;
   isTwitch: boolean;
   isPrime: boolean;
   isNetflix: boolean;
+  isTier3: boolean;
+  isDailymotion: boolean;
+  dailymotionEmbedSrc: string | null;
+  isSoundCloud: boolean;
+  soundCloudEmbedSrc: string | null;
+  isLoom: boolean;
+  loomEmbedSrc: string | null;
+  isPeerTube: boolean;
+  peerTubeEmbedSrc: string | null;
   isWebEmbed: boolean;
   isBadYoutubeUrl: boolean;
   normalizedUrl: string;
