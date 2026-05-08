@@ -36,6 +36,31 @@ function attachSyncHandlers(io, state, socket, deps) {
       audioSyncEnabled,
     } = data || {};
 
+    // DEDUPE: drop a second identical sync within 250 ms from the same socket.
+    // This swallows the double-firings we see from double-taps, racing
+    // ExoPlayer state callbacks, and React StrictMode mounts. Per-socket so
+    // legitimate near-simultaneous events from different members still flow.
+    if (typeof action === "string") {
+      const dedupeKey = `${action}|${typeof timestamp === "number" ? timestamp.toFixed(2) : ""}|${typeof videoUrl === "string" ? videoUrl : ""}|${typeof volume === "number" ? volume.toFixed(3) : ""}|${typeof isMuted === "boolean" ? isMuted : ""}|${typeof playbackSpeed === "number" ? playbackSpeed.toFixed(3) : ""}|${typeof audioSyncEnabled === "boolean" ? audioSyncEnabled : ""}`;
+      const dedupeBag = (socket.data ||= {});
+      const lastSync = dedupeBag.__lastSyncEvent;
+      const nowMs = Date.now();
+      if (
+        lastSync &&
+        lastSync.roomId === roomId &&
+        lastSync.key === dedupeKey &&
+        nowMs - lastSync.at < 250
+      ) {
+        if (typeof deps.vLog === "function") {
+          deps.vLog(
+            `Room ${roomId}: Dropping duplicate ${action} from ${socket.id} (${nowMs - lastSync.at}ms apart)`,
+          );
+        }
+        return;
+      }
+      dedupeBag.__lastSyncEvent = { roomId, key: dedupeKey, at: nowMs };
+    }
+
     if (typeof deps.vLog === "function") {
       deps.vLog(
         `Room ${roomId}: ${action} at ${timestamp} ${videoUrl ? `URL: ${videoUrl}` : ""}`,
@@ -59,28 +84,31 @@ function attachSyncHandlers(io, state, socket, deps) {
       ? prevTimestamp + Math.max(0, (now - prevUpdatedAt) / 1000) * prevSpeed
       : prevTimestamp;
 
-    // GUARD: Reject play/pause events that would regress playback significantly.
+    // GUARD: clients drift (long buffers, backgrounded tabs, sleeping phones)
+    // and their `currentTime` lags reality. If we trusted them blindly, a
+    // drifted client tapping play/pause would yank the whole room back several
+    // seconds. So for play/pause we clamp the resulting room timestamp to the
+    // server's estimated-now rather than rejecting outright — the room never
+    // moves backwards and the drifted client itself gets snapped forward when
+    // they receive the broadcast. `seek` is left alone because seeking back is
+    // a legitimate user action.
+    let clampedTimestamp = timestamp;
     if (
-      (action === "play" || action === "pause" || action === "seek") &&
-      typeof timestamp === "number"
+      (action === "play" || action === "pause") &&
+      typeof timestamp === "number" &&
+      Number.isFinite(timestamp)
     ) {
       const regression = estimatedNowTimestamp - timestamp;
-
-      const joinedAt =
-        socket.data &&
-        socket.data.roomJoinedAt &&
-        typeof socket.data.roomJoinedAt[roomId] === "number"
-          ? socket.data.roomJoinedAt[roomId]
-          : 0;
-      const joinedRecently = joinedAt > 0 && now - joinedAt < 15000;
-
-      if (regression > 10 && estimatedNowTimestamp > 15 && joinedRecently) {
+      // Only clamp when the regression is significant AND playback has been
+      // running for a meaningful amount of time — protects against wiping out
+      // a legitimate "go back near the start" play.
+      if (regression > 3 && estimatedNowTimestamp > 15) {
         if (typeof deps.vLog === "function") {
           deps.vLog(
-            `Room ${roomId}: Rejecting ${action} at ${timestamp} - would regress from ~${estimatedNowTimestamp.toFixed(1)}s (joinedRecently)`,
+            `Room ${roomId}: Clamping ${action} at ${timestamp} -> ~${estimatedNowTimestamp.toFixed(1)}s (regression=${regression.toFixed(1)}s)`,
           );
         }
-        return;
+        clampedTimestamp = estimatedNowTimestamp;
       }
     }
 
@@ -113,14 +141,15 @@ function attachSyncHandlers(io, state, socket, deps) {
       action === "set_speed";
 
     const hasIncomingTimestamp = typeof timestamp === "number";
+    const effectiveIncomingTimestamp = hasIncomingTimestamp
+      ? clampedTimestamp
+      : estimatedNowTimestamp;
     const nextTimestamp = shouldAnchorPlaybackPosition
       ? action === "change_url"
         ? hasIncomingTimestamp
           ? timestamp
           : 0
-        : hasIncomingTimestamp
-          ? timestamp
-          : estimatedNowTimestamp
+        : effectiveIncomingTimestamp
       : prevTimestamp;
 
     const nextUpdatedAt = shouldAnchorPlaybackPosition
