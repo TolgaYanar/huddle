@@ -56,7 +56,8 @@ fun VideoPlayerView(
     onError: (String) -> Unit,
     modifier: Modifier = Modifier,
     lastRemoteSyncAt: Long = 0L,
-    onUrlChange: ((String) -> Unit)? = null
+    onUrlChange: ((String) -> Unit)? = null,
+    onBuffering: ((Boolean) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val platform = remember(url) { detectPlatform(url) }
@@ -209,15 +210,24 @@ fun VideoPlayerView(
                             onProgress(exoPlayer.currentPosition / 1000.0, duration)
                         }
                         onReady()
+                        onBuffering?.invoke(false)
+                    }
+                    Player.STATE_BUFFERING -> {
+                        onBuffering?.invoke(true)
+                    }
+                    Player.STATE_IDLE -> {
+                        onBuffering?.invoke(false)
                     }
                     Player.STATE_ENDED -> {
                         onPause()
+                        onBuffering?.invoke(false)
                     }
                 }
             }
-            
+
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                 onError("Video error: ${error.message ?: error.errorCodeName}")
+                onBuffering?.invoke(false)
             }
         }
         
@@ -611,7 +621,7 @@ fun VideoControlsBar(
                     )
                 }
                 
-                // Skip buttons
+                // Skip buttons (±10s always; ±30s as compact text pills, mirroring web)
                 if (capabilities.canSeek) {
                     HuddleIconButton(
                         onClick = { onSeek(maxOf(0.0, currentTime - 10)) },
@@ -627,6 +637,30 @@ fun VideoControlsBar(
                         size = 36.dp,
                         iconSize = 20.dp
                     )
+
+                    // ±30s text pills — only show on platforms with reliable seek
+                    HuddleSmallButton(
+                        onClick = { onSeek(maxOf(0.0, currentTime - 30)) }
+                    ) {
+                        Text(
+                            text = "-30s",
+                            style = TextStyle(
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        )
+                    }
+                    HuddleSmallButton(
+                        onClick = { onSeek(minOf(duration, currentTime + 30)) }
+                    ) {
+                        Text(
+                            text = "+30s",
+                            style = TextStyle(
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        )
+                    }
                 }
                 
                 // Buffering indicator

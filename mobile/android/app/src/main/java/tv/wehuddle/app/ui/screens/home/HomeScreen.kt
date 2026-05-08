@@ -58,11 +58,7 @@ fun HomeScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                brush = androidx.compose.ui.graphics.Brush.verticalGradient(
-                    colors = listOf(Slate900, Slate950, Slate950)
-                )
-            )
+            .background(brush = roomAmbientBackground())
             .then(
                 if (isTV) {
                     Modifier.onDpadKeyEvent(

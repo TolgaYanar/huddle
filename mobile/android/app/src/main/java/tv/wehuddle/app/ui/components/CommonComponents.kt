@@ -14,6 +14,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -23,6 +24,24 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import tv.wehuddle.app.ui.theme.*
+
+/**
+ * Ambient gradient background used on the home and room screens — mirrors the
+ * web app's gradient-mesh (indigo bloom from the top, slate base, fuchsia tint
+ * fading toward the bottom). Compose can't stack multiple radial brushes for
+ * free, so this is a vertical multi-stop approximation that reads similarly.
+ */
+@Composable
+fun roomAmbientBackground(): Brush {
+    return Brush.verticalGradient(
+        colorStops = arrayOf(
+            0f to Color(0xFF1E1B4B), // indigo-950 bloom at the top
+            0.35f to Slate900,
+            0.85f to Slate950,
+            1f to Color(0xFF18063B) // faint fuchsia/indigo bottom accent
+        )
+    )
+}
 
 /**
  * Glass morphism card matching the web app style

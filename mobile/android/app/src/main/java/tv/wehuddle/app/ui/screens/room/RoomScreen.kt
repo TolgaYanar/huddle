@@ -399,6 +399,9 @@ private fun TvWideRoomLayout(
                                 // When user selects content in Netflix, sync it to the room
                                 viewModel.updateVideoUrl(newUrl)
                                 viewModel.loadVideo()
+                            },
+                            onBuffering = { buffering ->
+                                viewModel.updateVideoState { it.copy(isBuffering = buffering) }
                             }
                         )
                     } else {
@@ -966,11 +969,23 @@ private fun MobileRoomLayout(
     val Slate400 = Color(0xFF94A3B8)
     val Slate50 = Color(0xFFF8FAFC)
     val Blue500 = Color(0xFF3B82F6)
-    
+
+    // Theatre mode: hides tabs, URL input, bottom bar, and the chat preview to
+    // maximize the video area — mirrors the web app's theatre mode (which hides
+    // the left call sidebar). Force-select the Video tab whenever it turns on.
+    var isTheatreMode by remember { mutableStateOf(false) }
+    LaunchedEffect(isTheatreMode) {
+        if (isTheatreMode && selectedTab != 0) onTabSelected(0)
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(roomAmbientBackground())
+    ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Slate950)
             .statusBarsPadding()
             .imePadding()
     ) {
@@ -1000,7 +1015,8 @@ private fun MobileRoomLayout(
             onBack = onNavigateBack
         )
 
-        // 2. Tabs (Always Visible) - Use TV-aware tabs if on TV
+        // 2. Tabs (hidden in theatre mode)
+        if (!isTheatreMode) {
         if (isTV) {
             Row(
                 modifier = Modifier
@@ -1050,6 +1066,7 @@ private fun MobileRoomLayout(
                 }
             }
         }
+        } // end !isTheatreMode tabs
 
         // 3. Content Area (Flexible Weight)
         Box(
@@ -1071,7 +1088,9 @@ private fun MobileRoomLayout(
                     modifier = Modifier.verticalScroll(rememberScrollState()),
                     isTV = isTV,
                     onEnterFullscreen = onEnterFullscreen,
-                    isFullscreen = isFullscreen
+                    isFullscreen = isFullscreen,
+                    isTheatreMode = isTheatreMode,
+                    onToggleTheatreMode = { isTheatreMode = !isTheatreMode }
                 )
                 1 -> ControlsTabContent(
                     viewModel = viewModel,
@@ -1092,14 +1111,17 @@ private fun MobileRoomLayout(
             }
         }
 
-        // 4. Bottom Bar (Always Visible)
-        BottomMediaBar(
-            micEnabled = roomState.localMediaState.mic,
-            camEnabled = roomState.localMediaState.cam,
-            participants = participants
-        )
+        // 4. Bottom Bar (hidden in theatre mode)
+        if (!isTheatreMode) {
+            BottomMediaBar(
+                micEnabled = roomState.localMediaState.mic,
+                camEnabled = roomState.localMediaState.cam,
+                participants = participants
+            )
+        }
         } // End of !passwordRequired condition
     }
+    } // End of ambient-background Box
 
     // Password Modal - Show when password is required
     if (passwordRequired) {
@@ -1179,7 +1201,9 @@ private fun VideoTabContent(
     modifier: Modifier = Modifier,
     isTV: Boolean = false,
     onEnterFullscreen: () -> Unit = {},
-    isFullscreen: Boolean = false
+    isFullscreen: Boolean = false,
+    isTheatreMode: Boolean = false,
+    onToggleTheatreMode: () -> Unit = {}
 ) {
     var isChatExpanded by remember { mutableStateOf(false) }
     var showYouTubeBrowser by remember { mutableStateOf(false) }
@@ -1193,7 +1217,8 @@ private fun VideoTabContent(
         modifier = modifier.padding(padding),
         verticalArrangement = Arrangement.spacedBy(spacing)
     ) {
-        // --- 1. Video URL Input ---
+        // --- 1. Video URL Input (hidden in theatre mode) ---
+        if (!isTheatreMode) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(if (isTV) 12.dp else 8.dp),
@@ -1292,6 +1317,7 @@ private fun VideoTabContent(
                 }
             }
         }
+        } // end !isTheatreMode URL input
 
         // --- 2. Video Player ---
         GlassCard {
@@ -1354,24 +1380,65 @@ private fun VideoTabContent(
                             // When user selects content in Netflix, sync it to the room
                             viewModel.updateVideoUrl(newUrl)
                             viewModel.loadVideo()
+                        },
+                        onBuffering = { buffering ->
+                            viewModel.updateVideoState { it.copy(isBuffering = buffering) }
                         }
                     )
-                    
-                    // Fullscreen button overlay (top right)
-                    IconButton(
-                        onClick = onEnterFullscreen,
+
+                    // Buffering spinner overlay (centered) — visible whenever the
+                    // ExoPlayer is rebuffering, which is when the user actually
+                    // wants feedback that the video is loading.
+                    if (roomState.videoState.isBuffering) {
+                        CircularProgressIndicator(
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .size(48.dp),
+                            color = Color.White,
+                            strokeWidth = 3.dp
+                        )
+                    }
+
+                    // Top-right overlay buttons: theatre toggle + fullscreen
+                    Row(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
-                            .padding(8.dp)
-                            .size(36.dp)
-                            .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                            .padding(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Icon(
-                            Icons.Default.Fullscreen,
-                            contentDescription = "Enter fullscreen (with webcams)",
-                            tint = Color.White,
-                            modifier = Modifier.size(22.dp)
-                        )
+                        // Theatre mode toggle
+                        IconButton(
+                            onClick = onToggleTheatreMode,
+                            modifier = Modifier
+                                .size(36.dp)
+                                .background(
+                                    if (isTheatreMode) Color(0xFF6366F1).copy(alpha = 0.8f)
+                                    else Color.Black.copy(alpha = 0.5f),
+                                    CircleShape
+                                )
+                        ) {
+                            Icon(
+                                imageVector = if (isTheatreMode) Icons.Default.UnfoldLess else Icons.Default.UnfoldMore,
+                                contentDescription = if (isTheatreMode) "Exit theatre mode" else "Theatre mode",
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+
+                        // Fullscreen button
+                        IconButton(
+                            onClick = onEnterFullscreen,
+                            modifier = Modifier
+                                .size(36.dp)
+                                .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                        ) {
+                            Icon(
+                                Icons.Default.Fullscreen,
+                                contentDescription = "Enter fullscreen (with webcams)",
+                                tint = Color.White,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
                     }
                 } else {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -1417,8 +1484,9 @@ private fun VideoTabContent(
             )
         }
 
-        // --- 4. NEW: Expandable Live Chat ---
+        // --- 4. NEW: Expandable Live Chat (hidden in theatre mode) ---
         // This is the "Modern, Hideable" Chat Section
+        if (!isTheatreMode) {
         Surface(
             color = Color(0xFF1E293B).copy(alpha = 0.5f),
             shape = RoundedCornerShape(16.dp),
@@ -1529,7 +1597,8 @@ private fun VideoTabContent(
                 }
             }
         }
-        
+        } // end !isTheatreMode chat
+
         // Bottom Spacer to prevent hitting the bottom bar
         Spacer(modifier = Modifier.height(24.dp))
     }
