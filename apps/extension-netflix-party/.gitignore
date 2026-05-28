@@ -1,0 +1,5 @@
+# Chrome Web Store submission artifacts. Rebuilt on demand via
+# `cd dist && zip -r ../huddle-netflix-party-<version>.zip .` — no point
+# tracking the binary, the manifest version + git tag is the source of
+# truth for which release a zip corresponds to.
+huddle-netflix-party-*.zip

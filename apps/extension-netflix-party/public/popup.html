@@ -7,19 +7,20 @@
     <style>
       :root {
         color-scheme: dark;
-        /* Match the wehuddle.tv slate/indigo palette so popup feels like
-           the same product as the website. */
-        --bg: #020617;          /* slate-950 */
-        --surface: rgba(255, 255, 255, 0.05);
-        --surface-hover: rgba(255, 255, 255, 0.08);
-        --border: rgba(255, 255, 255, 0.1);
+        --bg: #020617;
+        --bg-soft: #0a0f1e;
+        --surface: rgba(255, 255, 255, 0.045);
+        --surface-hover: rgba(255, 255, 255, 0.085);
+        --surface-strong: rgba(255, 255, 255, 0.07);
+        --border: rgba(255, 255, 255, 0.09);
         --border-strong: rgba(255, 255, 255, 0.18);
-        --text: #f8fafc;        /* slate-50 */
-        --text-muted: #94a3b8;  /* slate-400 */
-        --text-dim: #64748b;    /* slate-500 */
+        --text: #f8fafc;
+        --text-muted: #94a3b8;
+        --text-dim: #64748b;
         --indigo: #6366f1;
         --indigo-soft: rgba(99, 102, 241, 0.15);
         --indigo-border: rgba(99, 102, 241, 0.4);
+        --indigo-text: #c7d2fe;
         --emerald: #10b981;
         --emerald-soft: rgba(16, 185, 129, 0.12);
         --emerald-border: rgba(16, 185, 129, 0.35);
@@ -32,60 +33,72 @@
         --amber-soft: rgba(245, 158, 11, 0.1);
         --amber-border: rgba(245, 158, 11, 0.35);
         --amber-text: #fde68a;
+        --shadow-glow: 0 4px 24px -8px rgba(99, 102, 241, 0.35);
       }
-
       * { box-sizing: border-box; }
-
       body {
         margin: 0;
-        font: 13px/1.4
-          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
-          Arial, sans-serif;
+        font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          Helvetica, Arial, sans-serif;
         background:
           radial-gradient(
-            circle at 50% -20%,
-            rgba(99, 102, 241, 0.18),
-            transparent 50%
+            circle at 50% -10%,
+            rgba(99, 102, 241, 0.22),
+            transparent 55%
+          ),
+          radial-gradient(
+            circle at 100% 100%,
+            rgba(244, 63, 94, 0.08),
+            transparent 45%
           ),
           var(--bg);
         color: var(--text);
-        width: 340px;
-        min-height: 240px;
+        width: 360px;
+        min-height: 320px;
+        -webkit-font-smoothing: antialiased;
       }
-
       .wrap {
         padding: 14px;
         display: flex;
         flex-direction: column;
-        gap: 12px;
+        gap: 11px;
       }
 
+      /* HEADER */
       .header {
         display: flex;
         align-items: center;
-        gap: 8px;
-        margin-bottom: 2px;
+        gap: 9px;
       }
-      .header img { width: 22px; height: 22px; border-radius: 4px; }
+      .header img {
+        width: 24px;
+        height: 24px;
+        border-radius: 5px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+      }
       .header h1 {
         margin: 0;
         font-size: 14px;
         font-weight: 600;
-        letter-spacing: 0.1px;
+        letter-spacing: -0.1px;
       }
       .header .ver {
         margin-left: auto;
         font-size: 10px;
         color: var(--text-dim);
         font-variant-numeric: tabular-nums;
+        padding: 2px 7px;
+        border-radius: 6px;
+        background: var(--surface);
+        border: 1px solid var(--border);
       }
 
-      /* Status pill — matches the website's Live/Offline header pill */
+      /* STATUS PILL */
       .status-pill {
         display: inline-flex;
         align-items: center;
-        gap: 6px;
-        padding: 5px 10px;
+        gap: 7px;
+        padding: 6px 11px;
         border-radius: 9999px;
         font-size: 11px;
         font-weight: 500;
@@ -93,19 +106,37 @@
         background: var(--surface);
         color: var(--text-muted);
         align-self: flex-start;
+        letter-spacing: 0.1px;
+        transition: background 0.2s, border-color 0.2s, color 0.2s,
+          box-shadow 0.2s;
       }
       .status-pill .dot {
-        width: 7px; height: 7px; border-radius: 50%;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
         background: var(--text-dim);
+        position: relative;
+        transition: background 0.2s, box-shadow 0.2s;
       }
       .status-pill[data-state="connected"] {
         color: var(--emerald-text);
         background: var(--emerald-soft);
         border-color: var(--emerald-border);
+        box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.05),
+          0 4px 12px -6px rgba(16, 185, 129, 0.4);
       }
       .status-pill[data-state="connected"] .dot {
         background: var(--emerald);
-        box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18);
+        box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.22);
+      }
+      .status-pill[data-state="connected"] .dot::after {
+        content: "";
+        position: absolute;
+        inset: -3px;
+        border-radius: 50%;
+        background: var(--emerald);
+        opacity: 0.4;
+        animation: ping 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
       }
       .status-pill[data-state="connecting"] {
         color: var(--amber-text);
@@ -126,16 +157,265 @@
         0%, 100% { opacity: 1; }
         50% { opacity: 0.4; }
       }
+      @keyframes ping {
+        0% { transform: scale(1); opacity: 0.4; }
+        75%, 100% { transform: scale(2.4); opacity: 0; }
+      }
+      @keyframes fadeSlideIn {
+        from { opacity: 0; transform: translateY(4px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes shimmer {
+        0%   { background-position: -200px 0; }
+        100% { background-position: 200px 0; }
+      }
 
+      /* CARD BASE */
+      .card {
+        padding: 11px;
+        border-radius: 13px;
+        border: 1px solid var(--border);
+        background: var(--surface);
+        animation: fadeSlideIn 0.18s ease-out;
+        transition: background 0.2s, border-color 0.2s;
+      }
+      .card[hidden] { display: none !important; }
+
+      /* NOW PLAYING */
+      .now-playing {
+        display: flex;
+        gap: 11px;
+      }
+      .poster-wrap {
+        position: relative;
+        width: 72px;
+        height: 104px;
+        flex: 0 0 72px;
+        border-radius: 8px;
+        overflow: hidden;
+        background:
+          linear-gradient(135deg, rgba(99, 102, 241, 0.25), rgba(0, 0, 0, 0.5));
+        box-shadow: 0 4px 12px -6px rgba(0, 0, 0, 0.6);
+      }
+      .poster-wrap img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
+      .poster-wrap.skeleton {
+        background: linear-gradient(
+          90deg,
+          rgba(255, 255, 255, 0.04) 0%,
+          rgba(255, 255, 255, 0.1) 50%,
+          rgba(255, 255, 255, 0.04) 100%
+        );
+        background-size: 400px 100%;
+        animation: shimmer 1.4s linear infinite;
+      }
+      .poster-wrap.placeholder::before {
+        content: "🎬";
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 28px;
+        opacity: 0.55;
+      }
+      .now-playing-meta {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        justify-content: center;
+      }
+      .now-playing-label {
+        font-size: 9.5px;
+        font-weight: 600;
+        color: var(--indigo-text);
+        letter-spacing: 0.7px;
+        text-transform: uppercase;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .now-playing-label::before {
+        content: "";
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--indigo);
+        box-shadow: 0 0 6px var(--indigo);
+      }
+      .now-playing-title {
+        font-size: 13.5px;
+        font-weight: 600;
+        color: var(--text);
+        line-height: 1.3;
+        letter-spacing: -0.1px;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+      .now-playing-episode {
+        font-size: 11px;
+        color: var(--text-muted);
+        line-height: 1.3;
+        display: -webkit-box;
+        -webkit-line-clamp: 1;
+        line-clamp: 1;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+      .now-playing-status {
+        margin-top: 3px;
+        font-size: 11px;
+        color: var(--text-muted);
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-variant-numeric: tabular-nums;
+      }
+      .now-playing-status svg {
+        width: 12px;
+        height: 12px;
+        flex-shrink: 0;
+      }
+      .now-playing-status[data-playing="true"] { color: var(--emerald-text); }
+      .now-playing-status[data-playing="false"] { color: var(--amber-text); }
+
+      /* MEMBERS */
+      .members {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .members-avatars {
+        display: flex;
+        align-items: center;
+      }
+      .members-avatars .avatar {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: linear-gradient(
+          135deg,
+          rgba(99, 102, 241, 0.35),
+          rgba(99, 102, 241, 0.15)
+        );
+        color: var(--indigo-text);
+        border: 2px solid var(--bg-soft);
+        margin-left: -7px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10.5px;
+        font-weight: 600;
+        letter-spacing: -0.2px;
+        position: relative;
+      }
+      .members-avatars .avatar:first-child { margin-left: 0; }
+      .members-avatars .avatar.host {
+        background: linear-gradient(
+          135deg,
+          rgba(245, 158, 11, 0.4),
+          rgba(245, 158, 11, 0.15)
+        );
+        color: var(--amber-text);
+      }
+      .members-avatars .avatar.you {
+        outline: 2px solid var(--emerald);
+        outline-offset: -2px;
+      }
+      .members-avatars .more {
+        margin-left: -7px;
+        height: 24px;
+        padding: 0 7px;
+        border-radius: 9999px;
+        background: var(--surface-strong);
+        border: 2px solid var(--bg-soft);
+        font-size: 10px;
+        color: var(--text-muted);
+        display: inline-flex;
+        align-items: center;
+      }
+      .members-text {
+        font-size: 11px;
+        color: var(--text-muted);
+        flex: 1;
+        min-width: 0;
+        line-height: 1.35;
+      }
+      .members-text strong {
+        color: var(--text);
+        font-weight: 600;
+      }
+      .members-text .role {
+        display: block;
+        font-size: 10px;
+        color: var(--text-dim);
+        margin-top: 1px;
+      }
+
+      /* COPY-INVITE BUTTON */
+      .invite-link {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        border-radius: 10px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        font-size: 11px;
+        color: var(--text-muted);
+        transition: background 0.15s, border-color 0.15s;
+      }
+      .invite-link[hidden] { display: none !important; }
+      .invite-link:hover {
+        background: var(--surface-hover);
+        border-color: var(--border-strong);
+      }
+      .invite-link code {
+        flex: 1;
+        font-family: ui-monospace, SFMono-Regular, monospace;
+        font-size: 10.5px;
+        color: var(--text);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .invite-link button {
+        flex: 0 0 auto;
+        background: transparent;
+        border: none;
+        color: var(--indigo-text);
+        font-size: 11px;
+        cursor: pointer;
+        padding: 4px 6px;
+        border-radius: 6px;
+        transition: background 0.15s, color 0.15s;
+      }
+      .invite-link button:hover {
+        background: var(--indigo-soft);
+      }
+      .invite-link button.copied { color: var(--emerald-text); }
+      .invite-link .invite-link-icon {
+        color: var(--indigo);
+        flex-shrink: 0;
+      }
+
+      /* INPUT + BUTTONS */
       label {
         display: block;
         font-size: 11px;
         font-weight: 500;
         color: var(--text-muted);
         margin-bottom: 5px;
-        letter-spacing: 0.1px;
       }
-
       input {
         width: 100%;
         padding: 10px 12px;
@@ -145,16 +425,15 @@
         color: var(--text);
         font: inherit;
         outline: none;
-        transition: border-color 0.15s, background 0.15s;
+        transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
       }
       input:focus {
         border-color: var(--indigo-border);
         background: rgba(0, 0, 0, 0.4);
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
       }
       input::placeholder { color: var(--text-dim); }
-
       .row { display: flex; gap: 8px; }
-
       button {
         flex: 1;
         padding: 10px;
@@ -165,41 +444,156 @@
         font: inherit;
         font-weight: 500;
         cursor: pointer;
-        transition: background 0.15s, border-color 0.15s;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        transition: background 0.15s, border-color 0.15s, transform 0.05s;
       }
-      button:hover { background: var(--surface-hover); }
-      button:disabled { opacity: 0.45; cursor: not-allowed; }
+      button:hover {
+        background: var(--surface-hover);
+        border-color: var(--border-strong);
+      }
+      button:active:not(:disabled) {
+        transform: translateY(0.5px);
+      }
+      button:disabled { opacity: 0.4; cursor: not-allowed; }
       button.primary {
-        background: var(--indigo-soft);
+        background: linear-gradient(
+          180deg,
+          rgba(99, 102, 241, 0.25),
+          rgba(99, 102, 241, 0.15)
+        );
         border-color: var(--indigo-border);
-        color: #c7d2fe;
+        color: var(--indigo-text);
+        box-shadow: var(--shadow-glow);
       }
-      button.primary:hover { background: rgba(99, 102, 241, 0.25); }
+      button.primary:hover {
+        background: linear-gradient(
+          180deg,
+          rgba(99, 102, 241, 0.35),
+          rgba(99, 102, 241, 0.22)
+        );
+        border-color: rgba(99, 102, 241, 0.55);
+      }
+      button svg { width: 13px; height: 13px; }
 
-      .hint {
+      /* ONBOARDING / EMPTY STATE */
+      .empty {
+        padding: 16px;
+        border-radius: 13px;
+        border: 1px dashed var(--border-strong);
+        background: var(--surface);
+        text-align: center;
+        animation: fadeSlideIn 0.18s ease-out;
+      }
+      .empty[hidden] { display: none !important; }
+      .empty .icon {
+        font-size: 26px;
+        margin-bottom: 8px;
+      }
+      .empty .empty-title {
+        font-size: 13.5px;
+        font-weight: 600;
+        margin-bottom: 4px;
+        letter-spacing: -0.1px;
+      }
+      .empty .empty-body {
         font-size: 11px;
         color: var(--text-muted);
-        line-height: 1.45;
+        line-height: 1.5;
       }
-      .hint a {
+      .empty .empty-body a {
         color: var(--indigo);
         text-decoration: none;
       }
-      .hint a:hover { text-decoration: underline; }
+      .empty .empty-body a:hover { text-decoration: underline; }
 
+      /* ONBOARDING STEPS (shown when on Netflix but not connected) */
+      .steps {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 12px;
+        border-radius: 13px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        animation: fadeSlideIn 0.18s ease-out;
+      }
+      .steps[hidden] { display: none !important; }
+      .steps-title {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--text);
+        letter-spacing: 0.1px;
+        margin-bottom: 2px;
+      }
+      .step {
+        display: flex;
+        gap: 9px;
+        align-items: flex-start;
+        font-size: 11.5px;
+        color: var(--text-muted);
+        line-height: 1.4;
+      }
+      .step-number {
+        flex: 0 0 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: var(--indigo-soft);
+        border: 1px solid var(--indigo-border);
+        color: var(--indigo-text);
+        font-size: 10px;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin-top: 1px;
+      }
+      .step a { color: var(--indigo); text-decoration: none; }
+      .step a:hover { text-decoration: underline; }
+      .step strong { color: var(--text); font-weight: 600; }
+
+      /* NOTE BANNER */
+      .note {
+        padding: 9px 11px;
+        border-radius: 10px;
+        background: var(--amber-soft);
+        border: 1px solid var(--amber-border);
+        color: var(--amber-text);
+        font-size: 11px;
+        line-height: 1.4;
+        animation: fadeSlideIn 0.18s ease-out;
+      }
+      .note[hidden] { display: none !important; }
+
+      /* HINT FALLBACK */
+      .hint {
+        font-size: 11px;
+        color: var(--text-muted);
+        line-height: 1.5;
+      }
+      .hint a { color: var(--indigo); text-decoration: none; }
+      .hint a:hover { text-decoration: underline; }
+      .hint[hidden] { display: none !important; }
+
+      /* FOOTER */
       .footer {
         display: flex;
         align-items: center;
         justify-content: space-between;
         font-size: 10px;
         color: var(--text-dim);
-        padding-top: 8px;
-        margin-top: 4px;
+        padding-top: 9px;
+        margin-top: 3px;
         border-top: 1px solid var(--border);
       }
       .footer a { color: var(--text-muted); text-decoration: none; }
       .footer a:hover { color: var(--text); }
-      .footer .server { font-family: ui-monospace, SFMono-Regular, monospace; }
+      .footer .server {
+        font-family: ui-monospace, SFMono-Regular, monospace;
+        opacity: 0.85;
+      }
     </style>
   </head>
   <body>
@@ -215,6 +609,74 @@
         <span id="status">Not connected</span>
       </span>
 
+      <!-- EMPTY: not on a Netflix watch page -->
+      <div class="empty" id="emptyOffNetflix" hidden>
+        <div class="icon">🍿</div>
+        <div class="empty-title">Open Netflix to start</div>
+        <div class="empty-body">
+          Huddle activates on <code>netflix.com/watch/…</code> pages. Open
+          any title to begin, or
+          <a id="openNetflixLink" href="https://www.netflix.com" target="_blank"
+            rel="noopener noreferrer">browse Netflix</a>.
+        </div>
+      </div>
+
+      <!-- NOW PLAYING -->
+      <div class="card now-playing" id="nowPlaying" hidden>
+        <div class="poster-wrap" id="posterWrap">
+          <img id="poster" alt="" />
+        </div>
+        <div class="now-playing-meta">
+          <div class="now-playing-label">Now playing</div>
+          <div class="now-playing-title" id="videoTitle">—</div>
+          <div class="now-playing-episode" id="videoEpisode" hidden></div>
+          <div class="now-playing-status" id="videoStatus"></div>
+        </div>
+      </div>
+
+      <!-- MEMBERS -->
+      <div class="card members" id="members" hidden>
+        <div class="members-avatars" id="membersAvatars"></div>
+        <div class="members-text" id="membersText">—</div>
+      </div>
+
+      <!-- INVITE LINK (when connected) -->
+      <div class="invite-link" id="inviteLink" hidden>
+        <svg class="invite-link-icon" viewBox="0 0 24 24" width="13"
+          height="13" fill="none" stroke="currentColor" stroke-width="1.75"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10 13a5 5 0 007.07 0l3-3a5 5 0 00-7.07-7.07l-1 1" />
+          <path d="M14 11a5 5 0 00-7.07 0l-3 3a5 5 0 007.07 7.07l1-1" />
+        </svg>
+        <code id="inviteLinkText"></code>
+        <button type="button" id="copyInviteBtn">Copy</button>
+      </div>
+
+      <!-- NOTE / ERROR BANNER -->
+      <div class="note" id="note" hidden></div>
+
+      <!-- ONBOARDING STEPS (when on Netflix but not connected) -->
+      <div class="steps" id="onboardingSteps" hidden>
+        <div class="steps-title">How to start a watch party</div>
+        <div class="step">
+          <span class="step-number">1</span>
+          <span>Have a room ID or invite link? <strong>Paste it below.</strong></span>
+        </div>
+        <div class="step">
+          <span class="step-number">2</span>
+          <span>No room yet?
+            <a href="https://wehuddle.tv" target="_blank"
+              rel="noopener noreferrer">Create one on wehuddle.tv</a>,
+            then come back here and paste it.</span>
+        </div>
+        <div class="step">
+          <span class="step-number">3</span>
+          <span>Share the same invite link with everyone you want to watch
+            with — they install this extension too and join the same room.</span>
+        </div>
+      </div>
+
+      <!-- CONNECT INPUT -->
       <div>
         <label for="roomId">Room ID or invite link</label>
         <input
@@ -226,13 +688,18 @@
       </div>
 
       <div class="row">
-        <button class="primary" id="connect">Connect</button>
-        <button id="disconnect">Disconnect</button>
+        <button type="button" class="primary" id="connect">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 12h14M13 6l6 6-6 6" />
+          </svg>
+          Connect
+        </button>
+        <button type="button" id="disconnect">Disconnect</button>
       </div>
 
       <p class="hint" id="hint">
-        Open a Netflix watch page, paste a room ID or your invite link, then
-        click Connect. Don&rsquo;t have a room?
+        Don&rsquo;t have a room?
         <a id="createRoomLink" href="https://wehuddle.tv" target="_blank"
           rel="noopener noreferrer">Create one on wehuddle.tv</a>.
       </p>

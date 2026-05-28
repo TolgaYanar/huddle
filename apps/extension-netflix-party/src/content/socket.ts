@@ -28,6 +28,18 @@ export function emitSync(
   if (!s || !roomId) return;
   const videoUrl = location.href;
 
+  // Stamp what we sent so applyRoomStateToVideo can recognise the echo of
+  // our own action when the server pushes the next room_state snapshot.
+  // Without this, a local seek would land, the room_state echo would
+  // arrive ~200ms later with a slightly-advanced timestamp (because the
+  // server extrapolates while isPlaying=true), drift > 1.0s would trigger,
+  // and the player would seek to a stale position — the "click multiple
+  // times to actually move" symptom.
+  state.lastLocalEmitAt = Date.now();
+  state.lastLocalEmitAction = action;
+  state.lastLocalEmitTimestamp =
+    typeof timestamp === "number" ? timestamp : null;
+
   s.emit("sync_video", {
     roomId,
     action,
@@ -77,6 +89,11 @@ export function connect(
   socket.on("connect", () => {
     state.localSenderId = socket?.id || null;
     state.lastConnectionError = null;
+    // Reset the "first room_state since this connect" gate so we recognise
+    // user-navigated-to-new-content scenarios on a fresh content-script
+    // start (Browse -> pick new title -> /watch/<new> unloads our script
+    // on /browse and reloads on the new /watch URL).
+    state.hasAppliedRoomStateSinceConnect = false;
 
     socket?.emit("join_room", { roomId });
     socket?.emit("request_room_state", roomId);
@@ -117,6 +134,104 @@ export function connect(
       );
     }
   });
+
+  // `receive_sync` is the server's instant broadcast on every play/pause/seek
+  // from any room member. The website's web client listens to this for
+  // sub-100ms reaction; we previously didn't, which is why seeks felt sticky:
+  // we'd send our own seek, the server would broadcast it back via
+  // receive_sync (ignored), and only the much-later `room_state` snapshot
+  // would arrive — by which point applyRoomStateToVideo's drift correction
+  // would re-seek us to a stale position. Symptom was "I need to click the
+  // scrubber multiple times to actually move."
+  socket.on(
+    "receive_sync",
+    (payload: {
+      roomId: string;
+      action: string;
+      timestamp?: number;
+      videoUrl?: string;
+      updatedAt?: number;
+      rev?: number;
+      volume?: number;
+      isMuted?: boolean;
+      playbackSpeed?: number;
+      audioSyncEnabled?: boolean;
+      senderId?: string;
+      senderUsername?: string;
+      serverNow?: number;
+    }) => {
+      if (!payload || payload.roomId !== state.currentRoomId) return;
+
+      // Skip our own echo. The server fans receive_sync to ALL room members
+      // including the sender; without this guard a local seek would be
+      // applied back onto the video that just performed it, and the second-
+      // pass apply could land somewhere slightly different than where the
+      // user clicked (because of NetflixWebPlayer's `drift > 1.0` re-seek).
+      if (payload.senderId && payload.senderId === state.localSenderId) return;
+
+      // receive_sync mostly carries the same fields as room_state, just
+      // without the full snapshot context. Synthesize a RoomState-shaped
+      // object and run it through applyRoomStateToVideo so we reuse all the
+      // existing apply-logic (drift threshold, play/pause gating, etc.).
+      // We rebuild isPlaying from the action because receive_sync doesn't
+      // include it explicitly.
+      const inferredIsPlaying =
+        payload.action === "play"
+          ? true
+          : payload.action === "pause"
+            ? false
+            : undefined;
+
+      const pseudoRoomState: RoomState = {
+        roomId: payload.roomId,
+        timestamp: payload.timestamp,
+        videoUrl: payload.videoUrl,
+        updatedAt: payload.updatedAt,
+        rev: payload.rev,
+        volume: payload.volume,
+        isMuted: payload.isMuted,
+        playbackSpeed: payload.playbackSpeed,
+        // Only set isPlaying if the action implies it; leave undefined for
+        // set_volume / set_speed / etc. so applyRoomStateToVideo doesn't
+        // toggle playback as a side effect.
+        ...(inferredIsPlaying !== undefined && { isPlaying: inferredIsPlaying }),
+        serverNow: payload.serverNow,
+      };
+
+      recordPendingRoomState(state, pseudoRoomState);
+      updateOverlay();
+      if (shouldApplyFollow()) {
+        applyRoomStateToVideo(
+          state,
+          pseudoRoomState,
+          { updateOverlay },
+          undefined,
+        );
+      }
+    },
+  );
+
+  // Membership updates. Fired every time someone joins or leaves the room,
+  // plus once on join with the current snapshot. We keep just enough state
+  // to render the "X people watching" indicator in the popup.
+  socket.on(
+    "room_users",
+    (payload: {
+      roomId: string;
+      users?: string[];
+      usernames?: Record<string, string | null>;
+      hostId?: string | null;
+    }) => {
+      if (!payload || payload.roomId !== state.currentRoomId) return;
+      const ids = Array.isArray(payload.users) ? payload.users : [];
+      state.roomMembers = ids.map((socketId) => ({
+        socketId,
+        username: payload.usernames?.[socketId] ?? null,
+      }));
+      state.hostId = payload.hostId ?? null;
+      updateOverlay();
+    },
+  );
 
   socket.on("chat_history", (payload: any) => {
     if (!payload || payload.roomId !== state.currentRoomId) return;

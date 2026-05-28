@@ -4,6 +4,7 @@ import { createInitialState } from "./state";
 import { ensureOverlay, updateOverlay } from "./overlay";
 import { loadConfig } from "./config";
 import { ensureVideoListeners } from "./playerSync";
+import { extractNetflixMetadata } from "./metadata";
 import { safeNetflixSetPlayingViaBackground } from "./netflixBackground";
 import { connect, disconnect, emitSync, shouldEmitLocalSync } from "./socket";
 
@@ -52,9 +53,52 @@ export function initContentScript() {
       }
 
       if (msg?.type === "HUDDLE_GET_STATUS") {
+        // Snapshot of everything the popup needs to draw its UI: room
+        // membership, what video is currently playing in the room, the
+        // user's video metadata for visual context, and playback state.
+        // Kept defensive — every field is best-effort and falls back to
+        // null/undefined so a popup that hits an older content script
+        // (e.g. while reloading the unpacked extension) doesn't crash.
+        let video: HTMLVideoElement | null = null;
+        try {
+          video = state.listenersAttachedTo ?? document.querySelector("video");
+        } catch {
+          video = null;
+        }
+
+        const metadata = (() => {
+          try {
+            return extractNetflixMetadata();
+          } catch {
+            return { title: null, posterUrl: null, episode: null };
+          }
+        })();
+
         sendResponse({
           connected: Boolean(state.socket && state.socket.connected),
           roomId: state.currentRoomId,
+          // Current page URL (lets popup show "/watch/<id>" badge).
+          currentUrl: location.href,
+          // Netflix-side metadata for visual context.
+          videoTitle: metadata.title,
+          videoEpisode: metadata.episode,
+          videoPosterUrl: metadata.posterUrl,
+          // Current video state we know about locally.
+          isPlaying: video ? !video.paused : null,
+          currentTime: video?.currentTime ?? null,
+          duration: video?.duration ?? null,
+          // Room snapshot derived from the most recent room_users event.
+          members: state.roomMembers,
+          hostId: state.hostId,
+          // Are we the host? (Used to label members in the popup.)
+          localSenderId: state.localSenderId,
+          // Last known room playback state — populated by either
+          // room_state or receive_sync events.
+          roomVideoUrl: state.pendingRoomState?.videoUrl ?? null,
+          roomIsPlaying: state.pendingRoomState?.isPlaying ?? null,
+          // Recent error / hint surface ("E100", "Click anywhere to
+          // resume…", etc.).
+          note: state.lastCatchUpNote,
         });
         return true;
       }
