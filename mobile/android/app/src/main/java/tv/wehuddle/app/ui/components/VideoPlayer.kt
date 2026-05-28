@@ -368,17 +368,21 @@ fun VideoPlayerView(
                 )
             }
             
-            // Tier 3 — DRM, can't embed inline. Show a placeholder telling
-            // the user to use the Huddle browser extension or open the source
-            // in its own app/tab. Mirrors the web's Tier3CtaCard.
+            // Tier 3 — DRM, can't embed inline. Show a real CTA card with
+            // "Open in <Platform> app" / "Open in browser" actions. Mirrors
+            // the web's Tier3CtaCard. Netflix is intentionally NOT in this
+            // list — NetflixWebPlayer handles it via WebView + JS-bridge
+            // higher up in the branching.
             platform == PlatformType.DISNEY_PLUS ||
                 platform == PlatformType.HBO ||
                 platform == PlatformType.HULU ||
                 platform == PlatformType.APPLE_TV_PLUS ||
                 platform == PlatformType.PARAMOUNT_PLUS ||
-                platform == PlatformType.PEACOCK -> {
-                EmbedNotSupportedPlaceholder(
+                platform == PlatformType.PEACOCK ||
+                platform == PlatformType.PRIME -> {
+                Tier3CtaCard(
                     platform = platform,
+                    url = url,
                     modifier = Modifier.fillMaxSize(),
                 )
             }

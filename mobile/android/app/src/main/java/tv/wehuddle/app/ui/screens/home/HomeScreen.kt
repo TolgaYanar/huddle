@@ -1,6 +1,7 @@
 package tv.wehuddle.app.ui.screens.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -73,7 +74,14 @@ fun HomeScreen(
             )
     ) {
         Column(
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
+                // safeDrawing covers the camera cutout, status bar, nav bar,
+                // and IME in one go — without this on Android 16 (Pixel 9
+                // emulator) the header sits *behind* the notch and the logo/
+                // login buttons get clipped. The gradient still extends
+                // edge-to-edge because it's painted on the outer Box.
+                .windowInsetsPadding(WindowInsets.safeDrawing)
         ) {
             // Header - TV optimized
             HomeHeader(
@@ -386,7 +394,11 @@ private fun MobileHomeContent(
             GlassCard(modifier = Modifier.widthIn(max = 400.dp), content = content)
         }
     }
-    
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(if (isTV) 24.dp else 16.dp),
+    ) {
     cardComponent {
         // Title
         Text(
@@ -529,6 +541,96 @@ private fun MobileHomeContent(
                     )
                 }
             }
+        }
+    }
+
+    // Netflix watch-together promo — mirrors the website's /netflix landing
+    // surface so Android users discover that Netflix works in-app via
+    // NetflixWebPlayer. Hidden on TV to keep that layout uncluttered.
+    if (!isTV) {
+        NetflixPromoCard(modifier = Modifier.widthIn(max = 400.dp))
+    }
+    } // end Column wrapper around card + promo
+}
+
+@Composable
+private fun NetflixPromoCard(modifier: Modifier = Modifier) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    GlassCard(modifier = modifier) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Rose500.copy(alpha = 0.15f))
+                    .border(
+                        1.dp,
+                        Rose500.copy(alpha = 0.30f),
+                        RoundedCornerShape(10.dp),
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "N",
+                    style = TextStyle(
+                        color = Rose500,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Black,
+                    ),
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Watch Netflix together",
+                    style = TextStyle(
+                        color = Slate50,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    ),
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = "Paste any netflix.com/watch link in a room — Huddle " +
+                        "plays it inside the app with synced controls. Uses " +
+                        "your own Netflix account.",
+                    style = TextStyle(
+                        color = Slate400,
+                        fontSize = 12.sp,
+                        lineHeight = 17.sp,
+                    ),
+                )
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        HuddleSecondaryButton(
+            onClick = {
+                try {
+                    val intent = android.content.Intent(
+                        android.content.Intent.ACTION_VIEW,
+                        android.net.Uri.parse("https://wehuddle.tv/netflix"),
+                    ).apply {
+                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(intent)
+                } catch (e: Exception) {
+                    android.util.Log.w(
+                        "NetflixPromoCard",
+                        "Failed to open /netflix landing",
+                        e,
+                    )
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(
+                text = "How does it work?",
+                style = TextStyle(fontWeight = FontWeight.Medium),
+            )
         }
     }
 }

@@ -7,105 +7,242 @@
     <style>
       :root {
         color-scheme: dark;
+        /* Match the wehuddle.tv slate/indigo palette so popup feels like
+           the same product as the website. */
+        --bg: #020617;          /* slate-950 */
+        --surface: rgba(255, 255, 255, 0.05);
+        --surface-hover: rgba(255, 255, 255, 0.08);
+        --border: rgba(255, 255, 255, 0.1);
+        --border-strong: rgba(255, 255, 255, 0.18);
+        --text: #f8fafc;        /* slate-50 */
+        --text-muted: #94a3b8;  /* slate-400 */
+        --text-dim: #64748b;    /* slate-500 */
+        --indigo: #6366f1;
+        --indigo-soft: rgba(99, 102, 241, 0.15);
+        --indigo-border: rgba(99, 102, 241, 0.4);
+        --emerald: #10b981;
+        --emerald-soft: rgba(16, 185, 129, 0.12);
+        --emerald-border: rgba(16, 185, 129, 0.35);
+        --emerald-text: #a7f3d0;
+        --rose: #f43f5e;
+        --rose-soft: rgba(244, 63, 94, 0.1);
+        --rose-border: rgba(244, 63, 94, 0.3);
+        --rose-text: #fca5a5;
+        --amber: #f59e0b;
+        --amber-soft: rgba(245, 158, 11, 0.1);
+        --amber-border: rgba(245, 158, 11, 0.35);
+        --amber-text: #fde68a;
       }
+
+      * { box-sizing: border-box; }
+
       body {
         margin: 0;
-        font:
-          13px system-ui,
-          -apple-system,
-          Segoe UI,
-          Roboto,
-          Arial;
-        background: #0b0b0f;
-        color: #fff;
-        width: 320px;
+        font: 13px/1.4
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+          Arial, sans-serif;
+        background:
+          radial-gradient(
+            circle at 50% -20%,
+            rgba(99, 102, 241, 0.18),
+            transparent 50%
+          ),
+          var(--bg);
+        color: var(--text);
+        width: 340px;
+        min-height: 240px;
       }
+
       .wrap {
-        padding: 12px;
+        padding: 14px;
         display: flex;
         flex-direction: column;
-        gap: 10px;
+        gap: 12px;
       }
-      .row {
+
+      .header {
         display: flex;
+        align-items: center;
         gap: 8px;
+        margin-bottom: 2px;
       }
+      .header img { width: 22px; height: 22px; border-radius: 4px; }
+      .header h1 {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 600;
+        letter-spacing: 0.1px;
+      }
+      .header .ver {
+        margin-left: auto;
+        font-size: 10px;
+        color: var(--text-dim);
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* Status pill — matches the website's Live/Offline header pill */
+      .status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 10px;
+        border-radius: 9999px;
+        font-size: 11px;
+        font-weight: 500;
+        border: 1px solid var(--border);
+        background: var(--surface);
+        color: var(--text-muted);
+        align-self: flex-start;
+      }
+      .status-pill .dot {
+        width: 7px; height: 7px; border-radius: 50%;
+        background: var(--text-dim);
+      }
+      .status-pill[data-state="connected"] {
+        color: var(--emerald-text);
+        background: var(--emerald-soft);
+        border-color: var(--emerald-border);
+      }
+      .status-pill[data-state="connected"] .dot {
+        background: var(--emerald);
+        box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18);
+      }
+      .status-pill[data-state="connecting"] {
+        color: var(--amber-text);
+        background: var(--amber-soft);
+        border-color: var(--amber-border);
+      }
+      .status-pill[data-state="connecting"] .dot {
+        background: var(--amber);
+        animation: pulse 1.2s ease-in-out infinite;
+      }
+      .status-pill[data-state="error"] {
+        color: var(--rose-text);
+        background: var(--rose-soft);
+        border-color: var(--rose-border);
+      }
+      .status-pill[data-state="error"] .dot { background: var(--rose); }
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.4; }
+      }
+
       label {
         display: block;
-        font-size: 12px;
-        opacity: 0.8;
-        margin-bottom: 4px;
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--text-muted);
+        margin-bottom: 5px;
+        letter-spacing: 0.1px;
       }
+
       input {
         width: 100%;
-        padding: 10px;
+        padding: 10px 12px;
         border-radius: 10px;
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        background: #11111a;
-        color: #fff;
+        border: 1px solid var(--border);
+        background: rgba(0, 0, 0, 0.25);
+        color: var(--text);
+        font: inherit;
         outline: none;
+        transition: border-color 0.15s, background 0.15s;
       }
-      .readonly {
-        width: 100%;
-        padding: 10px;
-        border-radius: 10px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        background: rgba(255, 255, 255, 0.04);
-        color: rgba(255, 255, 255, 0.85);
-        font-size: 12px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+      input:focus {
+        border-color: var(--indigo-border);
+        background: rgba(0, 0, 0, 0.4);
       }
+      input::placeholder { color: var(--text-dim); }
+
+      .row { display: flex; gap: 8px; }
+
       button {
+        flex: 1;
         padding: 10px;
         border-radius: 10px;
-        border: 1px solid rgba(255, 255, 255, 0.18);
-        background: #1c1c2a;
-        color: #fff;
+        border: 1px solid var(--border);
+        background: var(--surface);
+        color: var(--text);
+        font: inherit;
+        font-weight: 500;
         cursor: pointer;
+        transition: background 0.15s, border-color 0.15s;
       }
+      button:hover { background: var(--surface-hover); }
+      button:disabled { opacity: 0.45; cursor: not-allowed; }
       button.primary {
-        background: #5b5bf7;
-        border-color: #5b5bf7;
+        background: var(--indigo-soft);
+        border-color: var(--indigo-border);
+        color: #c7d2fe;
       }
-      .status {
-        font-size: 12px;
-        opacity: 0.85;
-      }
+      button.primary:hover { background: rgba(99, 102, 241, 0.25); }
+
       .hint {
-        font-size: 12px;
-        opacity: 0.7;
-        line-height: 1.3;
-      }
-      .small {
         font-size: 11px;
-        opacity: 0.7;
+        color: var(--text-muted);
+        line-height: 1.45;
       }
+      .hint a {
+        color: var(--indigo);
+        text-decoration: none;
+      }
+      .hint a:hover { text-decoration: underline; }
+
+      .footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 10px;
+        color: var(--text-dim);
+        padding-top: 8px;
+        margin-top: 4px;
+        border-top: 1px solid var(--border);
+      }
+      .footer a { color: var(--text-muted); text-decoration: none; }
+      .footer a:hover { color: var(--text); }
+      .footer .server { font-family: ui-monospace, SFMono-Regular, monospace; }
     </style>
   </head>
   <body>
     <div class="wrap">
-      <div>
-        <label>Server</label>
-        <div class="readonly" id="serverUrl">Configured by build</div>
+      <div class="header">
+        <img src="icon48.png" alt="" />
+        <h1>Huddle for Netflix</h1>
+        <span class="ver" id="version"></span>
       </div>
+
+      <span class="status-pill" id="statusPill" data-state="idle">
+        <span class="dot"></span>
+        <span id="status">Not connected</span>
+      </span>
+
       <div>
-        <label for="roomId">Room ID</label>
-        <input id="roomId" placeholder="e.g. netflix-night" />
+        <label for="roomId">Room ID or invite link</label>
+        <input
+          id="roomId"
+          placeholder="netflix-night  or  wehuddle.tv/r/…"
+          autocomplete="off"
+          spellcheck="false"
+        />
       </div>
+
       <div class="row">
         <button class="primary" id="connect">Connect</button>
         <button id="disconnect">Disconnect</button>
       </div>
-      <div class="status" id="status">Not connected</div>
-      <div class="hint">
-        Open a Netflix watch page in this tab. Share the same Room ID with
-        friends to sync play/pause/seek.
-      </div>
-      <div class="small">
-        Tip: if your server uses an allowlist, set
-        <code>ALLOW_EXTENSION_ORIGINS=true</code> on the server.
+
+      <p class="hint" id="hint">
+        Open a Netflix watch page, paste a room ID or your invite link, then
+        click Connect. Don&rsquo;t have a room?
+        <a id="createRoomLink" href="https://wehuddle.tv" target="_blank"
+          rel="noopener noreferrer">Create one on wehuddle.tv</a>.
+      </p>
+
+      <div class="footer">
+        <span>
+          <a href="https://wehuddle.tv/netflix" target="_blank"
+            rel="noopener noreferrer">Help</a>
+        </span>
+        <span class="server" id="serverUrl"></span>
       </div>
     </div>
 

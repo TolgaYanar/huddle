@@ -3,6 +3,5 @@
     "module": "ESNext",
     "strict": true,
     "forceConsistentCasingInFileNames": true
-  },
-  "extends": "expo/tsconfig.base"
+  }
 }

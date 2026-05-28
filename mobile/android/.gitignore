@@ -1,0 +1,57 @@
+# Standard Android Studio / Gradle / IntelliJ ignores.
+#
+# Don't track the gradle build cache, IDE-machine state, or per-machine
+# config (local.properties contains the user's SDK path which differs
+# across dev boxes). All of these regenerate on the next build / IDE
+# launch and only produce churn in PRs.
+
+# Gradle build cache + outputs
+.gradle/
+build/
+captures/
+/local.properties
+
+# Native build (NDK / CMake)
+.cxx/
+.externalNativeBuild/
+
+# Generated APK/AAB/AAR/etc.
+*.apk
+*.aab
+*.aar
+*.ap_
+*.dex
+
+# IntelliJ / Android Studio per-user state. Most contributors disagree
+# about what under .idea/ should be tracked; the safe set is "nothing
+# except a few opt-in files" and that's what this list enforces. If you
+# ever want to track e.g. codeStyles, add an explicit `!` exception.
+*.iml
+.idea/
+!.idea/.gitignore
+!.idea/codeStyles/
+!.idea/inspectionProfiles/
+
+# Keystores (never commit production signing keys)
+*.jks
+*.keystore
+keystore.properties
+
+# Build / debug logs
+*.log
+
+# Lint output
+lint/intermediates/
+lint/generated/
+lint/outputs/
+lint/tmp/
+lint/reports/
+
+# Firebase / Google Services configs (if ever added)
+google-services.json
+
+# fastlane (if ever added)
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots
+fastlane/test_output

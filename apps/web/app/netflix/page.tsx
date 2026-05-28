@@ -120,7 +120,7 @@ export default function NetflixPage() {
               <li>Open netflix.com/watch/&hellip; in another tab — it&rsquo;ll auto-join the room.</li>
             </ol>
             <a
-              href="https://chrome.google.com/webstore/category/extensions"
+              href="https://chromewebstore.google.com/detail/huddle-for-netflix/mmghgnlloogcifdblldihfmjoefabohc"
               target="_blank"
               rel="noopener noreferrer"
               className="mt-auto h-10 rounded-xl border border-indigo-500/40 bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-100 text-sm font-medium inline-flex items-center justify-center gap-2 transition-colors"

@@ -286,15 +286,41 @@ export function ensureVideoListeners(
     shouldEmitLocalSync: () => boolean;
   },
 ) {
-  if (attachVideoListeners(state, { emitSync, shouldEmitLocalSync })) return;
+  attachVideoListeners(state, { emitSync, shouldEmitLocalSync });
 
+  // Keep observing forever — previously this disconnected once the initial
+  // <video> was found, which meant Netflix's "Next episode" / autoplay
+  // navigation (the video element gets replaced, not refreshed) left our
+  // listeners bound to a detached node and sync silently stopped. The
+  // observer is cheap because attachVideoListeners is idempotent: it
+  // short-circuits when the current element matches state.listenersAttachedTo.
   const obs = new MutationObserver(() => {
-    if (attachVideoListeners(state, { emitSync, shouldEmitLocalSync })) {
-      obs.disconnect();
-    }
+    attachVideoListeners(state, { emitSync, shouldEmitLocalSync });
   });
-
   obs.observe(document.documentElement, { childList: true, subtree: true });
+
+  // SPA-nav fallback: even when the DOM doesn't change in a way the
+  // MutationObserver above catches (e.g. Netflix uses replaceState), the
+  // URL changes. Patch history to fire a custom event we listen for so we
+  // can re-check after every client-side nav.
+  const origPush = history.pushState.bind(history);
+  const origReplace = history.replaceState.bind(history);
+  history.pushState = (...args: Parameters<typeof history.pushState>) => {
+    const r = origPush(...args);
+    window.dispatchEvent(new Event("huddle:locationchange"));
+    return r;
+  };
+  history.replaceState = (...args: Parameters<typeof history.replaceState>) => {
+    const r = origReplace(...args);
+    window.dispatchEvent(new Event("huddle:locationchange"));
+    return r;
+  };
+  window.addEventListener("popstate", () =>
+    window.dispatchEvent(new Event("huddle:locationchange")),
+  );
+  window.addEventListener("huddle:locationchange", () => {
+    attachVideoListeners(state, { emitSync, shouldEmitLocalSync });
+  });
 }
 
 export function shouldApplyFollow() {

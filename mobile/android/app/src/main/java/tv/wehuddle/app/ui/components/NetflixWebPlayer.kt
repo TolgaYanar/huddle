@@ -793,23 +793,44 @@ private class NetflixWebViewClient(
         })();
     """.trimIndent()
     
+    /**
+     * The TV-spoof + CSS-patch combo is required to coerce Netflix into
+     * serving the HTML5 video on /watch pages. It is **actively harmful** on
+     * /login and /browse: the touch-disable + forced 1080p layout makes the
+     * sign-in form unusable on a phone, and `overflow: hidden` clips it
+     * further. Only inject on /watch/ URLs (the .nflxvideo.net WebSocket and
+     * iframe URLs also pass — they're always part of an active /watch).
+     */
+    private fun isVideoPage(url: String?): Boolean {
+        if (url.isNullOrBlank()) return false
+        return url.contains("/watch/", ignoreCase = true)
+    }
+
     override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
         super.onPageStarted(view, url, favicon)
         Log.d(TAG, "Page started: $url")
-        
-        // INJECT TV SPOOF EARLY - no touch, 1080p resolution
-        view?.evaluateJavascript(tvSpoof, null)
-        
+
+        if (isVideoPage(url)) {
+            // INJECT TV SPOOF EARLY - no touch, 1080p resolution
+            view?.evaluateJavascript(tvSpoof, null)
+        } else {
+            Log.d(TAG, "Skipping TV spoof on non-/watch page so sign-in works")
+        }
+
         onPageStarted()
     }
-    
+
     override fun onPageFinished(view: WebView?, url: String?) {
         super.onPageFinished(view, url)
         Log.d(TAG, "Page finished: $url")
         CookieManager.getInstance().flush()
-        
-        // 1. Re-inject TV spoof (in case Netflix overwrote it)
-        view?.evaluateJavascript(tvSpoof, null)
+
+        val watchPage = isVideoPage(url)
+
+        // 1. Re-inject TV spoof (in case Netflix overwrote it) — only on /watch
+        if (watchPage) {
+            view?.evaluateJavascript(tvSpoof, null)
+        }
         
         // 2. DEBUG: Log page status
         view?.evaluateJavascript("""
@@ -824,31 +845,40 @@ private class NetflixWebViewClient(
             }
         """.trimIndent(), null)
         
-        // 3. Apply CSS patch
-        view?.evaluateJavascript(cssPatch, null)
-        
-        // 4. MutationObserver to continuously remove app banners
-        view?.evaluateJavascript("""
-            (function() {
-                function removeBanners() {
-                    var selectors = [
-                        '.e1x52tce0', '.banner-container', '.mobile-app-banner',
-                        '[data-uia*="banner"]', '[data-uia*="app"]', 'header'
-                    ];
-                    selectors.forEach(function(sel) {
-                        document.querySelectorAll(sel).forEach(function(el) { el.remove(); });
-                    });
-                }
-                
-                removeBanners();
-                
-                if (document.body) {
-                    var observer = new MutationObserver(removeBanners);
-                    observer.observe(document.body, { childList: true, subtree: true });
-                }
-            })();
-        """.trimIndent(), null)
-        
+        if (watchPage) {
+            // 3. Apply CSS patch (force <video> fullscreen, hide banners,
+            //    body black + non-scrollable). Watch pages only — on /login
+            //    these rules hide the sign-in form.
+            view?.evaluateJavascript(cssPatch, null)
+
+            // 4. MutationObserver to continuously remove app banners. Also
+            //    only relevant once we're on a watch page; Netflix's login
+            //    UI legitimately uses <header> elements and we should not
+            //    strip them.
+            view?.evaluateJavascript("""
+                (function() {
+                    function removeBanners() {
+                        var selectors = [
+                            '.e1x52tce0', '.banner-container', '.mobile-app-banner',
+                            '[data-uia*="banner"]', '[data-uia*="app"]', 'header'
+                        ];
+                        selectors.forEach(function(sel) {
+                            document.querySelectorAll(sel).forEach(function(el) { el.remove(); });
+                        });
+                    }
+
+                    removeBanners();
+
+                    if (document.body) {
+                        var observer = new MutationObserver(removeBanners);
+                        observer.observe(document.body, { childList: true, subtree: true });
+                    }
+                })();
+            """.trimIndent(), null)
+        } else {
+            Log.d(TAG, "Skipping CSS patch + banner observer on non-/watch page")
+        }
+
         onPageFinished()
     }
     

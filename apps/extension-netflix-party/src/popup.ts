@@ -3,9 +3,14 @@ type ExtensionConfig = {
   roomId: string;
 };
 
-// Hardcoded server URL: not user-configurable.
-// TODO: set this to your production server before publishing.
+// Server URL is hardcoded — not user-configurable. The Chrome Web Store
+// listing distributes a single build per release; running against a local
+// dev server requires a sideloaded unpacked extension.
 const FIXED_SERVER_URL = "https://api.wehuddle.tv";
+
+const STATUS_POLL_MS = 2000;
+
+type StatusState = "idle" | "connecting" | "connected" | "error";
 
 function qs<T extends HTMLElement>(id: string): T {
   const el = document.getElementById(id);
@@ -13,11 +18,34 @@ function qs<T extends HTMLElement>(id: string): T {
   return el as T;
 }
 
-const serverUrlEl = qs<HTMLDivElement>("serverUrl");
+const serverUrlEl = qs<HTMLSpanElement>("serverUrl");
+const versionEl = qs<HTMLSpanElement>("version");
 const roomIdInput = qs<HTMLInputElement>("roomId");
-const statusEl = qs<HTMLDivElement>("status");
+const statusPillEl = qs<HTMLSpanElement>("statusPill");
+const statusEl = qs<HTMLSpanElement>("status");
 const connectBtn = qs<HTMLButtonElement>("connect");
 const disconnectBtn = qs<HTMLButtonElement>("disconnect");
+const hintEl = qs<HTMLParagraphElement>("hint");
+
+/**
+ * Extract a room ID from either a bare ID ("netflix-night") or any wehuddle
+ * URL form ("https://wehuddle.tv/r/netflix-night", "wehuddle.tv/r/x?foo=bar",
+ * etc.). Mirrors the same logic the website's home page uses so the popup
+ * accepts whatever a user happens to copy.
+ */
+function parseRoomId(input: string): string {
+  const raw = input.trim();
+  if (!raw) return "";
+
+  // If it looks like a URL, pull the segment after /r/
+  const match = raw.match(/\/r\/([^/?#]+)/i);
+  if (match?.[1]) {
+    return decodeURIComponent(match[1]).trim();
+  }
+
+  // Otherwise treat the input as a bare room ID.
+  return raw;
+}
 
 async function getActiveTabId(): Promise<number | null> {
   const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -25,14 +53,21 @@ async function getActiveTabId(): Promise<number | null> {
   return typeof tab?.id === "number" ? tab.id : null;
 }
 
-async function sendToActiveTab(message: any): Promise<void> {
-  const tabId = await getActiveTabId();
-  if (!tabId) throw new Error("No active tab");
-  await chrome.tabs.sendMessage(tabId, message);
+async function isActiveTabNetflixWatch(): Promise<boolean> {
+  const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+  const url = tabs?.[0]?.url ?? "";
+  return /^https:\/\/www\.netflix\.com\/watch\//i.test(url);
 }
 
-function setStatus(text: string) {
+async function sendToActiveTab(message: unknown): Promise<unknown> {
+  const tabId = await getActiveTabId();
+  if (tabId === null) throw new Error("No active tab");
+  return chrome.tabs.sendMessage(tabId, message);
+}
+
+function setStatus(text: string, state: StatusState): void {
   statusEl.textContent = text;
+  statusPillEl.dataset.state = state;
 }
 
 async function loadConfig(): Promise<ExtensionConfig> {
@@ -44,64 +79,118 @@ async function loadConfig(): Promise<ExtensionConfig> {
 }
 
 async function saveConfig(cfg: ExtensionConfig): Promise<void> {
-  await chrome.storage.local.set({
-    huddle_roomId: cfg.roomId,
-  });
+  await chrome.storage.local.set({ huddle_roomId: cfg.roomId });
 }
 
-async function refreshStatusFromTab(): Promise<void> {
+let lastPollAt = 0;
+let pollInFlight = false;
+
+/**
+ * Poll the content script for its current connection state. Updates the
+ * status pill + button-enabled states. Safe to call repeatedly — guarded by
+ * pollInFlight so overlapping calls collapse.
+ */
+async function refreshStatus(): Promise<void> {
+  if (pollInFlight) return;
+  pollInFlight = true;
   try {
-    const tabId = await getActiveTabId();
-    if (!tabId) {
-      setStatus("No active tab");
+    if (!(await isActiveTabNetflixWatch())) {
+      setStatus("Open a Netflix watch page", "idle");
+      connectBtn.disabled = true;
+      disconnectBtn.disabled = true;
+      hintEl.style.display = "block";
       return;
     }
 
-    const resp = await chrome.tabs.sendMessage(tabId, {
-      type: "HUDDLE_GET_STATUS",
-    });
-    if (resp?.connected) {
-      setStatus(`Connected: ${resp.roomId || ""}`);
-    } else {
-      setStatus("Not connected");
+    connectBtn.disabled = false;
+
+    try {
+      const resp = (await sendToActiveTab({ type: "HUDDLE_GET_STATUS" })) as
+        | { connected?: boolean; roomId?: string }
+        | undefined;
+      if (resp?.connected) {
+        setStatus(`Live · ${resp.roomId ?? ""}`, "connected");
+        disconnectBtn.disabled = false;
+        hintEl.style.display = "none";
+      } else {
+        setStatus("Not connected", "idle");
+        disconnectBtn.disabled = true;
+        hintEl.style.display = "block";
+      }
+    } catch {
+      // sendMessage throws if the content script hasn't loaded — usually
+      // because the Netflix page hasn't finished loading or this isn't a
+      // /watch URL after all.
+      setStatus("Waiting for Netflix to finish loading…", "connecting");
+      connectBtn.disabled = true;
+      disconnectBtn.disabled = true;
     }
-  } catch {
-    setStatus("Open a Netflix watch page");
+  } finally {
+    pollInFlight = false;
+    lastPollAt = Date.now();
   }
 }
 
 connectBtn.addEventListener("click", async () => {
-  const serverUrl = FIXED_SERVER_URL;
-  const roomId = roomIdInput.value.trim();
-
+  const roomId = parseRoomId(roomIdInput.value);
   if (!roomId) {
-    setStatus("Room ID is required");
+    setStatus("Room ID required", "error");
     return;
   }
 
-  const cfg: ExtensionConfig = { serverUrl, roomId };
+  // Normalize the visible input back to the extracted ID so the user can
+  // see what we'll actually use.
+  if (roomIdInput.value !== roomId) roomIdInput.value = roomId;
+
+  const cfg: ExtensionConfig = { serverUrl: FIXED_SERVER_URL, roomId };
   await saveConfig(cfg);
+
+  setStatus(`Connecting to ${roomId}…`, "connecting");
 
   try {
     await sendToActiveTab({ type: "HUDDLE_CONNECT", ...cfg });
-    setStatus(`Connecting: ${roomId}`);
+    // Poll right away — the content script flips connected=true once the
+    // socket handshake finishes.
+    setTimeout(refreshStatus, 600);
   } catch {
-    setStatus("Open a Netflix watch page");
+    setStatus("Open a Netflix watch page first", "error");
   }
 });
 
 disconnectBtn.addEventListener("click", async () => {
   try {
     await sendToActiveTab({ type: "HUDDLE_DISCONNECT" });
-    setStatus("Disconnected");
+    setStatus("Disconnected", "idle");
+    disconnectBtn.disabled = true;
   } catch {
-    setStatus("Not connected");
+    setStatus("Not connected", "idle");
   }
 });
 
+// Pressing Enter in the input is equivalent to clicking Connect.
+roomIdInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    connectBtn.click();
+  }
+});
+
+// Live status polling while popup is open. Popup closes => script unloads,
+// so no cleanup needed.
+const pollHandle = setInterval(() => {
+  // Skip if a poll already happened recently (e.g. just after Connect).
+  if (Date.now() - lastPollAt < STATUS_POLL_MS - 200) return;
+  void refreshStatus();
+}, STATUS_POLL_MS);
+window.addEventListener("unload", () => clearInterval(pollHandle));
+
+// Initial render.
 (async () => {
+  const manifest = chrome.runtime.getManifest();
+  versionEl.textContent = `v${manifest.version}`;
+  serverUrlEl.textContent = FIXED_SERVER_URL.replace(/^https?:\/\//, "");
+
   const cfg = await loadConfig();
-  serverUrlEl.textContent = cfg.serverUrl;
   roomIdInput.value = cfg.roomId;
-  await refreshStatusFromTab();
+  await refreshStatus();
 })();

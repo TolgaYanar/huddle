@@ -29,19 +29,36 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        buildConfigField("String", "SOCKET_URL", "\"https://wehuddle.tv\"")
-        buildConfigField("String", "API_BASE_URL", "\"https://wehuddle.tv/api/\"")
+        buildConfigField("String", "SOCKET_URL", "\"https://api.wehuddle.tv\"")
+        buildConfigField("String", "API_BASE_URL", "\"https://api.wehuddle.tv/api/\"")
     }
 
     buildTypes {
         debug {
             isDebuggable = true
-            // Primary URL (for real devices on network)
-            buildConfigField("String", "SOCKET_URL", "\"http://$devHost:4000\"")
-            buildConfigField("String", "API_BASE_URL", "\"http://$devHost:4000/api/\"")
-            // Emulator fallback URL (10.0.2.2 is the host machine from emulator)
-            buildConfigField("String", "EMULATOR_SOCKET_URL", "\"http://$emulatorHost:4000\"")
-            buildConfigField("String", "EMULATOR_API_BASE_URL", "\"http://$emulatorHost:4000/api/\"")
+            // Point debug builds at production by default so the app works
+            // out of the box on a fresh checkout without needing to run
+            // `apps/server` locally (which requires Postgres + .env setup).
+            // To dev against a local server, set HUDDLE_DEV_HOST in
+            // gradle.properties (e.g. =192.168.1.108) — that switches both
+            // URLs back to http://<host>:4000.
+            val useLocalDev = (project.findProperty("HUDDLE_DEV_HOST") as String?)
+                ?.trim()
+                ?.isNotEmpty() == true
+
+            if (useLocalDev) {
+                buildConfigField("String", "SOCKET_URL", "\"http://$devHost:4000\"")
+                buildConfigField("String", "API_BASE_URL", "\"http://$devHost:4000/api/\"")
+                buildConfigField("String", "EMULATOR_SOCKET_URL", "\"http://$emulatorHost:4000\"")
+                buildConfigField("String", "EMULATOR_API_BASE_URL", "\"http://$emulatorHost:4000/api/\"")
+            } else {
+                // Socket + REST live on api.wehuddle.tv, NOT the root domain
+                // (which redirects). The Chrome extension uses the same host.
+                buildConfigField("String", "SOCKET_URL", "\"https://api.wehuddle.tv\"")
+                buildConfigField("String", "API_BASE_URL", "\"https://api.wehuddle.tv/api/\"")
+                buildConfigField("String", "EMULATOR_SOCKET_URL", "\"https://api.wehuddle.tv\"")
+                buildConfigField("String", "EMULATOR_API_BASE_URL", "\"https://api.wehuddle.tv/api/\"")
+            }
         }
         release {
             isMinifyEnabled = true

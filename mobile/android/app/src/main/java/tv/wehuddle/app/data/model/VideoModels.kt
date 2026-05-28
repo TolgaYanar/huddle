@@ -331,3 +331,66 @@ data class VideoPlayerState(
     // Timestamp of the last remote sync to prevent local progress from overwriting it immediately
     val lastRemoteSyncAt: Long = 0L
 )
+
+/**
+ * True for sources whose top-level playback can't be embedded inline because
+ * of DRM (Widevine / FairPlay / PlayReady) + X-Frame-Options: DENY on the
+ * web side. Used by the Tier-3 CTA card on Android — Netflix is the only
+ * one of these we actually drive in-app today (via NetflixWebPlayer).
+ */
+fun PlatformType.isTier3(): Boolean = when (this) {
+    PlatformType.NETFLIX,
+    PlatformType.PRIME,
+    PlatformType.DISNEY_PLUS,
+    PlatformType.HBO,
+    PlatformType.HULU,
+    PlatformType.APPLE_TV_PLUS,
+    PlatformType.PARAMOUNT_PLUS,
+    PlatformType.PEACOCK -> true
+    else -> false
+}
+
+/** Human-friendly label — matches the web app's `platformDisplayName`. */
+fun platformDisplayName(p: PlatformType): String = when (p) {
+    PlatformType.YOUTUBE -> "YouTube"
+    PlatformType.VIMEO -> "Vimeo"
+    PlatformType.DAILYMOTION -> "Dailymotion"
+    PlatformType.WISTIA -> "Wistia"
+    PlatformType.SOUNDCLOUD -> "SoundCloud"
+    PlatformType.SPOTIFY -> "Spotify"
+    PlatformType.TIKTOK -> "TikTok"
+    PlatformType.LOOM -> "Loom"
+    PlatformType.PEERTUBE -> "PeerTube"
+    PlatformType.TWITCH -> "Twitch"
+    PlatformType.KICK -> "Kick"
+    PlatformType.HLS -> "HLS stream"
+    PlatformType.DASH -> "DASH stream"
+    PlatformType.DIRECT -> "Direct video"
+    PlatformType.NETFLIX -> "Netflix"
+    PlatformType.PRIME -> "Prime Video"
+    PlatformType.DISNEY_PLUS -> "Disney+"
+    PlatformType.HBO -> "HBO Max"
+    PlatformType.HULU -> "Hulu"
+    PlatformType.APPLE_TV_PLUS -> "Apple TV+"
+    PlatformType.PARAMOUNT_PLUS -> "Paramount+"
+    PlatformType.PEACOCK -> "Peacock"
+    PlatformType.UNKNOWN -> "this source"
+}
+
+/**
+ * Best-known Android package name for each Tier-3 platform's native app, so
+ * we can try to deep-link straight into it before falling back to the
+ * browser. Returns null when we don't know one — Apple TV+ has no phone
+ * Android app in most regions; we let the system handle the URL.
+ */
+fun platformAndroidPackage(p: PlatformType): String? = when (p) {
+    PlatformType.NETFLIX -> "com.netflix.mediaclient"
+    PlatformType.PRIME -> "com.amazon.avod.thirdpartyclient"
+    PlatformType.DISNEY_PLUS -> "com.disney.disneyplus"
+    PlatformType.HBO -> "com.wbd.stream"
+    PlatformType.HULU -> "com.hulu.plus"
+    PlatformType.PARAMOUNT_PLUS -> "com.cbs.app"
+    PlatformType.PEACOCK -> "com.peacocktv.peacockandroid"
+    PlatformType.APPLE_TV_PLUS -> null // no widely-available phone app
+    else -> null
+}
