@@ -13,10 +13,12 @@ function attachChatHandlers(io, state, socket, deps, isSocketInRoom) {
   socket.on("request_chat_history", async (rawRoom) => {
     const roomId = normalizeRoomId(rawRoom);
     if (!roomId) return;
-    // No strict membership check — clients (incl. the netflix-party
-    // extension) emit this immediately after join_room, which awaits a
-    // DB load before actually joining. The previous strict guard raced
-    // and returned an empty history.
+    // Clients emit this right after join_room, whose handler awaits a DB
+    // load before socket.join(). Await any in-flight join for this room,
+    // then gate on membership so non-members can't read private history.
+    const pending = socket.data?.pendingJoins?.get(roomId);
+    if (pending) await pending.catch(() => {});
+    if (!isSocketInRoom(roomId, socket.id)) return;
     await emitChatHistoryToSocket(deps, state, socket, roomId);
   });
 

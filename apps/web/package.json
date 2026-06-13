@@ -18,7 +18,8 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-player": "^3.4.0",
-    "shared-logic": "*"
+    "shared-logic": "*",
+    "undici": "^8.4.1"
   },
   "devDependencies": {
     "@repo/eslint-config": "*",

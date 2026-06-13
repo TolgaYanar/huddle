@@ -18,29 +18,49 @@ function readBooleanEnv(name) {
   return raw === "1" || raw.toLowerCase() === "true";
 }
 
-function createCorsOptions({ allowedOrigins, allowExtensionOrigins, methods }) {
+// Single source of truth for origin checks, shared by express cors and
+// socket.io. With an empty allowlist, dev reflects the request origin but
+// production fails closed (credentials: true makes reflection dangerous).
+function createOriginCheck({
+  allowedOrigins,
+  allowExtensionOrigins,
+  isProduction,
+}) {
   const list = Array.isArray(allowedOrigins) ? allowedOrigins : [];
+
+  return function originCheck(origin, callback) {
+    // Allow non-browser clients (no Origin header) like curl/mobile.
+    if (!origin) return callback(null, true);
+
+    // Optionally allow browser extension origins (Chrome/Firefox).
+    if (allowExtensionOrigins && isExtensionOrigin(origin)) {
+      return callback(null, true);
+    }
+
+    // No allowlist: reflect-request-origin in dev only; deny in production.
+    if (list.length === 0) return callback(null, !isProduction);
+
+    const normalizedOrigin = String(origin)
+      .toLowerCase()
+      .replace(/\/+$/, "");
+    return callback(null, list.includes(normalizedOrigin));
+  };
+}
+
+function createCorsOptions({
+  allowedOrigins,
+  allowExtensionOrigins,
+  methods,
+  isProduction = false,
+}) {
   const httpMethods = Array.isArray(methods) ? methods : ["GET", "POST"];
 
   return {
-    origin(origin, callback) {
-      const normalizedOrigin = String(origin || "")
-        .toLowerCase()
-        .replace(/\/+$/, "");
-
-      // Allow non-browser clients (no Origin header) like curl/mobile.
-      if (!origin) return callback(null, true);
-
-      // Optionally allow browser extension origins (Chrome/Firefox).
-      if (allowExtensionOrigins && isExtensionOrigin(origin)) {
-        return callback(null, true);
-      }
-
-      // If no allowlist provided, reflect-request-origin (dev-friendly).
-      if (list.length === 0) return callback(null, true);
-
-      return callback(null, list.includes(normalizedOrigin));
-    },
+    origin: createOriginCheck({
+      allowedOrigins,
+      allowExtensionOrigins,
+      isProduction,
+    }),
     credentials: true,
     methods: httpMethods,
   };
@@ -50,5 +70,6 @@ module.exports = {
   parseAllowedOrigins,
   isExtensionOrigin,
   readBooleanEnv,
+  createOriginCheck,
   createCorsOptions,
 };

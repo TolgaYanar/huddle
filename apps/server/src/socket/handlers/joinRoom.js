@@ -16,18 +16,7 @@ const {
 } = require("../helpers/cupGame");
 
 function attachJoinRoomHandler(io, state, socket, joinedRooms, deps) {
-  socket.on("join_room", async (payload) => {
-    const roomId =
-      typeof payload === "string"
-        ? payload
-        : payload && typeof payload === "object"
-          ? payload.roomId
-          : undefined;
-    const password =
-      typeof payload === "object" && payload ? payload.password : undefined;
-
-    if (!roomId || typeof roomId !== "string") return;
-
+  async function handleJoin(roomId, password) {
     // Restore persisted state if in-memory is cold (server restart recovery).
     await restoreRoomStateFromDB(deps, state, roomId);
 
@@ -240,6 +229,32 @@ function attachJoinRoomHandler(io, state, socket, joinedRooms, deps) {
     await emitChatHistoryToSocket(deps, state, socket, roomId);
 
     await emitActivityHistory(deps, state, socket, roomId);
+  }
+
+  socket.on("join_room", (payload) => {
+    const roomId =
+      typeof payload === "string"
+        ? payload
+        : payload && typeof payload === "object"
+          ? payload.roomId
+          : undefined;
+    const password =
+      typeof payload === "object" && payload ? payload.password : undefined;
+
+    if (!roomId || typeof roomId !== "string") return;
+
+    // Register the in-flight join synchronously (before any await) so the
+    // data-request handlers (chat/activity/room state) can await it instead
+    // of racing the DB load that runs before socket.join().
+    const bag = (socket.data ||= {});
+    bag.pendingJoins ||= new Map();
+    const p = handleJoin(roomId, password);
+    bag.pendingJoins.set(roomId, p);
+    p.catch((err) => {
+      console.error("Failed to handle join_room", err);
+    }).finally(() => {
+      if (bag.pendingJoins.get(roomId) === p) bag.pendingJoins.delete(roomId);
+    });
   });
 }
 

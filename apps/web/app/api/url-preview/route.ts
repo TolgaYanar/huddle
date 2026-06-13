@@ -1,8 +1,15 @@
 import { NextResponse } from "next/server";
-import dns from "node:dns/promises";
+import dns from "node:dns";
 import net from "node:net";
 
+import {
+  Agent,
+  fetch as undiciFetch,
+  type Response as UndiciResponse,
+} from "undici";
+
 import { createRouteRateLimiter } from "../_lib/rateLimit";
+import { isPrivateIp, validatePreviewUrl } from "../_lib/ssrf";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,6 +18,36 @@ export const dynamic = "force-dynamic";
 const limiter = createRouteRateLimiter({ windowMs: 60_000, max: 30 });
 
 const MAX_URL_LENGTH = 2048;
+const MAX_REDIRECTS = 5;
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
+
+// Connect-time DNS filter: every connection (including each redirect hop)
+// re-resolves the hostname and refuses to dial when any resolved address is
+// private. This closes the DNS-rebinding window between any pre-check and the
+// actual socket connect — GET's pre-checks only exist for friendly 400 errors.
+const ssrfSafeLookup: net.LookupFunction = (hostname, options, callback) => {
+  dns.lookup(hostname, { ...options, all: true }, (err, addresses) => {
+    if (err) {
+      callback(err, "");
+      return;
+    }
+    if (
+      addresses.length === 0 ||
+      addresses.some((a) => isPrivateIp(a.address))
+    ) {
+      callback(new Error(`Blocked address for host ${hostname}`), "");
+      return;
+    }
+    if (options.all) {
+      callback(null, addresses);
+      return;
+    }
+    const first = addresses[0] as dns.LookupAddress;
+    callback(null, first.address, first.family);
+  });
+};
+
+const previewAgent = new Agent({ connect: { lookup: ssrfSafeLookup } });
 
 type UrlPreviewResponse =
   | {
@@ -55,39 +92,24 @@ export async function GET(req: Request) {
       );
     }
 
-    if (target.protocol !== "http:" && target.protocol !== "https:") {
+    const validation = validatePreviewUrl(target);
+    if (!validation.ok) {
       return NextResponse.json<UrlPreviewResponse>(
-        { ok: false, error: "Unsupported protocol" },
+        { ok: false, error: validation.reason },
         { status: 400 }
       );
     }
 
-    // Basic SSRF guard: block obvious local hostnames.
-    const hostname = target.hostname.toLowerCase();
-    if (
-      hostname === "localhost" ||
-      hostname.endsWith(".localhost") ||
-      hostname === "0.0.0.0" ||
-      hostname === "127.0.0.1" ||
-      hostname === "::1"
-    ) {
-      return NextResponse.json<UrlPreviewResponse>(
-        { ok: false, error: "Blocked host" },
-        { status: 400 }
-      );
-    }
-
-    // If hostname is an IP literal, validate it.
-    if (net.isIP(hostname)) {
-      if (isPrivateIp(hostname)) {
-        return NextResponse.json<UrlPreviewResponse>(
-          { ok: false, error: "Blocked IP" },
-          { status: 400 }
-        );
-      }
-    } else {
-      // Resolve hostname and block private ranges.
-      const addrs = await dns.lookup(hostname, { all: true, verbatim: true });
+    // Friendly pre-check: resolve the first hop's hostname and 400 on private
+    // ranges. The security boundary is previewAgent's connect-time lookup.
+    const bareHostname = target.hostname.startsWith("[")
+      ? target.hostname.slice(1, -1)
+      : target.hostname;
+    if (!net.isIP(bareHostname)) {
+      const addrs = await dns.promises.lookup(bareHostname, {
+        all: true,
+        verbatim: true,
+      });
       if (addrs.some((a) => isPrivateIp(a.address))) {
         return NextResponse.json<UrlPreviewResponse>(
           { ok: false, error: "Blocked IP" },
@@ -97,64 +119,100 @@ export async function GET(req: Request) {
     }
 
     const controller = new AbortController();
+    // One total time budget shared by every redirect hop.
     const timeoutId = setTimeout(() => controller.abort(), 3500);
 
-    let res: Response;
     try {
-      res = await fetch(target.toString(), {
-        signal: controller.signal,
-        redirect: "follow",
-        headers: {
-          "user-agent":
-            "Mozilla/5.0 (compatible; wehuddle-bot/1.0; +https://wehuddle.tv)",
-          accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
-        },
-        // Prevent caching during dev and keep previews fresh.
-        cache: "no-store",
-      });
+      let current = target;
+      for (let redirects = 0; redirects <= MAX_REDIRECTS; redirects++) {
+        if (!validatePreviewUrl(current).ok) {
+          return NextResponse.json<UrlPreviewResponse>(
+            { ok: false, error: "Preview failed" },
+            { status: 200 }
+          );
+        }
+
+        const res = await undiciFetch(current.toString(), {
+          signal: controller.signal,
+          redirect: "manual",
+          dispatcher: previewAgent,
+          headers: {
+            "user-agent":
+              "Mozilla/5.0 (compatible; wehuddle-bot/1.0; +https://wehuddle.tv)",
+            accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
+          },
+          // Prevent caching during dev and keep previews fresh.
+          cache: "no-store",
+        });
+
+        if (REDIRECT_STATUSES.has(res.status)) {
+          res.body?.cancel().catch(() => {});
+          const location = res.headers.get("location");
+          if (!location) {
+            return NextResponse.json<UrlPreviewResponse>(
+              { ok: false, error: "Preview failed" },
+              { status: 200 }
+            );
+          }
+          try {
+            current = new URL(location, current);
+          } catch {
+            return NextResponse.json<UrlPreviewResponse>(
+              { ok: false, error: "Preview failed" },
+              { status: 200 }
+            );
+          }
+          continue;
+        }
+
+        const finalUrl = current.toString();
+
+        if (!res.ok) {
+          return NextResponse.json<UrlPreviewResponse>(
+            { ok: false, error: `Upstream status ${res.status}` },
+            { status: 200 }
+          );
+        }
+
+        const contentType = res.headers.get("content-type") || "";
+        if (!contentType.includes("text/html")) {
+          return NextResponse.json<UrlPreviewResponse>(
+            { ok: true, title: null, thumbnail: null, finalUrl },
+            { status: 200 }
+          );
+        }
+
+        const html = await readTextWithLimit(res, 1_000_000);
+
+        const title =
+          extractMeta(html, "property", "og:title") ||
+          extractMeta(html, "name", "twitter:title") ||
+          extractTitleTag(html) ||
+          null;
+
+        const thumbnail =
+          extractMeta(html, "property", "og:image") ||
+          extractMeta(html, "name", "twitter:image") ||
+          null;
+
+        return NextResponse.json<UrlPreviewResponse>(
+          {
+            ok: true,
+            title: title ? decodeEntities(title) : null,
+            thumbnail: thumbnail ? absolutizeUrl(finalUrl, thumbnail) : null,
+            finalUrl,
+          },
+          { status: 200 }
+        );
+      }
+
+      return NextResponse.json<UrlPreviewResponse>(
+        { ok: false, error: "Too many redirects" },
+        { status: 200 }
+      );
     } finally {
       clearTimeout(timeoutId);
     }
-
-    const finalUrl = res.url || target.toString();
-
-    if (!res.ok) {
-      return NextResponse.json<UrlPreviewResponse>(
-        { ok: false, error: `Upstream status ${res.status}` },
-        { status: 200 }
-      );
-    }
-
-    const contentType = res.headers.get("content-type") || "";
-    if (!contentType.includes("text/html")) {
-      return NextResponse.json<UrlPreviewResponse>(
-        { ok: true, title: null, thumbnail: null, finalUrl },
-        { status: 200 }
-      );
-    }
-
-    const html = await readTextWithLimit(res, 1_000_000);
-
-    const title =
-      extractMeta(html, "property", "og:title") ||
-      extractMeta(html, "name", "twitter:title") ||
-      extractTitleTag(html) ||
-      null;
-
-    const thumbnail =
-      extractMeta(html, "property", "og:image") ||
-      extractMeta(html, "name", "twitter:image") ||
-      null;
-
-    return NextResponse.json<UrlPreviewResponse>(
-      {
-        ok: true,
-        title: title ? decodeEntities(title) : null,
-        thumbnail: thumbnail ? absolutizeUrl(finalUrl, thumbnail) : null,
-        finalUrl,
-      },
-      { status: 200 }
-    );
   } catch (e) {
     void e;
     return NextResponse.json<UrlPreviewResponse>(
@@ -240,37 +298,7 @@ function absolutizeUrl(baseUrl: string, maybeRelative: string): string {
   }
 }
 
-function isPrivateIp(ip: string): boolean {
-  // IPv4
-  if (net.isIP(ip) === 4) {
-    const parts = ip.split(".").map((p) => Number(p));
-    if (parts.length !== 4 || parts.some((n) => !Number.isFinite(n)))
-      return true;
-
-    const a = parts[0] as number;
-    const b = parts[1] as number;
-    if (a === 10) return true;
-    if (a === 127) return true;
-    if (a === 0) return true;
-    if (a === 169 && b === 254) return true;
-    if (a === 172 && b >= 16 && b <= 31) return true;
-    if (a === 192 && b === 168) return true;
-    return false;
-  }
-
-  // IPv6 (block loopback, unique local, link-local)
-  if (net.isIP(ip) === 6) {
-    const lower = ip.toLowerCase();
-    if (lower === "::1") return true;
-    if (lower.startsWith("fc") || lower.startsWith("fd")) return true; // ULA
-    if (lower.startsWith("fe80:")) return true; // link-local
-    return false;
-  }
-
-  return true;
-}
-
-async function readTextWithLimit(res: Response, limitBytes: number) {
+async function readTextWithLimit(res: UndiciResponse, limitBytes: number) {
   if (!res.body) return "";
 
   const reader = res.body.getReader();

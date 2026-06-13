@@ -49,6 +49,7 @@ const corsOptions = createCorsOptions({
   allowedOrigins,
   allowExtensionOrigins,
   methods: ["GET", "POST", "DELETE", "OPTIONS"],
+  isProduction: process.env.NODE_ENV === "production",
 });
 
 app.disable("x-powered-by");
@@ -73,13 +74,9 @@ app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 app.use(express.json({ limit: "1mb" }));
 
-if (
-  process.env.NODE_ENV === "production" &&
-  allowedOrigins.length === 0 &&
-  !allowExtensionOrigins
-) {
+if (process.env.NODE_ENV === "production" && allowedOrigins.length === 0) {
   console.warn(
-    "[security] CORS_ORIGINS is empty in production — all origins will be reflected. Set CORS_ORIGINS to a comma-separated allowlist.",
+    "[security] CORS_ORIGINS is empty in production — all browser origins will be DENIED (CORS fails closed). Set CORS_ORIGINS to a comma-separated allowlist.",
   );
 }
 
@@ -134,7 +131,7 @@ const server = http.createServer(app);
 io = createIo(server, {
   allowedOrigins,
   allowExtensionOrigins,
-  isExtensionOrigin,
+  isProduction: process.env.NODE_ENV === "production",
   vLog,
 });
 

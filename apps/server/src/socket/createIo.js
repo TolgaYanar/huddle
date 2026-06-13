@@ -1,26 +1,18 @@
 const { Server } = require("socket.io");
 
+const { createOriginCheck } = require("../cors");
+
 function createIo(
   server,
-  { allowedOrigins, allowExtensionOrigins, isExtensionOrigin, vLog },
+  { allowedOrigins, allowExtensionOrigins, isProduction, vLog },
 ) {
   const io = new Server(server, {
     cors: {
-      origin(origin, callback) {
-        const normalizedOrigin = String(origin || "")
-          .toLowerCase()
-          .replace(/\/+$/, "");
-
-        // Allow non-browser clients (no Origin header) like curl/mobile.
-        if (!origin) return callback(null, true);
-
-        // Optionally allow browser extension origins (Chrome/Firefox).
-        if (allowExtensionOrigins && isExtensionOrigin(origin)) {
-          return callback(null, true);
-        }
-        if (allowedOrigins.length === 0) return callback(null, true);
-        return callback(null, allowedOrigins.includes(normalizedOrigin));
-      },
+      origin: createOriginCheck({
+        allowedOrigins,
+        allowExtensionOrigins,
+        isProduction,
+      }),
       credentials: true,
       methods: ["GET", "POST"],
     },

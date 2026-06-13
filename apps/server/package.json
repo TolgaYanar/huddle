@@ -9,7 +9,7 @@
     "db:reset": "prisma migrate reset",
     "dev": "node --watch-path=index.js --watch-path=src index.js",
     "start": "prisma migrate deploy && node index.js",
-    "test": "node --test src/auth/__tests__/*.test.js src/socket/helpers/__tests__/*.test.js src/__tests__/*.test.js"
+    "test": "node --test src/auth/__tests__/*.test.js src/socket/helpers/__tests__/*.test.js src/socket/handlers/__tests__/*.test.js src/__tests__/*.test.js"
   },
   "dependencies": {
     "@prisma/client": "^6.11.0",
