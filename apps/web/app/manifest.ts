@@ -20,16 +20,31 @@ export default function manifest(): MetadataRoute.Manifest {
         purpose: "any",
       },
       {
-        src: "/icon",
+        src: "/icon-192",
         type: "image/png",
-        sizes: "256x256",
+        sizes: "192x192",
         purpose: "any",
       },
       {
+        src: "/icon-512",
+        type: "image/png",
+        sizes: "512x512",
+        purpose: "any",
+      },
+      {
+        // Same glyph kept inside the central ~80% safe zone so masks
+        // (circle/squircle) don't clip it — this unlocks the install prompt.
+        src: "/icon-512",
+        type: "image/png",
+        sizes: "512x512",
+        purpose: "maskable",
+      },
+      {
+        // iOS apple-touch-icon at its true rendered size; not maskable.
         src: "/apple-icon",
         type: "image/png",
         sizes: "180x180",
-        purpose: "maskable",
+        purpose: "any",
       },
     ],
   };

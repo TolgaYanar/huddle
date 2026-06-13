@@ -30,8 +30,8 @@ export const metadata: Metadata = {
         url: "/favicon.svg?v=2",
         type: "image/svg+xml",
       },
-      // Optional PNG fallback (add apps/web/public/favicon.png if desired)
-      { url: "/favicon.png?v=2", type: "image/png" },
+      // PNG fallback for clients that don't render SVG favicons.
+      { url: "/icon-192", type: "image/png", sizes: "192x192" },
     ],
     apple: [
       // iOS prefers a PNG apple-touch-icon
@@ -42,7 +42,7 @@ export const metadata: Metadata = {
         url: "/favicon.svg?v=2",
         type: "image/svg+xml",
       },
-      { url: "/favicon.png?v=2", type: "image/png" },
+      { url: "/icon-192", type: "image/png", sizes: "192x192" },
     ],
   },
   alternates: {

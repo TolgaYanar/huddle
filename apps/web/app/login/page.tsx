@@ -108,8 +108,9 @@ function LoginPageInner() {
             >
               {/* Username field */}
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-slate-400">Username</label>
+                <label htmlFor="login-username" className="text-xs font-medium text-slate-400">Username</label>
                 <input
+                  id="login-username"
                   value={username}
                   onChange={(e) => {
                     setUsername(
@@ -129,9 +130,10 @@ function LoginPageInner() {
 
               {/* Password field */}
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-slate-400">Password</label>
+                <label htmlFor="login-password" className="text-xs font-medium text-slate-400">Password</label>
                 <div className="relative">
                   <input
+                    id="login-password"
                     value={password}
                     onChange={(e) => {
                       setPassword(e.target.value);

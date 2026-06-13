@@ -39,6 +39,7 @@ export function useActivityLogSubscriptions({
   onRoomState,
   onChatHistory,
   onChatMessage,
+  onChatRateLimited,
   onActivityHistory,
   onActivityEvent,
   requestRoomState,
@@ -107,6 +108,31 @@ export function useActivityLogSubscriptions({
       setLogs((prev) => applyChatMessage({ prev, message: m, roomId, userId }));
     });
 
+    // chat_rate_limited is a per-socket signal: the server only emits it to the
+    // socket whose message was dropped, so any received event is inherently for
+    // this client. Surface it as a transient SYSTEM notice so the dropped
+    // message isn't silent.
+    const cleanupChatRateLimited = onChatRateLimited?.(
+      (data: { roomId: string }) => {
+        if (!data || data.roomId !== roomId) return;
+        const time = new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        });
+        setLogs((prev) => [
+          ...prev,
+          {
+            id: `rate-limited-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+            msg: "You're sending messages too quickly — wait a moment.",
+            type: "notice",
+            time,
+            user: "System",
+          },
+        ]);
+      },
+    );
+
     const cleanupActivityHistory = onActivityHistory?.(
       (data: ActivityHistoryData) => {
         setLogs((prev) => applyActivityHistory({ prev, data, roomId, userId }));
@@ -134,6 +160,7 @@ export function useActivityLogSubscriptions({
       cleanupRoomState?.();
       cleanupChatHistory?.();
       cleanupChatMessage?.();
+      cleanupChatRateLimited?.();
       cleanupActivityHistory?.();
       cleanupActivityEvent?.();
 
@@ -150,6 +177,7 @@ export function useActivityLogSubscriptions({
     onRoomState,
     onChatHistory,
     onChatMessage,
+    onChatRateLimited,
     onActivityHistory,
     onActivityEvent,
     requestRoomState,

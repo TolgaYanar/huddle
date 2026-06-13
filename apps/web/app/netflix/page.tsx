@@ -7,7 +7,7 @@ export const metadata: Metadata = {
     "Watch Netflix together with friends. Install the Huddle Chrome extension or get the Android app to sync playback in real time.",
   alternates: { canonical: "/netflix" },
   openGraph: {
-    title: "Watch Netflix together — Huddle",
+    title: "Watch Netflix together — WeHuddle",
     description:
       "Sync Netflix playback across friends. Chrome extension and Android app.",
     url: "https://wehuddle.tv/netflix",
@@ -175,23 +175,12 @@ export default function NetflixPage() {
               <li>Tap any wehuddle.tv/r/&hellip; link to open the room in-app.</li>
               <li>Pick a Netflix title — the player launches inline and syncs.</li>
             </ol>
-            <a
-              href="#"
-              className="mt-auto h-10 rounded-xl border border-emerald-500/40 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-100 text-sm font-medium inline-flex items-center justify-center gap-2 transition-colors"
+            <span
+              aria-disabled="true"
+              className="mt-auto h-10 rounded-xl border border-white/10 bg-white/5 text-slate-400 text-sm font-medium inline-flex items-center justify-center gap-2 cursor-default select-none"
             >
-              Get the Android app
-              <svg
-                className="w-3.5 h-3.5"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={1.75}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M14 3h7v7M21 3l-9 9M5 5h6M5 19h14a2 2 0 002-2v-6" />
-              </svg>
-            </a>
+              Android app — coming soon
+            </span>
           </div>
         </div>
 
@@ -208,10 +197,10 @@ export default function NetflixPage() {
               Netflix sets <code className="text-slate-300">X-Frame-Options: DENY</code> on
               every response, and Widevine DRM is bound to the top-level browsing
               context. Together they make it impossible for any website to embed
-              Netflix in an iframe — not Huddle, not Teleparty, not Rave, not
+              Netflix in an iframe — not WeHuddle, not Teleparty, not Rave, not
               anyone. The browser itself enforces this. The extension and app
-              both work because they run as a privileged client *outside* the
-              webpage sandbox.
+              both work because they run as a privileged client <em>outside</em>{" "}
+              the webpage sandbox.
             </p>
           </details>
 
@@ -222,7 +211,7 @@ export default function NetflixPage() {
             </summary>
             <p className="text-xs text-slate-400 leading-relaxed mt-3">
               Yes — everyone in the room signs into their own Netflix account.
-              Huddle never proxies your account or shares it across users; we
+              WeHuddle never proxies your account or shares it across users; we
               just keep playback aligned across each viewer&rsquo;s own session.
             </p>
           </details>
@@ -235,7 +224,7 @@ export default function NetflixPage() {
             <p className="text-xs text-slate-400 leading-relaxed mt-3">
               Same DRM constraint as Netflix, but they each need their own
               integration — different player APIs, different anti-bot detection.
-              They&rsquo;re on the roadmap; for now Huddle&rsquo;s chat, voice,
+              They&rsquo;re on the roadmap; for now WeHuddle&rsquo;s chat, voice,
               and reactions still work alongside whatever you&rsquo;re watching
               in your own tab.
             </p>

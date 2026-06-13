@@ -37,6 +37,20 @@ export function useChatApi({
     [socketRef],
   );
 
+  const onChatRateLimited = useCallback(
+    (callback: (data: { roomId: string }) => void) => {
+      if (socketRef.current) {
+        socketRef.current.on("chat_rate_limited", callback);
+      }
+      return () => {
+        if (socketRef.current) {
+          socketRef.current.off("chat_rate_limited", callback);
+        }
+      };
+    },
+    [socketRef],
+  );
+
   const onChatHistory = useCallback(
     (callback: (data: ChatHistoryData) => void) => {
       if (socketRef.current) {
@@ -95,6 +109,7 @@ export function useChatApi({
   return {
     sendChatMessage,
     onChatMessage,
+    onChatRateLimited,
     onChatHistory,
     requestChatHistory,
     addReaction,

@@ -90,6 +90,7 @@ export function useRoomClientPlayback(args: {
     onRoomState: room.onRoomState,
     onChatHistory: room.onChatHistory,
     onChatMessage: room.onChatMessage,
+    onChatRateLimited: room.onChatRateLimited,
     onActivityHistory: room.onActivityHistory,
     onActivityEvent: room.onActivityEvent,
     requestRoomState: room.requestRoomState,

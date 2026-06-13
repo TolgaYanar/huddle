@@ -321,6 +321,7 @@ export function HomeClient() {
                     }
                   }}
                   placeholder="Enter room name or paste invite link…"
+                  aria-label="Room name or invite link"
                   className="flex-1 min-w-0 bg-black/30 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500/40 hover:border-white/20 transition"
                 />
                 <button
@@ -418,6 +419,10 @@ export function HomeClient() {
       <footer className="py-5 px-6 border-t border-white/5 flex items-center justify-center gap-4 text-xs text-slate-500">
         <Link href="/privacy" className="hover:text-slate-300 transition-colors">
           Privacy Policy
+        </Link>
+        <span className="text-slate-700">·</span>
+        <Link href="/terms" className="hover:text-slate-300 transition-colors">
+          Terms
         </Link>
         <span className="text-slate-700">·</span>
         <span>© {CURRENT_YEAR} WeHuddle</span>

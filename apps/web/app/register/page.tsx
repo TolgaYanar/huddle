@@ -156,7 +156,7 @@ function RegisterPageInner() {
                 </div>
               </div>
               <h1 className="text-xl font-semibold text-white tracking-tight">Create an account</h1>
-              <p className="text-sm text-slate-400 mt-1">Join Huddle to save your rooms and sync across devices.</p>
+              <p className="text-sm text-slate-400 mt-1">Join WeHuddle to save your rooms and sync across devices.</p>
             </div>
 
             <form
@@ -180,8 +180,9 @@ function RegisterPageInner() {
             >
               {/* Username field */}
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-slate-400">Username</label>
+                <label htmlFor="register-username" className="text-xs font-medium text-slate-400">Username</label>
                 <input
+                  id="register-username"
                   value={username}
                   onChange={(e) => {
                     setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""));
@@ -212,9 +213,10 @@ function RegisterPageInner() {
 
               {/* Password field */}
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-slate-400">Password</label>
+                <label htmlFor="register-password" className="text-xs font-medium text-slate-400">Password</label>
                 <div className="relative">
                   <input
+                    id="register-password"
                     value={password}
                     onChange={(e) => {
                       setPassword(e.target.value);
@@ -246,9 +248,10 @@ function RegisterPageInner() {
 
               {/* Confirm Password field */}
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-slate-400">Confirm Password</label>
+                <label htmlFor="register-confirm-password" className="text-xs font-medium text-slate-400">Confirm Password</label>
                 <div className="relative">
                   <input
+                    id="register-confirm-password"
                     value={confirmPassword}
                     onChange={(e) => {
                       setConfirmPassword(e.target.value);
@@ -344,6 +347,16 @@ function RegisterPageInner() {
             >
               Log in
             </Link>
+          </p>
+          <p className="text-xs text-slate-600 text-center mt-3">
+            By creating an account you agree to our{" "}
+            <Link
+              href="/terms"
+              className="text-slate-500 hover:text-slate-400 transition-colors"
+            >
+              Terms
+            </Link>
+            .
           </p>
         </div>
       </main>

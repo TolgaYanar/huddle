@@ -51,6 +51,12 @@ export type UseActivityLogProps = {
   onChatMessage?: (
     callback: (m: ChatMessage) => void,
   ) => (() => void) | undefined;
+  // Fires when the server drops one of *our* chat messages for exceeding the
+  // per-socket rate limit. It's a per-socket signal, so any received event is
+  // inherently meant for this client.
+  onChatRateLimited?: (
+    callback: (data: { roomId: string }) => void,
+  ) => (() => void) | undefined;
   onActivityHistory?: (
     callback: (data: ActivityHistoryData) => void,
   ) => (() => void) | undefined;
