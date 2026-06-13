@@ -11,8 +11,21 @@ import {
   computeDesiredTimestampNow,
   getNetflixWatchIdFromUrl,
   getLocalWatchId,
+  isNetflixWatchUrl,
 } from "./video";
 import { isLikelyEchoEvent, withRemoteGuard } from "./syncUtils";
+
+// True only when the room is known to be watching a Netflix /watch URL.
+// Gates local gesture emits (play/pause/seek/set_speed) so a Netflix tab
+// can't inject playback into a non-Netflix room. Returns false when we
+// don't yet know the room's URL — gestures stay local until the first
+// room_state confirms the room is on Netflix. (change_url is NOT gated: it
+// is exactly how a room transitions TO Netflix.)
+export function roomIsOnNetflix(state: ContentState): boolean {
+  return state.lastKnownRoomVideoUrl === null
+    ? false
+    : isNetflixWatchUrl(state.lastKnownRoomVideoUrl);
+}
 
 export function stopPlayPausePoll(state: ContentState) {
   if (state.playPausePollTimer !== null) {
@@ -56,6 +69,8 @@ export function startPlayPausePoll(
 
     if (state.isApplyingRemote) return;
     if (!shouldEmitLocalSync()) return;
+    // Don't inject local play/pause into a room that isn't on Netflix.
+    if (!roomIsOnNetflix(state)) return;
     if (
       typeof timestamp === "number" &&
       isLikelyEchoEvent(state, action, timestamp)
@@ -74,9 +89,20 @@ export function recordPendingRoomState(
   roomState: RoomState,
 ) {
   state.pendingRoomState = roomState;
+  state.pendingRoomStateReceivedAt = Date.now();
+
+  // Learn the room's authoritative videoUrl whenever a snapshot carries one.
+  // Full room_state always includes it; receive_sync may omit it, in which
+  // case we keep the last value rather than clobbering it with null.
+  if (typeof roomState.videoUrl === "string") {
+    state.lastKnownRoomVideoUrl = roomState.videoUrl;
+  }
 
   const v = getBestVideo();
-  const t = computeDesiredTimestampNow(roomState);
+  const t = computeDesiredTimestampNow(
+    roomState,
+    state.pendingRoomStateReceivedAt,
+  );
   if (v && t !== null && Number.isFinite(v.currentTime)) {
     state.pendingDriftSeconds = v.currentTime - t;
   } else {
@@ -103,6 +129,22 @@ export function applyRoomStateToVideo(
   const now = Date.now();
   if (now - state.lastRemoteApplyAt < 250) return;
 
+  // If the room is watching something that isn't Netflix (e.g. a YouTube
+  // room), do NOT touch the local Netflix video. expectedWatchId would be
+  // null below, the mismatch branch would be skipped, and the room's
+  // timestamps/play/pause would be applied to our unrelated Netflix video —
+  // and local gestures would echo back, compounding the hijack. Bail with a
+  // passive note instead. When the room URL is still unknown (null) we fall
+  // through to preserve best-effort behaviour for brand-new rooms.
+  const effectiveRoomUrl =
+    (typeof roomState.videoUrl === "string" ? roomState.videoUrl : null) ??
+    state.lastKnownRoomVideoUrl;
+  if (effectiveRoomUrl !== null && !isNetflixWatchUrl(effectiveRoomUrl)) {
+    state.lastCatchUpNote = "Room is watching something else";
+    updateOverlay();
+    return;
+  }
+
   const expectedWatchId =
     typeof roomState.videoUrl === "string"
       ? getNetflixWatchIdFromUrl(roomState.videoUrl)
@@ -123,9 +165,7 @@ export function applyRoomStateToVideo(
     //
     // We can tell them apart with hasAppliedRoomStateSinceConnect.
     const targetUrl = roomState.videoUrl ?? "";
-    const isNetflixWatchUrl = /^https:\/\/www\.netflix\.com\/watch\//i.test(
-      targetUrl,
-    );
+    const targetIsNetflixWatch = isNetflixWatchUrl(targetUrl);
     const recentlyNavigatedToSame =
       state.lastAutoNavigatedTo === targetUrl &&
       Date.now() - state.lastAutoNavigatedAt < 5000;
@@ -157,7 +197,7 @@ export function applyRoomStateToVideo(
       }
       // We're on a non-watch URL (shouldn't normally happen — manifest
       // gates us — but defensive). Fall through to the passive hint.
-    } else if (isNetflixWatchUrl && !recentlyNavigatedToSame) {
+    } else if (targetIsNetflixWatch && !recentlyNavigatedToSame) {
       // Case B: the room moved while we were watching — follow it.
       state.lastAutoNavigatedTo = targetUrl;
       state.lastAutoNavigatedAt = Date.now();
@@ -190,7 +230,10 @@ export function applyRoomStateToVideo(
   if (rev && rev < state.lastAppliedRev) return;
   if (rev) state.lastAppliedRev = rev;
 
-  const desiredTime = computeDesiredTimestampNow(roomState);
+  const desiredTime = computeDesiredTimestampNow(
+    roomState,
+    state.pendingRoomStateReceivedAt,
+  );
   const desiredPlaying = roomState.isPlaying === true;
   const desiredRate =
     typeof roomState.playbackSpeed === "number"
@@ -237,6 +280,16 @@ export function applyRoomStateToVideo(
           state.lastRemoteApplyAt = Date.now();
 
           void safeNetflixSeekViaBackground(desiredTime).then((res) => {
+            if (res.ok) {
+              // The background seek resolves asynchronously; lastRemoteApplyAt
+              // was stamped before the await, so by the time the resulting
+              // `seeked` event fires the 1.5s echo window may already have
+              // lapsed and the echo leaks back out as a "user seek". Re-stamp
+              // now so the echo window starts when the seek actually lands.
+              state.lastRemoteAction = "seek";
+              state.lastRemoteTimestamp = desiredTime;
+              state.lastRemoteApplyAt = Date.now();
+            }
             state.lastCatchUpNote = res.ok
               ? null
               : `Seek failed: ${res.error || "unknown"}`;
@@ -299,48 +352,49 @@ export function attachVideoListeners(
   if (!v) return false;
   if (state.listenersAttachedTo === v) return true;
 
-  const canEmitFromGesture = (windowMs: number) =>
-    Date.now() - state.lastUserGestureAt < windowMs;
-  const canEmitNow = (
-    action: string,
-    timestamp: number,
-    gestureWindowMs: number,
-  ) => {
+  const canEmitNow = (action: string, timestamp: number) => {
     if (state.isApplyingRemote) return false;
     if (!shouldEmitLocalSync()) return false;
-    const hasRecentGesture = canEmitFromGesture(gestureWindowMs);
-    if (hasRecentGesture) return true;
+    // Don't inject local play/pause/seek into a room that isn't on Netflix.
+    if (!roomIsOnNetflix(state)) return false;
+    // Suppress echoes of a remote-applied action. This must run BEFORE we
+    // treat the event as user-initiated: a remote seek that lands shortly
+    // after a user gesture would otherwise be re-broadcast as a user seek
+    // (feedback loop). Anything past this guard is a genuine local action.
     if (isLikelyEchoEvent(state, action, timestamp)) return false;
     return true;
   };
 
   const onPlay = () => {
-    if (!canEmitNow("play", v.currentTime, 10000)) return;
+    if (!canEmitNow("play", v.currentTime)) return;
     emitSync("play", v.currentTime);
   };
 
   const onPause = () => {
-    if (!canEmitNow("pause", v.currentTime, 10000)) return;
+    if (!canEmitNow("pause", v.currentTime)) return;
     emitSync("pause", v.currentTime);
   };
 
   const onSeeked = () => {
-    if (!canEmitNow("seek", v.currentTime, 15000)) return;
+    if (!canEmitNow("seek", v.currentTime)) return;
     emitSync("seek", v.currentTime);
   };
 
   const onRate = () => {
     if (state.isApplyingRemote) return;
     if (!shouldEmitLocalSync()) return;
+    // Don't inject local speed changes into a room that isn't on Netflix.
+    if (!roomIsOnNetflix(state)) return;
     const s = state.socket;
     const roomId = state.currentRoomId;
     if (!s || !roomId) return;
+    // No videoUrl on set_speed: it isn't a navigation, so attaching the
+    // local href would hijack the room's videoUrl (see emitSync).
     s.emit("sync_video", {
       roomId,
       action: "set_speed",
       timestamp: v.currentTime,
       playbackSpeed: v.playbackRate,
-      videoUrl: location.href,
     });
   };
 
@@ -414,8 +468,8 @@ export function ensureVideoListeners(
     state.lastLocalEmitAt = Date.now();
     state.lastLocalEmitAction = "change_url";
     state.lastLocalEmitTimestamp = 0;
-    // emitSync includes location.href automatically on every emit, so the
-    // server will see the new URL and update the room's videoUrl.
+    // emitSync attaches location.href on change_url emits, so the server
+    // will see the new URL and update the room's videoUrl.
     emitSync("change_url", 0);
   };
 

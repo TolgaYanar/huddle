@@ -116,13 +116,17 @@ export const NetflixSyncPlayer = forwardRef<
       setLocalTime(time);
       lastSyncTimeRef.current = Date.now();
     },
+    // The imperative handle is only invoked by the remote-apply path
+    // (lib/player.ts playFromRef/pauseFromRef). It must update local UI state
+    // ONLY and never call onPlay/onPause — doing so would re-broadcast a sync
+    // we are merely applying (feedback loop). User-initiated play/pause flows
+    // through the on-screen SyncedControls (handleTogglePlay), which calls
+    // onPlay/onPause directly.
     play: () => {
       setIsPaused(false);
-      onPlay();
     },
     pause: () => {
       setIsPaused(true);
-      onPause();
     },
     getCurrentTime: () => localTime,
     getDuration: () => localDuration,

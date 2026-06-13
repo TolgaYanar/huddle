@@ -3,8 +3,24 @@ const {
   emitRoomStateToSocket,
   emitRoomStateToRoom,
   persistRoomState,
+  getEstimatedTimestampForState,
 } = require("../helpers/sync");
 const { emitPlaylistStateToRoom } = require("../helpers/playlists");
+
+// Exhaustive set of sync actions any real client (web SyncAction type,
+// Android SyncAction enum, extension emit literals) or the server's own
+// playlist emitter ever sends. Anything outside this set is dropped — a
+// rogue/buggy client cannot drive the room with an unknown action.
+const ALLOWED_SYNC_ACTIONS = new Set([
+  "play",
+  "pause",
+  "seek",
+  "change_url",
+  "set_speed",
+  "set_volume",
+  "set_mute",
+  "set_audio_sync",
+]);
 
 function attachSyncHandlers(io, state, socket, deps) {
   socket.on("request_room_state", async (rawRoom) => {
@@ -36,6 +52,17 @@ function attachSyncHandlers(io, state, socket, deps) {
       playbackSpeed,
       audioSyncEnabled,
     } = data || {};
+
+    // ALLOWLIST: reject any action no real client emits. Defends against a
+    // rogue/buggy client poisoning room state with an unknown action.
+    if (typeof action !== "string" || !ALLOWED_SYNC_ACTIONS.has(action)) {
+      if (typeof deps.vLog === "function") {
+        deps.vLog(
+          `Room ${roomId}: Dropping disallowed sync action ${JSON.stringify(action)} from ${socket.id}`,
+        );
+      }
+      return;
+    }
 
     // DEDUPE: drop a second identical sync within 250 ms from the same socket.
     // This swallows the double-firings we see from double-taps, racing
@@ -73,17 +100,10 @@ function attachSyncHandlers(io, state, socket, deps) {
     const now = Date.now();
     const prevTimestamp =
       typeof prev.timestamp === "number" ? prev.timestamp : 0;
-    const prevUpdatedAt =
-      typeof prev.updatedAt === "number" ? prev.updatedAt : now;
-    const prevSpeed =
-      typeof prev.playbackSpeed === "number" &&
-      Number.isFinite(prev.playbackSpeed)
-        ? prev.playbackSpeed
-        : 1;
-    const prevIsPlaying = prev.isPlaying === true;
-    const estimatedNowTimestamp = prevIsPlaying
-      ? prevTimestamp + Math.max(0, (now - prevUpdatedAt) / 1000) * prevSpeed
-      : prevTimestamp;
+    // Use the shared estimator so the regression clamp below benefits from the
+    // same MAX_EXTRAPOLATION_MS cap as room_state — a stale "playing" room
+    // can't produce an absurd estimate that traps a late joiner.
+    const estimatedNowTimestamp = getEstimatedTimestampForState(prev, now);
 
     // GUARD: clients drift (long buffers, backgrounded tabs, sleeping phones)
     // and their `currentTime` lags reality. If we trusted them blindly, a
@@ -161,7 +181,13 @@ function attachSyncHandlers(io, state, socket, deps) {
 
     const next = {
       ...prev,
-      videoUrl: typeof videoUrl === "string" ? videoUrl : prev.videoUrl,
+      // Only change_url may set the room URL. Older extension builds attach
+      // their tab's URL to every play/pause/seek, which would let one member
+      // hijack the room's video — keep prev.videoUrl for all other actions.
+      videoUrl:
+        action === "change_url" && typeof videoUrl === "string"
+          ? videoUrl
+          : prev.videoUrl,
       timestamp: nextTimestamp,
       action: typeof action === "string" ? action : prev.action,
       updatedAt: nextUpdatedAt,

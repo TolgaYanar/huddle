@@ -53,26 +53,34 @@ export function getLocalWatchId(): string | null {
   return m?.[1] ? m[1] : null;
 }
 
-export function computeDesiredTimestampNow(state: RoomState): number | null {
+export function isNetflixWatchUrl(url: string): boolean {
+  return /^https:\/\/www\.netflix\.com\/watch\//i.test(url);
+}
+
+export function computeDesiredTimestampNow(
+  state: RoomState,
+  receivedAtMs: number,
+): number | null {
   const base =
     typeof state.timestamp === "number" && Number.isFinite(state.timestamp)
       ? state.timestamp
       : null;
   if (base === null) return null;
 
-  const serverNow =
-    typeof state.serverNow === "number" && Number.isFinite(state.serverNow)
-      ? state.serverNow
-      : null;
   const isPlaying = state.isPlaying === true;
-  if (!isPlaying || serverNow === null) return base;
+  if (!isPlaying) return base;
 
   const speed =
     typeof state.playbackSpeed === "number" &&
     Number.isFinite(state.playbackSpeed)
       ? state.playbackSpeed
       : 1;
-  const clientNow = Date.now();
-  const deltaSeconds = Math.max(0, (clientNow - serverNow) / 1000);
-  return base + deltaSeconds * speed;
+  // Anchor extrapolation at the instant we RECEIVED the snapshot (client
+  // clock on both sides of the subtraction). Using serverNow here folded the
+  // client's absolute clock skew into the result, so skew > 1s tripped the
+  // drift > 1.0 check and hard-seeked Netflix on every event. Apply happens
+  // synchronously with receipt, so elapsed ~= 0 and the gross-skew seek is
+  // gone, while ongoing playback still extrapolates between events.
+  const elapsedSeconds = Math.max(0, (Date.now() - receivedAtMs) / 1000);
+  return base + elapsedSeconds * speed;
 }

@@ -1,4 +1,8 @@
 const { emitRoomUsersToRoom } = require("../helpers/users");
+const {
+  anchorRoomStateOnEmpty,
+  persistRoomState,
+} = require("../helpers/sync");
 
 function attachLeaveRoomHandler(io, state, socket, joinedRooms, deps) {
   socket.on("leave_room", async (payload) => {
@@ -45,12 +49,18 @@ function attachLeaveRoomHandler(io, state, socket, joinedRooms, deps) {
       state: { mic: false, cam: false, screen: false },
     });
 
+    // Compute who is left after this socket leaves (socket.leave above has
+    // usually already removed us from the adapter room, but filter on id too
+    // to be robust), independent of host status.
+    const room = io.sockets.adapter.rooms.get(roomId);
+    const remaining = room
+      ? Array.from(room).filter((id) => id !== socket.id)
+      : [];
+    const roomNowEmpty = remaining.length === 0;
+
     // Reassign host if needed.
     if (state.roomHost.get(roomId) === socket.id) {
-      const room = io.sockets.adapter.rooms.get(roomId);
-      const remaining = room ? Array.from(room) : [];
-
-      if (remaining.length > 0) {
+      if (!roomNowEmpty) {
         state.roomHost.set(roomId, remaining[0]);
         io.to(roomId).emit("room_host", {
           roomId,
@@ -61,6 +71,16 @@ function attachLeaveRoomHandler(io, state, socket, joinedRooms, deps) {
         state.roomBans.delete(roomId);
         state.roomPasswordHash.delete(roomId);
         state.roomWheel.delete(roomId);
+      }
+    }
+
+    // Pause-anchor + persist on last-leave so a late joiner doesn't inherit an
+    // absurd extrapolated timestamp. We intentionally do NOT clear the
+    // per-room maps here — that aggressive cleanup is deferred to Phase 3.
+    if (roomNowEmpty) {
+      const anchored = anchorRoomStateOnEmpty(state, roomId);
+      if (anchored) {
+        persistRoomState(deps, state, roomId).catch(() => {});
       }
     }
 

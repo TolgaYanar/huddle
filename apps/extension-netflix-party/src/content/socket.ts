@@ -11,6 +11,7 @@ import {
   startPlayPausePoll,
   stopPlayPausePoll,
   shouldApplyFollow,
+  roomIsOnNetflix,
 } from "./playerSync";
 
 export function shouldEmitLocalSync(state: ContentState) {
@@ -26,7 +27,6 @@ export function emitSync(
   const s = state.socket;
   const roomId = state.currentRoomId;
   if (!s || !roomId) return;
-  const videoUrl = location.href;
 
   // Stamp what we sent so applyRoomStateToVideo can recognise the echo of
   // our own action when the server pushes the next room_state snapshot.
@@ -40,11 +40,14 @@ export function emitSync(
   state.lastLocalEmitTimestamp =
     typeof timestamp === "number" ? timestamp : null;
 
+  // Only attach videoUrl on change_url. Attaching it to every play/pause/
+  // seek let a Netflix tab overwrite the room's videoUrl for everyone (URL
+  // hijack) — the room would jump to whatever this client was watching.
   s.emit("sync_video", {
     roomId,
     action,
     timestamp,
-    videoUrl,
+    ...(action === "change_url" && { videoUrl: location.href }),
   });
 }
 
@@ -89,11 +92,13 @@ export function connect(
   socket.on("connect", () => {
     state.localSenderId = socket?.id || null;
     state.lastConnectionError = null;
-    // Reset the "first room_state since this connect" gate so we recognise
-    // user-navigated-to-new-content scenarios on a fresh content-script
-    // start (Browse -> pick new title -> /watch/<new> unloads our script
-    // on /browse and reloads on the new /watch URL).
-    state.hasAppliedRoomStateSinceConnect = false;
+    // NOTE: we deliberately do NOT reset hasAppliedRoomStateSinceConnect
+    // here. createInitialState seeds it false, so a genuine fresh content-
+    // script load (user navigated Browse -> new /watch title, script
+    // re-inits) still starts false and correctly leads via Case A. A mere
+    // socket reconnect on the SAME page keeps the flag true and correctly
+    // FOLLOWS the room (Case B) — resetting it here used to yank the whole
+    // room to this client's title on every transient reconnect.
 
     socket?.emit("join_room", { roomId });
     socket?.emit("request_room_state", roomId);
@@ -308,16 +313,19 @@ export function setPlaybackSpeed(state: ContentState, playbackSpeed: number) {
 
   if (state.isApplyingRemote) return;
   if (!shouldEmitLocalSync(state)) return;
+  // Don't inject local speed changes into a room that isn't on Netflix.
+  if (!roomIsOnNetflix(state)) return;
 
   const s = state.socket;
   const roomId = state.currentRoomId;
   if (!s || !roomId) return;
 
+  // No videoUrl on set_speed: it isn't a navigation, so attaching the local
+  // href would hijack the room's videoUrl (see emitSync).
   s.emit("sync_video", {
     roomId,
     action: "set_speed",
     timestamp: v.currentTime,
     playbackSpeed,
-    videoUrl: location.href,
   });
 }

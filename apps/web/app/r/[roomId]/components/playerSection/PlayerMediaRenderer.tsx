@@ -195,6 +195,11 @@ export function PlayerMediaRenderer({
           <div className="absolute inset-0" />
         ) : isNetflix ? (
           <NetflixSyncPlayer
+            ref={
+              playerRef as unknown as React.RefObject<
+                import("../netflixSyncPlayer/types").NetflixSyncPlayerRef | null
+              >
+            }
             url={normalizedUrl}
             isPlaying={videoState === "Playing"}
             currentTime={currentTime}

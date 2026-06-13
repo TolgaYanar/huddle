@@ -63,11 +63,22 @@ export type ContentState = {
   roomMembers: Array<{ socketId: string; username: string | null }>;
   hostId: string | null;
 
+  // The most recent authoritative videoUrl the server reported for the room
+  // (learned from full room_state snapshots, which always carry it).
+  // Drives the "is the room even on Netflix?" gate so a Netflix tab doesn't
+  // drive playback into — or hijack gestures onto — a non-Netflix room.
+  // null means we haven't learned it yet (brand-new / no snapshot).
+  lastKnownRoomVideoUrl: string | null;
+
   playPausePollTimer: number | null;
   lastLocalPaused: boolean | null;
 
   pendingRoomState: RoomState | null;
   pendingDriftSeconds: number | null;
+  // Client-clock instant the pending snapshot was received. Extrapolation
+  // anchors here (not serverNow) so absolute clock skew between client and
+  // server doesn't fold into the desired position and trigger spurious seeks.
+  pendingRoomStateReceivedAt: number;
 
   pendingPlayOnGesture: boolean;
   lastCatchUpNote: string | null;
@@ -112,11 +123,14 @@ export function createInitialState(): ContentState {
     roomMembers: [],
     hostId: null,
 
+    lastKnownRoomVideoUrl: null,
+
     playPausePollTimer: null,
     lastLocalPaused: null,
 
     pendingRoomState: null,
     pendingDriftSeconds: null,
+    pendingRoomStateReceivedAt: 0,
 
     pendingPlayOnGesture: false,
     lastCatchUpNote: null,

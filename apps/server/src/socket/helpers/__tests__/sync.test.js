@@ -4,6 +4,8 @@ const assert = require("node:assert/strict");
 const {
   getEstimatedTimestampForState,
   buildRoomStatePayload,
+  anchorRoomStateOnEmpty,
+  MAX_EXTRAPOLATION_MS,
 } = require("../sync");
 
 // ---------------------------------------------------------------------------
@@ -73,6 +75,31 @@ describe("getEstimatedTimestampForState", () => {
   it("returns baseTimestamp when isPlaying is absent", () => {
     const state = { timestamp: 99 };
     assert.equal(getEstimatedTimestampForState(state, Date.now()), 99);
+  });
+
+  it("returns baseTimestamp when playing but stale beyond the extrapolation cap", () => {
+    const now = Date.now();
+    const state = {
+      timestamp: 120,
+      isPlaying: true,
+      // 7 hours of silence — well past the 6h cap.
+      updatedAt: now - (MAX_EXTRAPOLATION_MS + 60 * 60 * 1000),
+      playbackSpeed: 1,
+    };
+    // Without the cap this would extrapolate to ~25,320s.
+    assert.equal(getEstimatedTimestampForState(state, now), 120);
+  });
+
+  it("still extrapolates a playing state with a small delta just under the cap", () => {
+    const now = Date.now();
+    const state = {
+      timestamp: 10,
+      isPlaying: true,
+      updatedAt: now - 5000, // 5s ago, well within the cap
+      playbackSpeed: 1,
+    };
+    const estimated = getEstimatedTimestampForState(state, now);
+    assert.ok(estimated >= 14.9 && estimated <= 15.1, `Expected ~15, got ${estimated}`);
   });
 });
 
@@ -148,5 +175,59 @@ describe("buildRoomStatePayload", () => {
     const state = { rev: NaN, isPlaying: false };
     const result = buildRoomStatePayload("r", state, Date.now());
     assert.equal(result.rev, 0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// anchorRoomStateOnEmpty
+// ---------------------------------------------------------------------------
+describe("anchorRoomStateOnEmpty", () => {
+  function makeState(roomState) {
+    const map = new Map();
+    if (roomState) map.set("room1", roomState);
+    return { roomState: map };
+  }
+
+  it("anchors a playing room to its estimated position, paused, rev bumped", () => {
+    const now = Date.now();
+    const state = makeState({
+      videoUrl: "https://youtube.com/watch?v=abc",
+      timestamp: 100,
+      isPlaying: true,
+      updatedAt: now - 5000, // 5s elapsed
+      playbackSpeed: 1,
+      rev: 4,
+    });
+
+    const result = anchorRoomStateOnEmpty(state, "room1");
+    assert.ok(result, "expected an anchored state");
+    assert.equal(result.isPlaying, false);
+    assert.equal(result.action, "pause");
+    assert.equal(result.rev, 5);
+    // Anchored ~ original + 5s of elapsed playback.
+    assert.ok(result.timestamp >= 104.9 && result.timestamp <= 105.1, `Expected ~105, got ${result.timestamp}`);
+    // Preserves unrelated fields.
+    assert.equal(result.videoUrl, "https://youtube.com/watch?v=abc");
+    // Stored back into the map.
+    assert.equal(state.roomState.get("room1"), result);
+  });
+
+  it("returns null when there is no prior state", () => {
+    const state = makeState(null);
+    assert.equal(anchorRoomStateOnEmpty(state, "room1"), null);
+  });
+
+  it("does not advance an already-paused room and still bumps rev", () => {
+    const now = Date.now();
+    const state = makeState({
+      timestamp: 50,
+      isPlaying: false,
+      updatedAt: now - 60_000,
+      rev: 2,
+    });
+    const result = anchorRoomStateOnEmpty(state, "room1");
+    assert.equal(result.timestamp, 50);
+    assert.equal(result.isPlaying, false);
+    assert.equal(result.rev, 3);
   });
 });

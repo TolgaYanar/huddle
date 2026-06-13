@@ -1,6 +1,10 @@
 const { emitRoomUsersToRoom } = require("../helpers/users");
 const { cleanupDisconnectFromGames } = require("../helpers/gameTimer");
 const { cleanupDisconnectFromCupGames } = require("../helpers/cupGame");
+const {
+  anchorRoomStateOnEmpty,
+  persistRoomState,
+} = require("../helpers/sync");
 
 function attachDisconnectHandler(io, state, socket, joinedRooms, deps) {
   socket.on("disconnect", () => {
@@ -49,13 +53,17 @@ function attachDisconnectHandler(io, state, socket, joinedRooms, deps) {
         state: { mic: false, cam: false, screen: false },
       });
 
-      if (state.roomHost.get(roomId) === socket.id) {
-        const room = io.sockets.adapter.rooms.get(roomId);
-        const remaining = room
-          ? Array.from(room).filter((id) => id !== socket.id)
-          : [];
+      // Compute who is left in the room after this socket leaves, independent
+      // of host status, so we can pause-anchor an emptied room regardless of
+      // whether the leaver happened to be the host.
+      const room = io.sockets.adapter.rooms.get(roomId);
+      const remaining = room
+        ? Array.from(room).filter((id) => id !== socket.id)
+        : [];
+      const roomNowEmpty = remaining.length === 0;
 
-        if (remaining.length > 0) {
+      if (state.roomHost.get(roomId) === socket.id) {
+        if (!roomNowEmpty) {
           state.roomHost.set(roomId, remaining[0]);
           io.to(roomId).emit("room_host", {
             roomId,
@@ -66,6 +74,19 @@ function attachDisconnectHandler(io, state, socket, joinedRooms, deps) {
           state.roomBans.delete(roomId);
           state.roomPasswordHash.delete(roomId);
           state.roomWheel.delete(roomId);
+        }
+      }
+
+      // Pause-anchor + persist on last-leave so a late joiner doesn't inherit
+      // an absurd extrapolated timestamp. We intentionally do NOT clear the
+      // per-room maps (state/name/chat/timers/games/reactions) here — that
+      // aggressive cleanup is deferred to Phase 3 to survive reconnect blips.
+      if (roomNowEmpty) {
+        const anchored = anchorRoomStateOnEmpty(state, roomId);
+        if (anchored) {
+          // Fire-and-forget: the disconnect handler is sync, mirror the
+          // trailing async DB writes below.
+          persistRoomState(deps, state, roomId).catch(() => {});
         }
       }
 

@@ -8,6 +8,12 @@ function emitServerSyncToRoom(io, roomId, payload) {
   });
 }
 
+// If a room reports isPlaying for longer than this without any update, the
+// video almost certainly is not really still playing (everyone left, the
+// server slept, etc.). Beyond this we refuse to extrapolate so a late joiner
+// doesn't inherit an absurd timestamp that the play/pause clamp then traps.
+const MAX_EXTRAPOLATION_MS = 6 * 60 * 60 * 1000;
+
 function getEstimatedTimestampForState(state, nowMs) {
   if (!state) return 0;
   const baseTimestamp =
@@ -20,6 +26,10 @@ function getEstimatedTimestampForState(state, nowMs) {
     typeof state.updatedAt === "number" && Number.isFinite(state.updatedAt)
       ? state.updatedAt
       : nowMs;
+
+  // Stale-playback cap: don't extrapolate across a huge silence gap.
+  if (nowMs - updatedAtMs > MAX_EXTRAPOLATION_MS) return baseTimestamp;
+
   const speed =
     typeof state.playbackSpeed === "number" &&
     Number.isFinite(state.playbackSpeed)
@@ -236,6 +246,32 @@ async function restoreRoomStateFromDB(deps, state, roomId) {
   }
 }
 
+// When a room empties, freeze its playback at the current estimated position
+// and mark it paused. Otherwise a room left mid-play would keep "playing" in
+// state, and a joiner hours later would inherit a wildly extrapolated
+// timestamp. Returns the new (paused, rev-bumped) state, or null if the room
+// had no prior state to anchor.
+function anchorRoomStateOnEmpty(state, roomId) {
+  const prev = state.roomState.get(roomId);
+  if (!prev) return null;
+
+  const now = Date.now();
+  const anchored = getEstimatedTimestampForState(prev, now);
+  const prevRev =
+    typeof prev.rev === "number" && Number.isFinite(prev.rev) ? prev.rev : 0;
+
+  const next = {
+    ...prev,
+    timestamp: anchored,
+    isPlaying: false,
+    action: "pause",
+    updatedAt: now,
+    rev: prevRev + 1,
+  };
+  state.roomState.set(roomId, next);
+  return next;
+}
+
 module.exports = {
   emitServerSyncToRoom,
   getEstimatedTimestampForState,
@@ -245,4 +281,6 @@ module.exports = {
   applyPlaylistPlaybackToRoomState,
   persistRoomState,
   restoreRoomStateFromDB,
+  anchorRoomStateOnEmpty,
+  MAX_EXTRAPOLATION_MS,
 };
