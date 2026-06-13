@@ -94,6 +94,15 @@ export default function PrivacyPolicyPage() {
                 such as IP address and basic connection metadata for security,
                 abuse prevention, and service reliability.
               </li>
+              <li>
+                <span className="font-medium text-slate-100">
+                  Aggregate usage and performance analytics
+                </span>{" "}
+                via Vercel Web Analytics and Speed Insights (e.g., page views,
+                referrers, and anonymized page-performance metrics). This is
+                privacy-friendly: it uses no cookies, does not track you across
+                other sites, and does not build an advertising profile.
+              </li>
             </ul>
             <p>
               We do <span className="font-medium text-slate-100">not</span>{" "}
@@ -113,6 +122,10 @@ export default function PrivacyPolicyPage() {
               <li>
                 Operate, secure, and improve reliability (e.g., preventing
                 abuse, diagnosing outages)
+              </li>
+              <li>
+                Understand aggregate, anonymized usage (e.g., which pages are
+                visited) to improve the product
               </li>
             </ul>
             <p>We do not use your data for advertising.</p>
