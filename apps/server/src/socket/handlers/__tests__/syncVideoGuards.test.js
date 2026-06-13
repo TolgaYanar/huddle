@@ -183,3 +183,133 @@ describe("sync_video action allowlist (S4)", () => {
     assert.equal(state.roomState.get("room1").action, "set_audio_sync");
   });
 });
+
+describe("sync_video rate limit (H1)", () => {
+  it("drops the (max+1)th event in the window while earlier ones pass", async () => {
+    const { state, socket, vLogs } = createHarness();
+    const sync = socket.handlers.get("sync_video");
+
+    // The limiter is { windowMs: 2000, max: 40 }. Distinct timestamps avoid the
+    // 250ms identical-dedupe so each event is independently accountable. All 40
+    // must pass, the 41st must be dropped (within the same 2s window).
+    for (let i = 1; i <= 40; i++) {
+      await sync({ roomId: "room1", action: "seek", timestamp: i });
+    }
+    const after40 = state.roomState.get("room1");
+    assert.equal(after40.timestamp, 40, "the 40th event should have applied");
+    const revAfter40 = after40.rev;
+
+    // 41st event in the window is rate-limited: room state must not advance.
+    await sync({ roomId: "room1", action: "seek", timestamp: 41 });
+    const after41 = state.roomState.get("room1");
+    assert.equal(after41.timestamp, 40, "the 41st event must be dropped");
+    assert.equal(after41.rev, revAfter40, "dropped event must not bump rev");
+    assert.ok(
+      vLogs.some((l) => l.includes("Rate-limiting sync_video")),
+      "expected a vLog for the rate-limited event",
+    );
+  });
+});
+
+describe("sync_video videoUrl length cap (H3)", () => {
+  it("drops a change_url with an over-2048-char videoUrl (state unchanged)", async () => {
+    const { state, socket, vLogs } = createHarness();
+    const sync = socket.handlers.get("sync_video");
+
+    // Seed a legit URL first.
+    await sync({
+      roomId: "room1",
+      action: "change_url",
+      timestamp: 0,
+      videoUrl: "https://youtube.com/watch?v=legit",
+    });
+    const before = state.roomState.get("room1");
+
+    const overlong = `https://example.com/?q=${"a".repeat(2048)}`;
+    await sync({
+      roomId: "room1",
+      action: "change_url",
+      timestamp: 1,
+      videoUrl: overlong,
+    });
+
+    // Same state object — the overlong change_url was dropped before any mutation.
+    assert.equal(state.roomState.get("room1"), before);
+    assert.equal(
+      state.roomState.get("room1").videoUrl,
+      "https://youtube.com/watch?v=legit",
+    );
+    assert.ok(
+      vLogs.some((l) => l.includes("overlong videoUrl")),
+      "expected a vLog for the dropped overlong URL",
+    );
+  });
+
+  it("accepts a change_url whose videoUrl is exactly at the 2048 cap", async () => {
+    const { state, socket } = createHarness();
+    const sync = socket.handlers.get("sync_video");
+    const atCap = `https://x/${"b".repeat(2048 - "https://x/".length)}`;
+    assert.equal(atCap.length, 2048);
+    await sync({
+      roomId: "room1",
+      action: "change_url",
+      timestamp: 0,
+      videoUrl: atCap,
+    });
+    assert.equal(state.roomState.get("room1").videoUrl, atCap);
+  });
+});
+
+describe("sync_video activity persist is fire-and-forget (H2)", () => {
+  it("emits receive_sync even when the activity insert rejects", async () => {
+    // Build a harness that captures io.to(room).emit and uses a prisma whose
+    // roomActivity.create rejects — proving the broadcast does not await it.
+    const state = createSocketState();
+    const emits = [];
+    const io = {
+      sockets: { adapter: { rooms: new Map() }, sockets: new Map() },
+      to() {
+        return {
+          emit(event, payload) {
+            emits.push({ event, payload });
+          },
+        };
+      },
+    };
+    const socket = createFakeSocket(io, "socket-ff");
+    let createCalled = false;
+    const rejectingPrisma = {
+      roomActivity: {
+        create: async () => {
+          createCalled = true;
+          throw new Error("db down");
+        },
+      },
+    };
+    const deps = {
+      isDbConnected: () => false,
+      getPrisma: () => rejectingPrisma,
+      vLog: undefined,
+    };
+    attachSyncHandlers(io, state, socket, deps);
+    socket.join("room1");
+
+    // Must not reject even though the activity insert does.
+    await socket.handlers.get("sync_video")({
+      roomId: "room1",
+      action: "play",
+      timestamp: 5,
+    });
+
+    // The broadcast happened despite the (async) insert rejection.
+    assert.ok(
+      emits.some((e) => e.event === "receive_sync"),
+      "receive_sync must be emitted regardless of activity-insert failure",
+    );
+    // Room state advanced normally.
+    assert.equal(state.roomState.get("room1").isPlaying, true);
+    // Let the rejected promise settle so its .catch runs (no unhandled rejection).
+    await Promise.resolve();
+    assert.equal(createCalled, true, "the activity insert was attempted");
+  });
+});

@@ -105,6 +105,19 @@ export function useVideoPlayerState({
     pendingPauseRef.current = null;
   }, []);
 
+  // When a video ends during a playlist auto-advance, the player fires a
+  // non-user "ended" pause (debounced ~300ms in useHandlePause) that races the
+  // playlist's change_url/play for the next item. If the pause lands after the
+  // change_url it would re-pause the room at the previous item's end position
+  // on the NEW item. This drops any already-scheduled ended-pause and arms the
+  // existing suppression guard so an ended-pause fired in the next ~2.5s does
+  // not broadcast. A real user-gesture pause bypasses this guard, so it is
+  // unaffected.
+  const suppressPauseForPlaylistAdvance = useCallback(() => {
+    cancelPendingPause();
+    suppressPauseBroadcastUntilRef.current = Date.now() + 2500;
+  }, [cancelPendingPause]);
+
   const effectiveVolume = useMemo(() => {
     const v = localVolumeOverride ?? volume;
     return Math.max(0, Math.min(1, v));
@@ -296,5 +309,6 @@ export function useVideoPlayerState({
 
     // helpers
     cancelPendingPause,
+    suppressPauseForPlaylistAdvance,
   };
 }

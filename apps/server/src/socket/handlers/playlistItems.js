@@ -106,11 +106,16 @@ function attachPlaylistItemHandlers(io, state, socket, deps) {
         }
       }
 
-      // Update positions for all items
+      // Update positions for all items. Scope every update to this room's
+      // playlist via the relation filter (mirrors playlist_remove_item's
+      // deleteMany) so a member can't reorder items in OTHER rooms by guessing
+      // their cuid ids (IDOR). updateMany silently skips rows that don't match
+      // the room scope — the intended safe behavior — and, unlike update(),
+      // won't abort the transaction when an id isn't found.
       await deps.getPrisma().$transaction(
         itemIds.map((id, index) =>
-          deps.getPrisma().roomPlaylistItem.update({
-            where: { id },
+          deps.getPrisma().roomPlaylistItem.updateMany({
+            where: { id, playlist: { roomId } },
             data: { position: index },
           }),
         ),

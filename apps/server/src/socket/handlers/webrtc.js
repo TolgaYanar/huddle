@@ -18,6 +18,10 @@ function attachWebRTCHandlers(io, state, socket, deps) {
   // ICE candidate gathering normally produces under 50 candidates per peer
   // connection. 200/10s is generous; anything past that is abuse.
   const iceLimiter = createSocketRateLimiter({ windowMs: 10000, max: 200 });
+  // Media toggles (mic/cam/screen) are infrequent — a user flips one every few
+  // seconds at most. 5/s bounds the DB-write + chat-broadcast amplification
+  // (up to 3 roomMessage rows per call) a flood would otherwise cause.
+  const mediaStateLimiter = createSocketRateLimiter({ windowMs: 1000, max: 5 });
 
   socket.on("webrtc_offer", (data) => {
     const { roomId, to, sdp } = data || {};
@@ -55,6 +59,8 @@ function attachWebRTCHandlers(io, state, socket, deps) {
     if (!roomId || typeof roomId !== "string") return;
     if (!incoming || typeof incoming !== "object") return;
     if (!isSocketInRoom(roomId, socket.id)) return;
+    // Bound the per-socket rate before any DB write or chat broadcast.
+    if (!mediaStateLimiter()) return;
 
     const normalized = {
       mic: !!incoming.mic,

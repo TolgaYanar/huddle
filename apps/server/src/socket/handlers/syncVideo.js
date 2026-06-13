@@ -6,6 +6,11 @@ const {
   getEstimatedTimestampForState,
 } = require("../helpers/sync");
 const { emitPlaylistStateToRoom } = require("../helpers/playlists");
+const { createSocketRateLimiter } = require("../helpers/socketRateLimit");
+
+// A change_url payload IS the URL; nothing legitimate approaches this length.
+// An overlong URL is invalid, so we drop the event rather than store garbage.
+const MAX_VIDEO_URL_LENGTH = 2048;
 
 // Exhaustive set of sync actions any real client (web SyncAction type,
 // Android SyncAction enum, extension emit literals) or the server's own
@@ -23,6 +28,13 @@ const ALLOWED_SYNC_ACTIONS = new Set([
 ]);
 
 function attachSyncHandlers(io, state, socket, deps) {
+  // One per-socket sync bucket: ~20 events/sec. A real client emits ~2/sec
+  // (the 500ms poll plus occasional seeks), so this is generous for honest
+  // use but bounds an echo-loop or malicious flood. A dropped event is
+  // self-healing: the next accepted event re-broadcasts room_state, which
+  // snaps any client that was racing the limiter back into alignment.
+  const syncLimiter = createSocketRateLimiter({ windowMs: 2000, max: 40 });
+
   socket.on("request_room_state", async (rawRoom) => {
     const roomId = normalizeRoomId(rawRoom);
     if (!roomId) return;
@@ -59,6 +71,34 @@ function attachSyncHandlers(io, state, socket, deps) {
       if (typeof deps.vLog === "function") {
         deps.vLog(
           `Room ${roomId}: Dropping disallowed sync action ${JSON.stringify(action)} from ${socket.id}`,
+        );
+      }
+      return;
+    }
+
+    // URL CAP: a change_url payload is the URL itself. Reject an overlong one
+    // outright — it can't be a valid video URL and would only bloat state/DB.
+    // (Non-change_url actions ignore videoUrl per the Phase-2 guard below.)
+    if (
+      action === "change_url" &&
+      typeof videoUrl === "string" &&
+      videoUrl.length > MAX_VIDEO_URL_LENGTH
+    ) {
+      if (typeof deps.vLog === "function") {
+        deps.vLog(
+          `Room ${roomId}: Dropping change_url with overlong videoUrl (${videoUrl.length} chars) from ${socket.id}`,
+        );
+      }
+      return;
+    }
+
+    // RATE LIMIT: bound the sync hot-path per socket. Dropped here before any
+    // state mutation/broadcast. Self-healing — the next accepted event from
+    // any member re-broadcasts room_state, snapping this client back in line.
+    if (!syncLimiter()) {
+      if (typeof deps.vLog === "function") {
+        deps.vLog(
+          `Room ${roomId}: Rate-limiting sync_video ${action} from ${socket.id}`,
         );
       }
       return;
@@ -224,24 +264,18 @@ function attachSyncHandlers(io, state, socket, deps) {
       persistRoomState(deps, state, roomId);
     }
 
-    // Persist this event for activity feed/history.
-    try {
-      const prisma = deps.getPrisma();
-      await prisma.roomActivity.create({
-        data: {
-          roomId,
-          kind: "sync",
-          action: action ?? null,
-          timestamp: typeof timestamp === "number" ? timestamp : null,
-          videoUrl: typeof videoUrl === "string" ? videoUrl : null,
-          senderId: socket.id,
-          senderUsername,
-        },
-      });
-    } catch (err) {
-      console.error("Failed to persist sync activity", err);
-    }
+    // Capture the activity-row inputs into stable locals BEFORE we emit, so the
+    // fire-and-forget insert below reads the values at this point in time even
+    // though it runs after the broadcast (and after later events may mutate
+    // shared state). senderId mirrors the prior `socket.id`.
+    const activityAction = action ?? null;
+    const activityTimestamp = typeof timestamp === "number" ? timestamp : null;
+    const activityVideoUrl = typeof videoUrl === "string" ? videoUrl : null;
+    const activitySenderId = socket.id;
+    const activitySenderUsername = senderUsername;
 
+    // Emit FIRST so clients react immediately — the activity-feed persist is a
+    // best-effort DB write and must not add a round-trip to the sync hot-path.
     io.to(roomId).emit("receive_sync", {
       roomId,
       action,
@@ -259,6 +293,30 @@ function attachSyncHandlers(io, state, socket, deps) {
     });
 
     emitRoomStateToRoom(io, state, roomId);
+
+    // Persist this event for activity feed/history — fire-and-forget. The
+    // broadcast above already happened, so a slow/failing DB never delays sync.
+    try {
+      const prisma = deps.getPrisma();
+      prisma.roomActivity
+        .create({
+          data: {
+            roomId,
+            kind: "sync",
+            action: activityAction,
+            timestamp: activityTimestamp,
+            videoUrl: activityVideoUrl,
+            senderId: activitySenderId,
+            senderUsername: activitySenderUsername,
+          },
+        })
+        .catch((err) => {
+          console.error("Failed to persist sync activity", err);
+        });
+    } catch (err) {
+      // getPrisma() itself threw (DB unavailable); best-effort, swallow.
+      console.error("Failed to persist sync activity", err);
+    }
   });
 }
 

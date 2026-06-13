@@ -14,14 +14,25 @@ const {
   emitCupGameStateTo,
   ensurePlayer: ensureCupGamePlayer,
 } = require("../helpers/cupGame");
+const { getBanIdentity, cancelRoomCleanup } = require("../state");
 
 function attachJoinRoomHandler(io, state, socket, joinedRooms, deps) {
   async function handleJoin(roomId, password) {
     // Restore persisted state if in-memory is cold (server restart recovery).
     await restoreRoomStateFromDB(deps, state, roomId);
 
+    // Ban check by STABLE identity (user:<id> for authed, socket:<id> for
+    // guests) — see getBanIdentity. Authenticated bans survive reconnects;
+    // guest bans are best-effort (a new socket.id slips through).
+    //
+    // NOTE: we must NOT cancel any pending grace-period cleanup before these
+    // early-returns. A non-joining probe (wrong password, or a banned identity)
+    // never becomes an adapter member, so no future leave/disconnect would
+    // reschedule cleanup — cancelling here would permanently pin an emptied
+    // room's memory (the P2 leak). cancelRoomCleanup runs only on the paths
+    // below where this socket actually is/becomes a member of the room.
     const banned = state.roomBans.get(roomId);
-    if (banned && banned.has(socket.id)) {
+    if (banned && banned.has(getBanIdentity(socket))) {
       socket.emit("room_banned", { roomId });
       return;
     }
@@ -37,6 +48,11 @@ function attachJoinRoomHandler(io, state, socket, joinedRooms, deps) {
         return;
       }
     }
+
+    // This socket is/will be a member of the room (rejoin path below or the
+    // fresh socket.join). A (re)join within the grace window must keep all
+    // in-memory room state, so cancel any pending delayed cleanup now.
+    cancelRoomCleanup(state, roomId);
 
     // If the client re-sends join_room, don't spam activity or join events.
     if (socket.rooms.has(roomId)) {

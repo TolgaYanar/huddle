@@ -1,3 +1,5 @@
+const { getBanIdentity } = require("../state");
+
 function attachModerationHandlers(io, state, socket, deps) {
   // Host-only: set or clear room password.
   socket.on("set_room_password", async (data) => {
@@ -60,13 +62,22 @@ function attachModerationHandlers(io, state, socket, deps) {
     if (!targetId || typeof targetId !== "string") return;
     if (state.roomHost.get(roomId) !== socket.id) return;
 
+    // Resolve the target socket so we can ban a STABLE identity rather than the
+    // raw socket.id (which changes on every reconnect). Authenticated targets
+    // are banned by user id for the life of the room; if the target socket is
+    // already gone we fall back to socket:<id> (best-effort guest ban).
+    const targetSocket = io.sockets.sockets.get(targetId);
+    const banIdentity = targetSocket
+      ? getBanIdentity(targetSocket)
+      : `socket:${targetId}`;
+
     // Add to ban list for this room.
     let banned = state.roomBans.get(roomId);
     if (!banned) {
       banned = new Set();
       state.roomBans.set(roomId, banned);
     }
-    banned.add(targetId);
+    banned.add(banIdentity);
 
     // Optional audit event.
     try {
@@ -101,7 +112,6 @@ function attachModerationHandlers(io, state, socket, deps) {
 
     // Notify + disconnect the target.
     io.to(targetId).emit("room_banned", { roomId });
-    const targetSocket = io.sockets.sockets.get(targetId);
     if (targetSocket) {
       try {
         targetSocket.disconnect(true);

@@ -136,9 +136,12 @@ export function useRoomClientPlayback(args: {
     lastPlaylistAdvanceAtRef.current = now;
 
     if (playlist.activePlaylist?.settings?.autoPlay) {
+      // Cancel/suppress the imminent end-of-video pause first so it cannot race
+      // and override the next item's change_url/play (Phase 3 sync integrity).
+      video.suppressPauseForPlaylistAdvance();
       playlist.playNext();
     }
-  }, [playlist]);
+  }, [playlist, video]);
 
   useMediaSessionControls({
     isClient,

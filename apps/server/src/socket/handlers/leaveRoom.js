@@ -3,6 +3,7 @@ const {
   anchorRoomStateOnEmpty,
   persistRoomState,
 } = require("../helpers/sync");
+const { scheduleRoomCleanup } = require("../state");
 
 function attachLeaveRoomHandler(io, state, socket, joinedRooms, deps) {
   socket.on("leave_room", async (payload) => {
@@ -75,13 +76,15 @@ function attachLeaveRoomHandler(io, state, socket, joinedRooms, deps) {
     }
 
     // Pause-anchor + persist on last-leave so a late joiner doesn't inherit an
-    // absurd extrapolated timestamp. We intentionally do NOT clear the
-    // per-room maps here — that aggressive cleanup is deferred to Phase 3.
+    // absurd extrapolated timestamp. Then schedule a delayed cleanup of the
+    // per-room maps (Phase 3): persisted-first so a rejoin after the grace
+    // window restores from DB, while a rejoin within the window cancels it.
     if (roomNowEmpty) {
       const anchored = anchorRoomStateOnEmpty(state, roomId);
       if (anchored) {
         persistRoomState(deps, state, roomId).catch(() => {});
       }
+      scheduleRoomCleanup(io, state, roomId);
     }
 
     // Broadcast an authoritative snapshot so all clients reconcile.

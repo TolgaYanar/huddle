@@ -12,10 +12,20 @@ function attachUsernameHandlers(io, state, socket) {
     if (!limiter()) return;
 
     const { username } = data || {};
-    const trimmed =
+    let trimmed =
       typeof username === "string"
         ? username.trim().slice(0, MAX_USERNAME_LENGTH)
         : "";
+
+    // "Playlist" is the system/playlist sender sentinel (see syncVideo.js
+    // change_url playlist-override gate, which checks senderUsername ===
+    // "Playlist"). A guest must not be able to impersonate it. Treat any
+    // case/whitespace variant as an empty name: clear the stored username and
+    // fan out username: null, so usernamesById stays consistent across clients
+    // (they all converge on null rather than some seeing the reserved value).
+    if (trimmed.toLowerCase() === "playlist") {
+      trimmed = "";
+    }
 
     if (trimmed) {
       state.socketIdToUsername.set(socket.id, trimmed);

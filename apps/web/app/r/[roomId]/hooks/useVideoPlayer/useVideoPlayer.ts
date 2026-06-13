@@ -42,6 +42,7 @@ export function useVideoPlayer({
     playerRef,
     loadTimeoutRef,
     lastUserPauseAtRef,
+    suppressPauseForPlaylistAdvance,
     setUrl,
     setInputUrl,
     setVideoState,
@@ -182,5 +183,9 @@ export function useVideoPlayer({
 
     // Used by player components when they seek() programmatically.
     suppressNextSeekBroadcast,
+
+    // Called just before a playlist auto-advance so the imminent end-of-video
+    // pause cannot override the next item's change_url/play (see state.ts).
+    suppressPauseForPlaylistAdvance,
   };
 }

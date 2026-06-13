@@ -5,6 +5,7 @@ const {
   anchorRoomStateOnEmpty,
   persistRoomState,
 } = require("../helpers/sync");
+const { scheduleRoomCleanup } = require("../state");
 
 function attachDisconnectHandler(io, state, socket, joinedRooms, deps) {
   socket.on("disconnect", () => {
@@ -78,9 +79,10 @@ function attachDisconnectHandler(io, state, socket, joinedRooms, deps) {
       }
 
       // Pause-anchor + persist on last-leave so a late joiner doesn't inherit
-      // an absurd extrapolated timestamp. We intentionally do NOT clear the
-      // per-room maps (state/name/chat/timers/games/reactions) here — that
-      // aggressive cleanup is deferred to Phase 3 to survive reconnect blips.
+      // an absurd extrapolated timestamp. Then schedule a delayed cleanup of
+      // the per-room maps (Phase 3): the anchored state is persisted to DB
+      // first, so a rejoin after the grace window restores it (paused) from DB,
+      // while a rejoin within the window cancels the cleanup and keeps memory.
       if (roomNowEmpty) {
         const anchored = anchorRoomStateOnEmpty(state, roomId);
         if (anchored) {
@@ -88,6 +90,7 @@ function attachDisconnectHandler(io, state, socket, joinedRooms, deps) {
           // trailing async DB writes below.
           persistRoomState(deps, state, roomId).catch(() => {});
         }
+        scheduleRoomCleanup(io, state, roomId);
       }
 
       emitRoomUsersToRoom(io, state, roomId);
