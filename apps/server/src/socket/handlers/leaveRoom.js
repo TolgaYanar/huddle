@@ -1,9 +1,7 @@
 const { emitRoomUsersToRoom } = require("../helpers/users");
-const {
-  anchorRoomStateOnEmpty,
-  persistRoomState,
-} = require("../helpers/sync");
+const { anchorRoomStateOnEmpty, persistRoomState } = require("../helpers/sync");
 const { scheduleRoomCleanup } = require("../state");
+const { isRoomMember } = require("../helpers/membership");
 
 function attachLeaveRoomHandler(io, state, socket, joinedRooms, deps) {
   socket.on("leave_room", async (payload) => {
@@ -15,7 +13,7 @@ function attachLeaveRoomHandler(io, state, socket, joinedRooms, deps) {
           : undefined;
 
     if (!roomId || typeof roomId !== "string") return;
-    if (!socket.rooms.has(roomId)) return;
+    if (!isRoomMember(socket, roomId)) return;
 
     try {
       socket.leave(roomId);
@@ -67,12 +65,10 @@ function attachLeaveRoomHandler(io, state, socket, joinedRooms, deps) {
           roomId,
           hostId: state.roomHost.get(roomId),
         });
-      } else {
-        state.roomHost.delete(roomId);
-        state.roomBans.delete(roomId);
-        state.roomPasswordHash.delete(roomId);
-        state.roomWheel.delete(roomId);
       }
+      // See disconnect.js: these four maps are intentionally left for
+      // scheduleRoomCleanup() so the ROOM_EMPTY_GRACE_MS window can actually
+      // preserve the password, ban list and host across a reconnect blip.
     }
 
     // Pause-anchor + persist on last-leave so a late joiner doesn't inherit an

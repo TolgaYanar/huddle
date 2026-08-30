@@ -10,6 +10,11 @@ import type {
   WebRTCPeersLatestRef,
   WebRTCSpeakingPayload,
 } from "./types";
+import { reconcileRoomUsers } from "./presence";
+
+// Upper bound on candidates buffered for a peer whose connection does not
+// exist yet. Real gathering produces well under 50 per peer.
+const MAX_BUFFERED_ICE_CANDIDATES = 100;
 
 export function useWebRTCPeerSubscriptions<MediaState>(args: {
   isConnected: boolean;
@@ -39,6 +44,7 @@ export function useWebRTCPeerSubscriptions<MediaState>(args: {
   useEffect(() => {
     if (!isConnected) return;
     if (!userId) return;
+    const pendingIce = pendingIceRef.current;
 
     const {
       onRoomUsers: _onRoomUsers,
@@ -57,15 +63,18 @@ export function useWebRTCPeerSubscriptions<MediaState>(args: {
           latestRef.current;
         if (data.roomId !== currentRoomId) return;
 
-        if (data.mediaStates && typeof data.mediaStates === "object") {
-          latestRef.current.setRemoteMedia((prev) => ({
-            ...prev,
-            ...data.mediaStates,
-          }));
-        }
+        const activePeerIds = reconcileRoomUsers({
+          users: Array.isArray(data.users) ? data.users : [],
+          currentUserId,
+          peerIds: latestRef.current.getPeerIds(),
+          mediaStates: data.mediaStates,
+          closePeer: latestRef.current.closePeer,
+          clearPendingIce: (peerId) => pendingIce.delete(peerId),
+          setRemoteMedia: latestRef.current.setRemoteMedia,
+          setRemoteSpeaking: latestRef.current.setRemoteSpeaking,
+        });
 
-        for (const peerId of data.users) {
-          if (!peerId || peerId === currentUserId) continue;
+        for (const peerId of activePeerIds) {
           // Deterministic initiator to reduce offer glare.
           if (currentUserId < peerId) {
             try {
@@ -102,7 +111,7 @@ export function useWebRTCPeerSubscriptions<MediaState>(args: {
     const cleanupLeft = _onUserLeft?.((peer) => {
       const peerId = toSocketId(peer);
       if (!peerId) return;
-      pendingIceRef.current.delete(peerId);
+      pendingIce.delete(peerId);
       latestRef.current.closePeer(peerId);
     });
 
@@ -114,12 +123,11 @@ export function useWebRTCPeerSubscriptions<MediaState>(args: {
       const pc = latestRef.current.createPeerConnection(data.from);
 
       try {
-        await pc.setRemoteDescription(data.sdp as RTCSessionDescriptionInit);
+        const accepted = await latestRef.current
+          .getPeerNegotiator(data.from)
+          .receiveDescription(data.sdp);
+        if (!accepted) return;
         await flushPendingIce(data.from, pc);
-        latestRef.current.syncTracksToPeer(data.from, pc);
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        latestRef.current.sendWebRTCAnswer(data.from, pc.localDescription);
       } catch {
         // ignore
       }
@@ -131,9 +139,17 @@ export function useWebRTCPeerSubscriptions<MediaState>(args: {
           latestRef.current;
         if (data.roomId !== currentRoomId) return;
         if (!data.from || data.from === currentUserId) return;
-        const pc = latestRef.current.createPeerConnection(data.from);
+        // An answer only makes sense for a peer we already offered to. Do not
+        // create one here: a straggling answer arriving after the peer was
+        // closed (reconcileRoomUsers / user_left) would otherwise resurrect an
+        // entry that nothing ever negotiates or tears down. The offer handler
+        // remains the one legitimate creation point.
+        const pc = latestRef.current.getExistingPeer(data.from);
+        const negotiator = latestRef.current.getExistingNegotiator(data.from);
+        if (!pc || !negotiator) return;
         try {
-          await pc.setRemoteDescription(data.sdp as RTCSessionDescriptionInit);
+          const accepted = await negotiator.receiveDescription(data.sdp);
+          if (!accepted) return;
           await flushPendingIce(data.from, pc);
         } catch {
           // ignore
@@ -146,19 +162,38 @@ export function useWebRTCPeerSubscriptions<MediaState>(args: {
         latestRef.current;
       if (data.roomId !== currentRoomId) return;
       if (!data.from || data.from === currentUserId) return;
-      const pc = latestRef.current.createPeerConnection(data.from);
+      // Never create a peer connection from the ICE path. A candidate can
+      // arrive after reconcileRoomUsers or user_left closed the peer, and
+      // creating one here resurrected an entry that is never negotiated and
+      // never torn down. Buffer instead: the offer handler is the legitimate
+      // entry point and flushPendingIce drains the buffer once it exists.
+      const pc = latestRef.current.getExistingPeer(data.from);
       const candidate = data.candidate as RTCIceCandidateInit;
-      // If remote description isn't set yet, buffer the candidate.
-      if (!pc.remoteDescription) {
-        const buf = pendingIceRef.current.get(data.from) ?? [];
-        buf.push(candidate);
-        pendingIceRef.current.set(data.from, buf);
+
+      if (!pc || !pc.remoteDescription) {
+        const buf = pendingIce.get(data.from) ?? [];
+        // Bound the buffer so candidates for a peer that never materialises
+        // cannot grow without limit. A peer connection normally gathers far
+        // fewer than this.
+        if (buf.length < MAX_BUFFERED_ICE_CANDIDATES) {
+          buf.push(candidate);
+          pendingIce.set(data.from, buf);
+        }
         return;
       }
+
       try {
         await pc.addIceCandidate(candidate);
-      } catch {
-        // ignore
+      } catch (error) {
+        // Candidates belonging to an intentionally ignored colliding offer are
+        // expected to fail. Keep other failures visible during development.
+        if (
+          !latestRef.current
+            .getExistingNegotiator(data.from)
+            ?.shouldIgnoreIceError()
+        ) {
+          console.warn("Failed to add WebRTC ICE candidate", error);
+        }
       }
     });
 
@@ -197,6 +232,7 @@ export function useWebRTCPeerSubscriptions<MediaState>(args: {
       (cleanupIce as (() => void) | undefined)?.();
       (cleanupMedia as (() => void) | undefined)?.();
       (cleanupSpeaking as (() => void) | undefined)?.();
+      pendingIce.clear();
     };
   }, [isConnected, userId, roomId, latestRef]);
 }

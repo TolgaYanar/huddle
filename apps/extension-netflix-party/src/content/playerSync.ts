@@ -13,7 +13,12 @@ import {
   getLocalWatchId,
   isNetflixWatchUrl,
 } from "./video";
-import { isLikelyEchoEvent, withRemoteGuard } from "./syncUtils";
+import {
+  isLikelyEchoEvent,
+  resolvePlaybackIntent,
+  shouldThrottleApply,
+  withRemoteGuard,
+} from "./syncUtils";
 
 // True only when the room is known to be watching a Netflix /watch URL.
 // Gates local gesture emits (play/pause/seek/set_speed) so a Netflix tab
@@ -118,7 +123,7 @@ export function applyRoomStateToVideo(
   }: {
     updateOverlay: () => void;
   },
-  opts?: { manual?: boolean },
+  opts?: { manual?: boolean; source?: "room_state" | "receive_sync" },
 ) {
   if (!seekEnabled && !autoPlayPauseEnabled) return;
 
@@ -126,8 +131,14 @@ export function applyRoomStateToVideo(
   if (!v) return;
 
   // Avoid hammering the player; Netflix can be sensitive to rapid seek/play.
+  // The server emits receive_sync and room_state back to back for every
+  // event, so throttling both dropped the full snapshot microseconds after
+  // the partial one — and with it the only correct isPlaying/timestamp we
+  // get. room_state is authoritative and rare, so it is never throttled.
   const now = Date.now();
-  if (now - state.lastRemoteApplyAt < 250) return;
+  if (opts?.source !== "room_state" && now - state.lastRemoteApplyAt < 250) {
+    return;
+  }
 
   // If the room is watching something that isn't Netflix (e.g. a YouTube
   // room), do NOT touch the local Netflix video. expectedWatchId would be
@@ -234,7 +245,12 @@ export function applyRoomStateToVideo(
     roomState,
     state.pendingRoomStateReceivedAt,
   );
-  const desiredPlaying = roomState.isPlaying === true;
+  // Three states, not two. `receive_sync` for set_volume / set_mute /
+  // set_speed / set_audio_sync deliberately omits isPlaying because those
+  // events carry no playback intent. Collapsing undefined to `false` (as
+  // `=== true` did) made the else-branch below actively pause the local
+  // Netflix video every time anyone nudged the volume.
+  const desiredPlaying = resolvePlaybackIntent(roomState.isPlaying);
   const desiredRate =
     typeof roomState.playbackSpeed === "number"
       ? roomState.playbackSpeed
@@ -299,7 +315,9 @@ export function applyRoomStateToVideo(
         }
       }
 
-      if (desiredPlaying) {
+      if (desiredPlaying === null) {
+        // No playback intent in this message: leave the player as-is.
+      } else if (desiredPlaying) {
         if (v.paused) {
           if (!autoPlayPauseEnabled) return;
           if (!state.hasUserGesture) {

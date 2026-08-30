@@ -41,10 +41,16 @@ export function PasswordModal({
           submitRoomPassword();
         }}
       >
-        <h2 id="room-password-title" className="text-xl font-semibold text-slate-50">
+        <h2
+          id="room-password-title"
+          className="text-xl font-semibold text-slate-50"
+        >
           Room password
         </h2>
-        <p id="room-password-description" className="mt-2 text-sm text-slate-300">
+        <p
+          id="room-password-description"
+          className="mt-2 text-sm text-slate-300"
+        >
           {passwordError ?? "This room requires a password."}
         </p>
 

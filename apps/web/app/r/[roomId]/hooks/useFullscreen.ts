@@ -17,10 +17,10 @@ export function useFullscreen({ isClient }: UseFullscreenProps) {
     const onFsChange = () => {
       const fsEl = document.fullscreenElement;
       setIsScreenFullscreen(
-        Boolean(fsEl && fsEl === screenStageContainerRef.current)
+        Boolean(fsEl && fsEl === screenStageContainerRef.current),
       );
       setIsPlayerFullscreen(
-        Boolean(fsEl && fsEl === playerContainerRef.current)
+        Boolean(fsEl && fsEl === playerContainerRef.current),
       );
     };
     document.addEventListener("fullscreenchange", onFsChange);

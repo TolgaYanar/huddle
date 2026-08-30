@@ -226,7 +226,8 @@ export function PlayerMediaRenderer({
           <DailymotionEmbed
             ref={
               playerRef as unknown as React.RefObject<
-                import("./mediaRenderer/DailymotionEmbed").DailymotionEmbedRef | null
+                | import("./mediaRenderer/DailymotionEmbed").DailymotionEmbedRef
+                | null
               >
             }
             src={dailymotionEmbedSrc}
@@ -252,7 +253,8 @@ export function PlayerMediaRenderer({
           <SoundCloudEmbed
             ref={
               playerRef as unknown as React.RefObject<
-                import("./mediaRenderer/SoundCloudEmbed").SoundCloudEmbedRef | null
+                | import("./mediaRenderer/SoundCloudEmbed").SoundCloudEmbedRef
+                | null
               >
             }
             src={soundCloudEmbedSrc}

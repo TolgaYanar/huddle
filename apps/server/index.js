@@ -31,6 +31,7 @@ const {
   validateRoomId,
 } = require("./src/auth/validators");
 const { createRequireAuth } = require("./src/auth/middleware");
+const { createSessionCleanup } = require("./src/auth/sessionCleanup");
 
 const { registerRoutes } = require("./src/routes");
 const { createIo } = require("./src/socket/createIo");
@@ -86,6 +87,8 @@ const isDbConnected = () => prismaState.dbConnected;
 
 const session = createSessionService({ getPrisma, isDbConnected });
 const requireAuth = createRequireAuth({ getAuthUser: session.getAuthUser });
+const sessionCleanup = createSessionCleanup({ getPrisma, isDbConnected, vLog });
+sessionCleanup.start();
 
 let io;
 
@@ -162,16 +165,28 @@ server.listen(PORT, "0.0.0.0", () => {
   if (lanIp) {
     console.log(`✓ Server accessible on LAN at http://${lanIp}:${PORT}`);
   }
-  console.log(
-    `✓ Database status: ${isDbConnected() ? "Connected" : "Disconnected (running in memory-only mode)"}`
-  );
+  // The pg pool connects lazily, so the startup probe is still in flight here.
+  // Reporting isDbConnected() synchronously printed "memory-only mode" even
+  // against a healthy database. Wait for the probe, then report the truth.
+  void prismaState.ready.then((connected) => {
+    console.log(
+      `✓ Database status: ${connected ? "Connected" : "Disconnected (running in memory-only mode)"}`,
+    );
+  });
 });
 
-process.on("SIGINT", async () => {
+let shuttingDown = false;
+async function shutdown() {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  sessionCleanup.stop();
   try {
     const prisma = getPrisma();
     if (prisma) await prisma.$disconnect();
   } finally {
     process.exit(0);
   }
-});
+}
+
+process.once("SIGINT", shutdown);
+process.once("SIGTERM", shutdown);

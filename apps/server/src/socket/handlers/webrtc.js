@@ -1,15 +1,12 @@
 const { createSocketRateLimiter } = require("../helpers/socketRateLimit");
+const { isSocketIdInRoom } = require("../helpers/membership");
 
 function attachWebRTCHandlers(io, state, socket, deps) {
   // --- WebRTC signaling (socket.io relays between peers) ---
-  const isSocketInRoom = (roomId, socketId) => {
-    try {
-      const room = io.sockets.adapter.rooms.get(roomId);
-      return room ? room.has(socketId) : false;
-    } catch {
-      return false;
-    }
-  };
+  // Both the caller and the relay target are checked through the shared
+  // helper, which rejects a roomId that is really just a socket id.
+  const isSocketInRoom = (roomId, socketId) =>
+    isSocketIdInRoom(io, roomId, socketId);
 
   // Speaking events are emitted from voice-activity detection — typically
   // every 50–200ms while talking. Bound to ~20/s to drop pathological floods
@@ -22,14 +19,64 @@ function attachWebRTCHandlers(io, state, socket, deps) {
   // seconds at most. 5/s bounds the DB-write + chat-broadcast amplification
   // (up to 3 roomMessage rows per call) a flood would otherwise cause.
   const mediaStateLimiter = createSocketRateLimiter({ windowMs: 1000, max: 5 });
+  // Offer/answer are relayed 1:1 and carry the largest payload in the
+  // signaling set. A normal session negotiates a handful of times per peer;
+  // 30/10s leaves room for renegotiation storms (mic/cam/screen toggles)
+  // while bounding egress amplification.
+  const sdpLimiter = createSocketRateLimiter({ windowMs: 10000, max: 30 });
+
+  // socket.io accepts ~1MB per event by default. A session description is a
+  // small text blob, so reject anything that is not a plausibly shaped SDP
+  // before relaying it to another member.
+  const MAX_SDP_LENGTH = 64_000;
+  const isValidSdp = (sdp) =>
+    !!sdp &&
+    typeof sdp === "object" &&
+    typeof sdp.type === "string" &&
+    sdp.type.length <= 16 &&
+    typeof sdp.sdp === "string" &&
+    sdp.sdp.length > 0 &&
+    sdp.sdp.length <= MAX_SDP_LENGTH;
+
+  // An ICE candidate is a short SDP attribute line plus a little metadata.
+  // Without a shape check the relay forwarded any object at 200/10s, so a
+  // member could push ~200MB of arbitrary JSON at another member.
+  const MAX_CANDIDATE_LENGTH = 1024;
+  const isValidIceCandidate = (candidate) => {
+    if (!candidate || typeof candidate !== "object") return false;
+    // An end-of-candidates signal is an empty candidate string.
+    if (typeof candidate.candidate !== "string") return false;
+    if (candidate.candidate.length > MAX_CANDIDATE_LENGTH) return false;
+    if (
+      candidate.sdpMid != null &&
+      (typeof candidate.sdpMid !== "string" || candidate.sdpMid.length > 64)
+    ) {
+      return false;
+    }
+    if (
+      candidate.sdpMLineIndex != null &&
+      !Number.isInteger(candidate.sdpMLineIndex)
+    ) {
+      return false;
+    }
+    if (
+      candidate.usernameFragment != null &&
+      (typeof candidate.usernameFragment !== "string" ||
+        candidate.usernameFragment.length > 256)
+    ) {
+      return false;
+    }
+    return true;
+  };
 
   socket.on("webrtc_offer", (data) => {
     const { roomId, to, sdp } = data || {};
     if (!roomId || typeof roomId !== "string") return;
     if (!to || typeof to !== "string") return;
-    if (!sdp) return;
+    if (!isValidSdp(sdp)) return;
     if (!isSocketInRoom(roomId, socket.id) || !isSocketInRoom(roomId, to))
       return;
+    if (!sdpLimiter()) return;
     io.to(to).emit("webrtc_offer", { roomId, from: socket.id, sdp });
   });
 
@@ -37,9 +84,10 @@ function attachWebRTCHandlers(io, state, socket, deps) {
     const { roomId, to, sdp } = data || {};
     if (!roomId || typeof roomId !== "string") return;
     if (!to || typeof to !== "string") return;
-    if (!sdp) return;
+    if (!isValidSdp(sdp)) return;
     if (!isSocketInRoom(roomId, socket.id) || !isSocketInRoom(roomId, to))
       return;
+    if (!sdpLimiter()) return;
     io.to(to).emit("webrtc_answer", { roomId, from: socket.id, sdp });
   });
 
@@ -47,11 +95,22 @@ function attachWebRTCHandlers(io, state, socket, deps) {
     const { roomId, to, candidate } = data || {};
     if (!roomId || typeof roomId !== "string") return;
     if (!to || typeof to !== "string") return;
-    if (!candidate) return;
+    if (!isValidIceCandidate(candidate)) return;
     if (!isSocketInRoom(roomId, socket.id) || !isSocketInRoom(roomId, to))
       return;
     if (!iceLimiter()) return;
-    io.to(to).emit("webrtc_ice", { roomId, from: socket.id, candidate });
+    // Relay only the fields the browser needs, so unknown keys on the wire
+    // are never forwarded to another member.
+    io.to(to).emit("webrtc_ice", {
+      roomId,
+      from: socket.id,
+      candidate: {
+        candidate: candidate.candidate,
+        sdpMid: candidate.sdpMid ?? null,
+        sdpMLineIndex: candidate.sdpMLineIndex ?? null,
+        usernameFragment: candidate.usernameFragment ?? null,
+      },
+    });
   });
 
   socket.on("webrtc_media_state", async (data) => {

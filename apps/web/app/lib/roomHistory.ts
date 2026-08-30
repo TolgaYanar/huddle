@@ -15,9 +15,7 @@ export function readRoomHistory(): RoomHistoryEntry[] {
     if (!Array.isArray(parsed)) return [];
     return parsed.filter(
       (e) =>
-        e &&
-        typeof e.roomId === "string" &&
-        typeof e.visitedAt === "number",
+        e && typeof e.roomId === "string" && typeof e.visitedAt === "number",
     ) as RoomHistoryEntry[];
   } catch {
     return [];

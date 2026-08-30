@@ -59,11 +59,17 @@ function RequirementCheck({ met, label }: { met: boolean; label: string }) {
             stroke="currentColor"
             strokeWidth={3}
           >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M5 13l4 4L19 7"
+            />
           </svg>
         ) : null}
       </div>
-      <span className={met ? "text-emerald-400" : "text-slate-500"}>{label}</span>
+      <span className={met ? "text-emerald-400" : "text-slate-500"}>
+        {label}
+      </span>
     </div>
   );
 }
@@ -84,8 +90,10 @@ function RegisterPageInner() {
 
   const usernameValid = USERNAME_REQUIREMENTS.every((r) => r.test(username));
   const passwordValid = PASSWORD_REQUIREMENTS.every((r) => r.test(password));
-  const passwordsMatch = password === confirmPassword && confirmPassword.length > 0;
-  const canSubmit = usernameValid && passwordValid && passwordsMatch && !loading;
+  const passwordsMatch =
+    password === confirmPassword && confirmPassword.length > 0;
+  const canSubmit =
+    usernameValid && passwordValid && passwordsMatch && !loading;
 
   const getErrorMessage = (err: unknown): string => {
     if (err && typeof err === "object" && "code" in err) {
@@ -150,13 +158,27 @@ function RegisterPageInner() {
             <div className="mb-6">
               <div className="flex items-center gap-3 mb-3">
                 <div className="h-9 w-9 rounded-xl bg-indigo-500/15 border border-indigo-500/20 flex items-center justify-center">
-                  <svg className="w-4 h-4 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                  <svg
+                    className="w-4 h-4 text-indigo-400"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
+                    />
                   </svg>
                 </div>
               </div>
-              <h1 className="text-xl font-semibold text-white tracking-tight">Create an account</h1>
-              <p className="text-sm text-slate-400 mt-1">Join WeHuddle to save your rooms and sync across devices.</p>
+              <h1 className="text-xl font-semibold text-white tracking-tight">
+                Create an account
+              </h1>
+              <p className="text-sm text-slate-400 mt-1">
+                Join WeHuddle to save your rooms and sync across devices.
+              </p>
             </div>
 
             <form
@@ -180,12 +202,19 @@ function RegisterPageInner() {
             >
               {/* Username field */}
               <div className="space-y-1.5">
-                <label htmlFor="register-username" className="text-xs font-medium text-slate-400">Username</label>
+                <label
+                  htmlFor="register-username"
+                  className="text-xs font-medium text-slate-400"
+                >
+                  Username
+                </label>
                 <input
                   id="register-username"
                   value={username}
                   onChange={(e) => {
-                    setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""));
+                    setUsername(
+                      e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""),
+                    );
                     setError(null);
                   }}
                   placeholder="Your Username"
@@ -205,7 +234,11 @@ function RegisterPageInner() {
                 {username.length > 0 && (
                   <div className="grid gap-1 mt-2">
                     {USERNAME_REQUIREMENTS.map((req) => (
-                      <RequirementCheck key={req.id} met={req.test(username)} label={req.label} />
+                      <RequirementCheck
+                        key={req.id}
+                        met={req.test(username)}
+                        label={req.label}
+                      />
                     ))}
                   </div>
                 )}
@@ -213,7 +246,12 @@ function RegisterPageInner() {
 
               {/* Password field */}
               <div className="space-y-1.5">
-                <label htmlFor="register-password" className="text-xs font-medium text-slate-400">Password</label>
+                <label
+                  htmlFor="register-password"
+                  className="text-xs font-medium text-slate-400"
+                >
+                  Password
+                </label>
                 <div className="relative">
                   <input
                     id="register-password"
@@ -235,12 +273,19 @@ function RegisterPageInner() {
                         : "border-white/8 focus:ring-indigo-500/25 focus:border-indigo-500/35"
                     }`}
                   />
-                  <PasswordToggleButton show={showPassword} onToggle={() => setShowPassword((v) => !v)} />
+                  <PasswordToggleButton
+                    show={showPassword}
+                    onToggle={() => setShowPassword((v) => !v)}
+                  />
                 </div>
                 {showRequirements && (
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2">
                     {PASSWORD_REQUIREMENTS.map((req) => (
-                      <RequirementCheck key={req.id} met={req.test(password)} label={req.label} />
+                      <RequirementCheck
+                        key={req.id}
+                        met={req.test(password)}
+                        label={req.label}
+                      />
                     ))}
                   </div>
                 )}
@@ -248,7 +293,12 @@ function RegisterPageInner() {
 
               {/* Confirm Password field */}
               <div className="space-y-1.5">
-                <label htmlFor="register-confirm-password" className="text-xs font-medium text-slate-400">Confirm Password</label>
+                <label
+                  htmlFor="register-confirm-password"
+                  className="text-xs font-medium text-slate-400"
+                >
+                  Confirm Password
+                </label>
                 <div className="relative">
                   <input
                     id="register-confirm-password"
@@ -268,15 +318,30 @@ function RegisterPageInner() {
                         : "border-white/8 focus:ring-indigo-500/25 focus:border-indigo-500/35"
                     }`}
                   />
-                  <PasswordToggleButton show={showConfirmPassword} onToggle={() => setShowConfirmPassword((v) => !v)} />
+                  <PasswordToggleButton
+                    show={showConfirmPassword}
+                    onToggle={() => setShowConfirmPassword((v) => !v)}
+                  />
                 </div>
                 {confirmPassword.length > 0 && !passwordsMatch && (
-                  <p className="text-xs text-rose-400 mt-1">Passwords do not match</p>
+                  <p className="text-xs text-rose-400 mt-1">
+                    Passwords do not match
+                  </p>
                 )}
                 {confirmPassword.length > 0 && passwordsMatch && (
                   <p className="text-xs text-emerald-400 mt-1 flex items-center gap-1">
-                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    <svg
+                      className="w-3 h-3"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={3}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M5 13l4 4L19 7"
+                      />
                     </svg>
                     Passwords match
                   </p>

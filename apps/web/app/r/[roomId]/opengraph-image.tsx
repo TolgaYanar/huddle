@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const runtime = "edge";
+import { PopcornMark } from "../../_components/PopcornMark";
 
 export const size = {
   width: 1200,
@@ -78,7 +78,7 @@ export default async function OpenGraphImage({
             gap: 16,
           }}
         >
-          <div style={{ fontSize: 56 }}>🍿</div>
+          <PopcornMark size={56} />
           <div style={{ fontSize: 72, fontWeight: 900, letterSpacing: -2 }}>
             WeHuddle
           </div>
@@ -148,6 +148,6 @@ export default async function OpenGraphImage({
     </div>,
     {
       ...size,
-    }
+    },
   );
 }

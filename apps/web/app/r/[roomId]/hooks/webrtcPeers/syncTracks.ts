@@ -6,9 +6,9 @@ export function syncTracksToPeer(
   if (!localStream) return;
   // Skip tracks that have already ended (e.g. screen share stopped by the
   // browser before React state cleanup has run).
-  const localTracks = localStream.getTracks().filter(
-    (t) => t.readyState !== "ended",
-  );
+  const localTracks = localStream
+    .getTracks()
+    .filter((t) => t.readyState !== "ended");
 
   // Remove senders whose tracks are no longer present.
   for (const sender of pc.getSenders()) {

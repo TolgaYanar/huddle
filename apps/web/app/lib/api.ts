@@ -32,7 +32,7 @@ type ApiError = Error & { status?: number; code?: string };
 
 async function requestJson<T>(
   path: string,
-  init: RequestInit & { json?: unknown } = {}
+  init: RequestInit & { json?: unknown } = {},
 ): Promise<T> {
   const baseUrl = getApiBaseUrl();
 
@@ -61,7 +61,7 @@ async function requestJson<T>(
     const apiErr: ApiError = new Error(
       err instanceof DOMException && err.name === "AbortError"
         ? "Request timed out. Please try again."
-        : "Network error. Please try again."
+        : "Network error. Please try again.",
     );
     apiErr.code =
       err instanceof DOMException && err.name === "AbortError"
@@ -80,7 +80,7 @@ async function requestJson<T>(
   if (!res.ok) {
     const err: ApiError = new Error(
       (data && typeof data.error === "string" && data.error) ||
-        `http_${res.status}`
+        `http_${res.status}`,
     );
     err.status = res.status;
     err.code = data && typeof data.error === "string" ? data.error : undefined;
@@ -124,7 +124,7 @@ export async function apiSaveRoom(roomId: string) {
     {
       method: "POST",
       json: { roomId },
-    }
+    },
   );
 }
 
@@ -133,6 +133,6 @@ export async function apiUnsaveRoom(roomId: string) {
     `/api/saved-rooms/${encodeURIComponent(roomId)}`,
     {
       method: "DELETE",
-    }
+    },
   );
 }

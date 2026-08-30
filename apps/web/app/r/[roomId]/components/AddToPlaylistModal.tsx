@@ -16,7 +16,7 @@ interface AddToPlaylistModalProps {
     videoUrl: string,
     title: string,
     duration?: number,
-    thumbnail?: string
+    thumbnail?: string,
   ) => void;
   onCreatePlaylist: (name: string, description?: string) => void;
 }
@@ -96,12 +96,12 @@ export function AddToPlaylistModal({
 }: AddToPlaylistModalProps) {
   const [title, setTitle] = useState("");
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<string | null>(
-    null
+    null,
   );
   const [isCreatingPlaylist, setIsCreatingPlaylist] = useState(false);
   const [newPlaylistName, setNewPlaylistName] = useState("");
   const [addedToPlaylists, setAddedToPlaylists] = useState<Set<string>>(
-    new Set()
+    new Set(),
   );
 
   // Reset state when modal opens/closes
@@ -140,185 +140,185 @@ export function AddToPlaylistModal({
       labelledBy={titleId}
       panelClassName="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden"
     >
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-white/10">
-          <h3 id={titleId} className="text-lg font-semibold text-slate-50">
-            Add to Playlist
-          </h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1 text-slate-400 hover:text-slate-200 transition"
-            title="Close modal"
-            aria-label="Close modal"
-          >
-            <CloseIcon />
-          </button>
-        </div>
+      {/* Header */}
+      <div className="flex items-center justify-between p-4 border-b border-white/10">
+        <h3 id={titleId} className="text-lg font-semibold text-slate-50">
+          Add to Playlist
+        </h3>
+        <button
+          type="button"
+          onClick={onClose}
+          className="p-1 text-slate-400 hover:text-slate-200 transition"
+          title="Close modal"
+          aria-label="Close modal"
+        >
+          <CloseIcon />
+        </button>
+      </div>
 
-        {/* Content */}
-        <div className="p-4 space-y-4">
-          {/* Video URL preview */}
-          <div className="bg-black/20 rounded-lg px-3 py-2">
-            <div className="text-xs text-slate-500 truncate">{videoUrl}</div>
-            {(() => {
-              const startTime = getYouTubeStartTime(videoUrl);
-              if (startTime && startTime > 0) {
-                return (
-                  <div className="text-xs text-indigo-400 mt-1">
-                    ⏱ Starts at {formatStartTime(startTime)}
-                  </div>
-                );
-              }
-              return null;
-            })()}
-          </div>
-
-          {/* Custom title input */}
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">
-              Video Title
-            </label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Enter a custom title..."
-              className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500/25 focus:border-sky-500/30"
-              autoFocus
-            />
-          </div>
-
-          {/* Playlist selection */}
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">
-              Select Playlist
-            </label>
-
-            {playlists.length === 0 && !isCreatingPlaylist ? (
-              <div className="text-center py-4">
-                <p className="text-sm text-slate-500 mb-2">No playlists yet</p>
-                <button
-                  type="button"
-                  onClick={() => setIsCreatingPlaylist(true)}
-                  className="text-sm text-sky-400 hover:text-sky-300 transition"
-                >
-                  Create your first playlist
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-2 max-h-48 overflow-y-auto">
-                {playlists.map((playlist) => {
-                  const isAdded = addedToPlaylists.has(playlist.id);
-                  const isSelected = selectedPlaylistId === playlist.id;
-
-                  return (
-                    <button
-                      key={playlist.id}
-                      type="button"
-                      onClick={() =>
-                        !isAdded && setSelectedPlaylistId(playlist.id)
-                      }
-                      disabled={isAdded}
-                      className={`w-full flex items-center gap-3 p-3 rounded-lg border transition text-left ${
-                        isAdded
-                          ? "bg-emerald-500/10 border-emerald-500/30 cursor-default"
-                          : isSelected
-                            ? "bg-sky-500/20 border-sky-500/30"
-                            : "bg-black/20 border-white/10 hover:bg-white/5 hover:border-white/20"
-                      }`}
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div
-                          className={`text-sm font-medium ${isAdded ? "text-emerald-300" : "text-slate-200"}`}
-                        >
-                          {playlist.name}
-                        </div>
-                        <div className="text-xs text-slate-500">
-                          {playlist.items.length} items
-                        </div>
-                      </div>
-                      {isAdded && (
-                        <span className="text-emerald-400">
-                          <CheckIcon />
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Create new playlist */}
-            {isCreatingPlaylist ? (
-              <div className="mt-2 p-3 bg-black/20 rounded-lg border border-white/10 space-y-2">
-                <input
-                  type="text"
-                  value={newPlaylistName}
-                  onChange={(e) => setNewPlaylistName(e.target.value)}
-                  placeholder="New playlist name..."
-                  className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500/25"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      handleCreatePlaylist();
-                    }
-                  }}
-                />
-                <div className="flex gap-2 justify-end">
-                  <button
-                    type="button"
-                    onClick={() => setIsCreatingPlaylist(false)}
-                    className="px-3 py-1.5 text-sm text-slate-400 hover:text-slate-200 transition"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleCreatePlaylist}
-                    disabled={!newPlaylistName.trim()}
-                    className="px-3 py-1.5 text-sm bg-sky-600 hover:bg-sky-500 text-white rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Create
-                  </button>
+      {/* Content */}
+      <div className="p-4 space-y-4">
+        {/* Video URL preview */}
+        <div className="bg-black/20 rounded-lg px-3 py-2">
+          <div className="text-xs text-slate-500 truncate">{videoUrl}</div>
+          {(() => {
+            const startTime = getYouTubeStartTime(videoUrl);
+            if (startTime && startTime > 0) {
+              return (
+                <div className="text-xs text-indigo-400 mt-1">
+                  ⏱ Starts at {formatStartTime(startTime)}
                 </div>
-              </div>
-            ) : (
-              playlists.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setIsCreatingPlaylist(true)}
-                  className="mt-2 w-full p-2 text-sm text-slate-400 hover:text-slate-200 border border-dashed border-white/20 hover:border-white/40 rounded-lg transition flex items-center justify-center gap-2"
-                >
-                  <PlusIcon />
-                  Create new playlist
-                </button>
-              )
-            )}
-          </div>
+              );
+            }
+            return null;
+          })()}
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-2 p-4 border-t border-white/10 bg-black/20">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 text-sm text-slate-400 hover:text-slate-200 transition"
-          >
-            Close
-          </button>
-          <button
-            type="button"
-            onClick={handleAddToPlaylist}
-            disabled={
-              !selectedPlaylistId ||
-              !title.trim() ||
-              addedToPlaylists.has(selectedPlaylistId || "")
-            }
-            className="px-4 py-2 text-sm bg-sky-600 hover:bg-sky-500 text-white rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Add to Playlist
-          </button>
+        {/* Custom title input */}
+        <div>
+          <label className="block text-sm font-medium text-slate-300 mb-1.5">
+            Video Title
+          </label>
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Enter a custom title..."
+            className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500/25 focus:border-sky-500/30"
+            autoFocus
+          />
         </div>
+
+        {/* Playlist selection */}
+        <div>
+          <label className="block text-sm font-medium text-slate-300 mb-1.5">
+            Select Playlist
+          </label>
+
+          {playlists.length === 0 && !isCreatingPlaylist ? (
+            <div className="text-center py-4">
+              <p className="text-sm text-slate-500 mb-2">No playlists yet</p>
+              <button
+                type="button"
+                onClick={() => setIsCreatingPlaylist(true)}
+                className="text-sm text-sky-400 hover:text-sky-300 transition"
+              >
+                Create your first playlist
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-2 max-h-48 overflow-y-auto">
+              {playlists.map((playlist) => {
+                const isAdded = addedToPlaylists.has(playlist.id);
+                const isSelected = selectedPlaylistId === playlist.id;
+
+                return (
+                  <button
+                    key={playlist.id}
+                    type="button"
+                    onClick={() =>
+                      !isAdded && setSelectedPlaylistId(playlist.id)
+                    }
+                    disabled={isAdded}
+                    className={`w-full flex items-center gap-3 p-3 rounded-lg border transition text-left ${
+                      isAdded
+                        ? "bg-emerald-500/10 border-emerald-500/30 cursor-default"
+                        : isSelected
+                          ? "bg-sky-500/20 border-sky-500/30"
+                          : "bg-black/20 border-white/10 hover:bg-white/5 hover:border-white/20"
+                    }`}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div
+                        className={`text-sm font-medium ${isAdded ? "text-emerald-300" : "text-slate-200"}`}
+                      >
+                        {playlist.name}
+                      </div>
+                      <div className="text-xs text-slate-500">
+                        {playlist.items.length} items
+                      </div>
+                    </div>
+                    {isAdded && (
+                      <span className="text-emerald-400">
+                        <CheckIcon />
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Create new playlist */}
+          {isCreatingPlaylist ? (
+            <div className="mt-2 p-3 bg-black/20 rounded-lg border border-white/10 space-y-2">
+              <input
+                type="text"
+                value={newPlaylistName}
+                onChange={(e) => setNewPlaylistName(e.target.value)}
+                placeholder="New playlist name..."
+                className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500/25"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    handleCreatePlaylist();
+                  }
+                }}
+              />
+              <div className="flex gap-2 justify-end">
+                <button
+                  type="button"
+                  onClick={() => setIsCreatingPlaylist(false)}
+                  className="px-3 py-1.5 text-sm text-slate-400 hover:text-slate-200 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCreatePlaylist}
+                  disabled={!newPlaylistName.trim()}
+                  className="px-3 py-1.5 text-sm bg-sky-600 hover:bg-sky-500 text-white rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Create
+                </button>
+              </div>
+            </div>
+          ) : (
+            playlists.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setIsCreatingPlaylist(true)}
+                className="mt-2 w-full p-2 text-sm text-slate-400 hover:text-slate-200 border border-dashed border-white/20 hover:border-white/40 rounded-lg transition flex items-center justify-center gap-2"
+              >
+                <PlusIcon />
+                Create new playlist
+              </button>
+            )
+          )}
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="flex items-center justify-end gap-2 p-4 border-t border-white/10 bg-black/20">
+        <button
+          type="button"
+          onClick={onClose}
+          className="px-4 py-2 text-sm text-slate-400 hover:text-slate-200 transition"
+        >
+          Close
+        </button>
+        <button
+          type="button"
+          onClick={handleAddToPlaylist}
+          disabled={
+            !selectedPlaylistId ||
+            !title.trim() ||
+            addedToPlaylists.has(selectedPlaylistId || "")
+          }
+          className="px-4 py-2 text-sm bg-sky-600 hover:bg-sky-500 text-white rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Add to Playlist
+        </button>
+      </div>
     </Modal>
   );
 }

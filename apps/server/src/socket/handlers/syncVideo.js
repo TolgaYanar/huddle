@@ -7,6 +7,7 @@ const {
 } = require("../helpers/sync");
 const { emitPlaylistStateToRoom } = require("../helpers/playlists");
 const { createSocketRateLimiter } = require("../helpers/socketRateLimit");
+const { isRoomMember } = require("../helpers/membership");
 
 // A change_url payload IS the URL; nothing legitimate approaches this length.
 // An overlong URL is invalid, so we drop the event rather than store garbage.
@@ -44,7 +45,7 @@ function attachSyncHandlers(io, state, socket, deps) {
     // read the playback state of private rooms.
     const pending = socket.data?.pendingJoins?.get(roomId);
     if (pending) await pending.catch(() => {});
-    if (!socket.rooms.has(roomId)) return;
+    if (!isRoomMember(socket, roomId)) return;
     emitRoomStateToSocket(state, socket, roomId);
   });
 
@@ -53,7 +54,7 @@ function attachSyncHandlers(io, state, socket, deps) {
     const roomId = normalizeRoomId(data);
     if (!roomId) return;
     // Only members of a room may broadcast sync events to it.
-    if (!socket.rooms.has(roomId)) return;
+    if (!isRoomMember(socket, roomId)) return;
 
     const {
       action,

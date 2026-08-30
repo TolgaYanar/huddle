@@ -72,13 +72,13 @@ export async function GET(req: Request) {
     if (!raw) {
       return NextResponse.json<UrlPreviewResponse>(
         { ok: false, error: "Missing url" },
-        { status: 400 }
+        { status: 400 },
       );
     }
     if (raw.length > MAX_URL_LENGTH) {
       return NextResponse.json<UrlPreviewResponse>(
         { ok: false, error: "URL too long" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -88,7 +88,7 @@ export async function GET(req: Request) {
     } catch {
       return NextResponse.json<UrlPreviewResponse>(
         { ok: false, error: "Invalid url" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -96,7 +96,7 @@ export async function GET(req: Request) {
     if (!validation.ok) {
       return NextResponse.json<UrlPreviewResponse>(
         { ok: false, error: validation.reason },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -113,7 +113,7 @@ export async function GET(req: Request) {
       if (addrs.some((a) => isPrivateIp(a.address))) {
         return NextResponse.json<UrlPreviewResponse>(
           { ok: false, error: "Blocked IP" },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
@@ -128,7 +128,7 @@ export async function GET(req: Request) {
         if (!validatePreviewUrl(current).ok) {
           return NextResponse.json<UrlPreviewResponse>(
             { ok: false, error: "Preview failed" },
-            { status: 200 }
+            { status: 200 },
           );
         }
 
@@ -151,7 +151,7 @@ export async function GET(req: Request) {
           if (!location) {
             return NextResponse.json<UrlPreviewResponse>(
               { ok: false, error: "Preview failed" },
-              { status: 200 }
+              { status: 200 },
             );
           }
           try {
@@ -159,7 +159,7 @@ export async function GET(req: Request) {
           } catch {
             return NextResponse.json<UrlPreviewResponse>(
               { ok: false, error: "Preview failed" },
-              { status: 200 }
+              { status: 200 },
             );
           }
           continue;
@@ -170,7 +170,7 @@ export async function GET(req: Request) {
         if (!res.ok) {
           return NextResponse.json<UrlPreviewResponse>(
             { ok: false, error: `Upstream status ${res.status}` },
-            { status: 200 }
+            { status: 200 },
           );
         }
 
@@ -178,7 +178,7 @@ export async function GET(req: Request) {
         if (!contentType.includes("text/html")) {
           return NextResponse.json<UrlPreviewResponse>(
             { ok: true, title: null, thumbnail: null, finalUrl },
-            { status: 200 }
+            { status: 200 },
           );
         }
 
@@ -202,13 +202,13 @@ export async function GET(req: Request) {
             thumbnail: thumbnail ? absolutizeUrl(finalUrl, thumbnail) : null,
             finalUrl,
           },
-          { status: 200 }
+          { status: 200 },
         );
       }
 
       return NextResponse.json<UrlPreviewResponse>(
         { ok: false, error: "Too many redirects" },
-        { status: 200 }
+        { status: 200 },
       );
     } finally {
       clearTimeout(timeoutId);
@@ -217,7 +217,7 @@ export async function GET(req: Request) {
     void e;
     return NextResponse.json<UrlPreviewResponse>(
       { ok: false, error: "Preview failed" },
-      { status: 200 }
+      { status: 200 },
     );
   }
 }
@@ -225,20 +225,20 @@ export async function GET(req: Request) {
 function extractMeta(
   html: string,
   key: "property" | "name",
-  value: string
+  value: string,
 ): string | null {
   // Very small HTML meta parser: good enough for OG/Twitter tags.
   // Matches both orders: key/value then content, or content then key/value.
   const re1 = new RegExp(
     `<meta[^>]*\\b${key}=["']${escapeRegExp(value)}["'][^>]*\\bcontent=["']([^"']+)["'][^>]*>`,
-    "i"
+    "i",
   );
   const m1 = html.match(re1);
   if (m1?.[1]) return m1[1];
 
   const re2 = new RegExp(
     `<meta[^>]*\\bcontent=["']([^"']+)["'][^>]*\\b${key}=["']${escapeRegExp(value)}["'][^>]*>`,
-    "i"
+    "i",
   );
   const m2 = html.match(re2);
   if (m2?.[1]) return m2[1];

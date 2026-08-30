@@ -1,5 +1,7 @@
 # Huddle 🍿
 
+[![CI](https://github.com/TolgaYanar/huddle/actions/workflows/ci.yml/badge.svg)](https://github.com/TolgaYanar/huddle/actions/workflows/ci.yml)
+
 A real-time video watching and chat application with synchronized playback, voice/video chat, and text messaging.
 
 Watch videos together with friends, synchronized playback across all participants.
@@ -18,7 +20,8 @@ Watch videos together with friends, synchronized playback across all participant
 
 ### Prerequisites
 
-- Node.js 20+
+- Node.js 20 (>=20.19.4), Node.js 22 (>=22.12), or Node.js >=24
+  (matching Prisma 7's supported Node lines)
 - PostgreSQL
 - npm 11+
 
@@ -35,10 +38,14 @@ npm install
 2. **Backend environment** (`apps/server/.env`):
 
 ```env
-DATABASE_URL=postgresql://user:password@localhost:5432/huddle
-CORS_ORIGINS=
+DATABASE_URL=postgresql://postgres:password@localhost:5432/huddle?schema=public
+CORS_ORIGINS=http://localhost:3002
 NODE_ENV=development
 ```
+
+Do not leave `CORS_ORIGINS` empty. An empty allowlist reflects the request origin
+in development only; with `NODE_ENV=production` the server fails closed and
+rejects every browser origin, so both the API and the Socket.IO handshake break.
 
 3. **Database setup:**
 
@@ -48,11 +55,16 @@ npm run db:deploy  # Run migrations
 npm run build      # Generate Prisma client
 ```
 
-4. **Frontend environment** (`apps/web/.env.local`):
+4. **Frontend environment** (`apps/web/.env.local`, see `apps/web/.env.example`):
 
 ```env
 API_PROXY_TARGET=http://localhost:4000
+YOUTUBE_API_KEY=<your-youtube-data-api-v3-key>
 ```
+
+`YOUTUBE_API_KEY` is read by the Next.js route handlers in `apps/web/app/api/`
+(`youtube-search`, `youtube-playlist`, `youtube-preview`, `video-info`). Without
+it, YouTube browsing and search return "YouTube browsing is not configured".
 
 5. **Start everything:**
 
@@ -60,15 +72,27 @@ API_PROXY_TARGET=http://localhost:4000
 npm run dev
 ```
 
+### Checks
+
+```bash
+npm run lint          # ESLint (web)
+npm run check-types   # tsc (web + extension)
+npm run test          # vitest (web) + node:test (server)
+npm run build         # next build + prisma generate + extension bundle
+```
+
+The same four commands run in CI on every push and pull request. Use Node
+20.19.4 (`.nvmrc`).
+
 - 🌐 Web: http://localhost:3002
 - 🔌 Backend: http://localhost:4000
-- 🔍 Diagnostics: http://localhost:3002/diagnostic
+- 🔍 Health check: http://localhost:4000/health
 
 ## 🌐 Production Deployment
 
-**See [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) for complete instructions.**
+Web is deployed on Vercel, the backend on Railway.
 
-### Quick Deploy Checklist
+### Deploy Checklist
 
 **Railway (Backend):**
 
@@ -82,8 +106,19 @@ NODE_ENV=production
 
 ```env
 API_PROXY_TARGET=https://your-backend.railway.app
-NEXT_PUBLIC_SOCKET_SERVER_URL=wss://your-backend.railway.app
+YOUTUBE_API_KEY=<your-youtube-data-api-v3-key>
 ```
+
+Leave `NEXT_PUBLIC_SOCKET_SERVER_URL` unset. The client then connects to the web
+origin and Next.js proxies `/socket.io` to `API_PROXY_TARGET`, so the HttpOnly
+session cookie rides along with the handshake.
+
+Only point the socket straight at the backend
+(`NEXT_PUBLIC_SOCKET_SERVER_URL=wss://<backend-host>`) when the backend shares a
+parent domain with the web app **and** `COOKIE_DOMAIN` is set on the server to
+that shared domain. On a plain `*.vercel.app` + `*.railway.app` pair the two are
+cross-site, the session cookie is not sent, and the socket connects
+unauthenticated.
 
 🔴 **Important:** Redeploy Vercel after setting environment variables!
 
@@ -92,22 +127,28 @@ NEXT_PUBLIC_SOCKET_SERVER_URL=wss://your-backend.railway.app
 ```
 huddle/
 ├── apps/
-│   ├── web/              # Next.js frontend
-│   ├── server/           # Express backend
-│   └── docs/             # Documentation
+│   ├── web/                      # Next.js 16 frontend (port 3002)
+│   ├── server/                   # Express + Socket.IO + Prisma backend (port 4000)
+│   └── extension-netflix-party/  # MV3 Chrome extension for Netflix sync
 ├── packages/
-│   ├── shared-logic/     # Socket.IO & WebRTC hooks
-│   ├── ui/               # Shared components
-│   └── eslint-config/    # Shared configs
-└── mobile/               # React Native (WIP)
+│   ├── shared-logic/             # useRoom() Socket.IO & WebRTC hooks, shared types
+│   ├── eslint-config/            # Shared ESLint config
+│   └── typescript-config/        # Shared tsconfig bases
+├── mobile/android/               # Native Android client (Kotlin, Gradle)
+└── scripts/
 ```
+
+npm workspaces cover `apps/*` and `packages/*` only. `mobile/android` is a
+separate Gradle project and is not part of any turbo task.
 
 ## 🛠️ Tech Stack
 
 - **Frontend:** Next.js 16, React 19, TypeScript, Tailwind
 - **Backend:** Express, Socket.IO, Prisma, PostgreSQL
 - **Real-time:** Socket.IO, WebRTC
-- **Hosting:** Vercel + Railway
+- **Clients:** Web, Chrome extension (Netflix sync), native Android (Kotlin)
+- **Monorepo:** Turborepo + npm workspaces
+- **Hosting:** Vercel (web) + Railway (server)
 
 ## 🐛 Troubleshooting
 
@@ -119,10 +160,13 @@ huddle/
 
 ### Socket disconnects immediately
 
-- ✅ Check Railway logs for CORS errors
-- ✅ Use `wss://` not `ws://` for production
+- ✅ Check Railway logs for CORS errors — an empty `CORS_ORIGINS` denies every
+  browser origin in production
+- ✅ Prefer leaving `NEXT_PUBLIC_SOCKET_SERVER_URL` unset so the handshake goes
+  through the same-origin rewrite and carries the session cookie
+- ✅ If you do set it, use `wss://` not `ws://`
 
-Visit `/diagnostic` page to test connectivity.
+Check the backend health endpoint (`/health`) to test connectivity.
 
 ## 📝 License
 

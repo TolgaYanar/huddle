@@ -1,10 +1,41 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import React from "react";
 
 import { Modal } from "../../../components/Modal";
-import { GamePanel, type GamePanelProps } from "./GamePanel";
-import { CupGamePanel, type CupGamePanelProps } from "./cupGame/CupGamePanel";
+import type { GamePanelProps } from "./GamePanel";
+import type { CupGamePanelProps } from "./cupGame/CupGamePanel";
+
+// GamePanel (~2k lines) and CupGamePanel (~1.3k lines, which also pulls in the
+// canvas-based ImageEditor) were statically imported, so every member of every
+// room downloaded and parsed all of it on first paint — including the majority
+// who never open a game. Both already render behind `openGameId`, so splitting
+// them out costs nothing but a short loading state on first open.
+//
+// `ssr: false` is safe here: GameModal is a client component that returns null
+// until a game is opened, so these never render on the server anyway.
+const GamePanel = dynamic(
+  () => import("./GamePanel").then((m) => m.GamePanel),
+  { ssr: false, loading: () => <GameLoading /> },
+);
+
+const CupGamePanel = dynamic(
+  () => import("./cupGame/CupGamePanel").then((m) => m.CupGamePanel),
+  { ssr: false, loading: () => <GameLoading /> },
+);
+
+function GameLoading() {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="flex items-center justify-center py-16 text-sm text-slate-400"
+    >
+      Loading game…
+    </div>
+  );
+}
 
 const GAME_TITLES: Record<string, string> = {
   "guess-it": "Guess It!",
@@ -33,7 +64,9 @@ export function GameModal({
   const emoji = GAME_EMOJIS[openGameId] ?? "🎮";
   const titleId = "game-modal-title";
 
-  const guessActive = gameProps.gameState.games.some((g) => g.status === "active");
+  const guessActive = gameProps.gameState.games.some(
+    (g) => g.status === "active",
+  );
   const cupActive = cupGameProps.cupGameState.games.some(
     (g) => g.session.status === "playing" || g.session.status === "placing",
   );

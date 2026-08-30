@@ -138,7 +138,7 @@ chrome.runtime.onMessage.addListener(
                   const pauseSel =
                     '[data-uia="control-play-pause-pause"], [aria-label="Pause"], button[aria-label="Pause"]';
                   const el = document.querySelector(
-                    shouldPlay ? playSel : pauseSel
+                    shouldPlay ? playSel : pauseSel,
                   ) as HTMLElement | null;
                   if (el) {
                     el.click();
@@ -195,5 +195,5 @@ chrome.runtime.onMessage.addListener(
     }
 
     return false;
-  }
+  },
 );

@@ -43,7 +43,9 @@ export default function PrivacyPolicyPage() {
           <h1 className="text-3xl font-semibold tracking-tight text-slate-50">
             Privacy Policy
           </h1>
-          <p className="mt-2 text-sm text-slate-400">Last updated: 2026-06-13</p>
+          <p className="mt-2 text-sm text-slate-400">
+            Last updated: 2026-06-13
+          </p>
         </header>
 
         <div className="space-y-8 text-slate-200">
@@ -144,7 +146,9 @@ export default function PrivacyPolicyPage() {
             <ul className="list-disc space-y-2 pl-6">
               <li>Synchronize playback for room participants</li>
               <li>Deliver and display chat messages</li>
-              <li>Enable optional peer-to-peer voice/video calls and screen share</li>
+              <li>
+                Enable optional peer-to-peer voice/video calls and screen share
+              </li>
               <li>
                 Create and authenticate your account, keep you signed in, and
                 store the rooms you save (only if you choose to register)
@@ -221,8 +225,7 @@ export default function PrivacyPolicyPage() {
             <ul className="list-disc space-y-2 pl-6">
               <li>
                 service providers required to operate our infrastructure
-                (hosting, databases, monitoring), under appropriate
-                protections;
+                (hosting, databases, monitoring), under appropriate protections;
               </li>
               <li>
                 a third-party STUN server (currently Google&apos;s public STUN
@@ -274,9 +277,9 @@ export default function PrivacyPolicyPage() {
               9) Children’s privacy
             </h2>
             <p>
-              This service is not intended for children under 13 (or the
-              minimum age required in your jurisdiction). We do not knowingly
-              collect personal information from children.
+              This service is not intended for children under 13 (or the minimum
+              age required in your jurisdiction). We do not knowingly collect
+              personal information from children.
             </p>
           </section>
 

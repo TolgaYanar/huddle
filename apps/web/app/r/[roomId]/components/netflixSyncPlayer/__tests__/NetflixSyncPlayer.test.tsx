@@ -83,8 +83,10 @@ describe("NetflixSyncPlayer imperative handle", () => {
   it("play()/pause() update local state without re-broadcasting (anti-echo)", () => {
     const { ref, onPlay, onPause } = renderPlayer();
 
-    ref.current!.play();
-    ref.current!.pause();
+    act(() => {
+      ref.current!.play();
+      ref.current!.pause();
+    });
 
     // The remote-apply path drives the imperative handle; it must NOT call
     // onPlay/onPause or the client would echo a sync it is merely applying.

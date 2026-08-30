@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
+import { PeerNegotiator } from "./negotiation";
 import { syncTracksToPeer as syncTracksToPeerImpl } from "./syncTracks";
 import type { UseWebRTCPeersArgs, WebRTCPeersLatest } from "./types";
 import { useWebRTCPeerSubscriptions } from "./useWebRTCPeerSubscriptions";
@@ -38,12 +39,26 @@ export function useWebRTCPeers<MediaState>(
     onWebRTCSpeaking,
   } = args;
 
+  const negotiatorsRef = useRef<Map<string, PeerNegotiator>>(new Map());
+  const identityRef = useRef(userId);
+  const signalingRef = useRef({ sendWebRTCOffer, sendWebRTCAnswer });
+  identityRef.current = userId;
+  signalingRef.current = { sendWebRTCOffer, sendWebRTCAnswer };
+
   const latestRef = useRef<WebRTCPeersLatest<MediaState>>({
     roomId,
     userId,
     createPeerConnection: null as unknown as (
       peerId: string,
     ) => RTCPeerConnection,
+    getPeerIds: null as unknown as () => string[],
+    getExistingPeer: null as unknown as (
+      peerId: string,
+    ) => RTCPeerConnection | undefined,
+    getExistingNegotiator: null as unknown as (
+      peerId: string,
+    ) => PeerNegotiator | undefined,
+    getPeerNegotiator: null as unknown as (peerId: string) => PeerNegotiator,
     sendOfferToPeer: null as unknown as (peerId: string) => Promise<void>,
     closePeer: null as unknown as (peerId: string) => void,
     syncTracksToPeer: null as unknown as (
@@ -96,6 +111,7 @@ export function useWebRTCPeers<MediaState>(
         try {
           pc.onicecandidate = null;
           pc.ontrack = null;
+          pc.onsignalingstatechange = null;
           pc.onconnectionstatechange = null;
           pc.close();
         } catch {
@@ -103,6 +119,7 @@ export function useWebRTCPeers<MediaState>(
         }
       }
       peersRef.current.delete(peerId);
+      negotiatorsRef.current.delete(peerId);
       remoteStreamsRef.current.delete(peerId);
 
       setRemoteMedia((prev) => {
@@ -143,6 +160,17 @@ export function useWebRTCPeers<MediaState>(
       const pc = new RTCPeerConnection(rtcConfig);
       peersRef.current.set(peerId, pc);
 
+      const negotiator = new PeerNegotiator({
+        pc,
+        isPolite: () => identityRef.current > peerId,
+        syncTracks: () => syncTracksToPeer(peerId, pc),
+        sendOffer: (description) =>
+          signalingRef.current.sendWebRTCOffer(peerId, description),
+        sendAnswer: (description) =>
+          signalingRef.current.sendWebRTCAnswer(peerId, description),
+      });
+      negotiatorsRef.current.set(peerId, negotiator);
+
       pc.onicecandidate = (event) => {
         if (event.candidate) {
           sendWebRTCIce(peerId, event.candidate);
@@ -168,6 +196,15 @@ export function useWebRTCPeers<MediaState>(
         updateRemoteStreamsState();
       };
 
+      pc.onsignalingstatechange = () => {
+        // A renegotiation requested while this peer was mid-exchange is held
+        // in the negotiator. Without this trigger it only drained when another
+        // description happened to arrive, so a mic/camera toggle made during
+        // an in-flight offer could be dropped for the rest of the session.
+        if (pc.signalingState !== "stable") return;
+        void negotiatorsRef.current.get(peerId)?.flushPendingOffer();
+      };
+
       pc.onconnectionstatechange = () => {
         const s = pc.connectionState;
         // "disconnected" is transient — ICE can self-recover, so don't tear
@@ -191,17 +228,43 @@ export function useWebRTCPeers<MediaState>(
     ],
   );
 
+  const getPeerIds = useCallback(
+    () => Array.from(peersRef.current.keys()),
+    [peersRef],
+  );
+
+  // Lookups that never create. The ICE path must use these: reconcileRoomUsers
+  // and user_left close departed peers, and a straggling candidate arriving
+  // afterwards used to re-create a peer entry that is never negotiated and
+  // never closed (connectionState stays "new", so onconnectionstatechange
+  // never fires to clean it up).
+  const getExistingPeer = useCallback(
+    (peerId: string) => peersRef.current.get(peerId),
+    [peersRef],
+  );
+
+  const getExistingNegotiator = useCallback(
+    (peerId: string) => negotiatorsRef.current.get(peerId),
+    [],
+  );
+
+  const getPeerNegotiator = useCallback(
+    (peerId: string) => {
+      createPeerConnection(peerId);
+      const negotiator = negotiatorsRef.current.get(peerId);
+      if (!negotiator) {
+        throw new Error(`Missing WebRTC negotiator for peer ${peerId}`);
+      }
+      return negotiator;
+    },
+    [createPeerConnection],
+  );
+
   const sendOfferToPeer = useCallback(
     async (peerId: string) => {
-      const pc = createPeerConnection(peerId);
-      if (pc.signalingState !== "stable") return;
-
-      syncTracksToPeer(peerId, pc);
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      sendWebRTCOffer(peerId, pc.localDescription);
+      await getPeerNegotiator(peerId).requestOffer();
     },
-    [createPeerConnection, sendWebRTCOffer, syncTracksToPeer],
+    [getPeerNegotiator],
   );
 
   const renegotiateAllPeers = useCallback(async () => {
@@ -229,6 +292,10 @@ export function useWebRTCPeers<MediaState>(
     latestRef.current.userId = userId;
 
     latestRef.current.createPeerConnection = createPeerConnection;
+    latestRef.current.getPeerIds = getPeerIds;
+    latestRef.current.getExistingPeer = getExistingPeer;
+    latestRef.current.getExistingNegotiator = getExistingNegotiator;
+    latestRef.current.getPeerNegotiator = getPeerNegotiator;
     latestRef.current.sendOfferToPeer = sendOfferToPeer;
     latestRef.current.closePeer = closePeer;
     latestRef.current.syncTracksToPeer = syncTracksToPeer;
@@ -250,6 +317,10 @@ export function useWebRTCPeers<MediaState>(
     roomId,
     userId,
     createPeerConnection,
+    getPeerIds,
+    getExistingPeer,
+    getExistingNegotiator,
+    getPeerNegotiator,
     sendOfferToPeer,
     closePeer,
     syncTracksToPeer,

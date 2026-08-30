@@ -75,7 +75,9 @@ function RoomClientInner({ roomId }: { roomId: string }) {
 
 export default function RoomClient({ roomId }: { roomId: string }) {
   return (
-    <ErrorBoundary fallback={(error) => <RoomErrorFallback roomId={roomId} error={error} />}>
+    <ErrorBoundary
+      fallback={(error) => <RoomErrorFallback roomId={roomId} error={error} />}
+    >
       <RoomClientInner roomId={roomId} />
     </ErrorBoundary>
   );

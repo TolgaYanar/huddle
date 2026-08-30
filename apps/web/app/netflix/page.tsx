@@ -117,7 +117,10 @@ export default function NetflixPage() {
             <ol className="text-xs text-slate-400 leading-relaxed flex flex-col gap-1 list-decimal pl-4">
               <li>Install Huddle for Netflix from the Chrome Web Store.</li>
               <li>Create or join a room on wehuddle.tv.</li>
-              <li>Open netflix.com/watch/&hellip; in another tab — it&rsquo;ll auto-join the room.</li>
+              <li>
+                Open netflix.com/watch/&hellip; in another tab — it&rsquo;ll
+                auto-join the room.
+              </li>
             </ol>
             <a
               href="https://chromewebstore.google.com/detail/huddle-for-netflix/mmghgnlloogcifdblldihfmjoefabohc"
@@ -172,8 +175,12 @@ export default function NetflixPage() {
             </p>
             <ol className="text-xs text-slate-400 leading-relaxed flex flex-col gap-1 list-decimal pl-4">
               <li>Install the Huddle Android app.</li>
-              <li>Tap any wehuddle.tv/r/&hellip; link to open the room in-app.</li>
-              <li>Pick a Netflix title — the player launches inline and syncs.</li>
+              <li>
+                Tap any wehuddle.tv/r/&hellip; link to open the room in-app.
+              </li>
+              <li>
+                Pick a Netflix title — the player launches inline and syncs.
+              </li>
             </ol>
             <span
               aria-disabled="true"
@@ -186,28 +193,37 @@ export default function NetflixPage() {
 
         {/* FAQ */}
         <div className="w-full max-w-2xl flex flex-col gap-4">
-          <h2 className="text-lg font-semibold text-slate-100">Common questions</h2>
+          <h2 className="text-lg font-semibold text-slate-100">
+            Common questions
+          </h2>
 
           <details className="group bg-white/5 rounded-xl border border-white/10 p-4 open:bg-white/[0.07] transition-colors">
             <summary className="text-sm font-medium text-slate-200 cursor-pointer list-none flex items-center justify-between">
-              <span>Why can&rsquo;t I just paste a Netflix URL into a room?</span>
-              <span className="text-slate-500 group-open:rotate-180 transition-transform">⌄</span>
+              <span>
+                Why can&rsquo;t I just paste a Netflix URL into a room?
+              </span>
+              <span className="text-slate-500 group-open:rotate-180 transition-transform">
+                ⌄
+              </span>
             </summary>
             <p className="text-xs text-slate-400 leading-relaxed mt-3">
-              Netflix sets <code className="text-slate-300">X-Frame-Options: DENY</code> on
-              every response, and Widevine DRM is bound to the top-level browsing
-              context. Together they make it impossible for any website to embed
-              Netflix in an iframe — not WeHuddle, not Teleparty, not Rave, not
-              anyone. The browser itself enforces this. The extension and app
-              both work because they run as a privileged client <em>outside</em>{" "}
-              the webpage sandbox.
+              Netflix sets{" "}
+              <code className="text-slate-300">X-Frame-Options: DENY</code> on
+              every response, and Widevine DRM is bound to the top-level
+              browsing context. Together they make it impossible for any website
+              to embed Netflix in an iframe — not WeHuddle, not Teleparty, not
+              Rave, not anyone. The browser itself enforces this. The extension
+              and app both work because they run as a privileged client{" "}
+              <em>outside</em> the webpage sandbox.
             </p>
           </details>
 
           <details className="group bg-white/5 rounded-xl border border-white/10 p-4 open:bg-white/[0.07] transition-colors">
             <summary className="text-sm font-medium text-slate-200 cursor-pointer list-none flex items-center justify-between">
               <span>Do I need a Netflix subscription?</span>
-              <span className="text-slate-500 group-open:rotate-180 transition-transform">⌄</span>
+              <span className="text-slate-500 group-open:rotate-180 transition-transform">
+                ⌄
+              </span>
             </summary>
             <p className="text-xs text-slate-400 leading-relaxed mt-3">
               Yes — everyone in the room signs into their own Netflix account.
@@ -219,21 +235,25 @@ export default function NetflixPage() {
           <details className="group bg-white/5 rounded-xl border border-white/10 p-4 open:bg-white/[0.07] transition-colors">
             <summary className="text-sm font-medium text-slate-200 cursor-pointer list-none flex items-center justify-between">
               <span>What about Disney+, HBO Max, Hulu, Apple TV+?</span>
-              <span className="text-slate-500 group-open:rotate-180 transition-transform">⌄</span>
+              <span className="text-slate-500 group-open:rotate-180 transition-transform">
+                ⌄
+              </span>
             </summary>
             <p className="text-xs text-slate-400 leading-relaxed mt-3">
               Same DRM constraint as Netflix, but they each need their own
               integration — different player APIs, different anti-bot detection.
-              They&rsquo;re on the roadmap; for now WeHuddle&rsquo;s chat, voice,
-              and reactions still work alongside whatever you&rsquo;re watching
-              in your own tab.
+              They&rsquo;re on the roadmap; for now WeHuddle&rsquo;s chat,
+              voice, and reactions still work alongside whatever you&rsquo;re
+              watching in your own tab.
             </p>
           </details>
 
           <details className="group bg-white/5 rounded-xl border border-white/10 p-4 open:bg-white/[0.07] transition-colors">
             <summary className="text-sm font-medium text-slate-200 cursor-pointer list-none flex items-center justify-between">
               <span>iOS support?</span>
-              <span className="text-slate-500 group-open:rotate-180 transition-transform">⌄</span>
+              <span className="text-slate-500 group-open:rotate-180 transition-transform">
+                ⌄
+              </span>
             </summary>
             <p className="text-xs text-slate-400 leading-relaxed mt-3">
               Not yet — Apple App Store guideline 4.3 / 5.2.1 makes the WebView
@@ -245,7 +265,10 @@ export default function NetflixPage() {
       </main>
 
       <footer className="py-5 px-6 border-t border-white/5 flex items-center justify-center gap-4 text-xs text-slate-500">
-        <Link href="/privacy" className="hover:text-slate-300 transition-colors">
+        <Link
+          href="/privacy"
+          className="hover:text-slate-300 transition-colors"
+        >
           Privacy Policy
         </Link>
         <span className="text-slate-700">·</span>

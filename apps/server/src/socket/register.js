@@ -21,6 +21,7 @@ const { attachGameHandlers } = require("./handlers/game");
 const { attachCupGameHandlers } = require("./handlers/cupGame");
 const { attachUsernameHandlers } = require("./handlers/username");
 const { attachReactionHandlers } = require("./handlers/reactions");
+const { isSocketIdInRoom } = require("./helpers/membership");
 
 function registerSocket(io, deps) {
   const state = createSocketState();
@@ -30,14 +31,10 @@ function registerSocket(io, deps) {
 
   attachSocketAuth(io, state, deps);
 
-  const isSocketInRoom = (roomId, socketId) => {
-    try {
-      const room = io.sockets.adapter.rooms.get(roomId);
-      return room ? room.has(socketId) : false;
-    } catch {
-      return false;
-    }
-  };
+  // Delegates to the shared helper so the "roomId === socketId" pseudo-room
+  // is rejected here too, not just on the socket.rooms code path.
+  const isSocketInRoom = (roomId, socketId) =>
+    isSocketIdInRoom(io, roomId, socketId);
 
   io.on("connection", (socket) => {
     if (typeof deps.vLog === "function")

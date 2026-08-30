@@ -1,4 +1,5 @@
 const { createSocketRateLimiter } = require("../helpers/socketRateLimit");
+const { isRoomMember } = require("../helpers/membership");
 
 const ALLOWED_EMOJIS = new Set(["👍", "❤️", "😂", "😮", "😢", "🔥"]);
 
@@ -12,9 +13,12 @@ function attachReactionHandlers(io, state, socket) {
     const { roomId, messageId, emoji } = data || {};
     if (!roomId || typeof roomId !== "string") return;
     if (!messageId || typeof messageId !== "string") return;
+    // Bound the key: roomReactions is only freed at room cleanup, so an
+    // unvalidated messageId is a retained-memory amplifier (20 toggles/5s).
+    if (messageId.length > 64) return;
     if (!emoji || !ALLOWED_EMOJIS.has(emoji)) return;
     // Only allow reactions from sockets that have joined the room.
-    if (!socket.rooms.has(roomId)) return;
+    if (!isRoomMember(socket, roomId)) return;
     if (!limiter()) return;
 
     if (!state.roomReactions.has(roomId)) {
@@ -47,7 +51,10 @@ function attachReactionHandlers(io, state, socket) {
       serialized[e] = Array.from(ids);
     }
 
-    io.to(roomId).emit("reaction_updated", { messageId, reactions: serialized });
+    io.to(roomId).emit("reaction_updated", {
+      messageId,
+      reactions: serialized,
+    });
   });
 }
 

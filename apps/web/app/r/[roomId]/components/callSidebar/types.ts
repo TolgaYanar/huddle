@@ -1,6 +1,7 @@
 import type React from "react";
 
 import type { WebRTCMediaState } from "shared-logic";
+import type { DraggedTilePayload } from "../../lib/dnd";
 
 export type CallSidebarProps = {
   userId: string;
@@ -41,6 +42,7 @@ export type CallSidebarProps = {
   setAutoGainControlEnabled: React.Dispatch<React.SetStateAction<boolean>>;
 
   localVideoRef: React.RefObject<HTMLVideoElement | null>;
+  setLocalVideoElement: React.RefCallback<HTMLVideoElement>;
 
   remoteStreams: Array<{ id: string; stream: MediaStream }>;
   remoteSpeaking: Record<string, boolean>;
@@ -48,4 +50,5 @@ export type CallSidebarProps = {
 
   setIsDraggingTile: (v: boolean) => void;
   setIsStageDragOver: (v: boolean) => void;
+  onPinTile: (payload: DraggedTilePayload) => void;
 };

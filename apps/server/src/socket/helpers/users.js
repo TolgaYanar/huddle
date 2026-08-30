@@ -1,5 +1,17 @@
 function ensureRoomHost(io, state, roomId, fallbackHostSocketId) {
-  if (!state.roomHost.has(roomId) && fallbackHostSocketId) {
+  const currentHost = state.roomHost.get(roomId);
+
+  // The stored host may be a socket id that no longer exists. leaveRoom and
+  // disconnect deliberately keep roomHost through the empty-room grace window
+  // (so a refresh does not hand the room to whoever reconnects first), which
+  // means the id can outlive its socket. Re-check it against the live room and
+  // promote the joiner if the previous host is gone, otherwise the room comes
+  // back from a reconnect with a host nobody is.
+  const hostStillPresent =
+    typeof currentHost === "string" &&
+    Boolean(io?.sockets?.adapter?.rooms?.get(roomId)?.has(currentHost));
+
+  if (!hostStillPresent && fallbackHostSocketId) {
     state.roomHost.set(roomId, fallbackHostSocketId);
   }
 

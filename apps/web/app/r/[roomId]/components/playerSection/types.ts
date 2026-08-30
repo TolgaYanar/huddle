@@ -132,9 +132,7 @@ export type PlayerSectionProps = {
   fullscreenChatOpen: boolean;
   setFullscreenChatOpen: React.Dispatch<React.SetStateAction<boolean>>;
   fullscreenChatMessages: FullscreenChatMessage[];
-  chatText: string;
-  setChatText: React.Dispatch<React.SetStateAction<string>>;
-  handleSendChat: (e: React.FormEvent) => void;
+  sendChat: (text: string) => boolean;
 
   isTheatreMode: boolean;
   onToggleTheatreMode: () => void;

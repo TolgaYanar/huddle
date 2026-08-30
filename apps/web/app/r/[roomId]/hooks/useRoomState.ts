@@ -12,19 +12,19 @@ interface UseRoomStateProps {
       users: string[];
       usernames?: Record<string, string | null>;
       hostId?: string | null;
-    }) => void
+    }) => void,
   ) => (() => void) | undefined;
   onUserJoined?: (
-    callback: (peer: UserPresenceData) => void
+    callback: (peer: UserPresenceData) => void,
   ) => (() => void) | undefined;
   onUserLeft?: (
-    callback: (peer: UserPresenceData) => void
+    callback: (peer: UserPresenceData) => void,
   ) => (() => void) | undefined;
   onRoomPasswordStatus?: (
-    callback: (data: { roomId: string; hasPassword: boolean }) => void
+    callback: (data: { roomId: string; hasPassword: boolean }) => void,
   ) => (() => void) | undefined;
   onRoomPasswordRequired?: (
-    callback: (data: { roomId: string; reason?: string }) => void
+    callback: (data: { roomId: string; reason?: string }) => void,
   ) => (() => void) | undefined;
   joinRoom: (password?: string) => void;
 }
@@ -72,7 +72,7 @@ export function useRoomState({
 
       if (Array.isArray(data.users)) {
         setParticipants(
-          Array.from(new Set(data.users.filter((id) => id && id !== userId)))
+          Array.from(new Set(data.users.filter((id) => id && id !== userId))),
         );
       }
 
@@ -84,7 +84,7 @@ export function useRoomState({
         try {
           window.sessionStorage.setItem(
             `huddle:roomPassword:${roomId}`,
-            submitted
+            submitted,
           );
         } catch {
           // ignore
@@ -112,7 +112,7 @@ export function useRoomState({
       setPasswordError(
         data.reason === "invalid"
           ? "Wrong password. Try again."
-          : "This room requires a password."
+          : "This room requires a password.",
       );
 
       if (data.reason === "invalid") {
@@ -186,12 +186,18 @@ export function useRoomState({
       }
     };
 
-    const onRoomNameChanged = (data: { roomId: string; name: string | null }) => {
+    const onRoomNameChanged = (data: {
+      roomId: string;
+      name: string | null;
+    }) => {
       if (data.roomId !== roomId) return;
       setRoomNameState(data.name ?? null);
     };
 
-    const onUsernameChanged = (data: { socketId: string; username: string | null }) => {
+    const onUsernameChanged = (data: {
+      socketId: string;
+      username: string | null;
+    }) => {
       setUsernamesById((prev) => ({ ...prev, [data.socketId]: data.username }));
     };
 

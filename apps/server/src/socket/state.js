@@ -22,6 +22,12 @@ function createSocketState() {
     roomHost: new Map(),
     roomBans: new Map(),
     roomPasswordHash: new Map(),
+    // Monotonic counter per room, bumped on every set_room_password request.
+    // Async scrypt finishes out of order, so only the newest request may
+    // commit its hash. This must be shared across sockets: attachModerationHandlers
+    // runs per connection, so a per-handler counter cannot order two different
+    // hosts' updates against each other.
+    roomPasswordUpdateGeneration: new Map(),
     roomName: new Map(),
 
     // Wheel
@@ -81,6 +87,7 @@ const PER_ROOM_MAPS = [
   "roomHost",
   "roomBans",
   "roomPasswordHash",
+  "roomPasswordUpdateGeneration",
   "roomWheel",
   "roomGames",
   "roomCupGames",

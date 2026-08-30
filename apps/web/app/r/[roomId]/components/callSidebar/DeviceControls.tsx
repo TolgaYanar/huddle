@@ -2,7 +2,15 @@ import React from "react";
 
 function MicIcon({ className }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <rect x="9" y="2" width="6" height="11" rx="3" />
       <path d="M5 10a7 7 0 0 0 14 0" />
       <line x1="12" y1="19" x2="12" y2="22" />
@@ -13,7 +21,15 @@ function MicIcon({ className }: { className?: string }) {
 
 function MicOffIcon({ className }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <line x1="2" y1="2" x2="22" y2="22" />
       <path d="M18.89 13.23A7.12 7.12 0 0 0 19 12" />
       <path d="M5 10a7 7 0 0 0 11.9 5.1" />
@@ -27,7 +43,15 @@ function MicOffIcon({ className }: { className?: string }) {
 
 function CamIcon({ className }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M15.5 10.5 19 7v10l-3.5-3.5" />
       <rect x="2" y="7" width="13" height="10" rx="2" />
     </svg>
@@ -36,7 +60,15 @@ function CamIcon({ className }: { className?: string }) {
 
 function CamOffIcon({ className }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <line x1="2" y1="2" x2="22" y2="22" />
       <path d="M10.66 6H13a2 2 0 0 1 2 2v2.34l1 1L19 7v10" />
       <path d="M14.97 14.97A2 2 0 0 1 13 17H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h.09" />
@@ -46,7 +78,15 @@ function CamOffIcon({ className }: { className?: string }) {
 
 function ScreenIcon({ className }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <rect x="2" y="3" width="20" height="14" rx="2" />
       <line x1="8" y1="21" x2="16" y2="21" />
       <line x1="12" y1="17" x2="12" y2="21" />
@@ -164,7 +204,11 @@ export function DeviceControls(props: {
                 : "bg-amber-500/15 border-amber-500/30 text-amber-300"
               : "bg-black/20 border-white/10 text-slate-400 hover:bg-white/5 hover:text-slate-200"
           }`}
-          title={micEnabled ? `Hold ${pushToTalkBindingLabel} to transmit` : "Enable mic first"}
+          title={
+            micEnabled
+              ? `Hold ${pushToTalkBindingLabel} to transmit`
+              : "Enable mic first"
+          }
         >
           {pushToTalkEnabled
             ? pushToTalkDown
@@ -182,7 +226,11 @@ export function DeviceControls(props: {
                 ? "bg-amber-500/15 border-amber-500/30 text-amber-300"
                 : "bg-black/20 border-white/10 text-slate-400 hover:bg-white/5 hover:text-slate-200"
             }`}
-            title={isRebindingPushToTalkKey ? "Press a key or mouse button (Esc to cancel)" : "Change key binding"}
+            title={
+              isRebindingPushToTalkKey
+                ? "Press a key or mouse button (Esc to cancel)"
+                : "Change key binding"
+            }
           >
             {isRebindingPushToTalkKey ? "Listening…" : "Rebind"}
           </button>

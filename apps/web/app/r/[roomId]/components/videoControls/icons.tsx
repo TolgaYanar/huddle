@@ -77,10 +77,7 @@ export const TheatreIcon = () => (
       strokeLinecap="round"
       strokeLinejoin="round"
     />
-    <path
-      strokeLinecap="round"
-      d="M3 9.5h18M3 14.5h18"
-    />
+    <path strokeLinecap="round" d="M3 9.5h18M3 14.5h18" />
   </svg>
 );
 

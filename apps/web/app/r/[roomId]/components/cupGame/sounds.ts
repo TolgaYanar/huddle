@@ -67,14 +67,18 @@ export function isSoundMuted() {
   return muted;
 }
 
-function tone(freq: number, durationMs: number, opts?: {
-  type?: OscillatorType;
-  attack?: number;
-  release?: number;
-  gain?: number;
-  detune?: number;
-  sweepTo?: number;
-}) {
+function tone(
+  freq: number,
+  durationMs: number,
+  opts?: {
+    type?: OscillatorType;
+    attack?: number;
+    release?: number;
+    gain?: number;
+    detune?: number;
+    sweepTo?: number;
+  },
+) {
   const c = ensureRunning();
   if (!c || !masterGain || muted) return;
   const osc = c.createOscillator();
@@ -88,7 +92,10 @@ function tone(freq: number, durationMs: number, opts?: {
   const peak = opts?.gain ?? 0.18;
   g.gain.setValueAtTime(0, now);
   g.gain.linearRampToValueAtTime(peak, now + attack);
-  g.gain.exponentialRampToValueAtTime(0.0001, now + durationMs / 1000 + release);
+  g.gain.exponentialRampToValueAtTime(
+    0.0001,
+    now + durationMs / 1000 + release,
+  );
   if (opts?.sweepTo !== undefined) {
     osc.frequency.setValueAtTime(freq, now);
     osc.frequency.exponentialRampToValueAtTime(
@@ -102,7 +109,10 @@ function tone(freq: number, durationMs: number, opts?: {
   osc.stop(now + durationMs / 1000 + release + 0.05);
 }
 
-function noiseBurst(durationMs: number, opts?: { gain?: number; filterFreq?: number }) {
+function noiseBurst(
+  durationMs: number,
+  opts?: { gain?: number; filterFreq?: number },
+) {
   const c = ensureRunning();
   if (!c || !masterGain || muted) return;
   const sampleRate = c.sampleRate;
@@ -147,7 +157,10 @@ export function playSound(kind: SoundKind) {
     case "hurt": {
       noiseBurst(220, { gain: 0.32, filterFreq: 900 });
       tone(140, 220, { type: "square", gain: 0.16, sweepTo: 70 });
-      setTimeout(() => tone(110, 180, { type: "sawtooth", gain: 0.12, sweepTo: 60 }), 90);
+      setTimeout(
+        () => tone(110, 180, { type: "sawtooth", gain: 0.12, sweepTo: 60 }),
+        90,
+      );
       return;
     }
     case "shielded": {
@@ -168,7 +181,10 @@ export function playSound(kind: SoundKind) {
     }
     case "bad": {
       tone(180, 200, { type: "sawtooth", gain: 0.18, sweepTo: 90 });
-      setTimeout(() => tone(120, 220, { type: "square", gain: 0.16, sweepTo: 60 }), 100);
+      setTimeout(
+        () => tone(120, 220, { type: "square", gain: 0.16, sweepTo: 60 }),
+        100,
+      );
       return;
     }
     case "skip": {

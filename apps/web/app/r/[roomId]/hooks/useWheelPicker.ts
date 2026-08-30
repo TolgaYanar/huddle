@@ -4,10 +4,10 @@ import type { WheelStateData, WheelSpunData } from "shared-logic";
 interface UseWheelPickerProps {
   roomId: string;
   onWheelState?: (
-    callback: (data: WheelStateData) => void
+    callback: (data: WheelStateData) => void,
   ) => (() => void) | undefined;
   onWheelSpun?: (
-    callback: (data: WheelSpunData) => void
+    callback: (data: WheelSpunData) => void,
   ) => (() => void) | undefined;
   requestWheelState?: () => void;
   addWheelEntry?: (text: string) => void;
@@ -28,7 +28,7 @@ export function useWheelPicker({
 }: UseWheelPickerProps) {
   const [wheelEntries, setWheelEntries] = useState<string[]>([]);
   const [wheelLastSpin, setWheelLastSpin] = useState<WheelSpunData | null>(
-    null
+    null,
   );
   const [isWheelOpen, setIsWheelOpen] = useState(false);
 

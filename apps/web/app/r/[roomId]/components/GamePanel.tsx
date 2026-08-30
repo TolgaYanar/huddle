@@ -13,8 +13,15 @@ import type {
 import { ImageEditor } from "./imageEditor/ImageEditor";
 
 const CATEGORIES = [
-  "Brands", "People", "Places", "Movies & TV",
-  "Music", "Sports", "Animals", "Things", "Other",
+  "Brands",
+  "People",
+  "Places",
+  "Movies & TV",
+  "Music",
+  "Sports",
+  "Animals",
+  "Things",
+  "Other",
 ];
 
 // Turn-timer choices surfaced in the setup form. null means "no timer".
@@ -320,9 +327,9 @@ function ImagePicker({
           {!aiResult && !aiLoading && !error && (
             <p className="text-xs text-slate-600 leading-relaxed">
               Describe an imaginary scene — &ldquo;red dragon eating ice
-              cream&rdquo;. For real-world things (brands, places, people),
-              use the 🔍 Search tab — AI doesn&apos;t reliably draw real
-              logos or famous people.
+              cream&rdquo;. For real-world things (brands, places, people), use
+              the 🔍 Search tab — AI doesn&apos;t reliably draw real logos or
+              famous people.
             </p>
           )}
         </>
@@ -478,12 +485,16 @@ function RoundEditor({
             className="bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/25"
           >
             {CATEGORIES.map((c) => (
-              <option key={c} value={c}>{c}</option>
+              <option key={c} value={c}>
+                {c}
+              </option>
             ))}
           </select>
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-xs text-slate-500">Answer <span className="text-slate-600">(secret)</span></label>
+          <label className="text-xs text-slate-500">
+            Answer <span className="text-slate-600">(secret)</span>
+          </label>
           <input
             type="text"
             value={round.answer}
@@ -499,7 +510,9 @@ function RoundEditor({
       {pickerOpen ? (
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
-            <label className="text-xs text-slate-500">Clue image <span className="text-slate-600">(optional)</span></label>
+            <label className="text-xs text-slate-500">
+              Clue image <span className="text-slate-600">(optional)</span>
+            </label>
             <button
               type="button"
               onClick={() => setPickerOpen(false)}
@@ -528,7 +541,9 @@ function RoundEditor({
                 "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Crect width='40' height='40' fill='%23334155'/%3E%3C/svg%3E";
             }}
           />
-          <span className="flex-1 text-xs text-emerald-400 font-medium">Image selected ✓</span>
+          <span className="flex-1 text-xs text-emerald-400 font-medium">
+            Image selected ✓
+          </span>
           <button
             type="button"
             onClick={() => setPickerOpen(true)}
@@ -538,7 +553,9 @@ function RoundEditor({
           </button>
           <button
             type="button"
-            onClick={() => { onChange({ ...round, image: "" }); }}
+            onClick={() => {
+              onChange({ ...round, image: "" });
+            }}
             className="text-slate-500 hover:text-rose-400 transition-colors text-lg leading-none px-1"
           >
             ×
@@ -550,8 +567,11 @@ function RoundEditor({
           onClick={() => setPickerOpen(true)}
           className="flex items-center gap-2 text-xs text-slate-600 hover:text-sky-400 transition-colors py-0.5"
         >
-          <span className="w-5 h-5 rounded-md border border-dashed border-white/15 flex items-center justify-center hover:border-sky-500/40 text-slate-600">+</span>
-          Add clue image <span className="text-slate-700">(optional — text-only is fine)</span>
+          <span className="w-5 h-5 rounded-md border border-dashed border-white/15 flex items-center justify-center hover:border-sky-500/40 text-slate-600">
+            +
+          </span>
+          Add clue image{" "}
+          <span className="text-slate-700">(optional — text-only is fine)</span>
         </button>
       )}
 
@@ -562,14 +582,22 @@ function RoundEditor({
             <input
               type="checkbox"
               checked={round.hideBlanks}
-              onChange={(e) => onChange({ ...round, hideBlanks: e.target.checked })}
+              onChange={(e) =>
+                onChange({ ...round, hideBlanks: e.target.checked })
+              }
               className="sr-only"
             />
-            <div className={`w-7 h-3.5 rounded-full transition-colors ${round.hideBlanks ? "bg-sky-600" : "bg-white/10"}`}>
-              <div className={`absolute top-0.5 w-2.5 h-2.5 rounded-full bg-white shadow transition-transform ${round.hideBlanks ? "translate-x-3.5" : "translate-x-0.5"}`} />
+            <div
+              className={`w-7 h-3.5 rounded-full transition-colors ${round.hideBlanks ? "bg-sky-600" : "bg-white/10"}`}
+            >
+              <div
+                className={`absolute top-0.5 w-2.5 h-2.5 rounded-full bg-white shadow transition-transform ${round.hideBlanks ? "translate-x-3.5" : "translate-x-0.5"}`}
+              />
             </div>
           </div>
-          <span className="text-xs text-slate-500">Hide letter count until first hint</span>
+          <span className="text-xs text-slate-500">
+            Hide letter count until first hint
+          </span>
         </label>
         {canRemove && (
           <button
@@ -625,8 +653,7 @@ function RoundSetupForm({
   const updateRound = (i: number, r: GameRoundInput) =>
     setRounds((prev) => prev.map((x, idx) => (idx === i ? r : x)));
 
-  const isRoundValid = (r: GameRoundInput) =>
-    r.answer.trim().length > 0;
+  const isRoundValid = (r: GameRoundInput) => r.answer.trim().length > 0;
 
   const validRounds = rounds.filter(isRoundValid);
 
@@ -894,7 +921,10 @@ function useSecondsLeft(turnDeadline: number | null, serverNow: number) {
   const offset = serverNow ? Date.now() - serverNow : 0;
   const compute = () => {
     if (!turnDeadline) return null;
-    return Math.max(0, Math.ceil((turnDeadline - (Date.now() - offset)) / 1000));
+    return Math.max(
+      0,
+      Math.ceil((turnDeadline - (Date.now() - offset)) / 1000),
+    );
   };
   const [value, setValue] = useState<number | null>(compute);
   useEffect(() => {
@@ -973,12 +1003,10 @@ function ActiveRoundView({
   const blanksHidden =
     round.hideBlanks && round.hintsRevealed === 0 && !amActiveQuestioner;
 
-  const currentGuesserName =
-    game.session.currentGuesserSocketId
-      ? game.session.participantUsernames[
-          game.session.currentGuesserSocketId
-        ] ?? "Someone"
-      : "Someone";
+  const currentGuesserName = game.session.currentGuesserSocketId
+    ? (game.session.participantUsernames[game.session.currentGuesserSocketId] ??
+      "Someone")
+    : "Someone";
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1236,10 +1264,14 @@ function RoundResultsView({
   const canAdvance =
     questioner.socketId === mySocketId || game.creatorId === mySocketId;
   // Rounds remaining after this one (for current questioner and all others)
-  const remainingCurrent = questioner.totalRounds - questioner.currentRoundIndex - 1;
+  const remainingCurrent =
+    questioner.totalRounds - questioner.currentRoundIndex - 1;
   const remainingOthers = game.questioners
     .filter((q) => q.socketId !== questioner.socketId)
-    .reduce((sum, q) => sum + Math.max(0, q.totalRounds - q.currentRoundIndex), 0);
+    .reduce(
+      (sum, q) => sum + Math.max(0, q.totalRounds - q.currentRoundIndex),
+      0,
+    );
   const hasMore = remainingCurrent > 0 || remainingOthers > 0;
 
   return (
@@ -1251,8 +1283,8 @@ function RoundResultsView({
       <div className="flex flex-col gap-5 min-w-0">
         <div className="flex items-center justify-between text-xs text-slate-500">
           <span>
-            Round {questioner.currentRoundIndex + 1} of{" "}
-            {questioner.totalRounds} — {questioner.username ?? "Unknown"}
+            Round {questioner.currentRoundIndex + 1} of {questioner.totalRounds}{" "}
+            — {questioner.username ?? "Unknown"}
           </span>
           <span className="px-2 py-0.5 rounded-lg bg-white/5">
             {round.category}
@@ -1283,9 +1315,7 @@ function RoundResultsView({
                 key={w.socketId}
                 className="px-3 py-1 rounded-full bg-emerald-600/20 text-emerald-300 text-sm border border-emerald-600/30"
                 title={
-                  typeof w.points === "number"
-                    ? `${w.points} pts`
-                    : undefined
+                  typeof w.points === "number" ? `${w.points} pts` : undefined
                 }
               >
                 {w.username ?? "Unknown"} ✓
@@ -1665,7 +1695,12 @@ function GameView({
     return (
       <div>
         {header}
-        <FinalScoreboard game={game} mySocketId={mySocketId} isRoomHost={isRoomHost} onReset={onReset} />
+        <FinalScoreboard
+          game={game}
+          mySocketId={mySocketId}
+          isRoomHost={isRoomHost}
+          onReset={onReset}
+        />
       </div>
     );
   }
@@ -1764,10 +1799,7 @@ function GameLobby({
   mySocketId: string;
   isRoomHost: boolean;
   onSelectGame: (gameId: string) => void;
-  onCreateGame: (
-    rounds: GameRoundInput[],
-    options?: CreateGameOptions,
-  ) => void;
+  onCreateGame: (rounds: GameRoundInput[], options?: CreateGameOptions) => void;
   onDeleteGame: (gameId: string) => void;
 }) {
   const [creatingGame, setCreatingGame] = useState(false);
@@ -1834,7 +1866,9 @@ function GameLobby({
                 optional clue image.
               </li>
               <li>
-                <span className="text-slate-200 font-medium">Invite friends.</span>{" "}
+                <span className="text-slate-200 font-medium">
+                  Invite friends.
+                </span>{" "}
                 Other players in this room can join as additional questioners
                 with their own rounds.
               </li>
@@ -1849,8 +1883,9 @@ function GameLobby({
               </li>
             </ol>
             <div className="mt-3 pt-3 border-t border-white/10 text-[11px] text-slate-500">
-              Typos and punctuation are forgiven — &ldquo;the matrix&rdquo; matches
-              &ldquo;Matrix&rdquo;, &ldquo;cafe&rdquo; matches &ldquo;café&rdquo;.
+              Typos and punctuation are forgiven — &ldquo;the matrix&rdquo;
+              matches &ldquo;Matrix&rdquo;, &ldquo;cafe&rdquo; matches
+              &ldquo;café&rdquo;.
             </div>
           </div>
           <button
@@ -1931,9 +1966,7 @@ export function GamePanel({
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
   const prevGameIdsRef = React.useRef<Set<string>>(new Set());
 
-  const selectedGame = gameState.games.find(
-    (g) => g.gameId === selectedGameId,
-  );
+  const selectedGame = gameState.games.find((g) => g.gameId === selectedGameId);
 
   // Auto-select newly created game (mine) or the only active game
   React.useEffect(() => {
@@ -1966,9 +1999,7 @@ export function GamePanel({
         onEndRound={() => endRound(selectedGame.gameId)}
         onNextRound={() => nextRound(selectedGame.gameId)}
         onEndSession={() => endSession(selectedGame.gameId)}
-        onSetObserver={(observer) =>
-          setObserver(selectedGame.gameId, observer)
-        }
+        onSetObserver={(observer) => setObserver(selectedGame.gameId, observer)}
         onReset={() => {
           resetGame(selectedGame.gameId);
           setSelectedGameId(null);

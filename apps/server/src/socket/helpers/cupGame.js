@@ -56,7 +56,8 @@ function clampLives(value, fallback = 3) {
 }
 
 function getOrCreateRoomCupGames(state, roomId) {
-  if (!state.roomCupGames.has(roomId)) state.roomCupGames.set(roomId, new Map());
+  if (!state.roomCupGames.has(roomId))
+    state.roomCupGames.set(roomId, new Map());
   return state.roomCupGames.get(roomId);
 }
 
@@ -71,12 +72,41 @@ function pickGridForPlayers(playerCount, sizePref) {
     if (sizePref === "large") return large;
     return standard;
   };
-  if (playerCount <= 2) return choose({ rows: 4, cols: 4 }, { rows: 4, cols: 4 }, { rows: 5, cols: 5 });
-  if (playerCount === 3) return choose({ rows: 4, cols: 4 }, { rows: 4, cols: 5 }, { rows: 5, cols: 6 });
-  if (playerCount === 4) return choose({ rows: 4, cols: 5 }, { rows: 5, cols: 6 }, { rows: 6, cols: 6 });
-  if (playerCount === 5) return choose({ rows: 5, cols: 6 }, { rows: 6, cols: 6 }, { rows: 6, cols: 7 });
-  if (playerCount === 6) return choose({ rows: 5, cols: 7 }, { rows: 6, cols: 7 }, { rows: 7, cols: 7 });
-  return choose({ rows: 6, cols: 7 }, { rows: 7, cols: 7 }, { rows: 7, cols: 8 });
+  if (playerCount <= 2)
+    return choose(
+      { rows: 4, cols: 4 },
+      { rows: 4, cols: 4 },
+      { rows: 5, cols: 5 },
+    );
+  if (playerCount === 3)
+    return choose(
+      { rows: 4, cols: 4 },
+      { rows: 4, cols: 5 },
+      { rows: 5, cols: 6 },
+    );
+  if (playerCount === 4)
+    return choose(
+      { rows: 4, cols: 5 },
+      { rows: 5, cols: 6 },
+      { rows: 6, cols: 6 },
+    );
+  if (playerCount === 5)
+    return choose(
+      { rows: 5, cols: 6 },
+      { rows: 6, cols: 6 },
+      { rows: 6, cols: 7 },
+    );
+  if (playerCount === 6)
+    return choose(
+      { rows: 5, cols: 7 },
+      { rows: 6, cols: 7 },
+      { rows: 7, cols: 7 },
+    );
+  return choose(
+    { rows: 6, cols: 7 },
+    { rows: 7, cols: 7 },
+    { rows: 7, cols: 8 },
+  );
 }
 
 function makeGameId() {
@@ -87,7 +117,12 @@ function makeCups(rows, cols) {
   const total = rows * cols;
   const cups = new Array(total);
   for (let i = 0; i < total; i++) {
-    cups[i] = { index: i, status: "hidden", revealedAs: undefined, ownerSocketId: undefined };
+    cups[i] = {
+      index: i,
+      status: "hidden",
+      revealedAs: undefined,
+      ownerSocketId: undefined,
+    };
   }
   return cups;
 }
@@ -108,7 +143,15 @@ function makePlayer(socketId, username, startingLives, isSpectator = false) {
   };
 }
 
-function newGame({ creatorSocketId, creatorUsername, startingLives, gridSize, turnTimerSeconds, roomSocketIds, usernamesById }) {
+function newGame({
+  creatorSocketId,
+  creatorUsername,
+  startingLives,
+  gridSize,
+  turnTimerSeconds,
+  roomSocketIds,
+  usernamesById,
+}) {
   const lives = clampLives(startingLives);
   const grid = pickGridForPlayers(roomSocketIds.length || 2, gridSize);
   const cups = makeCups(grid.rows, grid.cols);
@@ -201,7 +244,11 @@ function advanceTurn(game) {
     if (!p || p.eliminated) continue;
     if (p.skipNextTurn) {
       p.skipNextTurn = false;
-      pushEvent(game, { kind: "skip", targetSocketId: sid, reason: "scheduled" });
+      pushEvent(game, {
+        kind: "skip",
+        targetSocketId: sid,
+        reason: "scheduled",
+      });
       continue;
     }
     return;
@@ -235,7 +282,11 @@ function applyHit(game, victimSocketId, spiderOwnerSocketId) {
   const p = getPlayer(game, victimSocketId);
   if (!p || p.eliminated) return { hit: false, mirroredTo: null };
 
-  if (p.hasMirror && spiderOwnerSocketId && spiderOwnerSocketId !== victimSocketId) {
+  if (
+    p.hasMirror &&
+    spiderOwnerSocketId &&
+    spiderOwnerSocketId !== victimSocketId
+  ) {
     p.hasMirror = false;
     const owner = getPlayer(game, spiderOwnerSocketId);
     if (owner && !owner.eliminated) {
@@ -331,11 +382,47 @@ function checkEndConditions(game) {
 function clearPendingCardIfDone(game) {
   if (!game.pendingCard) return;
   // Some cards (flipPlusTwo) keep awaiting until remainingFlips reaches 0.
-  if (game.pendingCard.remainingFlips && game.pendingCard.remainingFlips > 0) return;
+  if (game.pendingCard.remainingFlips && game.pendingCard.remainingFlips > 0)
+    return;
   game.pendingCard = null;
 }
 
 // ── Per-viewer payload builder ───────────────────────────────────────────────
+
+function buildPendingCardPayload(pendingCard, forSocketId) {
+  if (!pendingCard) return null;
+  const payload = { ...pendingCard };
+
+  // During relocate step two the source cup is still hidden. Only the drawer
+  // needs its index to render the selected source; exposing it to opponents
+  // reveals the exact location of one of the drawer's spiders.
+  if (pendingCard.drawerSocketId !== forSocketId) {
+    delete payload.srcCupIndex;
+  }
+
+  return payload;
+}
+
+function buildLastEventPayload(lastEvent, forSocketId) {
+  if (!lastEvent) return null;
+  const payload = { ...lastEvent };
+
+  // Peek and relocate effects are public, but the cups involved are not. The
+  // UI only needs these coordinates for the player who performed the action.
+  if (lastEvent.kind === "peek" && lastEvent.drawerSocketId !== forSocketId) {
+    delete payload.cupIndex;
+    delete payload.revealedAs;
+  }
+  if (
+    lastEvent.kind === "relocate" &&
+    lastEvent.ownerSocketId !== forSocketId
+  ) {
+    delete payload.fromCupIndex;
+    delete payload.toCupIndex;
+  }
+
+  return payload;
+}
 
 function buildCupGamePayload(state, game, forSocketId) {
   // `mineSpider` surfaces in two situations:
@@ -387,7 +474,7 @@ function buildCupGamePayload(state, game, forSocketId) {
     status: game.status,
     turnOrder: [...(game.turnOrder || [])],
     currentTurnSocketId: getCurrentTurnSocketId(game),
-    pendingCard: game.pendingCard ? { ...game.pendingCard } : null,
+    pendingCard: buildPendingCardPayload(game.pendingCard, forSocketId),
     turnDeadline: game.turnDeadline ?? null,
     serverNow: Date.now(),
     winnerSocketId: game.winnerSocketId ?? null,
@@ -395,7 +482,7 @@ function buildCupGamePayload(state, game, forSocketId) {
       ? [...game.drawWinnerSocketIds]
       : [],
     effectSeq: game.effectSeq || 0,
-    lastEvent: game.lastEvent || null,
+    lastEvent: buildLastEventPayload(game.lastEvent, forSocketId),
   };
 
   return {
@@ -421,15 +508,44 @@ function buildRoomCupGamesPayload(state, roomId, forSocketId) {
 }
 
 function emitCupGameStateTo(state, socket, roomId) {
-  socket.emit("cup_game_state", buildRoomCupGamesPayload(state, roomId, socket.id));
+  socket.emit(
+    "cup_game_state",
+    buildRoomCupGamesPayload(state, roomId, socket.id),
+  );
 }
 
 function emitCupGameStateToRoom(io, state, roomId) {
   const room = io.sockets.adapter.rooms.get(roomId);
   if (!room) return;
+  const games = state.roomCupGames.get(roomId);
+  const privateViewerIds = new Set();
+  for (const game of games?.values() || []) {
+    if (game.status === "placing") {
+      for (const player of game.players || []) {
+        privateViewerIds.add(player.socketId);
+      }
+    }
+    if (game.pendingCard?.drawerSocketId) {
+      privateViewerIds.add(game.pendingCard.drawerSocketId);
+    }
+    if (game.lastEvent?.kind === "peek" && game.lastEvent.drawerSocketId) {
+      privateViewerIds.add(game.lastEvent.drawerSocketId);
+    }
+    if (game.lastEvent?.kind === "relocate" && game.lastEvent.ownerSocketId) {
+      privateViewerIds.add(game.lastEvent.ownerSocketId);
+    }
+  }
+  const payloadCache = new Map();
   for (const socketId of room) {
     const s = io.sockets.sockets.get(socketId);
-    if (s) s.emit("cup_game_state", buildRoomCupGamesPayload(state, roomId, socketId));
+    if (!s) continue;
+    const visibilityKey = privateViewerIds.has(socketId) ? socketId : "public";
+    let payload = payloadCache.get(visibilityKey);
+    if (!payload) {
+      payload = buildRoomCupGamesPayload(state, roomId, socketId);
+      payloadCache.set(visibilityKey, payload);
+    }
+    s.emit("cup_game_state", payload);
   }
 }
 
@@ -450,7 +566,8 @@ function cleanupDisconnectFromCupGames(io, state, roomId, socketId) {
     }
     if (game.status === "placing") {
       // Forfeit any spiders they placed; remove them.
-      for (const cupIdx of [...p.mySpiderCups]) game.spiderOwnerByCup.delete(cupIdx);
+      for (const cupIdx of [...p.mySpiderCups])
+        game.spiderOwnerByCup.delete(cupIdx);
       game.players = game.players.filter((x) => x.socketId !== socketId);
       anyChange = true;
       continue;
@@ -471,7 +588,8 @@ function cleanupDisconnectFromCupGames(io, state, roomId, socketId) {
       const oIdx = game.turnOrder.indexOf(socketId);
       if (oIdx !== -1) {
         game.turnOrder.splice(oIdx, 1);
-        if (game.currentTurnIdx >= game.turnOrder.length) game.currentTurnIdx = 0;
+        if (game.currentTurnIdx >= game.turnOrder.length)
+          game.currentTurnIdx = 0;
       }
       // If the disconnect happened while they were holding a pending card,
       // void it so the table isn't stuck.
@@ -558,6 +676,8 @@ module.exports = {
   flipCupLowLevel,
   checkEndConditions,
   clearPendingCardIfDone,
+  buildPendingCardPayload,
+  buildLastEventPayload,
   buildCupGamePayload,
   buildRoomCupGamesPayload,
   emitCupGameStateTo,

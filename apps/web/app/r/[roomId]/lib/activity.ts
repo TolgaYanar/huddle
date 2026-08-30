@@ -39,7 +39,7 @@ export function capitalize(s: string) {
 }
 
 export function mapActivityEventToLog(
-  e: ActivityEvent
+  e: ActivityEvent,
 ): { type: string; msg: string } | null {
   if (!e) return null;
 

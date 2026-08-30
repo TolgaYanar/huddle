@@ -40,7 +40,9 @@ export function RoomSettingsPanel({
   const [passwordInput, setPasswordInput] = React.useState("");
   const [showPassword, setShowPassword] = React.useState(false);
   const [confirmKick, setConfirmKick] = React.useState<string | null>(null);
-  const [confirmTransfer, setConfirmTransfer] = React.useState<string | null>(null);
+  const [confirmTransfer, setConfirmTransfer] = React.useState<string | null>(
+    null,
+  );
 
   // Sync name input when panel opens or roomName changes externally.
   React.useEffect(() => {
@@ -59,8 +61,7 @@ export function RoomSettingsPanel({
 
   if (!isOpen) return null;
 
-  const getDisplayName = (id: string) =>
-    usernamesById[id] ?? id.slice(0, 6);
+  const getDisplayName = (id: string) => usernamesById[id] ?? id.slice(0, 6);
 
   const others = participants.filter((id) => id !== userId);
 
@@ -100,10 +101,11 @@ export function RoomSettingsPanel({
 
         {/* Scrollable body */}
         <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-5">
-
           {/* Room name */}
           <section>
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Room name</h3>
+            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+              Room name
+            </h3>
             <div className="flex gap-2">
               <input
                 value={nameInput}
@@ -145,7 +147,9 @@ export function RoomSettingsPanel({
           <section>
             <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
               Password
-              <span className={`ml-2 font-normal normal-case tracking-normal ${hasRoomPassword ? "text-amber-300" : "text-slate-500"}`}>
+              <span
+                className={`ml-2 font-normal normal-case tracking-normal ${hasRoomPassword ? "text-amber-300" : "text-slate-500"}`}
+              >
                 {hasRoomPassword ? "Enabled" : "Disabled"}
               </span>
             </h3>
@@ -211,15 +215,22 @@ export function RoomSettingsPanel({
                 <span className="flex-1 text-sm text-slate-200 truncate">
                   {getDisplayName(userId)}
                 </span>
-                <span className="text-xs text-indigo-300 font-medium">You · Host</span>
+                <span className="text-xs text-indigo-300 font-medium">
+                  You · Host
+                </span>
               </li>
 
               {others.map((id) => (
-                <li key={id} className="flex items-center gap-2 h-9 px-3 rounded-xl bg-white/5">
+                <li
+                  key={id}
+                  className="flex items-center gap-2 h-9 px-3 rounded-xl bg-white/5"
+                >
                   <span className="flex-1 text-sm text-slate-200 truncate">
                     {getDisplayName(id)}
                     {id === hostId && (
-                      <span className="ml-1.5 text-xs text-indigo-300">Host</span>
+                      <span className="ml-1.5 text-xs text-indigo-300">
+                        Host
+                      </span>
                     )}
                   </span>
 
@@ -296,7 +307,9 @@ export function RoomSettingsPanel({
               ))}
 
               {others.length === 0 && (
-                <li className="text-xs text-slate-500 px-3 py-2">No other participants</li>
+                <li className="text-xs text-slate-500 px-3 py-2">
+                  No other participants
+                </li>
               )}
             </ul>
           </section>

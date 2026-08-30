@@ -31,12 +31,10 @@ function setup() {
   // unsubscribe was invoked.
   let fired: ((data: { roomId: string }) => void) | null = null;
   const unsubscribe = vi.fn();
-  const onChatRateLimited = vi.fn(
-    (cb: (data: { roomId: string }) => void) => {
-      fired = cb;
-      return unsubscribe;
-    },
-  );
+  const onChatRateLimited = vi.fn((cb: (data: { roomId: string }) => void) => {
+    fired = cb;
+    return unsubscribe;
+  });
 
   // onSyncEvent is invoked unconditionally by the hook and must return a
   // cleanup; everything else the hook reads on the rate-limit path is

@@ -97,8 +97,8 @@ export function AddVideosToPlaylistModal(props: AddVideosToPlaylistModalProps) {
                 </label>
                 <p className="text-xs text-slate-500 mb-2">
                   Paste a YouTube video URL, YouTube playlist URL, Twitch/Kick
-                  stream, or direct video link. YouTube playlists will load
-                  all videos for preview.
+                  stream, or direct video link. YouTube playlists will load all
+                  videos for preview.
                 </p>
                 <div className="flex gap-2">
                   <input

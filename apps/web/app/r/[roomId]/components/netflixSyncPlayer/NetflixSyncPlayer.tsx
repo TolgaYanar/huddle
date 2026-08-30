@@ -213,12 +213,13 @@ export const NetflixSyncPlayer = forwardRef<
   }, [isPaused, onPause, onPlay]);
 
   useEffect(() => {
-    const countdownTimer = countdownRef.current;
-    const progressTimer = progressRef.current;
-
+    // Read the refs at teardown, not at mount. Capturing them here (as this
+    // effect used to) snapshots `null` for both, so the countdown interval
+    // armed later by the sync countdown was never cleared and kept calling
+    // setCountdown -> onReady() after the component unmounted.
     return () => {
-      if (countdownTimer) clearInterval(countdownTimer);
-      if (progressTimer) clearInterval(progressTimer);
+      if (countdownRef.current) clearInterval(countdownRef.current);
+      if (progressRef.current) clearInterval(progressRef.current);
     };
   }, []);
 

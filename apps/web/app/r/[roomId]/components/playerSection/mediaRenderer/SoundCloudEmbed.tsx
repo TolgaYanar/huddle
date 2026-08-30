@@ -98,8 +98,7 @@ function ensureWidgetApi(): Promise<void> {
     s.src = WIDGET_API_SRC;
     s.async = true;
     s.onload = () => resolve();
-    s.onerror = () =>
-      reject(new Error("SoundCloud Widget API failed to load"));
+    s.onerror = () => reject(new Error("SoundCloud Widget API failed to load"));
     document.head.appendChild(s);
   });
   return scriptPromise;
@@ -179,7 +178,9 @@ export const SoundCloudEmbed = forwardRef<
             }
           });
           // SoundCloud volume is 0..100; the room uses 0..1.
-          widget.setVolume(muted ? 0 : Math.max(0, Math.min(100, volume * 100)));
+          widget.setVolume(
+            muted ? 0 : Math.max(0, Math.min(100, volume * 100)),
+          );
           onReady();
           if (isPlaying) {
             suppressNextPlayRef.current = true;
@@ -224,20 +225,17 @@ export const SoundCloudEmbed = forwardRef<
           }
         });
 
-        widget.bind(
-          window.SC.Widget.Events.PLAY_PROGRESS,
-          (data) => {
-            const positionMs =
-              data && typeof data === "object" && "currentPosition" in data
-                ? (data as { currentPosition?: number }).currentPosition
-                : undefined;
-            if (typeof positionMs === "number" && Number.isFinite(positionMs)) {
-              const sec = positionMs / 1000;
-              lastPositionSecRef.current = sec;
-              onProgress(sec);
-            }
-          },
-        );
+        widget.bind(window.SC.Widget.Events.PLAY_PROGRESS, (data) => {
+          const positionMs =
+            data && typeof data === "object" && "currentPosition" in data
+              ? (data as { currentPosition?: number }).currentPosition
+              : undefined;
+          if (typeof positionMs === "number" && Number.isFinite(positionMs)) {
+            const sec = positionMs / 1000;
+            lastPositionSecRef.current = sec;
+            onProgress(sec);
+          }
+        });
 
         widget.bind(window.SC.Widget.Events.ERROR, (err) => {
           onError(err);

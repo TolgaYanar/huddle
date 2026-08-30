@@ -14,7 +14,7 @@ export function useStagePinning({
   remoteStreams,
 }: UseStagePinningProps) {
   const [pinnedStage, setPinnedStage] = useState<DraggedTilePayload | null>(
-    null
+    null,
   );
   const [isStageDragOver, setIsStageDragOver] = useState(false);
   const [isDraggingTile, setIsDraggingTile] = useState(false);

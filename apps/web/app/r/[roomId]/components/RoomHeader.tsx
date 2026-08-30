@@ -169,7 +169,9 @@ export function RoomHeader({
           <>
             <div className="hidden md:inline-flex items-center gap-1.5 text-xs border border-white/10 bg-black/20 rounded-full px-3 py-1 text-slate-300">
               <span className="text-slate-500">@</span>
-              <span className="text-slate-200 font-medium">{authUser.username}</span>
+              <span className="text-slate-200 font-medium">
+                {authUser.username}
+              </span>
             </div>
             <button
               type="button"
@@ -242,7 +244,9 @@ export function RoomHeader({
           >
             <path d="M11.48 3.499a.75.75 0 011.04 0l2.84 2.751 3.83.557a.75.75 0 01.41 1.28l-2.77 2.7.65 3.81a.75.75 0 01-1.09.79L12 13.51l-3.39 1.78a.75.75 0 01-1.09-.79l.65-3.81-2.77-2.7a.75.75 0 01.41-1.28l3.83-.557 2.84-2.751z" />
           </svg>
-          <span className="hidden sm:inline">{saveBusy ? "…" : isSaved ? "Saved" : "Save"}</span>
+          <span className="hidden sm:inline">
+            {saveBusy ? "…" : isSaved ? "Saved" : "Save"}
+          </span>
         </button>
 
         {saveError && (
@@ -338,7 +342,9 @@ export function RoomHeader({
               <path d="M14 11a5 5 0 00-7.07 0l-3 3a5 5 0 007.07 7.07l1-1" />
             </svg>
           )}
-          <span className="hidden md:inline">{copied ? "Copied" : "Copy invite"}</span>
+          <span className="hidden md:inline">
+            {copied ? "Copied" : "Copy invite"}
+          </span>
         </button>
 
         <TimerWidget {...timerWidgetProps} />
@@ -393,7 +399,15 @@ export function RoomHeader({
             className="hidden sm:inline-flex items-center gap-1.5 text-xs font-medium bg-amber-400/10 px-2.5 py-1 rounded-full border border-amber-400/30 text-amber-200"
             title="This room is password-protected"
           >
-            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              className="w-3 h-3"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <rect x="4" y="11" width="16" height="10" rx="2" />
               <path d="M8 11V7a4 4 0 018 0v4" />
             </svg>

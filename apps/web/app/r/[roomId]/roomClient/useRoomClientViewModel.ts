@@ -23,6 +23,9 @@ import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
 import { useTimer } from "../hooks/useTimer";
 import { writeRoomHistory } from "../../../lib/roomHistory";
 
+const capitalize = (value: string) =>
+  value.charAt(0).toUpperCase() + value.slice(1);
+
 export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
   const [userId, setUserId] = useState("");
   const [isClient, setIsClient] = useState(false);
@@ -30,12 +33,17 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
   const [isCallCollapsed, setIsCallCollapsed] = useState(false);
   const [isActivityCollapsed, setIsActivityCollapsed] = useState(false);
   const [isTheatreMode, setIsTheatreMode] = useState(false);
+  const toggleTheatreMode = useCallback(
+    () => setIsTheatreMode((value) => !value),
+    [],
+  );
 
   const [echoCancellationEnabled, setEchoCancellationEnabled] = useState(true);
   const [noiseSuppressionEnabled, setNoiseSuppressionEnabled] = useState(true);
   const [autoGainControlEnabled, setAutoGainControlEnabled] = useState(true);
   const [pushToTalkEnabled, setPushToTalkEnabled] = useState(false);
   const [guestUsername, setGuestUsernameState] = useState("");
+  const guestUsernameRef = useRef("");
   const hasInitialSyncRef = useRef<boolean>(false);
   const mountTimeRef = useRef<number>(Date.now());
 
@@ -44,21 +52,33 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
     mountTimeRef.current = Date.now();
     hasInitialSyncRef.current = false;
     try {
-      setGuestUsernameState(window.localStorage.getItem("huddle:username") ?? "");
-    } catch { /* ignore */ }
+      const savedGuestUsername =
+        window.localStorage.getItem("huddle:username") ?? "";
+      guestUsernameRef.current = savedGuestUsername;
+      setGuestUsernameState(savedGuestUsername);
+    } catch {
+      /* ignore */
+    }
   }, []);
 
   useEffect(() => {
     let cancelled = false;
     apiAuthMe()
-      .then((r) => { if (!cancelled) setAuthUser(r.user); })
-      .catch(() => { if (!cancelled) setAuthUser(null); });
-    return () => { cancelled = true; };
+      .then((r) => {
+        if (!cancelled) setAuthUser(r.user);
+      })
+      .catch(() => {
+        if (!cancelled) setAuthUser(null);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useUnhandledRejectionGuard();
 
   const room = useRoom(roomId, userId);
+  const setRoomUsername = room.setUsername;
 
   const sendSyncEvent = useGuardedSendSyncEvent(
     room.sendSyncEvent,
@@ -69,21 +89,25 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
   // Auto-send saved guest name when connecting (only for non-auth users)
   useEffect(() => {
     if (!isClient || !room.isConnected || authUser) return;
-    const name = guestUsername.trim();
-    if (name) room.setUsername(name);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isClient, room.isConnected, authUser]);
+    const name = guestUsernameRef.current.trim();
+    if (name) setRoomUsername(name);
+  }, [isClient, room.isConnected, authUser, setRoomUsername]);
 
-  const setGuestUsername = useCallback((name: string) => {
-    const trimmed = name.trim().slice(0, 30);
-    setGuestUsernameState(trimmed);
-    try {
-      if (trimmed) window.localStorage.setItem("huddle:username", trimmed);
-      else window.localStorage.removeItem("huddle:username");
-    } catch { /* ignore */ }
-    room.setUsername(trimmed);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [room.setUsername]);
+  const setGuestUsername = useCallback(
+    (name: string) => {
+      const trimmed = name.trim().slice(0, 30);
+      guestUsernameRef.current = trimmed;
+      setGuestUsernameState(trimmed);
+      try {
+        if (trimmed) window.localStorage.setItem("huddle:username", trimmed);
+        else window.localStorage.removeItem("huddle:username");
+      } catch {
+        /* ignore */
+      }
+      setRoomUsername(trimmed);
+    },
+    [setRoomUsername],
+  );
 
   useEffect(() => {
     if (room.isConnected && room.socket?.id) {
@@ -184,7 +208,7 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
     handleVolumeFromController: playback.video.handleVolumeFromController,
     toggleLocalMute: playback.video.toggleLocalMute,
     togglePlayerFullscreen: fullscreen.togglePlayerFullscreen,
-    toggleTheatreMode: () => setIsTheatreMode((v) => !v),
+    toggleTheatreMode,
   });
 
   const handleOpenAddToPlaylist = useCallback(() => {
@@ -215,12 +239,10 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
     audioSyncEnabled: playback.audioSyncEnabled,
     onAudioSyncEnabledChange: playback.handleAudioSyncEnabledChange,
     fullscreenChatMessages: playback.fullscreenChatMessages,
-    chatText: playback.activity.chatText,
-    setChatText: playback.activity.setChatText,
-    handleSendChat: playback.activity.handleSendChat,
+    sendChat: playback.activity.sendChat,
     onVideoEnded: playback.handleVideoEnded,
     isTheatreMode,
-    onToggleTheatreMode: () => setIsTheatreMode((v) => !v),
+    onToggleTheatreMode: toggleTheatreMode,
   });
 
   const playlistPanelProps = buildPlaylistPanelProps({
@@ -274,11 +296,13 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
     autoGainControlEnabled,
     setAutoGainControlEnabled,
     localVideoRef: rtc.mediaTracks.localVideoRef,
+    setLocalVideoElement: rtc.mediaTracks.setLocalVideoElement,
     remoteStreams: rtc.remoteStreams,
     remoteSpeaking: rtc.remoteSpeaking,
     remoteMedia: rtc.remoteMedia,
     setIsDraggingTile: stagePinning.setIsDraggingTile,
     setIsStageDragOver: stagePinning.setIsStageDragOver,
+    onPinTile: stagePinning.setPinnedStage,
   });
 
   const addToPlaylistModalProps = {
@@ -368,26 +392,48 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
     mySocketId: room.socket?.id || userId,
   });
 
-  const gameProps = {
-    gameState: game.gameState,
-    mySocketId: room.socket?.id || userId,
-    isRoomHost: roomState.hostId === userId,
-    createGame: game.createGame,
-    addRounds: game.addRounds,
-    removeRounds: game.removeRounds,
-    startSession: game.startSession,
-    submitGuess: game.submitGuess,
-    revealHint: game.revealHint,
-    skipTurn: game.skipTurn,
-    endRound: game.endRound,
-    nextRound: game.nextRound,
-    endSession: game.endSession,
-    setObserver: game.setObserver,
-    resetGame: game.resetGame,
-  };
+  const gameProps = useMemo(
+    () => ({
+      gameState: game.gameState,
+      mySocketId: room.socket?.id || userId,
+      isRoomHost: roomState.hostId === userId,
+      createGame: game.createGame,
+      addRounds: game.addRounds,
+      removeRounds: game.removeRounds,
+      startSession: game.startSession,
+      submitGuess: game.submitGuess,
+      revealHint: game.revealHint,
+      skipTurn: game.skipTurn,
+      endRound: game.endRound,
+      nextRound: game.nextRound,
+      endSession: game.endSession,
+      setObserver: game.setObserver,
+      resetGame: game.resetGame,
+    }),
+    [
+      game.gameState,
+      game.createGame,
+      game.addRounds,
+      game.removeRounds,
+      game.startSession,
+      game.submitGuess,
+      game.revealHint,
+      game.skipTurn,
+      game.endRound,
+      game.nextRound,
+      game.endSession,
+      game.setObserver,
+      game.resetGame,
+      room.socket?.id,
+      roomState.hostId,
+      userId,
+    ],
+  );
 
   const cupGame = useCupGame({
-    socket: room.socket as unknown as Parameters<typeof useCupGame>[0]["socket"],
+    socket: room.socket as unknown as Parameters<
+      typeof useCupGame
+    >[0]["socket"],
     onCupGameState: room.onCupGameState,
     requestCupGameState: room.requestCupGameState,
     createCupGame: room.createCupGame,
@@ -404,22 +450,41 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
     mySocketId: room.socket?.id || userId,
   });
 
-  const cupGameProps = {
-    cupGameState: cupGame.cupGameState,
-    mySocketId: room.socket?.id || userId,
-    isRoomHost: roomState.hostId === userId,
-    createCupGame: cupGame.createCupGame,
-    updateCupGameConfig: cupGame.updateCupGameConfig,
-    startCupGamePlacement: cupGame.startCupGamePlacement,
-    toggleCupGameSpider: cupGame.toggleCupGameSpider,
-    lockCupGamePlacement: cupGame.lockCupGamePlacement,
-    unlockCupGamePlacement: cupGame.unlockCupGamePlacement,
-    flipCup: cupGame.flipCup,
-    drawCupGameCard: cupGame.drawCupGameCard,
-    resolveCupGameCard: cupGame.resolveCupGameCard,
-    cancelCupGameCard: cupGame.cancelCupGameCard,
-    resetCupGame: cupGame.resetCupGame,
-  };
+  const cupGameProps = useMemo(
+    () => ({
+      cupGameState: cupGame.cupGameState,
+      mySocketId: room.socket?.id || userId,
+      isRoomHost: roomState.hostId === userId,
+      createCupGame: cupGame.createCupGame,
+      updateCupGameConfig: cupGame.updateCupGameConfig,
+      startCupGamePlacement: cupGame.startCupGamePlacement,
+      toggleCupGameSpider: cupGame.toggleCupGameSpider,
+      lockCupGamePlacement: cupGame.lockCupGamePlacement,
+      unlockCupGamePlacement: cupGame.unlockCupGamePlacement,
+      flipCup: cupGame.flipCup,
+      drawCupGameCard: cupGame.drawCupGameCard,
+      resolveCupGameCard: cupGame.resolveCupGameCard,
+      cancelCupGameCard: cupGame.cancelCupGameCard,
+      resetCupGame: cupGame.resetCupGame,
+    }),
+    [
+      cupGame.cupGameState,
+      cupGame.createCupGame,
+      cupGame.updateCupGameConfig,
+      cupGame.startCupGamePlacement,
+      cupGame.toggleCupGameSpider,
+      cupGame.lockCupGamePlacement,
+      cupGame.unlockCupGamePlacement,
+      cupGame.flipCup,
+      cupGame.drawCupGameCard,
+      cupGame.resolveCupGameCard,
+      cupGame.cancelCupGameCard,
+      cupGame.resetCupGame,
+      room.socket?.id,
+      roomState.hostId,
+      userId,
+    ],
+  );
 
   const activitySidebarProps = {
     roomId,
@@ -429,10 +494,8 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
     setIsActivityCollapsed,
     logs: playback.activity.logs,
     logsEndRef: playback.activity.logsEndRef,
-    capitalize: (s: string) => s.charAt(0).toUpperCase() + s.slice(1),
-    chatText: playback.activity.chatText,
-    setChatText: playback.activity.setChatText,
-    handleSendChat: playback.activity.handleSendChat,
+    capitalize,
+    sendChat: playback.activity.sendChat,
     reactions: playback.activity.reactions,
     addReaction: playback.activity.addReaction,
     gameProps,

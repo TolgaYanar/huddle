@@ -36,3 +36,8 @@ yarn-error.log*
 # Misc
 .DS_Store
 *.pem
+
+# Prisma
+# The project uses PostgreSQL; local SQLite files are artifacts, not the dev DB.
+*.db
+*.db-journal

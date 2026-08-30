@@ -9,9 +9,7 @@ import net from "node:net";
 
 export type PreviewUrlValidation = { ok: true } | { ok: false; reason: string };
 
-function parseIpv4Octets(
-  ip: string
-): [number, number, number, number] | null {
+function parseIpv4Octets(ip: string): [number, number, number, number] | null {
   if (net.isIP(ip) !== 4) return null;
   const parts = ip.split(".").map(Number);
   if (
@@ -64,7 +62,10 @@ function parseIpv6Hextets(ip: string): number[] | null {
   const di = s.indexOf("::");
   if (di !== -1) {
     const left = s.slice(0, di).split(":").filter(Boolean);
-    const right = s.slice(di + 2).split(":").filter(Boolean);
+    const right = s
+      .slice(di + 2)
+      .split(":")
+      .filter(Boolean);
     const fill = need - left.length - right.length;
     if (fill < 0) return null;
     groups = [...left, ...Array<string>(fill).fill("0"), ...right];
@@ -89,7 +90,14 @@ export function isPrivateIp(ip: string): boolean {
   if (!h) return true;
 
   const [h0, h1, h2, h3, h4, h5, h6, h7] = h as [
-    number, number, number, number, number, number, number, number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
   ];
 
   if (h0 === 0 && h1 === 0 && h2 === 0 && h3 === 0 && h4 === 0 && h5 === 0) {
@@ -106,10 +114,24 @@ export function isPrivateIp(ip: string): boolean {
     h7 >> 8,
     h7 & 0xff,
   ];
-  if (h0 === 0 && h1 === 0 && h2 === 0 && h3 === 0 && h4 === 0 && h5 === 0xffff) {
+  if (
+    h0 === 0 &&
+    h1 === 0 &&
+    h2 === 0 &&
+    h3 === 0 &&
+    h4 === 0 &&
+    h5 === 0xffff
+  ) {
     return isPrivateIpv4(embeddedV4()); // ::ffff:0:0/96 IPv4-mapped
   }
-  if (h0 === 0x64 && h1 === 0xff9b && h2 === 0 && h3 === 0 && h4 === 0 && h5 === 0) {
+  if (
+    h0 === 0x64 &&
+    h1 === 0xff9b &&
+    h2 === 0 &&
+    h3 === 0 &&
+    h4 === 0 &&
+    h5 === 0
+  ) {
     return isPrivateIpv4(embeddedV4()); // 64:ff9b::/96 NAT64
   }
 

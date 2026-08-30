@@ -94,6 +94,23 @@ export function PlaylistPanel({
     [dragIndex, selectedPlaylist, onReorderItems, handleDragEnd],
   );
 
+  const handleMoveItem = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      if (!selectedPlaylist) return;
+      if (toIndex < 0 || toIndex >= selectedPlaylist.items.length) return;
+
+      const items = [...selectedPlaylist.items];
+      const [movedItem] = items.splice(fromIndex, 1);
+      if (!movedItem) return;
+      items.splice(toIndex, 0, movedItem);
+      onReorderItems(
+        selectedPlaylist.id,
+        items.map((item) => item.id),
+      );
+    },
+    [selectedPlaylist, onReorderItems],
+  );
+
   const handleCreatePlaylist = useCallback(
     (name: string, description?: string) => {
       onCreatePlaylist(name, description);
@@ -337,8 +354,12 @@ export function PlaylistPanel({
                     }
                     isDragging={dragIndex === index}
                     isDragOver={dragOverIndex === index}
+                    canMoveUp={index > 0}
+                    canMoveDown={index < selectedPlaylist.items.length - 1}
                     onPlay={() => onPlayItem(selectedPlaylist.id, item.id)}
                     onRemove={() => onRemoveItem(selectedPlaylist.id, item.id)}
+                    onMoveUp={() => handleMoveItem(index, index - 1)}
+                    onMoveDown={() => handleMoveItem(index, index + 1)}
                     onDragStart={handleDragStart}
                     onDragOver={handleDragOver}
                     onDragEnd={handleDragEnd}

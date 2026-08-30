@@ -18,7 +18,7 @@ describe("ErrorBoundary", () => {
     render(
       <ErrorBoundary>
         <Bomb shouldThrow={false} />
-      </ErrorBoundary>
+      </ErrorBoundary>,
     );
     expect(screen.getByText("safe content")).toBeInTheDocument();
   });
@@ -27,7 +27,7 @@ describe("ErrorBoundary", () => {
     render(
       <ErrorBoundary>
         <Bomb shouldThrow={true} />
-      </ErrorBoundary>
+      </ErrorBoundary>,
     );
     expect(screen.getByText("Something went wrong")).toBeInTheDocument();
   });
@@ -36,7 +36,7 @@ describe("ErrorBoundary", () => {
     render(
       <ErrorBoundary fallback={<div>custom fallback</div>}>
         <Bomb shouldThrow={true} />
-      </ErrorBoundary>
+      </ErrorBoundary>,
     );
     expect(screen.getByText("custom fallback")).toBeInTheDocument();
   });
@@ -45,7 +45,7 @@ describe("ErrorBoundary", () => {
     render(
       <ErrorBoundary fallback={(err) => <div>caught: {err.message}</div>}>
         <Bomb shouldThrow={true} />
-      </ErrorBoundary>
+      </ErrorBoundary>,
     );
     expect(screen.getByText("caught: test explosion")).toBeInTheDocument();
   });
@@ -55,7 +55,7 @@ describe("ErrorBoundary", () => {
     render(
       <ErrorBoundary onError={onError}>
         <Bomb shouldThrow={true} />
-      </ErrorBoundary>
+      </ErrorBoundary>,
     );
     expect(onError).toHaveBeenCalledOnce();
     expect(onError.mock.calls[0]?.[0]).toBeInstanceOf(Error);
@@ -65,13 +65,13 @@ describe("ErrorBoundary", () => {
     const { rerender } = render(
       <ErrorBoundary>
         <Bomb shouldThrow={true} />
-      </ErrorBoundary>
+      </ErrorBoundary>,
     );
     // Update children to safe before resetting, so re-render after reset doesn't re-throw
     rerender(
       <ErrorBoundary>
         <Bomb shouldThrow={false} />
-      </ErrorBoundary>
+      </ErrorBoundary>,
     );
     fireEvent.click(screen.getByRole("button", { name: /try again/i }));
     expect(screen.getByText("safe content")).toBeInTheDocument();

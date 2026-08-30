@@ -29,7 +29,7 @@ export async function GET(req: Request) {
     // No key configured: don't error loudly; client will fall back.
     return NextResponse.json(
       { ok: false, reason: "missing_key" },
-      { status: 200 }
+      { status: 200 },
     );
   }
 
@@ -40,7 +40,7 @@ export async function GET(req: Request) {
   if (!videoId) {
     return NextResponse.json(
       { ok: false, reason: "invalid_url" },
-      { status: 200 }
+      { status: 200 },
     );
   }
 
@@ -67,7 +67,7 @@ export async function GET(req: Request) {
       if (reason === "quotaExceeded" || reason === "dailyLimitExceeded") {
         return NextResponse.json(
           { ok: false, reason: "quota" },
-          { status: 200 }
+          { status: 200 },
         );
       }
 
@@ -78,7 +78,7 @@ export async function GET(req: Request) {
     if (!item) {
       return NextResponse.json(
         { ok: false, reason: "not_found" },
-        { status: 200 }
+        { status: 200 },
       );
     }
 
@@ -107,7 +107,7 @@ export async function GET(req: Request) {
         thumbnail: thumbnailUrl,
         durationSeconds,
       },
-      { status: 200 }
+      { status: 200 },
     );
   } catch {
     return NextResponse.json({ ok: false, reason: "network" }, { status: 200 });

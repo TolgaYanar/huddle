@@ -42,7 +42,9 @@ export default function TermsOfServicePage() {
           <h1 className="text-3xl font-semibold tracking-tight text-slate-50">
             Terms of Service
           </h1>
-          <p className="mt-2 text-sm text-slate-400">Last updated: 2026-06-13</p>
+          <p className="mt-2 text-sm text-slate-400">
+            Last updated: 2026-06-13
+          </p>
         </header>
 
         <div className="space-y-8 text-slate-200">
@@ -177,9 +179,7 @@ export default function TermsOfServicePage() {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-xl font-semibold text-slate-100">
-              9) Privacy
-            </h2>
+            <h2 className="text-xl font-semibold text-slate-100">9) Privacy</h2>
             <p>
               Our handling of your information is described in our{" "}
               <Link

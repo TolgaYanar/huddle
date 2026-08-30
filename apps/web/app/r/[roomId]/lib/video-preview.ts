@@ -9,7 +9,7 @@ export interface VideoPreview {
 }
 
 export async function fetchVideoPreview(
-  url: string
+  url: string,
 ): Promise<VideoPreview | null> {
   try {
     const normalized = url.trim();
@@ -35,7 +35,7 @@ export async function fetchVideoPreview(
 
     // YouTube
     const ytMatch = normalized.match(
-      /(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/
+      /(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/,
     );
     if (ytMatch) {
       const videoId = ytMatch[1];
@@ -46,7 +46,7 @@ export async function fetchVideoPreview(
         const res = await fetchWithTimeout(
           `/api/youtube-preview?url=${encodeURIComponent(normalized)}`,
           { cache: "no-store" },
-          2500
+          2500,
         );
         const data = await res.json().catch(() => null);
         if (data && data.ok) {
@@ -90,7 +90,7 @@ export async function fetchVideoPreview(
         const res = await fetchWithTimeout(
           `https://vimeo.com/api/v2/video/${videoId}.json`,
           undefined,
-          2500
+          2500,
         );
         if (res.ok) {
           const data = await res.json();
@@ -221,7 +221,7 @@ async function probeVideoDurationSeconds(url: string): Promise<number | null> {
 async function fetchWithTimeout(
   input: RequestInfo | URL,
   init: RequestInit | undefined,
-  timeoutMs: number
+  timeoutMs: number,
 ): Promise<Response> {
   if (typeof AbortController === "undefined") {
     return fetch(input, init);
@@ -278,13 +278,13 @@ function extractTwitchChannel(rawUrl: string): string | null {
 }
 
 async function fetchOpenGraphPreview(
-  url: string
+  url: string,
 ): Promise<{ title: string | null; thumbnail: string | null } | null> {
   try {
     const res = await fetchWithTimeout(
       `/api/url-preview?url=${encodeURIComponent(url)}`,
       { cache: "no-store" },
-      2500
+      2500,
     );
     const data = await res.json().catch(() => null);
     if (!data || data.ok !== true) return null;

@@ -52,14 +52,28 @@ export function useHandleSeekFromController(args: PlaybackHandlersArgs) {
         return;
       }
 
-      if (!force && Date.now() < suppressSeekBroadcastUntilRef.current) {
+      // These two guards are NOT bypassable by `force`.
+      //
+      // `force` means "this came from a user scrubbing the player", and its
+      // only legitimate job is to bypass the small-delta heuristic below. The
+      // player callbacks that set it decide "user vs. remote" from
+      // navigator.userActivation.isActive, which is transient-active for ~5s
+      // after ANY gesture anywhere on the page — typing one chat message was
+      // enough. So a seek we had just applied from remote state came back
+      // through onSeek, bypassed both guards, and was re-broadcast to the
+      // room. Every member who had clicked anything recently echoed it, each
+      // echo re-anchoring the position: the "seek war".
+      //
+      // While we are actively applying remote state, a player callback is by
+      // definition an echo of that application, so it must never broadcast.
+      if (Date.now() < suppressSeekBroadcastUntilRef.current) {
         const newTime = Math.max(0, Math.min(time, duration || Infinity));
         seekToFromRef(playerRef, newTime);
         setCurrentTime(newTime);
         return;
       }
 
-      if (!force && applyingRemoteSyncRef.current) {
+      if (applyingRemoteSyncRef.current) {
         console.log(`[SEEK] Blocked: applying remote sync`);
         return;
       }

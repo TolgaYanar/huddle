@@ -3,3 +3,4 @@
 # tracking the binary, the manifest version + git tag is the source of
 # truth for which release a zip corresponds to.
 huddle-netflix-party-*.zip
+huddle-netflix-*.zip

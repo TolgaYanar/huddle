@@ -1,5 +1,6 @@
 const { emitPlaylistStateToRoom } = require("../helpers/playlists");
 const { applyPlaylistPlaybackToRoomState, persistRoomState } = require("../helpers/sync");
+const { isRoomMember } = require("../helpers/membership");
 
 function attachPlaylistPlaybackHandlers(io, state, socket, deps) {
   socket.on("playlist_play_item", async (data) => {
@@ -7,7 +8,7 @@ function attachPlaylistPlaybackHandlers(io, state, socket, deps) {
     if (!roomId || typeof roomId !== "string") return;
     if (!playlistId || typeof playlistId !== "string") return;
     if (!itemId || typeof itemId !== "string") return;
-    if (!socket.rooms.has(roomId)) return;
+    if (!isRoomMember(socket, roomId)) return;
     if (!deps.isDbConnected() || !deps.getPrisma()) return;
 
     try {
@@ -57,7 +58,7 @@ function attachPlaylistPlaybackHandlers(io, state, socket, deps) {
   socket.on("playlist_next", async (data) => {
     const { roomId } = data || {};
     if (!roomId || typeof roomId !== "string") return;
-    if (!socket.rooms.has(roomId)) return;
+    if (!isRoomMember(socket, roomId)) return;
     if (!deps.isDbConnected() || !deps.getPrisma()) return;
 
     const activeState = state.roomPlaylistActive.get(roomId);
@@ -141,7 +142,7 @@ function attachPlaylistPlaybackHandlers(io, state, socket, deps) {
   socket.on("playlist_previous", async (data) => {
     const { roomId } = data || {};
     if (!roomId || typeof roomId !== "string") return;
-    if (!socket.rooms.has(roomId)) return;
+    if (!isRoomMember(socket, roomId)) return;
     if (!deps.isDbConnected() || !deps.getPrisma()) return;
 
     const activeState = state.roomPlaylistActive.get(roomId);

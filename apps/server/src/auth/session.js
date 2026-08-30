@@ -18,7 +18,14 @@ function parseCookies(headerValue) {
     const key = part.slice(0, idx).trim();
     const val = part.slice(idx + 1).trim();
     if (!key) continue;
-    out[key] = decodeURIComponent(val);
+    try {
+      out[key] = decodeURIComponent(val);
+    } catch {
+      // A malformed escape (e.g. "%zz") is a bad request, not a server fault.
+      // Keep the raw value so the caller resolves it as "not authenticated"
+      // instead of throwing a 500 out of requireAuth/getAuthUser.
+      out[key] = val;
+    }
   }
   return out;
 }

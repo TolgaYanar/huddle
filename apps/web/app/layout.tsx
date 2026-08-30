@@ -100,11 +100,7 @@ export default function RootLayout({
   };
 
   return (
-    <html
-      lang="en"
-      suppressHydrationWarning
-      className="[color-scheme:dark]"
-    >
+    <html lang="en" suppressHydrationWarning className="[color-scheme:dark]">
       <head>
         <script
           type="application/ld+json"

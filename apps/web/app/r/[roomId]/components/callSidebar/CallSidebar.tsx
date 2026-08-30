@@ -82,7 +82,9 @@ import { AudioProcessingControls } from "./AudioProcessingControls";
 import { TileGrid } from "./TileGrid";
 import { ParticipantsWithoutStream } from "./ParticipantsWithoutStream";
 
-export function CallSidebar(props: CallSidebarProps) {
+export const CallSidebar = React.memo(function CallSidebar(
+  props: CallSidebarProps,
+) {
   const {
     userId,
     hostId,
@@ -114,11 +116,13 @@ export function CallSidebar(props: CallSidebarProps) {
     autoGainControlEnabled,
     setAutoGainControlEnabled,
     localVideoRef,
+    setLocalVideoElement,
     remoteStreams,
     remoteSpeaking,
     remoteMedia,
     setIsDraggingTile,
     setIsStageDragOver,
+    onPinTile,
   } = props;
 
   const isHost = Boolean(userId && hostId && userId === hostId);
@@ -144,12 +148,26 @@ export function CallSidebar(props: CallSidebarProps) {
 
         {isCallCollapsed ? (
           <div className="flex items-center gap-2">
-            <span className={`w-2 h-2 rounded-full ${micEnabled ? "bg-sky-400" : "bg-slate-600"}`} title={micEnabled ? "Mic on" : "Mic off"} />
-            <span className={`w-2 h-2 rounded-full ${camEnabled ? "bg-indigo-400" : "bg-slate-600"}`} title={camEnabled ? "Camera on" : "Camera off"} />
-            <span className={`w-2 h-2 rounded-full ${screenEnabled ? "bg-rose-400" : "bg-slate-600"}`} title={screenEnabled ? "Screen sharing" : "Screen off"} />
+            <span
+              className={`w-2 h-2 rounded-full ${micEnabled ? "bg-sky-400" : "bg-slate-600"}`}
+              title={micEnabled ? "Mic on" : "Mic off"}
+            />
+            <span
+              className={`w-2 h-2 rounded-full ${camEnabled ? "bg-indigo-400" : "bg-slate-600"}`}
+              title={camEnabled ? "Camera on" : "Camera off"}
+            />
+            <span
+              className={`w-2 h-2 rounded-full ${screenEnabled ? "bg-rose-400" : "bg-slate-600"}`}
+              title={screenEnabled ? "Screen sharing" : "Screen off"}
+            />
             <span className="text-xs text-slate-500">
-              {[remoteStreams.length + 1, participantsWithoutStream.length].reduce((a, b) => a + b, 0)}{" "}
-              {remoteStreams.length + 1 + participantsWithoutStream.length === 1 ? "person" : "people"}
+              {[
+                remoteStreams.length + 1,
+                participantsWithoutStream.length,
+              ].reduce((a, b) => a + b, 0)}{" "}
+              {remoteStreams.length + 1 + participantsWithoutStream.length === 1
+                ? "person"
+                : "people"}
             </span>
           </div>
         ) : (
@@ -194,6 +212,7 @@ export function CallSidebar(props: CallSidebarProps) {
               camEnabled={camEnabled}
               screenEnabled={screenEnabled}
               localVideoRef={localVideoRef}
+              setLocalVideoElement={setLocalVideoElement}
               remoteStreams={remoteStreams}
               remoteSpeaking={remoteSpeaking}
               remoteMedia={remoteMedia}
@@ -201,6 +220,7 @@ export function CallSidebar(props: CallSidebarProps) {
               getDisplayName={getDisplayName}
               setIsDraggingTile={setIsDraggingTile}
               setIsStageDragOver={setIsStageDragOver}
+              onPinTile={onPinTile}
             />
 
             <ParticipantsWithoutStream
@@ -216,4 +236,4 @@ export function CallSidebar(props: CallSidebarProps) {
       </div>
     </aside>
   );
-}
+});

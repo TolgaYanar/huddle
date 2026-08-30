@@ -268,7 +268,11 @@ export function useRoomCatchup({
 
     // Avoid redundant seeks if we just synced.
     const timeSinceAnchor = Date.now() - anchor.anchorAt;
-    if (timeSinceAnchor < SYNC_RECENT_ANCHOR_WINDOW_MS && drift < SYNC_RECENT_ANCHOR_DRIFT_SKIP_S) return;
+    if (
+      timeSinceAnchor < SYNC_RECENT_ANCHOR_WINDOW_MS &&
+      drift < SYNC_RECENT_ANCHOR_DRIFT_SKIP_S
+    )
+      return;
 
     applyingRemoteSyncRef.current = true;
     window.setTimeout(() => {

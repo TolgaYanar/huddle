@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const runtime = "edge";
+import { PopcornMark } from "./_components/PopcornMark";
 
 export const size = {
   width: 48,
@@ -21,10 +21,10 @@ export default function Icon() {
         borderRadius: "6px",
       }}
     >
-      <div style={{ fontSize: 28 }}>🍿</div>
+      <PopcornMark size={38} />
     </div>,
     {
       ...size,
-    }
+    },
   );
 }

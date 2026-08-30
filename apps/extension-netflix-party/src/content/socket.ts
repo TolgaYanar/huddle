@@ -13,6 +13,7 @@ import {
   shouldApplyFollow,
   roomIsOnNetflix,
 } from "./playerSync";
+import { receiveSyncCarriesPosition } from "./syncUtils";
 
 export function shouldEmitLocalSync(state: ContentState) {
   return Boolean(state.socket && state.socket.connected && state.currentRoomId);
@@ -135,7 +136,7 @@ export function connect(
         {
           updateOverlay,
         },
-        undefined,
+        { source: "room_state" },
       );
     }
   });
@@ -187,9 +188,15 @@ export function connect(
             ? false
             : undefined;
 
+      // set_volume / set_mute / set_audio_sync are not position-anchoring on
+      // the server, so payload.timestamp is whatever the last play/seek left
+      // behind. Feeding that to the drift check rewound Netflix viewers to a
+      // stale position whenever anyone touched the volume slider.
+      const carriesPosition = receiveSyncCarriesPosition(payload.action);
+
       const pseudoRoomState: RoomState = {
         roomId: payload.roomId,
-        timestamp: payload.timestamp,
+        ...(carriesPosition ? { timestamp: payload.timestamp } : {}),
         videoUrl: payload.videoUrl,
         updatedAt: payload.updatedAt,
         rev: payload.rev,
@@ -199,7 +206,9 @@ export function connect(
         // Only set isPlaying if the action implies it; leave undefined for
         // set_volume / set_speed / etc. so applyRoomStateToVideo doesn't
         // toggle playback as a side effect.
-        ...(inferredIsPlaying !== undefined && { isPlaying: inferredIsPlaying }),
+        ...(inferredIsPlaying !== undefined && {
+          isPlaying: inferredIsPlaying,
+        }),
         serverNow: payload.serverNow,
       };
 
@@ -210,7 +219,7 @@ export function connect(
           state,
           pseudoRoomState,
           { updateOverlay },
-          undefined,
+          { source: "receive_sync" },
         );
       }
     },
