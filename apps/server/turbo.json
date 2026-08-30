@@ -9,6 +9,10 @@
         "prisma/migrations/**",
         "prisma.config.js"
       ]
+    },
+    "test": {
+      "dependsOn": ["build"],
+      "outputs": []
     }
   }
 }

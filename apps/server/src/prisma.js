@@ -1,31 +1,10 @@
 const { PrismaClient } = require("@prisma/client");
 const { PrismaPg } = require("@prisma/adapter-pg");
 
-const DATABASE_CONNECTION_TIMEOUT_MS = 5_000;
-
-function getPrismaPgConfig(databaseUrl) {
-  let schema;
-  if (typeof databaseUrl === "string" && databaseUrl) {
-    try {
-      schema = new URL(databaseUrl).searchParams.get("schema") || undefined;
-    } catch {
-      // Let pg/Prisma report the malformed connection string during the probe.
-    }
-  }
-
-  return {
-    poolConfig: {
-      connectionString: databaseUrl,
-      // pg defaults to no timeout. Bound startup probes so an unreachable
-      // network cannot leave a connection attempt pending indefinitely.
-      connectionTimeoutMillis: DATABASE_CONNECTION_TIMEOUT_MS,
-    },
-    // Prisma 6 read `?schema=` from the datasource URL. Driver adapters need
-    // the schema explicitly or non-public-schema deployments silently query
-    // `public` after upgrading.
-    adapterOptions: schema ? { schema } : undefined,
-  };
-}
+const {
+  DATABASE_CONNECTION_TIMEOUT_MS,
+  getPrismaPgConfig,
+} = require("./prismaConfig");
 
 function initPrisma({ vLog }) {
   const state = {

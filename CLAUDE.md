@@ -60,8 +60,13 @@ expected full result, not a partial run. Server code is plain CommonJS JavaScrip
 type errors there are only caught by its `node --test` suites. Likewise only `web`
 defines `lint`, so `npm run lint` reports 1 task.
 
-Server tests do not need a database or a generated Prisma client: handlers take
-`prisma` by injection and only `src/prisma.js` imports `@prisma/client`.
+Server tests do not need a database, and almost none need a generated Prisma
+client: handlers take `prisma` by injection and only `src/prisma.js` imports
+`@prisma/client`. Keep it that way — put pure connection helpers in
+`src/prismaConfig.js` (no client import) and test those, not `src/prisma.js`.
+The one exception is `__tests__/prismaClient.test.js`, which is why the server's
+`test` task `dependsOn: ["build"]` (that build is `prisma generate`). Without
+that dependency the suite passes locally and fails on a fresh checkout.
 
 `web` builds with the Next 16 default (Turbopack). If a build appears to hang in
 the compile step, delete `apps/web/.next` and retry — a stale cache directory,
