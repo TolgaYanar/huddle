@@ -75,13 +75,14 @@ npm run dev
 ### Checks
 
 ```bash
+npm run format:check  # Prettier
 npm run lint          # ESLint (web)
 npm run check-types   # tsc (web + extension)
-npm run test          # vitest (web) + node:test (server)
+npm run test          # vitest (web + extension) + node:test (server)
 npm run build         # next build + prisma generate + extension bundle
 ```
 
-The same four commands run in CI on every push and pull request. Use Node
+The same five commands run in CI on every push and pull request. Use Node
 22.19.0 (`.nvmrc`).
 
 - 🌐 Web: http://localhost:3002

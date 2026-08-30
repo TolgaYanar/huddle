@@ -44,12 +44,18 @@ function registerAuthRoutes(
     const password = validatePassword(body?.password);
     if (!username) {
       return {
-        err: { status: 400, body: { error: "invalid_username", hint: "3-20 chars: a-z 0-9 _" } },
+        err: {
+          status: 400,
+          body: { error: "invalid_username", hint: "3-20 chars: a-z 0-9 _" },
+        },
       };
     }
     if (!password) {
       return {
-        err: { status: 400, body: { error: "invalid_password", hint: "min 8 characters" } },
+        err: {
+          status: 400,
+          body: { error: "invalid_password", hint: "min 8 characters" },
+        },
       };
     }
 
@@ -113,7 +119,8 @@ function registerAuthRoutes(
         return res.status(503).json({ error: "db_unavailable" });
       }
       const result = await createUser(req.body);
-      if (result.err) return res.status(result.err.status).json(result.err.body);
+      if (result.err)
+        return res.status(result.err.status).json(result.err.body);
       setSessionCookie(req, res, result.token);
       return res.json({ user: result.user });
     } catch (err) {
@@ -131,7 +138,8 @@ function registerAuthRoutes(
         return res.status(503).json({ error: "db_unavailable" });
       }
       const result = await authenticateUser(req.body);
-      if (result.err) return res.status(result.err.status).json(result.err.body);
+      if (result.err)
+        return res.status(result.err.status).json(result.err.body);
       setSessionCookie(req, res, result.token);
       return res.json({ user: result.user });
     } catch (err) {
@@ -147,8 +155,13 @@ function registerAuthRoutes(
         return res.status(503).json({ error: "db_unavailable" });
       }
       const result = await createUser(req.body);
-      if (result.err) return res.status(result.err.status).json(result.err.body);
-      return res.json({ user: result.user, token: result.token, expiresAt: result.expiresAt });
+      if (result.err)
+        return res.status(result.err.status).json(result.err.body);
+      return res.json({
+        user: result.user,
+        token: result.token,
+        expiresAt: result.expiresAt,
+      });
     } catch (err) {
       if (err && err.code === "P2002") {
         return res.status(409).json({ error: "username_taken" });
@@ -164,8 +177,13 @@ function registerAuthRoutes(
         return res.status(503).json({ error: "db_unavailable" });
       }
       const result = await authenticateUser(req.body);
-      if (result.err) return res.status(result.err.status).json(result.err.body);
-      return res.json({ user: result.user, token: result.token, expiresAt: result.expiresAt });
+      if (result.err)
+        return res.status(result.err.status).json(result.err.body);
+      return res.json({
+        user: result.user,
+        token: result.token,
+        expiresAt: result.expiresAt,
+      });
     } catch (err) {
       logErr(req, "/api/auth/login-token failed:", err);
       return res.status(500).json({ error: "server_error" });

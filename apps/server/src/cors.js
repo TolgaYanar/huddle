@@ -40,9 +40,7 @@ function createOriginCheck({
     // No allowlist: reflect-request-origin in dev only; deny in production.
     if (list.length === 0) return callback(null, !isProduction);
 
-    const normalizedOrigin = String(origin)
-      .toLowerCase()
-      .replace(/\/+$/, "");
+    const normalizedOrigin = String(origin).toLowerCase().replace(/\/+$/, "");
     return callback(null, list.includes(normalizedOrigin));
   };
 }

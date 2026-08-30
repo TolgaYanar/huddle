@@ -53,7 +53,9 @@ describe("createRateLimiter", () => {
 
       const res = makeRes();
       let nextCalled = false;
-      limiter(req, res, () => { nextCalled = true; });
+      limiter(req, res, () => {
+        nextCalled = true;
+      });
 
       assert.equal(nextCalled, false);
       assert.equal(res._status, 429);
@@ -72,11 +74,11 @@ describe("createRateLimiter", () => {
 
       assert.ok(
         typeof res._headers["Retry-After"] === "string",
-        "Retry-After should be a string header"
+        "Retry-After should be a string header",
       );
       assert.ok(
         Number(res._headers["Retry-After"]) > 0,
-        "Retry-After should be positive"
+        "Retry-After should be positive",
       );
     });
 
@@ -112,7 +114,9 @@ describe("createRateLimiter", () => {
 
       const res = makeRes();
       let nextCalled = false;
-      limiter(req, res, () => { nextCalled = true; });
+      limiter(req, res, () => {
+        nextCalled = true;
+      });
 
       assert.equal(nextCalled, true, "request after window reset should pass");
       assert.equal(res._status, 200);
@@ -136,7 +140,9 @@ describe("createRateLimiter", () => {
 
       const resB = makeRes();
       let nextCalledB = false;
-      limiter(reqB, resB, () => { nextCalledB = true; });
+      limiter(reqB, resB, () => {
+        nextCalledB = true;
+      });
       assert.equal(nextCalledB, true);
     });
   });

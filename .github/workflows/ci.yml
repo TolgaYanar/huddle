@@ -50,10 +50,11 @@ jobs:
     name: Dependency audit (advisory)
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # Advisory only: the Prisma CLI chain (@prisma/config -> deepmerge-ts/effect/defu)
-    # currently has open high advisories with no fix on the 6.x line. Flip this to a
-    # blocking job once that is resolved, e.g. by upgrading to Prisma 7.
-    continue-on-error: true
+    # Advisory only. The remaining runtime advisories are Prisma 7's CLI chain
+    # (prisma -> @prisma/config -> deepmerge-ts), which pins an exact vulnerable
+    # deepmerge-ts and has no published fix; npm overrides do not take. They are
+    # reachable only when the CLI runs (generate / migrate), never on the request
+    # path. Make this blocking once Prisma ships a fix and the report is empty.
 
     steps:
       - uses: actions/checkout@v4
@@ -65,9 +66,7 @@ jobs:
 
       - run: npm ci
 
-      # Fails the job on a new high/critical advisory in runtime dependencies.
-      # Dev-only tooling advisories are reported by the step above but do not block.
-      # Reported, never blocking: `continue-on-error` still surfaces a red X on
-      # the PR, which trains people to ignore it. Print the report and exit 0.
+      # Prints the report and always exits 0. `continue-on-error` was not enough:
+      # it still paints a red X on the PR, which trains people to ignore it.
       - name: Audit runtime dependencies
         run: npm audit --omit=dev --audit-level=high || true

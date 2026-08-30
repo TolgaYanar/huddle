@@ -10,7 +10,9 @@ function attachRoomSettingsHandlers(io, state, socket, deps) {
     if (state.roomHost.get(roomId) !== socket.id) return;
 
     const trimmed =
-      typeof name === "string" ? name.trim().slice(0, MAX_ROOM_NAME_LENGTH) : "";
+      typeof name === "string"
+        ? name.trim().slice(0, MAX_ROOM_NAME_LENGTH)
+        : "";
 
     if (trimmed) {
       state.roomName.set(roomId, trimmed);
