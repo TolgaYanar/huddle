@@ -22,7 +22,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           # Must satisfy the root engines field and Prisma 7's supported lines.
-          node-version: 20.19.4
+          node-version: 22.19.0
           cache: npm
 
       - name: Install dependencies
@@ -60,7 +60,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20.19.4
+          node-version: 22.19.0
           cache: npm
 
       - run: npm ci

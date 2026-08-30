@@ -40,7 +40,7 @@ npm run format         # prettier --write "**/*.{ts,tsx,md}"
 ```
 
 `.github/workflows/ci.yml` runs lint → check-types → test → build on every push and
-PR against `main`, on Node 20.19.4 (`.nvmrc`). A second, non-blocking job runs
+PR against `main`, on Node 22.19.0 (`.nvmrc`). A second, non-blocking job runs
 `npm audit --omit=dev`.
 
 Per package:
@@ -227,8 +227,10 @@ version — the source tree can already be ahead of what is published.
 - `shared-logic` is consumed as raw TypeScript through Next's
   `transpilePackages`; it has no build step, so it must stay framework-agnostic
   and free of Next-only imports.
-- Node 20 (>=20.19.4), Node 22 (>=22.12), or Node >=24 (Prisma 7 excludes
-  Node 21, early Node 22, and Node 23); npm 11.
+- Node >=22.19.0 (or >=24); npm 11. The floor is set by `undici` 8, which
+  calls `markAsUncloneable` and therefore cannot run on Node 20 — the web
+  build fails at page-data collection there, not at install. Prisma 7
+  additionally excludes Node 21, early Node 22 and Node 23.
 
 ## Documentation
 

@@ -20,7 +20,7 @@ Watch videos together with friends, synchronized playback across all participant
 
 ### Prerequisites
 
-- Node.js 20 (>=20.19.4), Node.js 22 (>=22.12), or Node.js >=24
+- Node.js >=22.19.0 (or >=24) — `undici` 8 does not run on Node 20
   (matching Prisma 7's supported Node lines)
 - PostgreSQL
 - npm 11+
@@ -82,7 +82,7 @@ npm run build         # next build + prisma generate + extension bundle
 ```
 
 The same four commands run in CI on every push and pull request. Use Node
-20.19.4 (`.nvmrc`).
+22.19.0 (`.nvmrc`).
 
 - 🌐 Web: http://localhost:3002
 - 🔌 Backend: http://localhost:4000
