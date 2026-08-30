@@ -37,6 +37,17 @@ export function useMediaTracks({
   const camTrackRef = useRef<MediaStreamTrack | null>(null);
   const screenTrackRef = useRef<MediaStreamTrack | null>(null);
   const screenStreamRef = useRef<MediaStream | null>(null);
+  const micRequestGenerationRef = useRef(0);
+  const camRequestGenerationRef = useRef(0);
+  const screenRequestGenerationRef = useRef(0);
+  // In-flight permission requests. The toggle effect re-runs on every
+  // isConnected change, and without these the re-run started a *second*
+  // getUserMedia/getDisplayMedia while the first was still pending — which
+  // bumped the generation and invalidated the request the user was actively
+  // answering. For screen share that discarded a completed picker choice.
+  const micPendingRef = useRef<Promise<boolean> | null>(null);
+  const camPendingRef = useRef<Promise<boolean> | null>(null);
+  const screenPendingRef = useRef<Promise<boolean> | null>(null);
 
   const [micEnabled, setMicEnabled] = useState(false);
   const [camEnabled, setCamEnabled] = useState(false);
@@ -60,21 +71,41 @@ export function useMediaTracks({
   }, []);
 
   const ensureMicEnabled = useCallback(async () => {
-    if (micTrackRef.current) return;
+    if (micTrackRef.current) return true;
+    // Reuse an in-flight request instead of racing a second one against it.
+    const inFlight = micPendingRef.current;
+    if (inFlight) return inFlight;
     const local = ensureLocalStream();
-    if (!local) return;
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: echoCancellationEnabled,
-        noiseSuppression: noiseSuppressionEnabled,
-        autoGainControl: autoGainControlEnabled,
-      },
-    });
-    const track = stream.getAudioTracks()[0] ?? null;
-    if (!track) return;
-    micTrackRef.current = track;
-    local.addTrack(track);
-    setMicTrackVersion((v) => v + 1);
+    if (!local) return false;
+    const requestGeneration = ++micRequestGenerationRef.current;
+    const request = (async () => {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: echoCancellationEnabled,
+          noiseSuppression: noiseSuppressionEnabled,
+          autoGainControl: autoGainControlEnabled,
+        },
+      });
+      const track = stream.getAudioTracks()[0] ?? null;
+      if (!track || requestGeneration !== micRequestGenerationRef.current) {
+        stream.getTracks().forEach((streamTrack) => streamTrack.stop());
+        return false;
+      }
+      stream
+        .getTracks()
+        .filter((streamTrack) => streamTrack !== track)
+        .forEach((streamTrack) => streamTrack.stop());
+      micTrackRef.current = track;
+      local.addTrack(track);
+      setMicTrackVersion((v) => v + 1);
+      return true;
+    })();
+    micPendingRef.current = request;
+    try {
+      return await request;
+    } finally {
+      if (micPendingRef.current === request) micPendingRef.current = null;
+    }
   }, [
     ensureLocalStream,
     echoCancellationEnabled,
@@ -84,6 +115,8 @@ export function useMediaTracks({
 
   const disableMic = useCallback(
     (skipStateUpdates = false) => {
+      micRequestGenerationRef.current += 1;
+      micPendingRef.current = null;
       const t = micTrackRef.current;
       if (t) {
         try {
@@ -104,24 +137,46 @@ export function useMediaTracks({
         sendWebRTCSpeaking(false);
       }
     },
-    [sendWebRTCSpeaking]
+    [sendWebRTCSpeaking],
   );
 
   const ensureCamEnabled = useCallback(async () => {
-    if (camTrackRef.current) return;
+    if (camTrackRef.current) return true;
+    // Reuse an in-flight request instead of racing a second one against it.
+    const inFlight = camPendingRef.current;
+    if (inFlight) return inFlight;
     const local = ensureLocalStream();
-    if (!local) return;
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-    const track = stream.getVideoTracks()[0] ?? null;
-    if (!track) return;
-    camTrackRef.current = track;
-    setCamTrackVersion((v) => v + 1);
-    if (!screenTrackRef.current) {
-      local.addTrack(track);
+    if (!local) return false;
+    const requestGeneration = ++camRequestGenerationRef.current;
+    const request = (async () => {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      const track = stream.getVideoTracks()[0] ?? null;
+      if (!track || requestGeneration !== camRequestGenerationRef.current) {
+        stream.getTracks().forEach((streamTrack) => streamTrack.stop());
+        return false;
+      }
+      stream
+        .getTracks()
+        .filter((streamTrack) => streamTrack !== track)
+        .forEach((streamTrack) => streamTrack.stop());
+      camTrackRef.current = track;
+      setCamTrackVersion((v) => v + 1);
+      if (!screenTrackRef.current) {
+        local.addTrack(track);
+      }
+      return true;
+    })();
+    camPendingRef.current = request;
+    try {
+      return await request;
+    } finally {
+      if (camPendingRef.current === request) camPendingRef.current = null;
     }
   }, [ensureLocalStream]);
 
   const disableCam = useCallback((skipStateUpdates = false) => {
+    camRequestGenerationRef.current += 1;
+    camPendingRef.current = null;
     const t = camTrackRef.current;
     if (t) {
       try {
@@ -140,34 +195,53 @@ export function useMediaTracks({
   }, []);
 
   const ensureScreenEnabled = useCallback(async () => {
-    if (screenTrackRef.current) return;
+    if (screenTrackRef.current) return true;
+    // Reuse an in-flight request instead of racing a second one against it.
+    const inFlight = screenPendingRef.current;
+    if (inFlight) return inFlight;
     const local = ensureLocalStream();
-    if (!local) return;
-    const stream = await navigator.mediaDevices.getDisplayMedia({
-      video: true,
-      audio: false,
-    });
-    const track = stream.getVideoTracks()[0] ?? null;
-    if (!track) return;
+    if (!local) return false;
+    const requestGeneration = ++screenRequestGenerationRef.current;
+    const request = (async () => {
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: false,
+      });
+      const track = stream.getVideoTracks()[0] ?? null;
+      if (!track || requestGeneration !== screenRequestGenerationRef.current) {
+        stream.getTracks().forEach((streamTrack) => streamTrack.stop());
+        return false;
+      }
 
-    screenStreamRef.current = stream;
-    screenTrackRef.current = track;
+      screenStreamRef.current = stream;
+      screenTrackRef.current = track;
 
-    for (const vt of local.getVideoTracks()) {
-      local.removeTrack(vt);
+      for (const vt of local.getVideoTracks()) {
+        local.removeTrack(vt);
+      }
+      local.addTrack(track);
+
+      track.onended = () => {
+        setScreenEnabled(false);
+      };
+      return true;
+    })();
+    screenPendingRef.current = request;
+    try {
+      return await request;
+    } finally {
+      if (screenPendingRef.current === request) screenPendingRef.current = null;
     }
-    local.addTrack(track);
-
-    track.onended = () => {
-      setScreenEnabled(false);
-    };
   }, [ensureLocalStream]);
 
   const disableScreen = useCallback(() => {
+    screenRequestGenerationRef.current += 1;
+    screenPendingRef.current = null;
     const t = screenTrackRef.current;
     const s = screenStreamRef.current;
 
     if (t) {
+      t.onended = null;
       try {
         localStreamRef.current?.removeTrack(t);
       } catch {
@@ -200,14 +274,64 @@ export function useMediaTracks({
     }
   }, []);
 
-  // Attach local stream to video element
+  // A callback ref runs every time conditional UI remounts the preview. A
+  // one-shot effect only saw the first element and left later video elements
+  // black after theatre/collapse/password-gate transitions.
+  const setLocalVideoElement = useCallback(
+    (element: HTMLVideoElement | null) => {
+      localVideoRef.current = element;
+      if (!element || !isClient) return;
+      const stream = ensureLocalStream();
+      if (stream) element.srcObject = stream;
+    },
+    [ensureLocalStream, isClient],
+  );
+
+  // Invalidate every in-flight permission request on unmount.
+  //
+  // This must NOT live in the toggle effect's cleanup. That cleanup also runs
+  // whenever isConnected flips (a reconnect blip), and bumping the generations
+  // there discarded a permission result the user still wanted — for screen
+  // share that means the picker they just completed is thrown away and they
+  // have to choose the window again. Turning a medium off already bumps its
+  // generation inside disableMic/disableCam/disableScreen, so the only case
+  // left for a blanket invalidation is teardown.
   useEffect(() => {
-    if (!isClient) return;
-    if (!localVideoRef.current) return;
-    const s = ensureLocalStream();
-    if (!s) return;
-    localVideoRef.current.srcObject = s;
-  }, [isClient, ensureLocalStream]);
+    return () => {
+      micRequestGenerationRef.current += 1;
+      camRequestGenerationRef.current += 1;
+      screenRequestGenerationRef.current += 1;
+      micPendingRef.current = null;
+      camPendingRef.current = null;
+      screenPendingRef.current = null;
+
+      const tracks = new Set<MediaStreamTrack>([
+        ...(localStreamRef.current?.getTracks() ?? []),
+        ...(screenStreamRef.current?.getTracks() ?? []),
+        ...[
+          micTrackRef.current,
+          camTrackRef.current,
+          screenTrackRef.current,
+        ].filter((track): track is MediaStreamTrack => track !== null),
+      ]);
+      if (screenTrackRef.current) screenTrackRef.current.onended = null;
+      for (const track of tracks) {
+        try {
+          track.stop();
+        } catch {
+          // ignore teardown failures
+        }
+      }
+
+      if (localVideoRef.current) localVideoRef.current.srcObject = null;
+      localVideoRef.current = null;
+      localStreamRef.current = null;
+      screenStreamRef.current = null;
+      micTrackRef.current = null;
+      camTrackRef.current = null;
+      screenTrackRef.current = null;
+    };
+  }, []);
 
   // Broadcast media state changes
   useEffect(() => {
@@ -229,49 +353,62 @@ export function useMediaTracks({
   // Handle track toggles
   useEffect(() => {
     if (!isClient) return;
+    let cancelled = false;
 
     (async () => {
       try {
         if (micEnabled) await ensureMicEnabled();
         else disableMic();
       } catch {
-        setMicEnabled(false);
+        if (!cancelled) setMicEnabled(false);
       }
+      if (cancelled) return;
 
       try {
         if (camEnabled) await ensureCamEnabled();
         else disableCam();
       } catch {
-        setCamEnabled(false);
+        if (!cancelled) setCamEnabled(false);
       }
+      if (cancelled) return;
 
       try {
         if (screenEnabled) await ensureScreenEnabled();
         else disableScreen();
       } catch {
-        setScreenEnabled(false);
+        if (!cancelled) setScreenEnabled(false);
       }
+      if (cancelled) return;
 
       if (isConnected) {
         await renegotiateAllPeers();
       }
     })();
+
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [micEnabled, camEnabled, screenEnabled, isClient, isConnected]);
 
   // Re-acquire mic when audio processing settings change
   useEffect(() => {
     if (!isClient || !micEnabled || !micTrackRef.current) return;
+    let cancelled = false;
 
     (async () => {
       try {
         disableMic(true);
         await ensureMicEnabled();
-        if (isConnected) await renegotiateAllPeers();
+        if (!cancelled && isConnected) await renegotiateAllPeers();
       } catch {
-        setMicEnabled(false);
+        if (!cancelled) setMicEnabled(false);
       }
     })();
+
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     echoCancellationEnabled,
@@ -364,6 +501,7 @@ export function useMediaTracks({
   return {
     localStreamRef,
     localVideoRef,
+    setLocalVideoElement,
     micTrackRef,
     camTrackRef,
     screenTrackRef,

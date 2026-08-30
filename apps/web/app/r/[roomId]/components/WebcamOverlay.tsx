@@ -31,7 +31,9 @@ export function WebcamOverlay({
   // the parent re-renders (which happens on every `currentTime` tick while a
   // video plays) made the camera tiles re-initialize and visibly freeze in
   // fullscreen — keep a ref so we can bail when the track hasn't changed.
-  const wiredTracksRef = useRef<Map<string, MediaStreamTrack | null>>(new Map());
+  const wiredTracksRef = useRef<Map<string, MediaStreamTrack | null>>(
+    new Map(),
+  );
   const overlayRef = useRef<HTMLDivElement | null>(null);
 
   const [{ x, y }, setPos] = useState({ x: 12, y: 12 });
@@ -128,7 +130,7 @@ export function WebcamOverlay({
 
   const camRemotes = useMemo(
     () => remotes.filter((r) => Boolean(r.media?.cam)),
-    [remotes]
+    [remotes],
   );
 
   const thumbHeight = Math.round(thumbWidth * (2 / 3));
@@ -302,7 +304,7 @@ export function WebcamOverlay({
             };
             try {
               (overlayRef.current as HTMLElement | null)?.setPointerCapture(
-                e.pointerId
+                e.pointerId,
               );
             } catch {
               // ignore

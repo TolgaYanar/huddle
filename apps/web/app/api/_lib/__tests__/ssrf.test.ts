@@ -36,12 +36,7 @@ describe("isPrivateIp", () => {
     expect(isPrivateIp(ip)).toBe(true);
   });
 
-  const allowed = [
-    "8.8.8.8",
-    "1.1.1.1",
-    "93.184.216.34",
-    "2606:4700::1111",
-  ];
+  const allowed = ["8.8.8.8", "1.1.1.1", "93.184.216.34", "2606:4700::1111"];
 
   it.each(allowed)("allows %s", (ip) => {
     expect(isPrivateIp(ip)).toBe(false);

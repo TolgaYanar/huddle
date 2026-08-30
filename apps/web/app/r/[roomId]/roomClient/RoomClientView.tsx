@@ -112,9 +112,7 @@ export function RoomClientView({
         <main
           className={`flex-1 grid grid-cols-1 ${gridColsClass} gap-4 px-4 sm:px-6 lg:px-8 2xl:px-12 py-4 sm:py-6 max-w-screen-2xl 2xl:max-w-none mx-auto w-full transition-[grid-template-columns] duration-300 ease-out`}
         >
-          <PlayerSection
-            {...playerSectionProps}
-          />
+          <PlayerSection {...playerSectionProps} />
           {!isTheatreMode && <CallSidebar {...callSidebarProps} />}
           <ActivitySidebar
             {...activitySidebarProps}

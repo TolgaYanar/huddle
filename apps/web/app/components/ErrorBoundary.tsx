@@ -36,7 +36,11 @@ export class ErrorBoundary extends React.Component<Props, State> {
     this.props.onError?.(error, info);
     // Keep a console trace in development.
     if (process.env.NODE_ENV !== "production") {
-      console.error("[ErrorBoundary] Caught error:", error, info.componentStack);
+      console.error(
+        "[ErrorBoundary] Caught error:",
+        error,
+        info.componentStack,
+      );
     }
   }
 
@@ -51,10 +55,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
       }
 
       return (
-        <DefaultErrorFallback
-          error={this.state.error}
-          onReset={this.reset}
-        />
+        <DefaultErrorFallback error={this.state.error} onReset={this.reset} />
       );
     }
 

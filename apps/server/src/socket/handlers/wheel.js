@@ -3,20 +3,21 @@ const {
   emitWheelStateTo,
   emitWheelStateToRoom,
 } = require("../helpers/wheel");
+const { isRoomMember } = require("../helpers/membership");
 
 function attachWheelHandlers(io, state, socket) {
   // --- Wheel picker (shared random picker) ---
   socket.on("wheel_get", (data) => {
     const { roomId } = data || {};
     if (!roomId || typeof roomId !== "string") return;
-    if (!socket.rooms.has(roomId)) return;
+    if (!isRoomMember(socket, roomId)) return;
     emitWheelStateTo(state, socket, roomId);
   });
 
   socket.on("wheel_add_entry", (data) => {
     const { roomId, text } = data || {};
     if (!roomId || typeof roomId !== "string") return;
-    if (!socket.rooms.has(roomId)) return;
+    if (!isRoomMember(socket, roomId)) return;
     const raw = typeof text === "string" ? text : "";
     const cleaned = raw.trim().slice(0, 200);
     if (!cleaned) return;
@@ -30,7 +31,7 @@ function attachWheelHandlers(io, state, socket) {
   socket.on("wheel_remove_entry", (data) => {
     const { roomId, index } = data || {};
     if (!roomId || typeof roomId !== "string") return;
-    if (!socket.rooms.has(roomId)) return;
+    if (!isRoomMember(socket, roomId)) return;
     const i = typeof index === "number" ? index : Number(index);
     if (!Number.isFinite(i)) return;
 
@@ -44,7 +45,7 @@ function attachWheelHandlers(io, state, socket) {
   socket.on("wheel_clear", (data) => {
     const { roomId } = data || {};
     if (!roomId || typeof roomId !== "string") return;
-    if (!socket.rooms.has(roomId)) return;
+    if (!isRoomMember(socket, roomId)) return;
     const wheel = getRoomWheel(state, roomId);
     wheel.entries = [];
     wheel.lastSpin = undefined;
@@ -54,7 +55,7 @@ function attachWheelHandlers(io, state, socket) {
   socket.on("wheel_spin", (data) => {
     const { roomId } = data || {};
     if (!roomId || typeof roomId !== "string") return;
-    if (!socket.rooms.has(roomId)) return;
+    if (!isRoomMember(socket, roomId)) return;
     const wheel = getRoomWheel(state, roomId);
     const entryCount = wheel.entries.length;
     if (entryCount <= 0) return;

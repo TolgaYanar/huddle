@@ -14,7 +14,7 @@ import { useYouTubePlayback } from "./playerSection/useYouTubePlayback";
 
 import type { PlayerSectionProps } from "./playerSection/types";
 
-export function PlayerSection({
+export const PlayerSection = React.memo(function PlayerSection({
   inputUrl,
   setInputUrl,
   handleUrlChange,
@@ -111,15 +111,16 @@ export function PlayerSection({
   fullscreenChatOpen,
   setFullscreenChatOpen,
   fullscreenChatMessages,
-  chatText,
-  setChatText,
-  handleSendChat,
+  sendChat,
   onVideoEnded,
 
   isTheatreMode,
   onToggleTheatreMode,
 }: PlayerSectionProps) {
-  const { playerConfig } = usePlayerConfig(normalizedUrl, roomPlaybackAnchorRef);
+  const { playerConfig } = usePlayerConfig(
+    normalizedUrl,
+    roomPlaybackAnchorRef,
+  );
 
   const clearLoadTimeout = React.useCallback(() => {
     if (loadTimeoutRef.current) {
@@ -309,9 +310,7 @@ export function PlayerSection({
         fullscreenChatOpen={fullscreenChatOpen}
         setFullscreenChatOpen={setFullscreenChatOpen}
         fullscreenChatMessages={fullscreenChatMessages}
-        chatText={chatText}
-        setChatText={setChatText}
-        handleSendChat={handleSendChat}
+        sendChat={sendChat}
         isConnected={isConnected}
         mediaProps={mediaProps}
         extraOverlay={
@@ -319,9 +318,7 @@ export function PlayerSection({
             muted={effectiveMuted}
             playerReady={playerReady}
             videoState={videoState}
-            onUnmute={
-              audioSyncEnabled === false ? toggleLocalMute : toggleMute
-            }
+            onUnmute={audioSyncEnabled === false ? toggleLocalMute : toggleMute}
           />
         }
       />
@@ -364,4 +361,4 @@ export function PlayerSection({
       />
     </section>
   );
-}
+});

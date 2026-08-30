@@ -7,6 +7,13 @@ function attachModerationHandlers(io, state, socket, deps) {
     if (!roomId || typeof roomId !== "string") return;
     if (state.roomHost.get(roomId) !== socket.id) return;
 
+    // Shared across sockets on purpose: attachModerationHandlers runs once per
+    // connection, so a handler-local counter could not order an update from a
+    // former host against one from the current host.
+    const updateGeneration =
+      (state.roomPasswordUpdateGeneration.get(roomId) || 0) + 1;
+    state.roomPasswordUpdateGeneration.set(roomId, updateGeneration);
+
     const pw = typeof password === "string" ? password : "";
     if (!pw) {
       state.roomPasswordHash.delete(roomId);
@@ -17,7 +24,23 @@ function attachModerationHandlers(io, state, socket, deps) {
       return;
     }
 
-    state.roomPasswordHash.set(roomId, deps.hashPassword(pw));
+    let passwordHash;
+    try {
+      passwordHash = await deps.hashPassword(pw);
+    } catch (err) {
+      console.error("Failed to hash room password:", err.message);
+      return;
+    }
+
+    // Async scrypt finishes out of order. Only the latest request from the
+    // current host may commit; otherwise an older password (or a former host)
+    // can overwrite a newer update after its hash completes.
+    if (state.roomPasswordUpdateGeneration.get(roomId) !== updateGeneration) {
+      return;
+    }
+    if (state.roomHost.get(roomId) !== socket.id) return;
+
+    state.roomPasswordHash.set(roomId, passwordHash);
     io.to(roomId).emit("room_password_status", {
       roomId,
       hasPassword: true,

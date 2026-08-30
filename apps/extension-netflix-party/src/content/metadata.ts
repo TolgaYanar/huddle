@@ -48,10 +48,10 @@ function pickPosterFromNetflixApi(): string | null {
   // stable.
   try {
     const candidates = [
-      'img.boxart-image[src]',
-      'img.previewModal--boxart[src]',
-      'img.title-card--metadataWrapper-image[src]',
-      'div.video-artwork img[src]',
+      "img.boxart-image[src]",
+      "img.previewModal--boxart[src]",
+      "img.title-card--metadataWrapper-image[src]",
+      "div.video-artwork img[src]",
     ];
     for (const sel of candidates) {
       const img = document.querySelector<HTMLImageElement>(sel);

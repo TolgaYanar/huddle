@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const runtime = "edge";
+import { PopcornMark } from "./_components/PopcornMark";
 
 export const alt = "WeHuddle";
 export const size = {
@@ -22,7 +22,9 @@ export default function OpenGraphImage() {
         background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)",
       }}
     >
-      <div style={{ fontSize: 200, marginBottom: 20 }}>🍿</div>
+      <div style={{ display: "flex", marginBottom: 20 }}>
+        <PopcornMark size={200} />
+      </div>
       <div
         style={{
           fontSize: 72,
@@ -35,6 +37,6 @@ export default function OpenGraphImage() {
     </div>,
     {
       ...size,
-    }
+    },
   );
 }

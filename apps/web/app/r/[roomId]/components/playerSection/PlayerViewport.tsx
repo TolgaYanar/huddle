@@ -39,9 +39,7 @@ export function PlayerViewport({
   fullscreenChatOpen,
   setFullscreenChatOpen,
   fullscreenChatMessages,
-  chatText,
-  setChatText,
-  handleSendChat,
+  sendChat,
   isConnected,
 
   mediaProps,
@@ -73,9 +71,7 @@ export function PlayerViewport({
   fullscreenChatOpen: boolean;
   setFullscreenChatOpen: React.Dispatch<React.SetStateAction<boolean>>;
   fullscreenChatMessages: FullscreenChatMessage[];
-  chatText: string;
-  setChatText: React.Dispatch<React.SetStateAction<string>>;
-  handleSendChat: (e: React.FormEvent) => void;
+  sendChat: (text: string) => boolean;
   isConnected: boolean;
 
   mediaProps: React.ComponentProps<typeof PlayerMediaRenderer>;
@@ -118,9 +114,7 @@ export function PlayerViewport({
         playerContainerRef={playerContainerRef}
         isConnected={isConnected}
         messages={fullscreenChatMessages}
-        chatText={chatText}
-        setChatText={setChatText}
-        handleSendChat={handleSendChat}
+        sendChat={sendChat}
       />
 
       {/*

@@ -1,5 +1,7 @@
 import type { UserPresenceData } from "shared-logic";
 
+import type { PeerNegotiator } from "./negotiation";
+
 export type RemoteStreamsState = Array<{ id: string; stream: MediaStream }>;
 
 export type RoomUsersPayload<MediaState> = {
@@ -95,6 +97,10 @@ export type WebRTCPeersLatest<MediaState> = {
   userId: string;
 
   createPeerConnection: (peerId: string) => RTCPeerConnection;
+  getPeerIds: () => string[];
+  getExistingPeer: (peerId: string) => RTCPeerConnection | undefined;
+  getExistingNegotiator: (peerId: string) => PeerNegotiator | undefined;
+  getPeerNegotiator: (peerId: string) => PeerNegotiator;
   sendOfferToPeer: (peerId: string) => Promise<void>;
   closePeer: (peerId: string) => void;
   syncTracksToPeer: (peerId: string, pc: RTCPeerConnection) => void;

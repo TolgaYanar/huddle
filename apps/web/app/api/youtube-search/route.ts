@@ -44,7 +44,7 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 }
 
 function pickThumbnailUrl(
-  thumbs: YouTubeThumbnails | null | undefined
+  thumbs: YouTubeThumbnails | null | undefined,
 ): string | null {
   return (
     thumbs?.maxres?.url ||
@@ -80,7 +80,7 @@ export async function GET(req: Request) {
   if (!apiKey) {
     return NextResponse.json<YouTubeSearchResponse>(
       { ok: false, reason: "missing_key" },
-      { status: 200 }
+      { status: 200 },
     );
   }
 
@@ -90,14 +90,14 @@ export async function GET(req: Request) {
   if (!q) {
     return NextResponse.json<YouTubeSearchResponse>(
       { ok: false, reason: "missing_query" },
-      { status: 200 }
+      { status: 200 },
     );
   }
 
   const maxResultsRaw = searchParams.get("maxResults");
   const maxResults = Math.min(
     25,
-    Math.max(1, maxResultsRaw ? Number(maxResultsRaw) : 12)
+    Math.max(1, maxResultsRaw ? Number(maxResultsRaw) : 12),
   );
 
   try {
@@ -112,7 +112,7 @@ export async function GET(req: Request) {
     // Regional relevance: API key is NOT region-locked, but search ranking can vary.
     // When deployed on Vercel, x-vercel-ip-country is commonly available.
     const country = normalizeCountryCode(
-      req.headers.get("x-vercel-ip-country")
+      req.headers.get("x-vercel-ip-country"),
     );
     if (country) endpoint.searchParams.set("regionCode", country);
 
@@ -144,13 +144,13 @@ export async function GET(req: Request) {
       if (reason === "quotaExceeded" || reason === "dailyLimitExceeded") {
         return NextResponse.json<YouTubeSearchResponse>(
           { ok: false, reason: "quota" },
-          { status: 200 }
+          { status: 200 },
         );
       }
 
       return NextResponse.json<YouTubeSearchResponse>(
         { ok: false, reason: "youtube_api_error" },
-        { status: 200 }
+        { status: 200 },
       );
     }
 
@@ -187,7 +187,7 @@ export async function GET(req: Request) {
   } catch {
     return NextResponse.json<YouTubeSearchResponse>(
       { ok: false, reason: "network" },
-      { status: 200 }
+      { status: 200 },
     );
   }
 }

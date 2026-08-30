@@ -45,7 +45,7 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 }
 
 function pickThumbnailUrl(
-  thumbs: YouTubeThumbnails | null | undefined
+  thumbs: YouTubeThumbnails | null | undefined,
 ): string | null {
   return (
     thumbs?.maxres?.url ||
@@ -89,7 +89,7 @@ export async function GET(req: Request) {
   if (!apiKey) {
     return NextResponse.json<YouTubePlaylistResponse>(
       { ok: false, reason: "missing_key" },
-      { status: 200 }
+      { status: 200 },
     );
   }
 
@@ -105,7 +105,7 @@ export async function GET(req: Request) {
   if (!urlOrId) {
     return NextResponse.json<YouTubePlaylistResponse>(
       { ok: false, reason: "missing_playlist_id" },
-      { status: 200 }
+      { status: 200 },
     );
   }
 
@@ -113,20 +113,20 @@ export async function GET(req: Request) {
   if (!playlistId) {
     return NextResponse.json<YouTubePlaylistResponse>(
       { ok: false, reason: "missing_playlist_id" },
-      { status: 200 }
+      { status: 200 },
     );
   }
 
   const maxResultsRaw = searchParams.get("maxResults");
   const maxResults = Math.min(
     50,
-    Math.max(1, maxResultsRaw ? Number(maxResultsRaw) : 50)
+    Math.max(1, maxResultsRaw ? Number(maxResultsRaw) : 50),
   );
 
   try {
     // First, get playlist info
     const playlistEndpoint = new URL(
-      "https://www.googleapis.com/youtube/v3/playlists"
+      "https://www.googleapis.com/youtube/v3/playlists",
     );
     playlistEndpoint.searchParams.set("part", "snippet");
     playlistEndpoint.searchParams.set("id", playlistId);
@@ -153,7 +153,7 @@ export async function GET(req: Request) {
 
     // Now get playlist items
     const endpoint = new URL(
-      "https://www.googleapis.com/youtube/v3/playlistItems"
+      "https://www.googleapis.com/youtube/v3/playlistItems",
     );
     endpoint.searchParams.set("part", "snippet,contentDetails");
     endpoint.searchParams.set("playlistId", playlistId);
@@ -189,20 +189,20 @@ export async function GET(req: Request) {
         if (reason === "quotaExceeded" || reason === "dailyLimitExceeded") {
           return NextResponse.json<YouTubePlaylistResponse>(
             { ok: false, reason: "quota" },
-            { status: 200 }
+            { status: 200 },
           );
         }
 
         if (reason === "playlistNotFound") {
           return NextResponse.json<YouTubePlaylistResponse>(
             { ok: false, reason: "not_found" },
-            { status: 200 }
+            { status: 200 },
           );
         }
 
         return NextResponse.json<YouTubePlaylistResponse>(
           { ok: false, reason: "youtube_api_error" },
-          { status: 200 }
+          { status: 200 },
         );
       }
 
@@ -266,7 +266,7 @@ export async function GET(req: Request) {
   } catch {
     return NextResponse.json<YouTubePlaylistResponse>(
       { ok: false, reason: "network" },
-      { status: 200 }
+      { status: 200 },
     );
   }
 }

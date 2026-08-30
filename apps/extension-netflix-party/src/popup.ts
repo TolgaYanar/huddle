@@ -262,7 +262,10 @@ function renderInviteLink(status: StatusResponse): void {
   copyInviteBtn.classList.remove("copied");
 }
 
-function renderOnboarding(status: StatusResponse | null, onNetflix: boolean): void {
+function renderOnboarding(
+  status: StatusResponse | null,
+  onNetflix: boolean,
+): void {
   // Show the numbered "How to start a watch party" card whenever the user
   // is on Netflix but isn't yet connected. Skip it once a connection is
   // established — the now-playing + members cards take that real estate.

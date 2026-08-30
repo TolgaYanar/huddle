@@ -23,7 +23,9 @@ const DEFAULT_STATE: TimerState = {
 export function useTimer({
   onTimerState,
 }: {
-  onTimerState: (cb: (data: TimerStateData) => void) => (() => void) | undefined;
+  onTimerState: (
+    cb: (data: TimerStateData) => void,
+  ) => (() => void) | undefined;
 }) {
   const [timer, setTimer] = useState<TimerState>(DEFAULT_STATE);
   const clockOffsetRef = useRef(0); // client - server

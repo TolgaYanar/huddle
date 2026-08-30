@@ -2,20 +2,21 @@ const {
   emitPlaylistStateTo,
   emitPlaylistStateToRoom,
 } = require("../helpers/playlists");
+const { isRoomMember } = require("../helpers/membership");
 
 function attachPlaylistCrudHandlers(io, state, socket, deps) {
   // --- Playlist management ---
   socket.on("playlist_get", async (data) => {
     const { roomId } = data || {};
     if (!roomId || typeof roomId !== "string") return;
-    if (!socket.rooms.has(roomId)) return;
+    if (!isRoomMember(socket, roomId)) return;
     await emitPlaylistStateTo(deps, state, socket, roomId);
   });
 
   socket.on("playlist_create", async (data) => {
     const { roomId, name, description, settings } = data || {};
     if (!roomId || typeof roomId !== "string") return;
-    if (!socket.rooms.has(roomId)) return;
+    if (!isRoomMember(socket, roomId)) return;
     if (!deps.isDbConnected() || !deps.getPrisma()) return;
 
     const playlistName =
@@ -52,7 +53,7 @@ function attachPlaylistCrudHandlers(io, state, socket, deps) {
     const { roomId, playlistId, name, description, settings } = data || {};
     if (!roomId || typeof roomId !== "string") return;
     if (!playlistId || typeof playlistId !== "string") return;
-    if (!socket.rooms.has(roomId)) return;
+    if (!isRoomMember(socket, roomId)) return;
     if (!deps.isDbConnected() || !deps.getPrisma()) return;
 
     try {
@@ -89,7 +90,7 @@ function attachPlaylistCrudHandlers(io, state, socket, deps) {
     const { roomId, playlistId } = data || {};
     if (!roomId || typeof roomId !== "string") return;
     if (!playlistId || typeof playlistId !== "string") return;
-    if (!socket.rooms.has(roomId)) return;
+    if (!isRoomMember(socket, roomId)) return;
     if (!deps.isDbConnected() || !deps.getPrisma()) return;
 
     try {
@@ -113,7 +114,7 @@ function attachPlaylistCrudHandlers(io, state, socket, deps) {
   socket.on("playlist_set_active", async (data) => {
     const { roomId, playlistId } = data || {};
     if (!roomId || typeof roomId !== "string") return;
-    if (!socket.rooms.has(roomId)) return;
+    if (!isRoomMember(socket, roomId)) return;
 
     // playlistId can be null to clear active playlist
     const activeId = typeof playlistId === "string" ? playlistId : null;

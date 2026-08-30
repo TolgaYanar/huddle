@@ -405,7 +405,7 @@ export interface CupGameSession {
   drawWinnerSocketIds?: string[];
   /** Bumped every time the server publishes a new flip/draw event so clients can play one-shot effects without diffing arrays. */
   effectSeq: number;
-  /** Most recent visible event for clients to animate. Replaced every state push. */
+  /** Most recent visible event for clients to animate; secret cup coordinates are only sent to the acting player. */
   lastEvent: CupGameEvent | null;
 }
 
@@ -425,11 +425,30 @@ export type CupGameEvent =
        */
       mirroredTo?: string;
     }
-  | { kind: "draw"; drawerSocketId: string; cardKind: CupGameCardKind; category: CupGameCardCategory }
+  | {
+      kind: "draw";
+      drawerSocketId: string;
+      cardKind: CupGameCardKind;
+      category: CupGameCardCategory;
+    }
   | { kind: "mirror"; drawerSocketId: string }
-  | { kind: "skip"; targetSocketId: string; reason: "skipYourTurn" | "stealTurn" | "scheduled" }
-  | { kind: "relocate"; ownerSocketId: string; fromCupIndex: number; toCupIndex: number }
-  | { kind: "peek"; drawerSocketId: string; cupIndex: number; revealedAs: "empty" | "spider" }
+  | {
+      kind: "skip";
+      targetSocketId: string;
+      reason: "skipYourTurn" | "stealTurn" | "scheduled";
+    }
+  | {
+      kind: "relocate";
+      ownerSocketId: string;
+      fromCupIndex?: number;
+      toCupIndex?: number;
+    }
+  | {
+      kind: "peek";
+      drawerSocketId: string;
+      cupIndex?: number;
+      revealedAs?: "empty" | "spider";
+    }
   | { kind: "eliminate"; socketId: string }
   | { kind: "win"; socketId: string }
   | { kind: "draw_end"; reason: "all_spiders_found" };

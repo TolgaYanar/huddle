@@ -19,17 +19,26 @@ const {
   clampLives,
 } = require("../helpers/cupGame");
 const { parseTurnTimer } = require("../helpers/gameTimer");
+const { isRoomMember } = require("../helpers/membership");
+const { createSocketRateLimiter } = require("../helpers/socketRateLimit");
+
+const MAX_CUP_GAMES_PER_ROOM = 8;
 
 function isHost(state, roomId, socketId) {
   return state.roomHost.get(roomId) === socketId;
 }
 
 function attachCupGameHandlers(io, state, socket) {
+  const createGameLimiter = createSocketRateLimiter({
+    windowMs: 10_000,
+    max: 4,
+  });
+
   // ── Get state ──────────────────────────────────────────────────────────────
   socket.on("cup_game_get", (data) => {
     const { roomId } = data || {};
     if (!roomId || typeof roomId !== "string") return;
-    if (!socket.rooms.has(roomId)) return;
+    if (!isRoomMember(socket, roomId)) return;
     emitCupGameStateTo(state, socket, roomId);
   });
 
@@ -37,7 +46,11 @@ function attachCupGameHandlers(io, state, socket) {
   socket.on("cup_game_create", (data) => {
     const { roomId, startingLives, gridSize, turnTimerSeconds } = data || {};
     if (!roomId || typeof roomId !== "string") return;
-    if (!socket.rooms.has(roomId)) return;
+    if (!isRoomMember(socket, roomId)) return;
+    if (!createGameLimiter()) return;
+
+    const roomGames = getOrCreateRoomCupGames(state, roomId);
+    if (roomGames.size >= MAX_CUP_GAMES_PER_ROOM) return;
 
     const room = io.sockets.adapter.rooms.get(roomId);
     const roomSocketIds = room ? [...room] : [socket.id];
@@ -53,21 +66,23 @@ function attachCupGameHandlers(io, state, socket) {
       roomSocketIds,
       usernamesById,
     });
-    getOrCreateRoomCupGames(state, roomId).set(game.id, game);
+    roomGames.set(game.id, game);
     emitCupGameStateToRoom(io, state, roomId);
   });
 
   // ── Update config (creator/host only, lobby only) ────────────────────────
   socket.on("cup_game_update_config", (data) => {
-    const { roomId, gameId, startingLives, gridSize, turnTimerSeconds } = data || {};
+    const { roomId, gameId, startingLives, gridSize, turnTimerSeconds } =
+      data || {};
     if (!roomId || typeof roomId !== "string") return;
-    if (!socket.rooms.has(roomId)) return;
+    if (!isRoomMember(socket, roomId)) return;
 
     const games = state.roomCupGames.get(roomId);
     if (!games) return;
     const game = games.get(gameId);
     if (!game || game.status !== "lobby") return;
-    if (socket.id !== game.creatorSocketId && !isHost(state, roomId, socket.id)) return;
+    if (socket.id !== game.creatorSocketId && !isHost(state, roomId, socket.id))
+      return;
 
     if (startingLives !== null && startingLives !== undefined) {
       const lives = clampLives(startingLives, game.config.startingLives);
@@ -78,8 +93,13 @@ function attachCupGameHandlers(io, state, socket) {
         p.spiderBudget = lives;
       }
     }
-    if (gridSize === "compact" || gridSize === "standard" || gridSize === "large") {
-      const playerCount = game.players.filter((p) => !p.isSpectator).length || 2;
+    if (
+      gridSize === "compact" ||
+      gridSize === "standard" ||
+      gridSize === "large"
+    ) {
+      const playerCount =
+        game.players.filter((p) => !p.isSpectator).length || 2;
       const grid = pickGridForPlayers(playerCount, gridSize);
       game.config.rows = grid.rows;
       game.config.cols = grid.cols;
@@ -101,13 +121,14 @@ function attachCupGameHandlers(io, state, socket) {
   socket.on("cup_game_start_placement", (data) => {
     const { roomId, gameId } = data || {};
     if (!roomId || typeof roomId !== "string") return;
-    if (!socket.rooms.has(roomId)) return;
+    if (!isRoomMember(socket, roomId)) return;
 
     const games = state.roomCupGames.get(roomId);
     if (!games) return;
     const game = games.get(gameId);
     if (!game || game.status !== "lobby") return;
-    if (socket.id !== game.creatorSocketId && !isHost(state, roomId, socket.id)) return;
+    if (socket.id !== game.creatorSocketId && !isHost(state, roomId, socket.id))
+      return;
     if (game.players.filter((p) => !p.isSpectator).length < 2) return;
 
     // Snap grid to current player count's recommended size if it's still at
@@ -115,7 +136,10 @@ function attachCupGameHandlers(io, state, socket) {
     // joined the lobby after creation.
     const playerCount = game.players.filter((p) => !p.isSpectator).length;
     const grid = pickGridForPlayers(playerCount, "standard");
-    if (game.config.rows * game.config.cols < playerCount * game.config.startingLives * 2) {
+    if (
+      game.config.rows * game.config.cols <
+      playerCount * game.config.startingLives * 2
+    ) {
       game.config.rows = grid.rows;
       game.config.cols = grid.cols;
       game.cups = new Array(grid.rows * grid.cols).fill(null).map((_, i) => ({
@@ -134,7 +158,7 @@ function attachCupGameHandlers(io, state, socket) {
   socket.on("cup_game_toggle_spider", (data) => {
     const { roomId, gameId, cupIndex } = data || {};
     if (!roomId || typeof roomId !== "string") return;
-    if (!socket.rooms.has(roomId)) return;
+    if (!isRoomMember(socket, roomId)) return;
 
     const games = state.roomCupGames.get(roomId);
     if (!games) return;
@@ -167,7 +191,11 @@ function attachCupGameHandlers(io, state, socket) {
         const otherPlayer = getPlayer(game, otherOwnerSocketId);
         const empties = [];
         for (let i = 0; i < game.cups.length; i++) {
-          if (game.cups[i].status === "hidden" && !game.spiderOwnerByCup.has(i) && i !== idx) {
+          if (
+            game.cups[i].status === "hidden" &&
+            !game.spiderOwnerByCup.has(i) &&
+            i !== idx
+          ) {
             empties.push(i);
           }
         }
@@ -201,7 +229,7 @@ function attachCupGameHandlers(io, state, socket) {
   socket.on("cup_game_lock_placement", (data) => {
     const { roomId, gameId } = data || {};
     if (!roomId || typeof roomId !== "string") return;
-    if (!socket.rooms.has(roomId)) return;
+    if (!isRoomMember(socket, roomId)) return;
 
     const games = state.roomCupGames.get(roomId);
     if (!games) return;
@@ -229,7 +257,7 @@ function attachCupGameHandlers(io, state, socket) {
   socket.on("cup_game_unlock_placement", (data) => {
     const { roomId, gameId } = data || {};
     if (!roomId || typeof roomId !== "string") return;
-    if (!socket.rooms.has(roomId)) return;
+    if (!isRoomMember(socket, roomId)) return;
 
     const games = state.roomCupGames.get(roomId);
     if (!games) return;
@@ -245,7 +273,7 @@ function attachCupGameHandlers(io, state, socket) {
   socket.on("cup_game_flip", (data) => {
     const { roomId, gameId, cupIndex } = data || {};
     if (!roomId || typeof roomId !== "string") return;
-    if (!socket.rooms.has(roomId)) return;
+    if (!isRoomMember(socket, roomId)) return;
 
     const games = state.roomCupGames.get(roomId);
     if (!games) return;
@@ -280,7 +308,12 @@ function attachCupGameHandlers(io, state, socket) {
           revealedAs: revealed,
           ownerSocketId: owner || null,
         });
-        pushEvent(game, { kind: "peek", drawerSocketId: socket.id, cupIndex: idx, revealedAs: revealed });
+        pushEvent(game, {
+          kind: "peek",
+          drawerSocketId: socket.id,
+          cupIndex: idx,
+          revealedAs: revealed,
+        });
         game.pendingCard = null;
         advanceTurn(game);
         scheduleCupTurnTimer(io, state, roomId, game.id);
@@ -318,7 +351,7 @@ function attachCupGameHandlers(io, state, socket) {
   socket.on("cup_game_draw", (data) => {
     const { roomId, gameId } = data || {};
     if (!roomId || typeof roomId !== "string") return;
-    if (!socket.rooms.has(roomId)) return;
+    if (!isRoomMember(socket, roomId)) return;
 
     const games = state.roomCupGames.get(roomId);
     if (!games) return;
@@ -328,7 +361,12 @@ function attachCupGameHandlers(io, state, socket) {
     if (getCurrentTurnSocketId(game) !== socket.id) return;
 
     const card = drawCard(game);
-    pushEvent(game, { kind: "draw", drawerSocketId: socket.id, cardKind: card.kind, category: card.category });
+    pushEvent(game, {
+      kind: "draw",
+      drawerSocketId: socket.id,
+      cardKind: card.kind,
+      category: card.category,
+    });
 
     const drawer = getPlayer(game, socket.id);
 
@@ -345,7 +383,11 @@ function attachCupGameHandlers(io, state, socket) {
         // The drawer's *next* turn skips. Their current turn is consumed by
         // the draw itself, so just advance.
         if (drawer) drawer.skipNextTurn = true;
-        pushEvent(game, { kind: "skip", targetSocketId: socket.id, reason: "skipYourTurn" });
+        pushEvent(game, {
+          kind: "skip",
+          targetSocketId: socket.id,
+          reason: "skipYourTurn",
+        });
         advanceTurn(game);
         scheduleCupTurnTimer(io, state, roomId, game.id);
         emitCupGameStateToRoom(io, state, roomId);
@@ -449,7 +491,7 @@ function attachCupGameHandlers(io, state, socket) {
   socket.on("cup_game_resolve_card", (data) => {
     const { roomId, gameId } = data || {};
     if (!roomId || typeof roomId !== "string") return;
-    if (!socket.rooms.has(roomId)) return;
+    if (!isRoomMember(socket, roomId)) return;
 
     const games = state.roomCupGames.get(roomId);
     if (!games) return;
@@ -462,7 +504,12 @@ function attachCupGameHandlers(io, state, socket) {
     switch (card.awaiting) {
       case "pickRow": {
         const rowIndex = Number(data.rowIndex);
-        if (!Number.isInteger(rowIndex) || rowIndex < 0 || rowIndex >= game.config.rows) return;
+        if (
+          !Number.isInteger(rowIndex) ||
+          rowIndex < 0 ||
+          rowIndex >= game.config.rows
+        )
+          return;
         const start = rowIndex * game.config.cols;
         for (let i = 0; i < game.config.cols; i++) {
           const cup = game.cups[start + i];
@@ -482,7 +529,12 @@ function attachCupGameHandlers(io, state, socket) {
       }
       case "pickBlock": {
         const topLeft = Number(data.blockTopLeftCupIndex);
-        if (!Number.isInteger(topLeft) || topLeft < 0 || topLeft >= game.cups.length) return;
+        if (
+          !Number.isInteger(topLeft) ||
+          topLeft < 0 ||
+          topLeft >= game.cups.length
+        )
+          return;
         const row = Math.floor(topLeft / game.config.cols);
         const col = topLeft % game.config.cols;
         if (row + 1 >= game.config.rows || col + 1 >= game.config.cols) return;
@@ -514,7 +566,11 @@ function attachCupGameHandlers(io, state, socket) {
         if (target.socketId === socket.id) return; // can't target self
         if (card.kind === "stealTurn") {
           target.skipNextTurn = true;
-          pushEvent(game, { kind: "skip", targetSocketId, reason: "stealTurn" });
+          pushEvent(game, {
+            kind: "skip",
+            targetSocketId,
+            reason: "stealTurn",
+          });
           game.pendingCard = null;
           advanceTurn(game);
           scheduleCupTurnTimer(io, state, roomId, game.id);
@@ -532,7 +588,8 @@ function attachCupGameHandlers(io, state, socket) {
       case "pickTargetCup": {
         if (card.kind !== "forceFlip" || !card.targetSocketId) return;
         const idx = Number(data.cupIndex);
-        if (!Number.isInteger(idx) || idx < 0 || idx >= game.cups.length) return;
+        if (!Number.isInteger(idx) || idx < 0 || idx >= game.cups.length)
+          return;
         const cup = game.cups[idx];
         if (!cup || cup.status !== "hidden") return;
         // Target is the flipper — they take any spider hit.
@@ -558,7 +615,8 @@ function attachCupGameHandlers(io, state, socket) {
         const dst = Number(data.toCupIndex);
         const src = card.srcCupIndex;
         if (typeof src !== "number") return;
-        if (!Number.isInteger(dst) || dst < 0 || dst >= game.cups.length) return;
+        if (!Number.isInteger(dst) || dst < 0 || dst >= game.cups.length)
+          return;
         if (dst === src) return;
         const dstCup = game.cups[dst];
         if (!dstCup || dstCup.status !== "hidden") return;
@@ -569,7 +627,12 @@ function attachCupGameHandlers(io, state, socket) {
         game.spiderOwnerByCup.delete(src);
         drawer.mySpiderCups.add(dst);
         game.spiderOwnerByCup.set(dst, socket.id);
-        pushEvent(game, { kind: "relocate", ownerSocketId: socket.id, fromCupIndex: src, toCupIndex: dst });
+        pushEvent(game, {
+          kind: "relocate",
+          ownerSocketId: socket.id,
+          fromCupIndex: src,
+          toCupIndex: dst,
+        });
         game.pendingCard = null;
         advanceTurn(game);
         scheduleCupTurnTimer(io, state, roomId, game.id);
@@ -585,7 +648,7 @@ function attachCupGameHandlers(io, state, socket) {
   socket.on("cup_game_cancel_card", (data) => {
     const { roomId, gameId } = data || {};
     if (!roomId || typeof roomId !== "string") return;
-    if (!socket.rooms.has(roomId)) return;
+    if (!isRoomMember(socket, roomId)) return;
     const games = state.roomCupGames.get(roomId);
     if (!games) return;
     const game = games.get(gameId);
@@ -594,7 +657,14 @@ function attachCupGameHandlers(io, state, socket) {
     // Only safe to cancel when no flips have happened yet (no remainingFlips
     // already burned). For simplicity we allow cancel on any awaiting state
     // that hasn't yet flipped a cup.
-    const cancelable = ["pickTarget", "pickTargetCup", "pickRelocateSrc", "pickRelocateDst", "pickRow", "pickBlock"];
+    const cancelable = [
+      "pickTarget",
+      "pickTargetCup",
+      "pickRelocateSrc",
+      "pickRelocateDst",
+      "pickRow",
+      "pickBlock",
+    ];
     if (!cancelable.includes(game.pendingCard.awaiting)) return;
     game.pendingCard = null;
     advanceTurn(game);
@@ -606,20 +676,17 @@ function attachCupGameHandlers(io, state, socket) {
   socket.on("cup_game_reset", (data) => {
     const { roomId, gameId } = data || {};
     if (!roomId || typeof roomId !== "string") return;
-    if (!socket.rooms.has(roomId)) return;
+    if (!isRoomMember(socket, roomId)) return;
     const games = state.roomCupGames.get(roomId);
     if (!games) return;
     const game = games.get(gameId);
     if (!game) return;
-    if (
-      game.status === "playing" &&
-      socket.id !== game.creatorSocketId &&
-      !isHost(state, roomId, socket.id)
-    ) return;
+    if (socket.id !== game.creatorSocketId && !isHost(state, roomId, socket.id))
+      return;
     cancelCupTurnTimer(state, gameId);
     games.delete(gameId);
     emitCupGameStateToRoom(io, state, roomId);
   });
 }
 
-module.exports = { attachCupGameHandlers };
+module.exports = { attachCupGameHandlers, MAX_CUP_GAMES_PER_ROOM };

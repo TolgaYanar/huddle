@@ -6,7 +6,10 @@ const {
 const { emitWheelStateTo } = require("../helpers/wheel");
 const { emitTimerStateTo } = require("../helpers/timer");
 const { emitPlaylistStateTo } = require("../helpers/playlists");
-const { emitRoomStateToSocket, restoreRoomStateFromDB } = require("../helpers/sync");
+const {
+  emitRoomStateToSocket,
+  restoreRoomStateFromDB,
+} = require("../helpers/sync");
 const { emitChatHistoryToSocket } = require("../helpers/chat");
 const { emitActivityHistory } = require("../helpers/activity");
 const { emitGameStateTo } = require("../helpers/game");
@@ -15,8 +18,21 @@ const {
   ensurePlayer: ensureCupGamePlayer,
 } = require("../helpers/cupGame");
 const { getBanIdentity, cancelRoomCleanup } = require("../state");
+const { isRoomMember } = require("../helpers/membership");
+const { createSocketRateLimiter } = require("../helpers/socketRateLimit");
+const { validateRoomId } = require("../../auth/validators");
+
+// A socket has no legitimate reason to sit in many rooms at once; the web
+// client joins exactly one. Bounding it stops a single connection from
+// accumulating adapter rooms and per-room state that disconnect must then
+// unwind one DB write at a time.
+const MAX_JOINED_ROOMS_PER_SOCKET = 8;
 
 function attachJoinRoomHandler(io, state, socket, joinedRooms, deps) {
+  // join_room is the most expensive unauthenticated event on the server: it
+  // restores state from the DB and, for a password-protected room, runs
+  // scrypt. Bound it before either can be reached.
+  const joinLimiter = createSocketRateLimiter({ windowMs: 10000, max: 10 });
   async function handleJoin(roomId, password) {
     // Restore persisted state if in-memory is cold (server restart recovery).
     await restoreRoomStateFromDB(deps, state, roomId);
@@ -39,7 +55,7 @@ function attachJoinRoomHandler(io, state, socket, joinedRooms, deps) {
 
     const storedHash = state.roomPasswordHash.get(roomId);
     if (storedHash) {
-      const ok = deps.verifyPassword(password, storedHash);
+      const ok = await deps.verifyPassword(password, storedHash);
       if (!ok) {
         socket.emit("room_requires_password", {
           roomId,
@@ -55,7 +71,7 @@ function attachJoinRoomHandler(io, state, socket, joinedRooms, deps) {
     cancelRoomCleanup(state, roomId);
 
     // If the client re-sends join_room, don't spam activity or join events.
-    if (socket.rooms.has(roomId)) {
+    if (isRoomMember(socket, roomId)) {
       try {
         if (!socket.data.roomJoinedAt) socket.data.roomJoinedAt = {};
         socket.data.roomJoinedAt[roomId] = Date.now();
@@ -248,7 +264,7 @@ function attachJoinRoomHandler(io, state, socket, joinedRooms, deps) {
   }
 
   socket.on("join_room", (payload) => {
-    const roomId =
+    const rawRoomId =
       typeof payload === "string"
         ? payload
         : payload && typeof payload === "object"
@@ -257,13 +273,34 @@ function attachJoinRoomHandler(io, state, socket, joinedRooms, deps) {
     const password =
       typeof payload === "object" && payload ? payload.password : undefined;
 
-    if (!roomId || typeof roomId !== "string") return;
+    // Same validation the REST layer already applies. Without it an arbitrary
+    // ~1MB string reached roomActivity.create() as a Postgres TEXT row and
+    // created a permanent adapter room per emit.
+    const roomId = validateRoomId(rawRoomId);
+    if (!roomId) return;
+
+    if (!joinLimiter()) return;
 
     // Register the in-flight join synchronously (before any await) so the
     // data-request handlers (chat/activity/room state) can await it instead
     // of racing the DB load that runs before socket.join().
     const bag = (socket.data ||= {});
     bag.pendingJoins ||= new Map();
+
+    // handleJoin awaits restoreRoomStateFromDB before its "already a member"
+    // short-circuit, so two join_room events in the same tick both took the
+    // fresh-join path: duplicate activity rows, duplicate user_joined
+    // broadcasts and duplicated history replays. React StrictMode double-mount
+    // and reconnect retries both hit this.
+    if (bag.pendingJoins.has(roomId)) return;
+
+    if (
+      !joinedRooms.has(roomId) &&
+      joinedRooms.size >= MAX_JOINED_ROOMS_PER_SOCKET
+    ) {
+      return;
+    }
+
     const p = handleJoin(roomId, password);
     bag.pendingJoins.set(roomId, p);
     p.catch((err) => {

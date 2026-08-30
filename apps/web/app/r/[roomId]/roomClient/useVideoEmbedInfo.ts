@@ -100,7 +100,7 @@ export function useVideoEmbedInfo(options: {
 
     const canPlay =
       !drmTier3 &&
-      (((!isBadYoutubeUrl && normalizedUrl.length > 0) ||
+      ((!isBadYoutubeUrl && normalizedUrl.length > 0) ||
         isKick ||
         isTwitch ||
         isNetflix ||
@@ -109,14 +109,10 @@ export function useVideoEmbedInfo(options: {
         isSoundCloud ||
         isLoom ||
         isPeerTube) &&
-        !isPrime);
+      !isPrime;
 
     const canControlPlayback =
-      !isKick &&
-      !isTwitch &&
-      !isPrime &&
-      !isLoom &&
-      !drmTier3;
+      !isKick && !isTwitch && !isPrime && !isLoom && !drmTier3;
 
     return {
       platform,

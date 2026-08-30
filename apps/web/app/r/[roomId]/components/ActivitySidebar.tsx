@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useCallback, useLayoutEffect, useRef, useState } from "react";
 import type { GamePanelProps } from "./GamePanel";
 import type { CupGamePanelProps } from "./cupGame/CupGamePanel";
+import { useFollowToBottom } from "../hooks/useFollowToBottom";
 
 const AVAILABLE_GAMES: {
   id: string;
@@ -35,6 +36,7 @@ export type ActivityLogEntry = {
 };
 
 const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥"] as const;
+const VISIBLE_LOG_PAGE_SIZE = 100;
 
 const EVENT_COLORS: Record<string, string> = {
   play: "text-emerald-400",
@@ -66,13 +68,50 @@ function userColor(name: string): string {
     "bg-indigo-600/60 text-indigo-100",
   ];
   let h = 0;
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffff;
+  for (let i = 0; i < name.length; i++)
+    h = (h * 31 + name.charCodeAt(i)) & 0xffff;
   return palette[h % palette.length]!;
 }
 
 type Tab = "activity" | "games";
 
-export function ActivitySidebar(props: {
+const ChatComposer = React.memo(function ChatComposer({
+  isConnected,
+  sendChat,
+}: {
+  isConnected: boolean;
+  sendChat: (text: string) => boolean;
+}) {
+  const [chatText, setChatText] = useState("");
+
+  return (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (sendChat(chatText)) setChatText("");
+      }}
+      className="p-3 border-t border-white/10 bg-black/20 flex gap-2"
+    >
+      <input
+        type="text"
+        value={chatText}
+        onChange={(event) => setChatText(event.target.value)}
+        placeholder={isConnected ? "Type a message…" : "Connecting…"}
+        disabled={!isConnected}
+        className="flex-1 bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500/25 focus:border-sky-500/30 transition disabled:opacity-60"
+      />
+      <button
+        type="submit"
+        disabled={!isConnected || !chatText.trim()}
+        className="h-9 px-4 rounded-xl border border-white/10 bg-white/5 text-slate-50 text-sm font-medium hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        Send
+      </button>
+    </form>
+  );
+});
+
+export const ActivitySidebar = React.memo(function ActivitySidebar(props: {
   roomId: string;
   userId: string;
   isConnected: boolean;
@@ -86,9 +125,7 @@ export function ActivitySidebar(props: {
   logsEndRef: React.RefObject<HTMLDivElement | null>;
   capitalize: (s: string) => string;
 
-  chatText: string;
-  setChatText: React.Dispatch<React.SetStateAction<string>>;
-  handleSendChat: (e: React.FormEvent) => void;
+  sendChat: (text: string) => boolean;
 
   reactions: Record<string, Record<string, string[]>>;
   addReaction: (messageId: string, emoji: string) => void;
@@ -106,9 +143,7 @@ export function ActivitySidebar(props: {
     isTheatreMode = false,
     logs,
     logsEndRef,
-    chatText,
-    setChatText,
-    handleSendChat,
+    sendChat,
     reactions,
     addReaction,
     gameProps,
@@ -117,7 +152,69 @@ export function ActivitySidebar(props: {
   } = props;
 
   const [activeTab, setActiveTab] = useState<Tab>("activity");
-  const [hoveredMsgId, setHoveredMsgId] = useState<string | null>(null);
+  const [activeReactionMsgId, setActiveReactionMsgId] = useState<string | null>(
+    null,
+  );
+  const [visibleLogCount, setVisibleLogCount] = useState(VISIBLE_LOG_PAGE_SIZE);
+  const previousLogScrollHeightRef = useRef<number | null>(null);
+  const isLogVisible = !isActivityCollapsed && activeTab === "activity";
+  const {
+    scrollContainerRef: logScrollContainerRef,
+    handleScroll: handleLogScroll,
+  } = useFollowToBottom<HTMLDivElement>(logs, { enabled: isLogVisible });
+  // Choosing a reaction unmounts the picker. Without this the button the user
+  // just activated disappears from under them and focus falls to <body>, so a
+  // keyboard user loses their place in the log and has to tab in from the top.
+  const reactionTriggerRefs = useRef(new Map<string, HTMLButtonElement>());
+  // Returning focus to the trigger fires the wrapper's focus handler, which
+  // would immediately reopen the picker the user just dismissed. Suppress that
+  // one event rather than dropping focus-to-open, which is how a keyboard user
+  // discovers the control in the first place.
+  const suppressReactionReopenRef = useRef(false);
+
+  const openReactionPicker = useCallback((msgId: string | null) => {
+    if (suppressReactionReopenRef.current) {
+      suppressReactionReopenRef.current = false;
+      return;
+    }
+    setActiveReactionMsgId(msgId);
+  }, []);
+
+  const closeReactionPicker = useCallback((msgId: string) => {
+    setActiveReactionMsgId(null);
+    const trigger = reactionTriggerRefs.current.get(msgId);
+    if (trigger) {
+      suppressReactionReopenRef.current = true;
+      trigger.focus();
+      // focus() dispatches synchronously, so the handler has already consumed
+      // the flag by now. Clear it anyway: if the trigger somehow already held
+      // focus, no event fires and a latched flag would swallow the user's next
+      // deliberate attempt to open the picker.
+      queueMicrotask(() => {
+        suppressReactionReopenRef.current = false;
+      });
+    }
+  }, []);
+
+  const firstVisibleLogIndex = Math.max(0, logs.length - visibleLogCount);
+  const visibleLogs = logs.slice(firstVisibleLogIndex);
+
+  const showEarlierLogs = useCallback(() => {
+    const container = logScrollContainerRef.current;
+    if (container) previousLogScrollHeightRef.current = container.scrollHeight;
+    setVisibleLogCount((count) =>
+      Math.min(logs.length, count + VISIBLE_LOG_PAGE_SIZE),
+    );
+  }, [logScrollContainerRef, logs.length]);
+
+  // Prepending older entries must not move the message the user was reading.
+  useLayoutEffect(() => {
+    const previousHeight = previousLogScrollHeightRef.current;
+    const container = logScrollContainerRef.current;
+    if (previousHeight === null || !container) return;
+    container.scrollTop += container.scrollHeight - previousHeight;
+    previousLogScrollHeightRef.current = null;
+  }, [logScrollContainerRef, visibleLogCount]);
 
   const hasActiveGame = gameProps.gameState.games.some(
     (g) => g.status === "active" || g.status === "finished",
@@ -194,16 +291,37 @@ export function ActivitySidebar(props: {
       {/* Chat/Activity tab */}
       {!isActivityCollapsed && activeTab === "activity" && (
         <>
-          <div className="flex-1 min-h-0 overflow-y-auto px-3 py-3 flex flex-col gap-0">
+          <div
+            ref={logScrollContainerRef}
+            onScroll={handleLogScroll}
+            role="region"
+            aria-label="Room activity"
+            className="flex-1 min-h-0 overflow-y-auto px-3 py-3 flex flex-col gap-0"
+          >
             {logs.length === 0 && (
               <div className="text-center text-slate-500 mt-8 text-sm">
                 No messages yet…
               </div>
             )}
 
-            {logs.map((log, i) => {
-              const prev = logs[i - 1];
-              const next = logs[i + 1];
+            {firstVisibleLogIndex > 0 && (
+              <button
+                type="button"
+                onClick={showEarlierLogs}
+                className="mx-auto mb-3 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-300 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+              >
+                Show {Math.min(VISIBLE_LOG_PAGE_SIZE, firstVisibleLogIndex)}
+                {" earlier messages"}
+              </button>
+            )}
+
+            {visibleLogs.map((log, visibleIndex) => {
+              const absoluteIndex = firstVisibleLogIndex + visibleIndex;
+              const prev = visibleLogs[visibleIndex - 1];
+              const next = visibleLogs[visibleIndex + 1];
+              const logKey =
+                log.id ??
+                `${log.type}:${log.user}:${log.time}:${absoluteIndex}`;
 
               if (log.type === "chat") {
                 const isFirstInGroup =
@@ -216,7 +334,8 @@ export function ActivitySidebar(props: {
 
                 return (
                   <div
-                    key={i}
+                    key={logKey}
+                    data-activity-entry
                     className={`flex gap-2.5 ${isFirstInGroup ? "mt-4 first:mt-0" : "mt-0.5"}`}
                   >
                     {/* Avatar column */}
@@ -248,25 +367,79 @@ export function ActivitySidebar(props: {
                       {/* Bubble + emoji picker */}
                       <div
                         className="relative group/msg"
-                        onMouseEnter={() => setHoveredMsgId(log.id ?? null)}
-                        onMouseLeave={() => setHoveredMsgId(null)}
+                        onMouseEnter={() =>
+                          setActiveReactionMsgId(log.id ?? null)
+                        }
+                        onMouseLeave={(event) => {
+                          if (
+                            !event.currentTarget.contains(
+                              document.activeElement,
+                            )
+                          ) {
+                            setActiveReactionMsgId(null);
+                          }
+                        }}
+                        onFocusCapture={() =>
+                          openReactionPicker(log.id ?? null)
+                        }
+                        onBlurCapture={(event) => {
+                          if (
+                            !event.currentTarget.contains(
+                              event.relatedTarget as Node | null,
+                            )
+                          ) {
+                            setActiveReactionMsgId(null);
+                          }
+                        }}
+                        onKeyDownCapture={(event) => {
+                          if (
+                            event.key === "Escape" &&
+                            log.id &&
+                            activeReactionMsgId === log.id
+                          ) {
+                            event.preventDefault();
+                            closeReactionPicker(log.id);
+                          }
+                        }}
                       >
                         <p className="text-sm text-slate-300 leading-relaxed break-words">
                           {log.msg}
                         </p>
 
-                        {/* Emoji picker — appears on hover if message has an id */}
-                        {log.id && hoveredMsgId === log.id && (
-                          <div className="absolute -top-6 right-0 flex items-center gap-0.5 bg-slate-800/95 border border-white/10 rounded-full px-1.5 py-0.5 shadow-lg z-20">
+                        {log.id && (
+                          <button
+                            type="button"
+                            ref={(element) => {
+                              const map = reactionTriggerRefs.current;
+                              if (element) map.set(log.id!, element);
+                              else map.delete(log.id!);
+                            }}
+                            onClick={() => setActiveReactionMsgId(log.id!)}
+                            aria-label={`Add reaction to message from ${log.user}`}
+                            aria-expanded={activeReactionMsgId === log.id}
+                            className="absolute -top-7 right-0 h-6 min-w-6 rounded-full border border-white/10 bg-slate-800/95 px-1 text-xs text-slate-300 opacity-60 shadow-lg transition hover:opacity-100 focus:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+                          >
+                            <span aria-hidden="true">☺+</span>
+                          </button>
+                        )}
+
+                        {/* Emoji picker — hover, keyboard focus, and touch accessible. */}
+                        {log.id && activeReactionMsgId === log.id && (
+                          <div
+                            role="group"
+                            aria-label="Choose a reaction"
+                            className="absolute -top-7 right-8 flex items-center gap-0.5 bg-slate-800/95 border border-white/10 rounded-full px-1.5 py-0.5 shadow-lg z-20"
+                          >
                             {REACTION_EMOJIS.map((emoji) => (
                               <button
                                 key={emoji}
                                 type="button"
-                                onMouseDown={(e) => e.preventDefault()}
                                 onClick={() => {
                                   addReaction(log.id!, emoji);
+                                  closeReactionPicker(log.id!);
                                 }}
-                                className="text-sm leading-none hover:scale-125 active:scale-110 transition-transform px-0.5"
+                                aria-label={`React with ${emoji}`}
+                                className="text-sm leading-none hover:scale-125 active:scale-110 transition-transform px-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 rounded"
                                 title={emoji}
                               >
                                 {emoji}
@@ -289,6 +462,7 @@ export function ActivitySidebar(props: {
                                   onClick={() =>
                                     log.id && addReaction(log.id, emoji)
                                   }
+                                  aria-label={`React with ${emoji}; ${userIds.length} ${userIds.length === 1 ? "reaction" : "reactions"}`}
                                   className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border transition-colors ${
                                     isMine
                                       ? "bg-sky-500/20 border-sky-500/40 text-sky-200 hover:bg-sky-500/30"
@@ -316,13 +490,13 @@ export function ActivitySidebar(props: {
               }
 
               // System event — compact centered divider
-              const color =
-                EVENT_COLORS[log.type] ?? "text-slate-500";
+              const color = EVENT_COLORS[log.type] ?? "text-slate-500";
               const icon = EVENT_ICONS[log.type] ?? "·";
 
               return (
                 <div
-                  key={i}
+                  key={logKey}
+                  data-activity-entry
                   className="flex items-center gap-2 py-2 select-none"
                 >
                   <div className="flex-1 h-px bg-white/5" />
@@ -337,26 +511,7 @@ export function ActivitySidebar(props: {
             <div ref={logsEndRef} />
           </div>
 
-          <form
-            onSubmit={handleSendChat}
-            className="p-3 border-t border-white/10 bg-black/20 flex gap-2"
-          >
-            <input
-              type="text"
-              value={chatText}
-              onChange={(e) => setChatText(e.target.value)}
-              placeholder={isConnected ? "Type a message…" : "Connecting…"}
-              disabled={!isConnected}
-              className="flex-1 bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500/25 focus:border-sky-500/30 transition disabled:opacity-60"
-            />
-            <button
-              type="submit"
-              disabled={!isConnected || !chatText.trim()}
-              className="h-9 px-4 rounded-xl border border-white/10 bg-white/5 text-slate-50 text-sm font-medium hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Send
-            </button>
-          </form>
+          <ChatComposer isConnected={isConnected} sendChat={sendChat} />
         </>
       )}
 
@@ -407,4 +562,4 @@ export function ActivitySidebar(props: {
       )}
     </aside>
   );
-}
+});

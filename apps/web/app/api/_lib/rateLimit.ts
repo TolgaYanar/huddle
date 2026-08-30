@@ -102,7 +102,10 @@ export function createRouteRateLimiter({
 
     if (hits.length >= max) {
       const oldest = hits[0] ?? now;
-      const retryAfter = Math.max(1, Math.ceil((oldest + windowMs - now) / 1000));
+      const retryAfter = Math.max(
+        1,
+        Math.ceil((oldest + windowMs - now) / 1000),
+      );
       const response = NextResponse.json(body, {
         status: 429,
         headers: {

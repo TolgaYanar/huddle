@@ -108,9 +108,9 @@ export function ImageEditor({ src, onClose, onSave }: ImageEditorProps) {
   const [tool, setTool] = React.useState<Tool>("black");
   const [rects, setRects] = React.useState<Rect[]>([]);
   const [draftRect, setDraftRect] = React.useState<Rect | null>(null);
-  const [imgState, setImgState] = React.useState<
-    "loading" | "ready" | "error"
-  >("loading");
+  const [imgState, setImgState] = React.useState<"loading" | "ready" | "error">(
+    "loading",
+  );
   const [tainted, setTainted] = React.useState(false);
 
   // Load the image whenever src changes; reset state.
@@ -364,8 +364,8 @@ export function ImageEditor({ src, onClose, onSave }: ImageEditorProps) {
 
       {tainted && (
         <p className="text-xs text-amber-400/80 mt-2">
-          Heads up: this image source blocks in-browser editing. Pick from
-          AI or paste a different URL if you need to redact.
+          Heads up: this image source blocks in-browser editing. Pick from AI or
+          paste a different URL if you need to redact.
         </p>
       )}
 
@@ -384,7 +384,9 @@ export function ImageEditor({ src, onClose, onSave }: ImageEditorProps) {
           disabled={imgState !== "ready"}
           className="flex-1 py-2.5 rounded-xl bg-sky-600 text-white text-sm font-semibold hover:bg-sky-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {rects.length === 0 ? "Use as-is" : `Save (${rects.length} edit${rects.length === 1 ? "" : "s"})`}
+          {rects.length === 0
+            ? "Use as-is"
+            : `Save (${rects.length} edit${rects.length === 1 ? "" : "s"})`}
         </button>
       </div>
     </Modal>

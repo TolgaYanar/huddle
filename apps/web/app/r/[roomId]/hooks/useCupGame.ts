@@ -5,7 +5,10 @@ import type {
   CupGameStateData,
 } from "shared-logic";
 
-type Socket = { on: (e: string, h: (...args: unknown[]) => void) => unknown; off: (e: string, h: (...args: unknown[]) => void) => unknown } | null;
+type Socket = {
+  on: (e: string, h: (...args: unknown[]) => void) => unknown;
+  off: (e: string, h: (...args: unknown[]) => void) => unknown;
+} | null;
 
 export function useCupGame({
   socket,
@@ -68,7 +71,11 @@ export function useCupGame({
     if (!socket) return;
     const handler = (...args: unknown[]) => {
       const payload = args[0] as
-        | { cupIndex: number; revealedAs: "empty" | "spider"; ownerSocketId: string | null }
+        | {
+            cupIndex: number;
+            revealedAs: "empty" | "spider";
+            ownerSocketId: string | null;
+          }
         | undefined;
       if (!payload || typeof window === "undefined") return;
       window.dispatchEvent(

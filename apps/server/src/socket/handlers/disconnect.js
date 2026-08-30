@@ -1,10 +1,7 @@
 const { emitRoomUsersToRoom } = require("../helpers/users");
 const { cleanupDisconnectFromGames } = require("../helpers/gameTimer");
 const { cleanupDisconnectFromCupGames } = require("../helpers/cupGame");
-const {
-  anchorRoomStateOnEmpty,
-  persistRoomState,
-} = require("../helpers/sync");
+const { anchorRoomStateOnEmpty, persistRoomState } = require("../helpers/sync");
 const { scheduleRoomCleanup } = require("../state");
 
 function attachDisconnectHandler(io, state, socket, joinedRooms, deps) {
@@ -39,7 +36,10 @@ function attachDisconnectHandler(io, state, socket, joinedRooms, deps) {
       try {
         cleanupDisconnectFromCupGames(io, state, roomId, socket.id);
       } catch (err) {
-        console.error("Failed to clean up cup games on disconnect:", err.message);
+        console.error(
+          "Failed to clean up cup games on disconnect:",
+          err.message,
+        );
       }
 
       socket.to(roomId).emit("user_left", { socketId: socket.id, username });
@@ -70,12 +70,13 @@ function attachDisconnectHandler(io, state, socket, joinedRooms, deps) {
             roomId,
             hostId: state.roomHost.get(roomId),
           });
-        } else {
-          state.roomHost.delete(roomId);
-          state.roomBans.delete(roomId);
-          state.roomPasswordHash.delete(roomId);
-          state.roomWheel.delete(roomId);
         }
+        // Do NOT drop roomHost/roomBans/roomPasswordHash/roomWheel here. The
+        // room is empty but scheduleRoomCleanup() below defers freeing every
+        // per-room map by ROOM_EMPTY_GRACE_MS, precisely so a reconnect blip or
+        // page refresh does not lose the room. Clearing them eagerly wiped the
+        // password and ban list on every last-leave, letting a kicked user
+        // rejoin as host. cleanupRoom() covers all four via PER_ROOM_MAPS.
       }
 
       // Pause-anchor + persist on last-leave so a late joiner doesn't inherit
@@ -102,10 +103,10 @@ function attachDisconnectHandler(io, state, socket, joinedRooms, deps) {
       for (const roomId of rooms) {
         try {
           if (deps.isDbConnected() && deps.getPrisma()) {
-            const senderUsername =
-              socket.data?.authUser?.username ||
-              state.socketIdToUsername.get(socket.id) ||
-              null;
+            // `username` was captured before state.socketIdToUsername was
+            // cleared above; re-reading the map here always yielded null for
+            // guests, so their leave rows lost the name their join row had.
+            const senderUsername = username;
             const evt = await deps.getPrisma().roomActivity.create({
               data: {
                 roomId,

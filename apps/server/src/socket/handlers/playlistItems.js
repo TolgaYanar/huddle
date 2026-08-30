@@ -1,4 +1,5 @@
 const { emitPlaylistStateToRoom } = require("../helpers/playlists");
+const { isRoomMember } = require("../helpers/membership");
 
 function attachPlaylistItemHandlers(io, state, socket, deps) {
   socket.on("playlist_add_item", async (data) => {
@@ -7,7 +8,7 @@ function attachPlaylistItemHandlers(io, state, socket, deps) {
     if (!roomId || typeof roomId !== "string") return;
     if (!playlistId || typeof playlistId !== "string") return;
     if (!videoUrl || typeof videoUrl !== "string") return;
-    if (!socket.rooms.has(roomId)) return;
+    if (!isRoomMember(socket, roomId)) return;
     if (!deps.isDbConnected() || !deps.getPrisma()) return;
 
     const itemTitle =
@@ -59,7 +60,7 @@ function attachPlaylistItemHandlers(io, state, socket, deps) {
     if (!roomId || typeof roomId !== "string") return;
     if (!playlistId || typeof playlistId !== "string") return;
     if (!itemId || typeof itemId !== "string") return;
-    if (!socket.rooms.has(roomId)) return;
+    if (!isRoomMember(socket, roomId)) return;
     if (!deps.isDbConnected() || !deps.getPrisma()) return;
 
     try {
@@ -81,7 +82,7 @@ function attachPlaylistItemHandlers(io, state, socket, deps) {
     if (!Array.isArray(itemIds)) return;
     if (itemIds.length > 500) return;
     if (itemIds.some((id) => typeof id !== "string")) return;
-    if (!socket.rooms.has(roomId)) return;
+    if (!isRoomMember(socket, roomId)) return;
     if (!deps.isDbConnected() || !deps.getPrisma()) return;
 
     try {

@@ -12,6 +12,7 @@ export function TileGrid(props: {
   camEnabled: boolean;
   screenEnabled: boolean;
   localVideoRef: React.RefObject<HTMLVideoElement | null>;
+  setLocalVideoElement: React.RefCallback<HTMLVideoElement>;
   remoteStreams: Array<{ id: string; stream: MediaStream }>;
   remoteSpeaking: Record<string, boolean>;
   remoteMedia: Record<string, WebRTCMediaState>;
@@ -19,6 +20,7 @@ export function TileGrid(props: {
   getDisplayName: (id: string) => string;
   setIsDraggingTile: (v: boolean) => void;
   setIsStageDragOver: (v: boolean) => void;
+  onPinTile: (payload: DraggedTilePayload) => void;
 }) {
   const {
     userId,
@@ -28,6 +30,7 @@ export function TileGrid(props: {
     camEnabled,
     screenEnabled,
     localVideoRef,
+    setLocalVideoElement,
     remoteStreams,
     remoteSpeaking,
     remoteMedia,
@@ -35,6 +38,7 @@ export function TileGrid(props: {
     getDisplayName,
     setIsDraggingTile,
     setIsStageDragOver,
+    onPinTile,
   } = props;
 
   return (
@@ -74,6 +78,15 @@ export function TileGrid(props: {
         <div className="absolute top-2 right-2 z-10 flex items-center gap-1">
           <button
             type="button"
+            onClick={() => onPinTile({ kind: "local" })}
+            className="h-9 px-2 inline-flex items-center justify-center rounded-xl border border-white/20 bg-black/60 text-slate-50 text-xs hover:bg-white/10 transition-colors"
+            title="Pin your video to the main player"
+            aria-label="Pin your video to the main player"
+          >
+            Pin
+          </button>
+          <button
+            type="button"
             onMouseDown={(e) => {
               e.stopPropagation();
             }}
@@ -98,7 +111,7 @@ export function TileGrid(props: {
           </button>
         </div>
         <video
-          ref={localVideoRef}
+          ref={setLocalVideoElement}
           autoPlay
           playsInline
           muted
@@ -127,23 +140,39 @@ export function TileGrid(props: {
             label={label}
             media={media}
             extraActions={
-              isHost ? (
+              <>
                 <button
                   type="button"
-                  onMouseDown={(e) => {
-                    e.stopPropagation();
-                  }}
+                  onMouseDown={(e) => e.stopPropagation()}
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    onKickUser(id);
+                    onPinTile({ kind: "remote", peerId: id });
                   }}
-                  className="h-9 px-3 inline-flex items-center justify-center rounded-xl border border-white/20 bg-black/60 text-slate-50 text-xs font-medium hover:bg-white/10 transition-colors"
-                  title="Kick user (host only)"
+                  className="h-9 px-2 inline-flex items-center justify-center rounded-xl border border-white/20 bg-black/60 text-slate-50 text-xs hover:bg-white/10 transition-colors"
+                  title={`Pin ${displayName} to the main player`}
+                  aria-label={`Pin ${displayName} to the main player`}
                 >
-                  Kick
+                  Pin
                 </button>
-              ) : null
+                {isHost && (
+                  <button
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.stopPropagation();
+                    }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onKickUser(id);
+                    }}
+                    className="h-9 px-3 inline-flex items-center justify-center rounded-xl border border-white/20 bg-black/60 text-slate-50 text-xs font-medium hover:bg-white/10 transition-colors"
+                    title="Kick user (host only)"
+                  >
+                    Kick
+                  </button>
+                )}
+              </>
             }
             draggablePayload={{ kind: "remote", peerId: id }}
             onDraggingChange={(v) => {

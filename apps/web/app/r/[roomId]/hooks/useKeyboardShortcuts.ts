@@ -23,9 +23,7 @@ function isTyping(): boolean {
  * — that's the contract every dialog in the room view honors.
  */
 function isModalOpen(): boolean {
-  return (
-    document.querySelector('[role="dialog"][aria-modal="true"]') !== null
-  );
+  return document.querySelector('[role="dialog"][aria-modal="true"]') !== null;
 }
 
 export function useKeyboardShortcuts({

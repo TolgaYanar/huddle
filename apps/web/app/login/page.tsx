@@ -78,13 +78,27 @@ function LoginPageInner() {
             <div className="mb-6">
               <div className="flex items-center gap-3 mb-3">
                 <div className="h-9 w-9 rounded-xl bg-indigo-500/15 border border-indigo-500/20 flex items-center justify-center">
-                  <svg className="w-4 h-4 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  <svg
+                    className="w-4 h-4 text-indigo-400"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                    />
                   </svg>
                 </div>
               </div>
-              <h1 className="text-xl font-semibold text-white tracking-tight">Welcome back</h1>
-              <p className="text-sm text-slate-400 mt-1">Log in to access your saved rooms.</p>
+              <h1 className="text-xl font-semibold text-white tracking-tight">
+                Welcome back
+              </h1>
+              <p className="text-sm text-slate-400 mt-1">
+                Log in to access your saved rooms.
+              </p>
             </div>
 
             <form
@@ -108,13 +122,18 @@ function LoginPageInner() {
             >
               {/* Username field */}
               <div className="space-y-1.5">
-                <label htmlFor="login-username" className="text-xs font-medium text-slate-400">Username</label>
+                <label
+                  htmlFor="login-username"
+                  className="text-xs font-medium text-slate-400"
+                >
+                  Username
+                </label>
                 <input
                   id="login-username"
                   value={username}
                   onChange={(e) => {
                     setUsername(
-                      e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "")
+                      e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""),
                     );
                     setError(null);
                   }}
@@ -130,7 +149,12 @@ function LoginPageInner() {
 
               {/* Password field */}
               <div className="space-y-1.5">
-                <label htmlFor="login-password" className="text-xs font-medium text-slate-400">Password</label>
+                <label
+                  htmlFor="login-password"
+                  className="text-xs font-medium text-slate-400"
+                >
+                  Password
+                </label>
                 <div className="relative">
                   <input
                     id="login-password"
@@ -144,7 +168,10 @@ function LoginPageInner() {
                     autoComplete="current-password"
                     className="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-2.5 pr-10 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/25 focus:border-indigo-500/35 hover:border-white/12 transition-all"
                   />
-                  <PasswordToggleButton show={showPassword} onToggle={() => setShowPassword((v) => !v)} />
+                  <PasswordToggleButton
+                    show={showPassword}
+                    onToggle={() => setShowPassword((v) => !v)}
+                  />
                 </div>
               </div>
 

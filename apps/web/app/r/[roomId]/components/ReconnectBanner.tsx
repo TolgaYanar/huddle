@@ -31,7 +31,7 @@ export function ReconnectBanner({
       }, 2500);
       return () => clearTimeout(t);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isConnected]);
 
   if (!visible) return null;
@@ -52,7 +52,9 @@ export function ReconnectBanner({
       <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50">
         <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-slate-900/95 border border-rose-500/40 shadow-xl backdrop-blur-md">
           <div className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
-          <span className="text-sm text-slate-200 font-medium">Connection lost</span>
+          <span className="text-sm text-slate-200 font-medium">
+            Connection lost
+          </span>
           <div className="flex gap-2 ml-1">
             <button
               type="button"
@@ -83,8 +85,19 @@ export function ReconnectBanner({
           fill="none"
           viewBox="0 0 24 24"
         >
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+          <circle
+            className="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            strokeWidth="4"
+          />
+          <path
+            className="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+          />
         </svg>
         <span className="text-sm text-slate-200 font-medium">
           {reconnectAttempt > 0

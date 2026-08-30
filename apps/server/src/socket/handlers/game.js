@@ -11,6 +11,14 @@ const {
   cancelTurnTimer,
   scheduleTurnTimer,
 } = require("../helpers/gameTimer");
+const { isRoomMember } = require("../helpers/membership");
+const { createSocketRateLimiter } = require("../helpers/socketRateLimit");
+
+const MAX_GAMES_PER_ROOM = 8;
+const MAX_QUESTIONERS_PER_GAME = 16;
+const MAX_IMAGE_URL_LENGTH = 2_048;
+const MAX_DATA_IMAGE_FIELD_LENGTH = 250_000;
+const MAX_EMBEDDED_IMAGE_BYTES_PER_GAME = 750_000;
 
 // Turn-cost-per-hint: 0 hints → 1.0 pts, 1 → 0.75, 2 → 0.5, 3+ → 0.25.
 function pointsForWin(hintsRevealed) {
@@ -19,32 +27,45 @@ function pointsForWin(hintsRevealed) {
 }
 
 const GAME_CATEGORIES = [
-  "Brands", "People", "Places", "Movies & TV",
-  "Music", "Sports", "Animals", "Things", "Other",
+  "Brands",
+  "People",
+  "Places",
+  "Movies & TV",
+  "Music",
+  "Sports",
+  "Animals",
+  "Things",
+  "Other",
 ];
 
 function makeGameId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
 
-// Cap the size of data-URL clue images we're willing to broadcast to every
-// player. 250 KB base64 ≈ 187 KB raw image — comfortably under socket.io's
-// 1 MB default payload limit even with several rounds.
-const MAX_IMAGE_FIELD_LENGTH = 250_000;
+// Bound both individual image fields and the aggregate embedded-image budget
+// of a game. Remote URLs stay cheap; base64 images otherwise multiply across
+// every recipient on each state broadcast.
 const DATA_URL_RE = /^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]+$/;
 
 function sanitizeImageField(raw) {
   if (typeof raw !== "string") return "";
   const value = raw.trim();
   if (!value) return "";
-  if (value.length > MAX_IMAGE_FIELD_LENGTH) return "";
-  if (/^https?:\/\//i.test(value)) return value;
-  if (DATA_URL_RE.test(value)) return value;
+  if (/^https?:\/\//i.test(value)) {
+    return value.length <= MAX_IMAGE_URL_LENGTH ? value : "";
+  }
+  if (value.length <= MAX_DATA_IMAGE_FIELD_LENGTH && DATA_URL_RE.test(value)) {
+    return value;
+  }
   return "";
 }
 
-function parseRounds(rounds) {
+function parseRounds(
+  rounds,
+  embeddedImageBudget = MAX_EMBEDDED_IMAGE_BYTES_PER_GAME,
+) {
   if (!Array.isArray(rounds) || rounds.length === 0) return null;
+  let remainingImageBudget = Math.max(0, embeddedImageBudget);
   const clean = rounds
     .slice(0, 10)
     .map((r) => {
@@ -55,7 +76,14 @@ function parseRounds(rounds) {
         typeof r.category === "string" && GAME_CATEGORIES.includes(r.category)
           ? r.category
           : "Other";
-      const image = sanitizeImageField(r.image);
+      let image = sanitizeImageField(r.image);
+      if (image.startsWith("data:image/")) {
+        if (image.length > remainingImageBudget) {
+          image = "";
+        } else {
+          remainingImageBudget -= image.length;
+        }
+      }
       return {
         category,
         answer,
@@ -73,6 +101,17 @@ function parseRounds(rounds) {
   return clean.length > 0 ? clean : null;
 }
 
+function embeddedImageBytesForQuestioner(questioner) {
+  return (questioner?.rounds || []).reduce(
+    (total, round) =>
+      total +
+      (typeof round.image === "string" && round.image.startsWith("data:image/")
+        ? round.image.length
+        : 0),
+    0,
+  );
+}
+
 function getOrCreateRoomGames(state, roomId) {
   if (!state.roomGames.has(roomId)) state.roomGames.set(roomId, new Map());
   return state.roomGames.get(roomId);
@@ -83,11 +122,17 @@ function isHost(state, roomId, socketId) {
 }
 
 function attachGameHandlers(io, state, socket) {
+  const createGameLimiter = createSocketRateLimiter({
+    windowMs: 10_000,
+    max: 4,
+  });
+  const roundsLimiter = createSocketRateLimiter({ windowMs: 10_000, max: 10 });
+
   // ── Get state ──────────────────────────────────────────────────────────────
   socket.on("game_get", (data) => {
     const { roomId } = data || {};
     if (!roomId || typeof roomId !== "string") return;
-    if (!socket.rooms.has(roomId)) return;
+    if (!isRoomMember(socket, roomId)) return;
     emitGameStateTo(state, socket, roomId);
   });
 
@@ -95,7 +140,11 @@ function attachGameHandlers(io, state, socket) {
   socket.on("game_create", (data) => {
     const { roomId, rounds } = data || {};
     if (!roomId || typeof roomId !== "string") return;
-    if (!socket.rooms.has(roomId)) return;
+    if (!isRoomMember(socket, roomId)) return;
+    if (!createGameLimiter()) return;
+
+    const roomGames = getOrCreateRoomGames(state, roomId);
+    if (roomGames.size >= MAX_GAMES_PER_ROOM) return;
 
     const cleanRounds = parseRounds(rounds);
     if (!cleanRounds) return;
@@ -128,7 +177,7 @@ function attachGameHandlers(io, state, socket) {
       },
     };
 
-    getOrCreateRoomGames(state, roomId).set(gameId, game);
+    roomGames.set(gameId, game);
     emitGameStateToRoom(io, state, roomId);
   });
 
@@ -136,20 +185,35 @@ function attachGameHandlers(io, state, socket) {
   socket.on("game_add_rounds", (data) => {
     const { roomId, gameId, rounds } = data || {};
     if (!roomId || typeof roomId !== "string") return;
-    if (!socket.rooms.has(roomId)) return;
+    if (!isRoomMember(socket, roomId)) return;
+    if (!roundsLimiter()) return;
 
     const games = state.roomGames.get(roomId);
     if (!games) return;
     const game = games.get(gameId);
     if (!game || game.session.status !== "staging") return;
 
-    const cleanRounds = parseRounds(rounds);
-    if (!cleanRounds) return;
-
     const username = state.socketIdToUsername.get(socket.id) || null;
     const existing = game.questioners.findIndex(
-      (q) => q.socketId === socket.id
+      (q) => q.socketId === socket.id,
     );
+    if (
+      existing === -1 &&
+      game.questioners.length >= MAX_QUESTIONERS_PER_GAME
+    ) {
+      return;
+    }
+    const embeddedBytesUsed = game.questioners.reduce(
+      (total, questioner, index) =>
+        total +
+        (index === existing ? 0 : embeddedImageBytesForQuestioner(questioner)),
+      0,
+    );
+    const cleanRounds = parseRounds(
+      rounds,
+      MAX_EMBEDDED_IMAGE_BYTES_PER_GAME - embeddedBytesUsed,
+    );
+    if (!cleanRounds) return;
     if (existing !== -1) {
       game.questioners[existing] = {
         socketId: socket.id,
@@ -173,7 +237,7 @@ function attachGameHandlers(io, state, socket) {
   socket.on("game_remove_rounds", (data) => {
     const { roomId, gameId } = data || {};
     if (!roomId || typeof roomId !== "string") return;
-    if (!socket.rooms.has(roomId)) return;
+    if (!isRoomMember(socket, roomId)) return;
 
     const games = state.roomGames.get(roomId);
     if (!games) return;
@@ -191,13 +255,14 @@ function attachGameHandlers(io, state, socket) {
   socket.on("session_start", (data) => {
     const { roomId, gameId } = data || {};
     if (!roomId || typeof roomId !== "string") return;
-    if (!socket.rooms.has(roomId)) return;
+    if (!isRoomMember(socket, roomId)) return;
 
     const games = state.roomGames.get(roomId);
     if (!games) return;
     const game = games.get(gameId);
     if (!game || game.session.status !== "staging") return;
-    if (socket.id !== game.creatorId && !isHost(state, roomId, socket.id)) return;
+    if (socket.id !== game.creatorId && !isHost(state, roomId, socket.id))
+      return;
     if (game.questioners.length === 0) return;
 
     const room = io.sockets.adapter.rooms.get(roomId);
@@ -215,7 +280,7 @@ function attachGameHandlers(io, state, socket) {
   socket.on("game_guess", (data) => {
     const { roomId, gameId, guess } = data || {};
     if (!roomId || typeof roomId !== "string") return;
-    if (!socket.rooms.has(roomId)) return;
+    if (!isRoomMember(socket, roomId)) return;
 
     const games = state.roomGames.get(roomId);
     if (!games) return;
@@ -278,7 +343,7 @@ function attachGameHandlers(io, state, socket) {
   socket.on("game_hint", (data) => {
     const { roomId, gameId } = data || {};
     if (!roomId || typeof roomId !== "string") return;
-    if (!socket.rooms.has(roomId)) return;
+    if (!isRoomMember(socket, roomId)) return;
 
     const games = state.roomGames.get(roomId);
     if (!games) return;
@@ -307,7 +372,7 @@ function attachGameHandlers(io, state, socket) {
   socket.on("game_skip_turn", (data) => {
     const { roomId, gameId } = data || {};
     if (!roomId || typeof roomId !== "string") return;
-    if (!socket.rooms.has(roomId)) return;
+    if (!isRoomMember(socket, roomId)) return;
 
     const games = state.roomGames.get(roomId);
     if (!games) return;
@@ -320,7 +385,8 @@ function attachGameHandlers(io, state, socket) {
       socket.id !== questioner.socketId &&
       socket.id !== game.creatorId &&
       !isHost(state, roomId, socket.id)
-    ) return;
+    )
+      return;
 
     game.session.currentGuesserIdx++;
     scheduleTurnTimer(io, state, roomId, gameId);
@@ -331,7 +397,7 @@ function attachGameHandlers(io, state, socket) {
   socket.on("game_end_round", (data) => {
     const { roomId, gameId } = data || {};
     if (!roomId || typeof roomId !== "string") return;
-    if (!socket.rooms.has(roomId)) return;
+    if (!isRoomMember(socket, roomId)) return;
 
     const games = state.roomGames.get(roomId);
     if (!games) return;
@@ -344,7 +410,8 @@ function attachGameHandlers(io, state, socket) {
       socket.id !== questioner.socketId &&
       socket.id !== game.creatorId &&
       !isHost(state, roomId, socket.id)
-    ) return;
+    )
+      return;
 
     const round = questioner.rounds[questioner.currentRoundIndex];
     if (round) {
@@ -360,7 +427,7 @@ function attachGameHandlers(io, state, socket) {
   socket.on("game_next_round", (data) => {
     const { roomId, gameId } = data || {};
     if (!roomId || typeof roomId !== "string") return;
-    if (!socket.rooms.has(roomId)) return;
+    if (!isRoomMember(socket, roomId)) return;
 
     const games = state.roomGames.get(roomId);
     if (!games) return;
@@ -373,7 +440,8 @@ function attachGameHandlers(io, state, socket) {
       socket.id !== questioner.socketId &&
       socket.id !== game.creatorId &&
       !isHost(state, roomId, socket.id)
-    ) return;
+    )
+      return;
 
     questioner.currentRoundIndex++;
     game.session.currentGuesserIdx = 0;
@@ -403,13 +471,14 @@ function attachGameHandlers(io, state, socket) {
   socket.on("session_end", (data) => {
     const { roomId, gameId } = data || {};
     if (!roomId || typeof roomId !== "string") return;
-    if (!socket.rooms.has(roomId)) return;
+    if (!isRoomMember(socket, roomId)) return;
 
     const games = state.roomGames.get(roomId);
     if (!games) return;
     const game = games.get(gameId);
     if (!game) return;
-    if (socket.id !== game.creatorId && !isHost(state, roomId, socket.id)) return;
+    if (socket.id !== game.creatorId && !isHost(state, roomId, socket.id))
+      return;
 
     game.session.status = "finished";
     const questioner = getActiveQuestioner(game);
@@ -432,7 +501,7 @@ function attachGameHandlers(io, state, socket) {
   socket.on("game_set_observer", (data) => {
     const { roomId, gameId, observer } = data || {};
     if (!roomId || typeof roomId !== "string") return;
-    if (!socket.rooms.has(roomId)) return;
+    if (!isRoomMember(socket, roomId)) return;
     if (typeof observer !== "boolean") return;
 
     const games = state.roomGames.get(roomId);
@@ -470,17 +539,14 @@ function attachGameHandlers(io, state, socket) {
   socket.on("game_reset", (data) => {
     const { roomId, gameId } = data || {};
     if (!roomId || typeof roomId !== "string") return;
-    if (!socket.rooms.has(roomId)) return;
+    if (!isRoomMember(socket, roomId)) return;
 
     const games = state.roomGames.get(roomId);
     if (!games) return;
     const game = games.get(gameId);
     if (!game) return;
-    if (
-      game.session.status === "active" &&
-      socket.id !== game.creatorId &&
-      !isHost(state, roomId, socket.id)
-    ) return;
+    if (socket.id !== game.creatorId && !isHost(state, roomId, socket.id))
+      return;
 
     cancelTurnTimer(state, gameId);
     games.delete(gameId);
@@ -488,4 +554,11 @@ function attachGameHandlers(io, state, socket) {
   });
 }
 
-module.exports = { attachGameHandlers, GAME_CATEGORIES };
+module.exports = {
+  attachGameHandlers,
+  GAME_CATEGORIES,
+  MAX_GAMES_PER_ROOM,
+  MAX_QUESTIONERS_PER_GAME,
+  MAX_EMBEDDED_IMAGE_BYTES_PER_GAME,
+  parseRounds,
+};

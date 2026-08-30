@@ -55,7 +55,7 @@ export function SilentAudio() {
 
         osc.start();
         console.log(
-          "🔊 Audio Context Started (Background Throttling Disabled)"
+          "🔊 Audio Context Started (Background Throttling Disabled)",
         );
 
         // If the browser suspends/ends the oscillator, try to rebuild.
@@ -70,6 +70,10 @@ export function SilentAudio() {
         window.addEventListener("pageshow", keepAlive);
         window.addEventListener("focus", keepAlive);
 
+        // keepAlive() re-enters startAudio() whenever the browser closes the
+        // context (common on iOS Safari / backgrounded tabs). Without this
+        // clear, each rebuild left an orphaned 5s interval running forever.
+        if (resumeTimer) window.clearInterval(resumeTimer);
         resumeTimer = window.setInterval(keepAlive, 5000);
       } catch (e) {
         console.error("Audio unlock failed", e);

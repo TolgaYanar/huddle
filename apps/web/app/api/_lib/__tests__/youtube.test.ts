@@ -27,9 +27,9 @@ describe("extractYouTubeVideoId", () => {
     expect(
       extractYouTubeVideoId("https://www.youtube.com/embed/dQw4w9WgXcQ"),
     ).toBe("dQw4w9WgXcQ");
-    expect(
-      extractYouTubeVideoId("https://www.youtube.com/v/dQw4w9WgXcQ"),
-    ).toBe("dQw4w9WgXcQ");
+    expect(extractYouTubeVideoId("https://www.youtube.com/v/dQw4w9WgXcQ")).toBe(
+      "dQw4w9WgXcQ",
+    );
     expect(
       extractYouTubeVideoId("https://www.youtube.com/shorts/dQw4w9WgXcQ"),
     ).toBe("dQw4w9WgXcQ");

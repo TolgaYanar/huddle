@@ -29,7 +29,7 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 
 // Extract Twitch channel/video info from URL
 function extractTwitchInfo(
-  url: string
+  url: string,
 ): { type: "channel" | "video" | "clip"; id: string } | null {
   try {
     const urlObj = new URL(url);
@@ -90,7 +90,7 @@ function parseYouTubeDuration(duration: string): number | null {
 }
 
 async function getYouTubeVideoInfo(
-  videoId: string
+  videoId: string,
 ): Promise<VideoInfoResponse> {
   const apiKey = process.env.YOUTUBE_API_KEY;
 
@@ -129,7 +129,7 @@ async function getYouTubeVideoInfo(
     const endpoint = new URL("https://www.googleapis.com/youtube/v3/videos");
     endpoint.searchParams.set(
       "part",
-      "snippet,contentDetails,liveStreamingDetails"
+      "snippet,contentDetails,liveStreamingDetails",
     );
     endpoint.searchParams.set("id", videoId);
     endpoint.searchParams.set("key", apiKey);
@@ -346,7 +346,7 @@ export async function GET(req: Request) {
   if (!url) {
     return NextResponse.json<VideoInfoResponse>(
       { ok: false, reason: "missing_url" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -399,7 +399,7 @@ export async function GET(req: Request) {
   } catch {
     return NextResponse.json<VideoInfoResponse>(
       { ok: false, reason: "invalid_url" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 }

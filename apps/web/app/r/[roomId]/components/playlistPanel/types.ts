@@ -56,8 +56,12 @@ export interface PlaylistItemRowProps {
   isPlaying: boolean;
   isDragging: boolean;
   isDragOver: boolean;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
   onPlay: () => void;
   onRemove: () => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
   onDragStart: (index: number) => void;
   onDragOver: (e: React.DragEvent, index: number) => void;
   onDragEnd: () => void;

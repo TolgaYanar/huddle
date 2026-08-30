@@ -13,13 +13,13 @@ interface UsePlaylistProps {
   roomId: string;
   onPlaylistState: (callback: (data: PlaylistStateData) => void) => () => void;
   onPlaylistItemPlayed: (
-    callback: (data: PlaylistItemPlayedData) => void
+    callback: (data: PlaylistItemPlayedData) => void,
   ) => () => void;
   requestPlaylistState: () => void;
   createPlaylist: (
     name: string,
     description?: string,
-    settings?: Partial<PlaylistSettings>
+    settings?: Partial<PlaylistSettings>,
   ) => void;
   updatePlaylist: (
     playlistId: string,
@@ -27,7 +27,7 @@ interface UsePlaylistProps {
       name?: string;
       description?: string;
       settings?: Partial<PlaylistSettings>;
-    }
+    },
   ) => void;
   deletePlaylist: (playlistId: string) => void;
   addPlaylistItem: (
@@ -35,7 +35,7 @@ interface UsePlaylistProps {
     videoUrl: string,
     title: string,
     duration?: number,
-    thumbnail?: string
+    thumbnail?: string,
   ) => void;
   removePlaylistItem: (playlistId: string, itemId: string) => void;
   reorderPlaylistItems: (playlistId: string, itemIds: string[]) => void;
@@ -46,7 +46,7 @@ interface UsePlaylistProps {
   onVideoEnded?: () => void;
   loadVideoUrl?: (
     url: string,
-    options?: { forcePlay?: boolean; skipBroadcast?: boolean }
+    options?: { forcePlay?: boolean; skipBroadcast?: boolean },
   ) => void;
 }
 
@@ -122,11 +122,11 @@ export function usePlaylist({
     (
       name: string,
       description?: string,
-      settings?: Partial<PlaylistSettings>
+      settings?: Partial<PlaylistSettings>,
     ) => {
       createPlaylistFn(name, description, settings);
     },
-    [createPlaylistFn]
+    [createPlaylistFn],
   );
 
   const updatePlaylist = useCallback(
@@ -136,18 +136,18 @@ export function usePlaylist({
         name?: string;
         description?: string;
         settings?: Partial<PlaylistSettings>;
-      }
+      },
     ) => {
       updatePlaylistFn(playlistId, updates);
     },
-    [updatePlaylistFn]
+    [updatePlaylistFn],
   );
 
   const deletePlaylist = useCallback(
     (playlistId: string) => {
       deletePlaylistFn(playlistId);
     },
-    [deletePlaylistFn]
+    [deletePlaylistFn],
   );
 
   const addItem = useCallback(
@@ -156,11 +156,11 @@ export function usePlaylist({
       videoUrl: string,
       title: string,
       duration?: number,
-      thumbnail?: string
+      thumbnail?: string,
     ) => {
       addPlaylistItemFn(playlistId, videoUrl, title, duration, thumbnail);
     },
-    [addPlaylistItemFn]
+    [addPlaylistItemFn],
   );
 
   const removeItem = useCallback(
@@ -170,12 +170,12 @@ export function usePlaylist({
         prev.map((p) =>
           p.id === playlistId
             ? { ...p, items: p.items.filter((item) => item.id !== itemId) }
-            : p
-        )
+            : p,
+        ),
       );
       removePlaylistItemFn(playlistId, itemId);
     },
-    [removePlaylistItemFn]
+    [removePlaylistItemFn],
   );
 
   const reorderItems = useCallback(
@@ -194,27 +194,27 @@ export function usePlaylist({
             .filter((item): item is PlaylistItem => item !== undefined);
 
           return { ...p, items: reorderedItems };
-        })
+        }),
       );
 
       // Send to server (will confirm or rollback)
       reorderPlaylistItemsFn(playlistId, itemIds);
     },
-    [reorderPlaylistItemsFn]
+    [reorderPlaylistItemsFn],
   );
 
   const setActive = useCallback(
     (playlistId: string | null) => {
       setActivePlaylistFn(playlistId);
     },
-    [setActivePlaylistFn]
+    [setActivePlaylistFn],
   );
 
   const playItem = useCallback(
     (playlistId: string, itemId: string) => {
       playPlaylistItemFn(playlistId, itemId);
     },
-    [playPlaylistItemFn]
+    [playPlaylistItemFn],
   );
 
   const openAddToPlaylist = useCallback((videoUrl: string) => {

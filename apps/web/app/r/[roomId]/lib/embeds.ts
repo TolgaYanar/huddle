@@ -33,10 +33,7 @@ export function getVimeoEmbedSrc(rawUrl: string): string | null {
 export function getDailymotionEmbedSrc(rawUrl: string): string | null {
   if (!rawUrl) return null;
   const lower = rawUrl.toLowerCase();
-  if (
-    !lower.includes("dailymotion.com") &&
-    !lower.includes("dai.ly")
-  )
+  if (!lower.includes("dailymotion.com") && !lower.includes("dai.ly"))
     return null;
 
   // Already a player URL.

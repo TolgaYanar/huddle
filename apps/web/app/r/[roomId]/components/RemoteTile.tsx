@@ -95,7 +95,7 @@ export function RemoteTile({
         try {
           e.dataTransfer.setData(
             TILE_DND_MIME,
-            JSON.stringify(draggablePayload)
+            JSON.stringify(draggablePayload),
           );
         } catch {
           // ignore
@@ -103,7 +103,7 @@ export function RemoteTile({
         if (draggablePayload.kind === "remote") {
           e.dataTransfer.setData(
             "text/plain",
-            `remote:${draggablePayload.peerId}`
+            `remote:${draggablePayload.peerId}`,
           );
         } else {
           e.dataTransfer.setData("text/plain", "local");

@@ -128,8 +128,7 @@ export function detectPlatform(url: string): PlatformType {
     lower.includes("geo.dailymotion.com")
   )
     return "dailymotion";
-  if (lower.includes("wistia.com") || lower.includes("wi.st"))
-    return "wistia";
+  if (lower.includes("wistia.com") || lower.includes("wi.st")) return "wistia";
   if (lower.includes("soundcloud.com")) return "soundcloud";
   if (lower.includes("open.spotify.com") || lower.includes("spotify.com"))
     return "spotify";
@@ -148,7 +147,11 @@ export function detectPlatform(url: string): PlatformType {
   if (/\.mpd(\?|$|#)/i.test(url)) return "dash";
 
   // Direct file URLs.
-  if (/\.(mp4|webm|ogg|ogv|mkv|avi|mov|m4v|m4a|mp3|wav|aac|flac)(\?|$|#)/i.test(url))
+  if (
+    /\.(mp4|webm|ogg|ogv|mkv|avi|mov|m4v|m4a|mp3|wav|aac|flac)(\?|$|#)/i.test(
+      url,
+    )
+  )
     return "direct";
 
   return "unknown";

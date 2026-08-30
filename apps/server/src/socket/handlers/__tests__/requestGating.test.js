@@ -55,7 +55,7 @@ function createHarness() {
   const deps = {
     isDbConnected: () => false,
     getPrisma: () => null,
-    verifyPassword: (pw, hash) => pw === hash,
+    verifyPassword: async (pw, hash) => pw === hash,
     vLog: undefined,
   };
   const isSocketInRoom = (roomId, socketId) => {

@@ -1,5 +1,10 @@
 const { createRateLimiter } = require("../auth/rateLimiter");
 
+// A missing user still performs one scrypt verification so login response time
+// does not reveal whether a username exists. This hash is not associated with
+// any account but has the same shape and cost as a stored credential.
+const DUMMY_PASSWORD_HASH = `${"0".repeat(32)}:${"0".repeat(128)}`;
+
 // 10 login attempts per 15 minutes per IP.
 const loginLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
@@ -49,7 +54,7 @@ function registerAuthRoutes(
     }
 
     const user = await getPrisma().user.create({
-      data: { username, passwordHash: hashPassword(password) },
+      data: { username, passwordHash: await hashPassword(password) },
       select: { id: true, username: true, createdAt: true },
     });
 
@@ -70,8 +75,13 @@ function registerAuthRoutes(
       select: { id: true, username: true, passwordHash: true, createdAt: true },
     });
 
-    const ok = user ? verifyPassword(password, user.passwordHash) : false;
-    if (!ok) return { err: { status: 401, body: { error: "invalid_credentials" } } };
+    const ok = await verifyPassword(
+      password,
+      user?.passwordHash || DUMMY_PASSWORD_HASH,
+    );
+    if (!user || !ok) {
+      return { err: { status: 401, body: { error: "invalid_credentials" } } };
+    }
 
     const { token, expiresAt } = await createSessionForUser(user.id);
     return {

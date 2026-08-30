@@ -35,19 +35,73 @@ const CARD_META: Record<
   CupGameCardKind,
   { emoji: string; label: string; blurb: string; category: "good" | "bad" }
 > = {
-  flipPlusOne: { emoji: "🔁", label: "Flip +1", blurb: "Flip another cup right now.", category: "bad" },
-  flipPlusTwo: { emoji: "💥", label: "Flip +2", blurb: "Flip two more cups in a row.", category: "bad" },
-  flipRow: { emoji: "➡️", label: "Flip Row", blurb: "Reveal an entire row.", category: "bad" },
-  flipBlock: { emoji: "🟦", label: "Flip 2×2", blurb: "Reveal a 2×2 block.", category: "bad" },
-  skipYourTurn: { emoji: "💤", label: "Skip Your Turn", blurb: "Your next turn vanishes.", category: "bad" },
-  forceFlip: { emoji: "👉", label: "Force Flip", blurb: "Pick a player + cup. They flip it.", category: "good" },
-  stealTurn: { emoji: "😴", label: "Steal a Turn", blurb: "Pick a player. Their next turn is skipped.", category: "good" },
-  peek: { emoji: "👁️", label: "Peek", blurb: "Secretly look under one cup.", category: "good" },
-  relocate: { emoji: "🔄", label: "Relocate", blurb: "Move one of your spiders to a new empty cup.", category: "good" },
-  mirror: { emoji: "🪞", label: "Mirror", blurb: "Next spider you'd flip hits its owner instead of you.", category: "good" },
+  flipPlusOne: {
+    emoji: "🔁",
+    label: "Flip +1",
+    blurb: "Flip another cup right now.",
+    category: "bad",
+  },
+  flipPlusTwo: {
+    emoji: "💥",
+    label: "Flip +2",
+    blurb: "Flip two more cups in a row.",
+    category: "bad",
+  },
+  flipRow: {
+    emoji: "➡️",
+    label: "Flip Row",
+    blurb: "Reveal an entire row.",
+    category: "bad",
+  },
+  flipBlock: {
+    emoji: "🟦",
+    label: "Flip 2×2",
+    blurb: "Reveal a 2×2 block.",
+    category: "bad",
+  },
+  skipYourTurn: {
+    emoji: "💤",
+    label: "Skip Your Turn",
+    blurb: "Your next turn vanishes.",
+    category: "bad",
+  },
+  forceFlip: {
+    emoji: "👉",
+    label: "Force Flip",
+    blurb: "Pick a player + cup. They flip it.",
+    category: "good",
+  },
+  stealTurn: {
+    emoji: "😴",
+    label: "Steal a Turn",
+    blurb: "Pick a player. Their next turn is skipped.",
+    category: "good",
+  },
+  peek: {
+    emoji: "👁️",
+    label: "Peek",
+    blurb: "Secretly look under one cup.",
+    category: "good",
+  },
+  relocate: {
+    emoji: "🔄",
+    label: "Relocate",
+    blurb: "Move one of your spiders to a new empty cup.",
+    category: "good",
+  },
+  mirror: {
+    emoji: "🪞",
+    label: "Mirror",
+    blurb: "Next spider you'd flip hits its owner instead of you.",
+    category: "good",
+  },
 };
 
-type PeekResult = { cupIndex: number; revealedAs: "empty" | "spider"; ownerSocketId: string | null };
+type PeekResult = {
+  cupIndex: number;
+  revealedAs: "empty" | "spider";
+  ownerSocketId: string | null;
+};
 
 export function CupGamePanel(props: CupGamePanelProps) {
   const { cupGameState } = props;
@@ -64,21 +118,33 @@ export function CupGamePanel(props: CupGamePanelProps) {
   return <CupGameInner key={game.gameId} game={game} {...props} />;
 }
 
-function CupGameInner(props: CupGamePanelProps & { game: CupGameData; mySocketId: string }) {
+function CupGameInner(
+  props: CupGamePanelProps & { game: CupGameData; mySocketId: string },
+) {
   const { game, mySocketId } = props;
   const { status } = game.session;
 
   // ── Local UI state for animations + peek result ───────────────────────────
   const [recentFlippedCup, setRecentFlippedCup] = useState<number | null>(null);
   const [hitFlippedCup, setHitFlippedCup] = useState<number | null>(null);
-  const [shieldedFlippedCup, setShieldedFlippedCup] = useState<number | null>(null);
+  const [shieldedFlippedCup, setShieldedFlippedCup] = useState<number | null>(
+    null,
+  );
   const [panelShakeKey, setPanelShakeKey] = useState(0);
   const [heartPopOnSocket, setHeartPopOnSocket] = useState<string | null>(null);
-  const [drawnCard, setDrawnCard] = useState<{ kind: CupGameCardKind; category: "good" | "bad"; key: number } | null>(null);
+  const [drawnCard, setDrawnCard] = useState<{
+    kind: CupGameCardKind;
+    category: "good" | "bad";
+    key: number;
+  } | null>(null);
   // bigCard = the same card, but pinned to render the centered hero overlay
   // for the big-card duration on every fresh draw. Cleared by a timeout so
   // the next state push doesn't re-summon it.
-  const [bigCard, setBigCard] = useState<{ kind: CupGameCardKind; category: "good" | "bad"; key: number } | null>(null);
+  const [bigCard, setBigCard] = useState<{
+    kind: CupGameCardKind;
+    category: "good" | "bad";
+    key: number;
+  } | null>(null);
   const [peekResult, setPeekResult] = useState<PeekResult | null>(null);
   const [muted, setMutedState] = useState(isSoundMuted());
 
@@ -86,7 +152,9 @@ function CupGameInner(props: CupGamePanelProps & { game: CupGameData; mySocketId
   // Null until the local player picks; reset when the active turn rotates.
   // Lives on the client only — picking "flip" doesn't reach the server, it
   // just dismisses the choice banner so the cup grid becomes interactive.
-  const [myTurnAction, setMyTurnAction] = useState<"flip" | "draw" | null>(null);
+  const [myTurnAction, setMyTurnAction] = useState<"flip" | "draw" | null>(
+    null,
+  );
   useEffect(() => {
     setMyTurnAction(null);
   }, [game.session.currentTurnSocketId]);
@@ -138,7 +206,10 @@ function CupGameInner(props: CupGamePanelProps & { game: CupGameData; mySocketId
         setDrawnCard(card);
         setBigCard(card);
         setTimeout(() => setBigCard(null), 10000);
-        setTimeout(() => playSound(evt.category === "good" ? "good" : "bad"), 320);
+        setTimeout(
+          () => playSound(evt.category === "good" ? "good" : "bad"),
+          320,
+        );
         break;
       }
       case "mirror": {
@@ -269,9 +340,7 @@ function CupGameInner(props: CupGamePanelProps & { game: CupGameData; mySocketId
           />
         </div>
       )}
-      {status === "finished" && (
-        <FinishedView {...props} game={game} />
-      )}
+      {status === "finished" && <FinishedView {...props} game={game} />}
     </div>
   );
 }
@@ -302,19 +371,38 @@ function CupGameHeader({
   }, [resetArmed]);
 
   const phaseBadge = (() => {
-    if (game.session.status === "lobby") return { text: "Setting up", color: "bg-sky-500/20 text-sky-300 border-sky-400/30" };
-    if (game.session.status === "placing") return { text: "Hiding spiders", color: "bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-400/30" };
-    if (game.session.status === "playing") return { text: "In play", color: "bg-emerald-500/20 text-emerald-300 border-emerald-400/30" };
-    return { text: "Game over", color: "bg-slate-500/20 text-slate-300 border-slate-400/30" };
+    if (game.session.status === "lobby")
+      return {
+        text: "Setting up",
+        color: "bg-sky-500/20 text-sky-300 border-sky-400/30",
+      };
+    if (game.session.status === "placing")
+      return {
+        text: "Hiding spiders",
+        color: "bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-400/30",
+      };
+    if (game.session.status === "playing")
+      return {
+        text: "In play",
+        color: "bg-emerald-500/20 text-emerald-300 border-emerald-400/30",
+      };
+    return {
+      text: "Game over",
+      color: "bg-slate-500/20 text-slate-300 border-slate-400/30",
+    };
   })();
   return (
     <div className="flex items-center justify-between gap-3">
       <div className="flex items-center gap-2 text-sm">
-        <span className={`px-2 py-0.5 rounded-full text-xs border ${phaseBadge.color}`}>
+        <span
+          className={`px-2 py-0.5 rounded-full text-xs border ${phaseBadge.color}`}
+        >
           {phaseBadge.text}
         </span>
         <span className="text-slate-400">
-          {game.config.rows}×{game.config.cols} board · {game.config.startingLives} {game.config.startingLives === 1 ? "life" : "lives"} each
+          {game.config.rows}×{game.config.cols} board ·{" "}
+          {game.config.startingLives}{" "}
+          {game.config.startingLives === 1 ? "life" : "lives"} each
         </span>
       </div>
       <div className="flex items-center gap-2">
@@ -366,30 +454,54 @@ function CupGameHeader({
 
 function CupGameLobby(props: CupGamePanelProps) {
   const [lives, setLives] = useState(3);
-  const [gridSize, setGridSize] = useState<"compact" | "standard" | "large">("standard");
+  const [gridSize, setGridSize] = useState<"compact" | "standard" | "large">(
+    "standard",
+  );
   const [timer, setTimer] = useState<20 | 30 | 60 | null>(20);
   return (
     <div className="flex flex-col gap-5">
       <div className="rounded-xl border border-white/10 bg-white/5 p-5">
         <div className="flex items-center gap-3 mb-2">
-          <span className="text-3xl" aria-hidden>🥤</span>
+          <span className="text-3xl" aria-hidden>
+            🥤
+          </span>
           <div>
             <h3 className="text-lg font-bold text-slate-100">Cup Spider</h3>
-            <p className="text-xs text-slate-400">A push-your-luck party game: hide spiders under cups, take turns flipping, and gamble on cards when you don&rsquo;t want to flip.</p>
+            <p className="text-xs text-slate-400">
+              A push-your-luck party game: hide spiders under cups, take turns
+              flipping, and gamble on cards when you don&rsquo;t want to flip.
+            </p>
           </div>
         </div>
         <ul className="text-xs text-slate-300/90 mt-3 space-y-1.5 list-disc pl-5">
-          <li>Before the game starts, each player secretly hides up to {lives} spider{lives === 1 ? "" : "s"} under cups they choose.</li>
-          <li>On your turn, do one thing: flip a cup, or draw a card from the deck. Drawing replaces your flip.</li>
-          <li>Flip a cup with a spider and you lose 1 life. Spider owners are safe — only the flipper takes the hit.</li>
-          <li>The deck has 5 good cards (peek, mirror, force someone else to flip…) and 5 bad cards (forced flips, skip turn). Each draw is a fresh 50/50.</li>
+          <li>
+            Before the game starts, each player secretly hides up to {lives}{" "}
+            spider{lives === 1 ? "" : "s"} under cups they choose.
+          </li>
+          <li>
+            On your turn, do one thing: flip a cup, or draw a card from the
+            deck. Drawing replaces your flip.
+          </li>
+          <li>
+            Flip a cup with a spider and you lose 1 life. Spider owners are safe
+            — only the flipper takes the hit.
+          </li>
+          <li>
+            The deck has 5 good cards (peek, mirror, force someone else to
+            flip…) and 5 bad cards (forced flips, skip turn). Each draw is a
+            fresh 50/50.
+          </li>
           <li>Last player with lives left wins.</li>
         </ul>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-          <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">Lives per player</div>
-          <div className="text-[10px] text-slate-500 mb-1.5">Also caps how many spiders each player can hide.</div>
+          <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">
+            Lives per player
+          </div>
+          <div className="text-[10px] text-slate-500 mb-1.5">
+            Also caps how many spiders each player can hide.
+          </div>
           <div className="flex items-center gap-1">
             {[1, 2, 3, 4, 5].map((n) => (
               <button
@@ -409,8 +521,12 @@ function CupGameLobby(props: CupGamePanelProps) {
           </div>
         </div>
         <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-          <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">Board size</div>
-          <div className="text-[10px] text-slate-500 mb-1.5">Larger boards = safer flips, longer games.</div>
+          <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">
+            Board size
+          </div>
+          <div className="text-[10px] text-slate-500 mb-1.5">
+            Larger boards = safer flips, longer games.
+          </div>
           <div className="flex items-center gap-1">
             {(
               [
@@ -436,8 +552,12 @@ function CupGameLobby(props: CupGamePanelProps) {
           </div>
         </div>
         <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-          <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">Time per turn</div>
-          <div className="text-[10px] text-slate-500 mb-1.5">Auto-skips slow players. Set to none for casual play.</div>
+          <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">
+            Time per turn
+          </div>
+          <div className="text-[10px] text-slate-500 mb-1.5">
+            Auto-skips slow players. Set to none for casual play.
+          </div>
           <div className="flex items-center gap-1">
             {([20, 30, 60, null] as const).map((t) => (
               <button
@@ -505,13 +625,33 @@ function LobbyView(props: CupGamePanelProps & { game: CupGameData }) {
         </button>
       </div>
       <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-        <h4 className="text-sm font-semibold text-slate-100 mb-2">How to play</h4>
+        <h4 className="text-sm font-semibold text-slate-100 mb-2">
+          How to play
+        </h4>
         <ol className="text-xs text-slate-300 space-y-1.5 list-decimal pl-4">
-          <li>When the host starts the game, each player secretly hides up to {game.config.startingLives} spider{game.config.startingLives === 1 ? "" : "s"} under cups they choose.</li>
-          <li>On your turn you do one thing: flip a cup, or draw a card from the deck.</li>
-          <li>Flipping a cup with a spider costs the flipper 1 life. The spider&rsquo;s owner is safe — unless they were the one who flipped it.</li>
-          <li>The deck is 5 helpful cards (peek, mirror, target someone else…) and 5 punishing ones (forced flips, skip turn). Each draw is a fresh 50/50.</li>
-          <li>Last player with any lives left wins. If every spider gets found first, whoever has the most lives wins.</li>
+          <li>
+            When the host starts the game, each player secretly hides up to{" "}
+            {game.config.startingLives} spider
+            {game.config.startingLives === 1 ? "" : "s"} under cups they choose.
+          </li>
+          <li>
+            On your turn you do one thing: flip a cup, or draw a card from the
+            deck.
+          </li>
+          <li>
+            Flipping a cup with a spider costs the flipper 1 life. The
+            spider&rsquo;s owner is safe — unless they were the one who flipped
+            it.
+          </li>
+          <li>
+            The deck is 5 helpful cards (peek, mirror, target someone else…) and
+            5 punishing ones (forced flips, skip turn). Each draw is a fresh
+            50/50.
+          </li>
+          <li>
+            Last player with any lives left wins. If every spider gets found
+            first, whoever has the most lives wins.
+          </li>
         </ol>
       </div>
     </div>
@@ -531,8 +671,12 @@ function ConfigEditor({
         Host settings — change anything before starting.
       </div>
       <div>
-        <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">Lives per player</div>
-        <div className="text-[10px] text-slate-500 mb-1.5">Also caps how many spiders each player can hide.</div>
+        <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">
+          Lives per player
+        </div>
+        <div className="text-[10px] text-slate-500 mb-1.5">
+          Also caps how many spiders each player can hide.
+        </div>
         <div className="flex gap-1">
           {[1, 2, 3, 4, 5].map((n) => (
             <button
@@ -552,8 +696,12 @@ function ConfigEditor({
         </div>
       </div>
       <div>
-        <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">Board size</div>
-        <div className="text-[10px] text-slate-500 mb-1.5">Larger boards = safer flips, longer games.</div>
+        <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">
+          Board size
+        </div>
+        <div className="text-[10px] text-slate-500 mb-1.5">
+          Larger boards = safer flips, longer games.
+        </div>
         <div className="flex gap-1">
           {(
             [
@@ -574,20 +722,28 @@ function ConfigEditor({
         </div>
       </div>
       <div>
-        <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">Time per turn</div>
-        <div className="text-[10px] text-slate-500 mb-1.5">Auto-skips slow players. Set to none for casual play.</div>
+        <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">
+          Time per turn
+        </div>
+        <div className="text-[10px] text-slate-500 mb-1.5">
+          Auto-skips slow players. Set to none for casual play.
+        </div>
         <div className="flex gap-1">
           {([20, 30, 60, null] as const).map((t) => (
             <button
               key={String(t)}
               type="button"
-              onClick={() => onChange({ turnTimerSeconds: t as 20 | 30 | 60 | null })}
+              onClick={() =>
+                onChange({ turnTimerSeconds: t as 20 | 30 | 60 | null })
+              }
               className={`flex-1 h-8 rounded-lg text-xs border ${
                 game.config.turnTimerSeconds === t
                   ? "border-sky-400/60 bg-sky-500/20 text-sky-200"
                   : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"
               }`}
-              aria-pressed={game.config.turnTimerSeconds === t ? "true" : "false"}
+              aria-pressed={
+                game.config.turnTimerSeconds === t ? "true" : "false"
+              }
             >
               {t === null ? "No limit" : `${t}s`}
             </button>
@@ -621,10 +777,13 @@ function PlacingView(props: CupGamePanelProps & { game: CupGameData }) {
       <div className="flex flex-col gap-3">
         <div className="rounded-xl border border-fuchsia-400/20 bg-fuchsia-500/10 px-4 py-3 text-sm text-fuchsia-200">
           <strong>Hide your spiders.</strong> Tap up to{" "}
-          <span className="font-semibold">{me?.spiderBudget ?? 0}</span> cups to put a spider under each. So far:{" "}
-          <span className="font-semibold">{me?.spidersPlaced ?? 0}</span> placed,{" "}
-          <span className="font-semibold">{remaining}</span> remaining. Tap a placed cup again to remove the spider.{" "}
-          <strong>Memorize where they are</strong> — they&rsquo;re visible to you now, but become hidden the moment the game starts.
+          <span className="font-semibold">{me?.spiderBudget ?? 0}</span> cups to
+          put a spider under each. So far:{" "}
+          <span className="font-semibold">{me?.spidersPlaced ?? 0}</span>{" "}
+          placed, <span className="font-semibold">{remaining}</span> remaining.
+          Tap a placed cup again to remove the spider.{" "}
+          <strong>Memorize where they are</strong> — they&rsquo;re visible to
+          you now, but become hidden the moment the game starts.
         </div>
         <CupGrid
           cols={game.config.cols}
@@ -634,7 +793,11 @@ function PlacingView(props: CupGamePanelProps & { game: CupGameData }) {
         />
       </div>
       <div className="flex flex-col gap-3">
-        <PlayerList players={game.players} mySocketId={mySocketId} placingPhase />
+        <PlayerList
+          players={game.players}
+          mySocketId={mySocketId}
+          placingPhase
+        />
         {me && !me.isSpectator && (
           <button
             type="button"
@@ -666,7 +829,11 @@ function PlayingView(
     recentFlippedCup: number | null;
     hitFlippedCup: number | null;
     shieldedFlippedCup: number | null;
-    drawnCard: { kind: CupGameCardKind; category: "good" | "bad"; key: number } | null;
+    drawnCard: {
+      kind: CupGameCardKind;
+      category: "good" | "bad";
+      key: number;
+    } | null;
     peekResult: PeekResult | null;
     dismissPeek: () => void;
     heartPopOnSocket: string | null;
@@ -732,8 +899,15 @@ function PlayingView(
 
   const handleCupClick = (idx: number) => {
     if (pending && iAmDrawer) {
-      if (pending.awaiting === "pickCup" || pending.awaiting === "pickTargetCup") {
-        if (pending.kind === "peek" || pending.kind === "flipPlusOne" || pending.kind === "flipPlusTwo") {
+      if (
+        pending.awaiting === "pickCup" ||
+        pending.awaiting === "pickTargetCup"
+      ) {
+        if (
+          pending.kind === "peek" ||
+          pending.kind === "flipPlusOne" ||
+          pending.kind === "flipPlusTwo"
+        ) {
           props.flipCup(game.gameId, idx);
           return;
         }
@@ -764,11 +938,16 @@ function PlayingView(
   };
   const handleBlockPick = (topLeftIdx: number) => {
     if (pending && iAmDrawer && pending.awaiting === "pickBlock") {
-      props.resolveCupGameCard(game.gameId, { blockTopLeftCupIndex: topLeftIdx });
+      props.resolveCupGameCard(game.gameId, {
+        blockTopLeftCupIndex: topLeftIdx,
+      });
     }
   };
 
-  const targetSelector = pending && iAmDrawer && (pending.awaiting === "pickTarget" || pending.awaiting === "pickTargetCup");
+  const targetSelector =
+    pending &&
+    iAmDrawer &&
+    (pending.awaiting === "pickTarget" || pending.awaiting === "pickTargetCup");
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px] gap-4 lg:gap-5">
@@ -789,17 +968,24 @@ function PlayingView(
           shieldedFlippedCup={shieldedFlippedCup}
           onCupClick={handleCupClick}
           rows={game.config.rows}
-          onRowClick={pending?.awaiting === "pickRow" ? handleRowPick : undefined}
-          onBlockClick={pending?.awaiting === "pickBlock" ? handleBlockPick : undefined}
+          onRowClick={
+            pending?.awaiting === "pickRow" ? handleRowPick : undefined
+          }
+          onBlockClick={
+            pending?.awaiting === "pickBlock" ? handleBlockPick : undefined
+          }
         />
         {peekResult && (
           <div className="rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200 flex items-center justify-between gap-3">
             <span>
-              <span className="font-semibold">Peek:</span> Cup #{peekResult.cupIndex + 1} hides{" "}
+              <span className="font-semibold">Peek:</span> Cup #
+              {peekResult.cupIndex + 1} hides{" "}
               {peekResult.revealedAs === "spider" ? (
                 <span className="font-semibold text-rose-300">a spider 🕷️</span>
               ) : (
-                <span className="font-semibold text-emerald-300">nothing — empty</span>
+                <span className="font-semibold text-emerald-300">
+                  nothing — empty
+                </span>
               )}
               .
             </span>
@@ -820,32 +1006,43 @@ function PlayingView(
           currentTurnSocketId={game.session.currentTurnSocketId}
           heartPopOnSocket={heartPopOnSocket}
         />
-        {myTurn && !pending && me && !me.eliminated && myTurnAction === "flip" && (
-          <button
-            type="button"
-            onClick={() => {
-              onPickDraw();
-            }}
-            className="cup-deck-button cup-deck-bob"
-            aria-label="Actually, draw a card instead"
-          >
-            <span className="cup-deck-back-2" aria-hidden />
-            <span className="cup-deck-back-1" aria-hidden />
-            <span className="cup-deck-front" aria-hidden>
-              <span className="cup-deck-back-emoji">🎴</span>
-            </span>
-            <span className="cup-deck-label">Or draw a card instead</span>
-          </button>
-        )}
-        {pending && iAmDrawer && (pending.awaiting === "pickRow" || pending.awaiting === "pickBlock" || pending.awaiting === "pickRelocateSrc" || pending.awaiting === "pickRelocateDst" || pending.awaiting === "pickTarget" || pending.awaiting === "pickTargetCup") && (
-          <button
-            type="button"
-            onClick={() => props.cancelCupGameCard(game.gameId)}
-            className="h-9 rounded-xl border border-rose-400/30 bg-rose-500/10 text-rose-300 text-xs font-semibold hover:bg-rose-500/20"
-          >
-            Cancel card
-          </button>
-        )}
+        {myTurn &&
+          !pending &&
+          me &&
+          !me.eliminated &&
+          myTurnAction === "flip" && (
+            <button
+              type="button"
+              onClick={() => {
+                onPickDraw();
+              }}
+              className="cup-deck-button cup-deck-bob"
+              aria-label="Actually, draw a card instead"
+            >
+              <span className="cup-deck-back-2" aria-hidden />
+              <span className="cup-deck-back-1" aria-hidden />
+              <span className="cup-deck-front" aria-hidden>
+                <span className="cup-deck-back-emoji">🎴</span>
+              </span>
+              <span className="cup-deck-label">Or draw a card instead</span>
+            </button>
+          )}
+        {pending &&
+          iAmDrawer &&
+          (pending.awaiting === "pickRow" ||
+            pending.awaiting === "pickBlock" ||
+            pending.awaiting === "pickRelocateSrc" ||
+            pending.awaiting === "pickRelocateDst" ||
+            pending.awaiting === "pickTarget" ||
+            pending.awaiting === "pickTargetCup") && (
+            <button
+              type="button"
+              onClick={() => props.cancelCupGameCard(game.gameId)}
+              className="h-9 rounded-xl border border-rose-400/30 bg-rose-500/10 text-rose-300 text-xs font-semibold hover:bg-rose-500/20"
+            >
+              Cancel card
+            </button>
+          )}
         {targetSelector && pending && (
           <TargetPicker
             game={game}
@@ -872,36 +1069,62 @@ function TurnBanner({
   me: CupGamePlayer | null;
   mySocketId: string;
   pending: CupGameData["session"]["pendingCard"];
-  drawnCard: { kind: CupGameCardKind; category: "good" | "bad"; key: number } | null;
+  drawnCard: {
+    kind: CupGameCardKind;
+    category: "good" | "bad";
+    key: number;
+  } | null;
 }) {
   const myTurn = game.session.currentTurnSocketId === mySocketId;
-  const turnPlayer = game.players.find((p) => p.socketId === game.session.currentTurnSocketId);
+  const turnPlayer = game.players.find(
+    (p) => p.socketId === game.session.currentTurnSocketId,
+  );
   if (pending) {
     const meta = CARD_META[pending.kind];
-    const drawer = game.players.find((p) => p.socketId === pending.drawerSocketId);
+    const drawer = game.players.find(
+      (p) => p.socketId === pending.drawerSocketId,
+    );
     const drawerName = drawer?.username || "Someone";
     let action = "";
     if (pending.awaiting === "pickCup") {
       if (pending.kind === "peek") action = "is peeking — picking a cup";
-      else action = `must flip ${pending.remainingFlips ?? 1} cup${(pending.remainingFlips ?? 1) > 1 ? "s" : ""}`;
-    } else if (pending.awaiting === "pickRow") action = "is choosing a row to flip";
-    else if (pending.awaiting === "pickBlock") action = "is choosing a 2×2 block";
+      else
+        action = `must flip ${pending.remainingFlips ?? 1} cup${(pending.remainingFlips ?? 1) > 1 ? "s" : ""}`;
+    } else if (pending.awaiting === "pickRow")
+      action = "is choosing a row to flip";
+    else if (pending.awaiting === "pickBlock")
+      action = "is choosing a 2×2 block";
     else if (pending.awaiting === "pickTarget") action = "is choosing a target";
-    else if (pending.awaiting === "pickTargetCup") action = "picked a target — now choosing the cup";
-    else if (pending.awaiting === "pickRelocateSrc") action = "is choosing which spider to move";
-    else if (pending.awaiting === "pickRelocateDst") action = "is choosing where to move it";
+    else if (pending.awaiting === "pickTargetCup")
+      action = "picked a target — now choosing the cup";
+    else if (pending.awaiting === "pickRelocateSrc")
+      action = "is choosing which spider to move";
+    else if (pending.awaiting === "pickRelocateDst")
+      action = "is choosing where to move it";
     return (
-      <div className={`rounded-xl border px-4 py-3 ${meta.category === "good" ? "border-emerald-400/30 bg-emerald-500/10" : "border-rose-400/30 bg-rose-500/10"}`}>
+      <div
+        className={`rounded-xl border px-4 py-3 ${meta.category === "good" ? "border-emerald-400/30 bg-emerald-500/10" : "border-rose-400/30 bg-rose-500/10"}`}
+      >
         <div className="flex items-center gap-3">
           {drawnCard && drawnCard.kind === pending.kind && (
-            <div className={`cup-card-flip-in shrink-0 w-14 h-20 rounded-xl border ${meta.category === "good" ? "border-emerald-300/60 bg-emerald-900/40" : "border-rose-300/60 bg-rose-900/40"} flex flex-col items-center justify-center`}>
-              <div className="text-2xl" aria-hidden>{meta.emoji}</div>
-              <div className="text-[8px] uppercase tracking-wider text-white/70 mt-0.5">{meta.category}</div>
+            <div
+              className={`cup-card-flip-in shrink-0 w-14 h-20 rounded-xl border ${meta.category === "good" ? "border-emerald-300/60 bg-emerald-900/40" : "border-rose-300/60 bg-rose-900/40"} flex flex-col items-center justify-center`}
+            >
+              <div className="text-2xl" aria-hidden>
+                {meta.emoji}
+              </div>
+              <div className="text-[8px] uppercase tracking-wider text-white/70 mt-0.5">
+                {meta.category}
+              </div>
             </div>
           )}
           <div className="text-sm">
-            <div className="font-semibold text-slate-100">{drawerName} drew {meta.label}</div>
-            <div className="text-xs text-slate-300/90">{meta.blurb} — {action}.</div>
+            <div className="font-semibold text-slate-100">
+              {drawerName} drew {meta.label}
+            </div>
+            <div className="text-xs text-slate-300/90">
+              {meta.blurb} — {action}.
+            </div>
           </div>
         </div>
       </div>
@@ -909,29 +1132,45 @@ function TurnBanner({
   }
   if (game.session.status !== "playing") return null;
   return (
-    <div className={`rounded-xl border px-4 py-3 flex items-center justify-between ${myTurn ? "border-sky-400/40 bg-sky-500/10" : "border-white/10 bg-white/5"}`}>
+    <div
+      className={`rounded-xl border px-4 py-3 flex items-center justify-between ${myTurn ? "border-sky-400/40 bg-sky-500/10" : "border-white/10 bg-white/5"}`}
+    >
       <div className="flex items-center gap-2 text-sm">
-        <span className={`inline-block w-2 h-2 rounded-full ${myTurn ? "bg-sky-300 animate-pulse" : "bg-slate-400"}`} />
+        <span
+          className={`inline-block w-2 h-2 rounded-full ${myTurn ? "bg-sky-300 animate-pulse" : "bg-slate-400"}`}
+        />
         <span className="font-semibold text-slate-100">
           {myTurn ? "Your turn" : `${turnPlayer?.username || "Someone"}'s turn`}
         </span>
         {turnPlayer && (
           <span className="text-xs text-slate-400">
-            · {turnPlayer.lives} {turnPlayer.lives === 1 ? "life" : "lives"} left
+            · {turnPlayer.lives} {turnPlayer.lives === 1 ? "life" : "lives"}{" "}
+            left
           </span>
         )}
         {me?.hasMirror && myTurn && (
-          <span className="text-xs px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-200 border border-sky-400/30">🪞 Mirror up</span>
+          <span className="text-xs px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-200 border border-sky-400/30">
+            🪞 Mirror up
+          </span>
         )}
       </div>
       {game.session.turnDeadline && (
-        <TurnCountdown deadline={game.session.turnDeadline} serverNow={game.session.serverNow} />
+        <TurnCountdown
+          deadline={game.session.turnDeadline}
+          serverNow={game.session.serverNow}
+        />
       )}
     </div>
   );
 }
 
-function TurnCountdown({ deadline, serverNow }: { deadline: number; serverNow: number }) {
+function TurnCountdown({
+  deadline,
+  serverNow,
+}: {
+  deadline: number;
+  serverNow: number;
+}) {
   const offset = Date.now() - serverNow;
   const [, force] = useState(0);
   useEffect(() => {
@@ -941,7 +1180,9 @@ function TurnCountdown({ deadline, serverNow }: { deadline: number; serverNow: n
   const remainingMs = Math.max(0, deadline - (Date.now() - offset));
   const seconds = Math.ceil(remainingMs / 1000);
   return (
-    <span className={`text-xs font-mono px-2 py-0.5 rounded-full border ${seconds <= 5 ? "border-rose-400/40 bg-rose-500/10 text-rose-300" : "border-white/10 bg-white/5 text-slate-300"}`}>
+    <span
+      className={`text-xs font-mono px-2 py-0.5 rounded-full border ${seconds <= 5 ? "border-rose-400/40 bg-rose-500/10 text-rose-300" : "border-white/10 bg-white/5 text-slate-300"}`}
+    >
       ⏱ {seconds}s
     </span>
   );
@@ -1076,9 +1317,14 @@ function PlayerList({
                 isTurn ? "bg-sky-500/10" : ""
               } ${p.eliminated ? "opacity-50" : ""}`}
             >
-              <span className={`inline-block w-2 h-2 rounded-full ${isTurn ? "bg-sky-300 animate-pulse" : "bg-slate-500"}`} />
-              <span className={`text-sm font-medium truncate ${isMe ? "text-sky-200" : "text-slate-200"}`}>
-                {p.username || "Player"}{isMe && " (you)"}
+              <span
+                className={`inline-block w-2 h-2 rounded-full ${isTurn ? "bg-sky-300 animate-pulse" : "bg-slate-500"}`}
+              />
+              <span
+                className={`text-sm font-medium truncate ${isMe ? "text-sky-200" : "text-slate-200"}`}
+              >
+                {p.username || "Player"}
+                {isMe && " (you)"}
               </span>
               <span className="ml-auto flex items-center gap-1.5">
                 {placingPhase && (
@@ -1087,7 +1333,14 @@ function PlayerList({
                     {p.isPlacementLocked && " ✓"}
                   </span>
                 )}
-                {p.hasMirror && <span className="text-xs" title="Mirror up — next spider hit reflects to its owner">🪞</span>}
+                {p.hasMirror && (
+                  <span
+                    className="text-xs"
+                    title="Mirror up — next spider hit reflects to its owner"
+                  >
+                    🪞
+                  </span>
+                )}
                 {p.skipNextTurn && <span className="text-xs">💤</span>}
                 {p.isSpectator && (
                   <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-500/20 text-slate-300 border border-slate-400/30">
@@ -1097,7 +1350,10 @@ function PlayerList({
                 {!p.isSpectator && (
                   <span className="flex gap-0.5">
                     {Array.from({ length: p.spiderBudget }).map((_, i) => (
-                      <span key={i} className={`text-xs ${i < p.lives ? "" : "opacity-25"}`}>
+                      <span
+                        key={i}
+                        className={`text-xs ${i < p.lives ? "" : "opacity-25"}`}
+                      >
                         ❤️
                       </span>
                     ))}
@@ -1105,7 +1361,10 @@ function PlayerList({
                 )}
               </span>
               {popping && (
-                <span className="cup-heart-pop absolute right-3 top-1.5 text-2xl pointer-events-none" aria-hidden>
+                <span
+                  className="cup-heart-pop absolute right-3 top-1.5 text-2xl pointer-events-none"
+                  aria-hidden
+                >
                   💔
                 </span>
               )}
@@ -1173,20 +1432,26 @@ function FinishedView(props: CupGamePanelProps & { game: CupGameData }) {
       {(winner || drawWinners.length > 0) && <Confetti />}
       <div className="flex flex-col gap-4">
         <div className="relative overflow-hidden rounded-xl border border-amber-400/40 bg-gradient-to-br from-amber-500/15 to-orange-500/10 p-6 text-center">
-          <div className="text-5xl mb-2" aria-hidden>🏆</div>
+          <div className="text-5xl mb-2" aria-hidden>
+            🏆
+          </div>
           {winner ? (
             <>
               <div className="text-xl font-bold text-amber-100">
                 {winner.username || "Player"} wins!
               </div>
-              <div className="text-xs text-amber-200/80 mt-1">Last spider standing.</div>
+              <div className="text-xs text-amber-200/80 mt-1">
+                Last spider standing.
+              </div>
             </>
           ) : drawWinners.length > 1 ? (
             <>
               <div className="text-xl font-bold text-amber-100">
                 Tie: {drawWinners.map((p) => p.username || "Player").join(", ")}
               </div>
-              <div className="text-xs text-amber-200/80 mt-1">All spiders found — most lives left.</div>
+              <div className="text-xs text-amber-200/80 mt-1">
+                All spiders found — most lives left.
+              </div>
             </>
           ) : (
             <div className="text-lg font-bold text-amber-100">Game over</div>
@@ -1287,10 +1552,14 @@ function BigCardOverlay({
     <div className="cup-bigcard-backdrop" aria-live="polite">
       <div className={`cup-bigcard cup-bigcard-${card.category}`}>
         <div className="cup-bigcard-inner">
-          <div className="cup-bigcard-emoji" aria-hidden>{meta.emoji}</div>
+          <div className="cup-bigcard-emoji" aria-hidden>
+            {meta.emoji}
+          </div>
           <div className="cup-bigcard-label">{meta.label}</div>
           <div className="cup-bigcard-blurb">{meta.blurb}</div>
-          <div className="cup-bigcard-tag">{card.category === "good" ? "Helpful" : "Punishment"}</div>
+          <div className="cup-bigcard-tag">
+            {card.category === "good" ? "Helpful" : "Punishment"}
+          </div>
         </div>
       </div>
     </div>

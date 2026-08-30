@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useFollowToBottom } from "../../hooks/useFollowToBottom";
 
 type ChatMessage = {
   msg: string;
@@ -15,9 +16,7 @@ export function FullscreenChatOverlay({
   playerContainerRef,
   isConnected,
   messages,
-  chatText,
-  setChatText,
-  handleSendChat,
+  sendChat,
 }: {
   isPlayerFullscreen: boolean;
   open: boolean;
@@ -25,10 +24,14 @@ export function FullscreenChatOverlay({
   playerContainerRef: React.RefObject<HTMLDivElement | null>;
   isConnected: boolean;
   messages: ChatMessage[];
-  chatText: string;
-  setChatText: React.Dispatch<React.SetStateAction<string>>;
-  handleSendChat: (e: React.FormEvent) => void;
+  sendChat: (text: string) => boolean;
 }) {
+  const [chatText, setChatText] = React.useState("");
+  const isChatVisible = isPlayerFullscreen && open;
+  const {
+    scrollContainerRef: fullscreenChatScrollRef,
+    handleScroll: handleFullscreenChatScroll,
+  } = useFollowToBottom<HTMLDivElement>(messages, { enabled: isChatVisible });
   const fullscreenChatPanelRef = React.useRef<HTMLDivElement | null>(null);
   const isDraggingChatRef = React.useRef(false);
   const dragOffsetRef = React.useRef<{ dx: number; dy: number } | null>(null);
@@ -212,7 +215,19 @@ export function FullscreenChatOverlay({
 
   return (
     <>
-      <div className="absolute z-50 fullscreenChatPanel">
+      {/* Position and size live in an inline style, not a regenerated global
+          stylesheet: these values change on every pointermove while the panel
+          is dragged or resized, and rewriting a <style> element per frame
+          forces a document-wide style recalculation. */}
+      <div
+        className="absolute z-50"
+        style={{
+          left: fullscreenChatPos?.x ?? 12,
+          top: fullscreenChatPos?.y ?? 12,
+          width: fullscreenChatSize?.w ?? 380,
+          height: fullscreenChatSize?.h ?? 320,
+        }}
+      >
         <div
           ref={fullscreenChatPanelRef}
           className="rounded-2xl border border-white/10 bg-black/50 backdrop-blur-md overflow-hidden h-full flex flex-col"
@@ -248,7 +263,13 @@ export function FullscreenChatOverlay({
             </button>
           </div>
 
-          <div className="p-3 flex-1 min-h-0 overflow-y-auto space-y-2">
+          <div
+            ref={fullscreenChatScrollRef}
+            onScroll={handleFullscreenChatScroll}
+            role="region"
+            aria-label="Fullscreen chat messages"
+            className="p-3 flex-1 min-h-0 overflow-y-auto space-y-2"
+          >
             {messages.length === 0 ? (
               <div className="text-sm text-slate-500">No messages yet.</div>
             ) : (
@@ -266,7 +287,10 @@ export function FullscreenChatOverlay({
           </div>
 
           <form
-            onSubmit={handleSendChat}
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (sendChat(chatText)) setChatText("");
+            }}
             className="p-3 border-t border-white/10 bg-black/20 flex gap-2"
           >
             <input
@@ -319,15 +343,6 @@ export function FullscreenChatOverlay({
           </div>
         </div>
       </div>
-      {/* eslint-disable-next-line react/no-unknown-property */}
-      <style jsx>{`
-        .fullscreenChatPanel {
-          left: ${fullscreenChatPos?.x ?? 12}px;
-          top: ${fullscreenChatPos?.y ?? 12}px;
-          width: ${fullscreenChatSize?.w ?? 380}px;
-          height: ${fullscreenChatSize?.h ?? 320}px;
-        }
-      `}</style>
     </>
   );
 }

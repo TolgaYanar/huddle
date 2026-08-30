@@ -115,7 +115,11 @@ describe("suppressPauseForPlaylistAdvance", () => {
         vi.advanceTimersByTime(400);
       });
 
-      expect(sendSyncEvent).toHaveBeenCalledWith("pause", expect.any(Number), URL);
+      expect(sendSyncEvent).toHaveBeenCalledWith(
+        "pause",
+        expect.any(Number),
+        URL,
+      );
     } finally {
       vi.useRealTimers();
     }

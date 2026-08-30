@@ -17,6 +17,11 @@
       "dependsOn": ["^check-types"],
       "env": ["YOUTUBE_API_KEY", "API_PROXY_TARGET"]
     },
+    "test": {
+      "dependsOn": ["^build"],
+      "env": ["YOUTUBE_API_KEY", "API_PROXY_TARGET"],
+      "outputs": []
+    },
     "dev": {
       "cache": false,
       "env": ["YOUTUBE_API_KEY", "API_PROXY_TARGET"],

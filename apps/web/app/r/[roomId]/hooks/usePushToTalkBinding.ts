@@ -76,11 +76,11 @@ export function usePushToTalkBinding(params: {
   const { isClient, enabled, micEnabled } = params;
 
   const [binding, setBinding] = useState<PushToTalkBinding>(
-    DEFAULT_PUSH_TO_TALK_BINDING
+    DEFAULT_PUSH_TO_TALK_BINDING,
   );
   const bindingLabel = useMemo(
     () => formatPushToTalkBinding(binding),
-    [binding]
+    [binding],
   );
 
   const [isRebinding, setIsRebinding] = useState(false);
@@ -128,7 +128,7 @@ export function usePushToTalkBinding(params: {
     try {
       window.localStorage.setItem(
         "huddle.pushToTalkBinding",
-        JSON.stringify(binding)
+        JSON.stringify(binding),
       );
     } catch {
       // ignore

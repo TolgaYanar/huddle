@@ -3,6 +3,7 @@ import type * as React from "react";
 import type { WebRTCMediaState } from "shared-logic";
 
 import type { RemoteStreamEntry } from "../types";
+import type { DraggedTilePayload } from "../lib/dnd";
 import type { RoomClientViewProps } from "./RoomClientView";
 
 export function buildCallSidebarProps(args: {
@@ -41,6 +42,7 @@ export function buildCallSidebarProps(args: {
   setAutoGainControlEnabled: React.Dispatch<React.SetStateAction<boolean>>;
 
   localVideoRef: React.RefObject<HTMLVideoElement | null>;
+  setLocalVideoElement: React.RefCallback<HTMLVideoElement>;
 
   isCallCollapsed: boolean;
   setIsCallCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
@@ -51,6 +53,7 @@ export function buildCallSidebarProps(args: {
 
   setIsDraggingTile: (v: boolean) => void;
   setIsStageDragOver: (v: boolean) => void;
+  onPinTile: (payload: DraggedTilePayload) => void;
 }): RoomClientViewProps["callSidebarProps"] {
   return {
     userId: args.userId,
@@ -91,6 +94,7 @@ export function buildCallSidebarProps(args: {
     setAutoGainControlEnabled: args.setAutoGainControlEnabled,
 
     localVideoRef: args.localVideoRef,
+    setLocalVideoElement: args.setLocalVideoElement,
 
     remoteStreams: args.remoteStreams,
     remoteSpeaking: args.remoteSpeaking,
@@ -98,5 +102,6 @@ export function buildCallSidebarProps(args: {
 
     setIsDraggingTile: args.setIsDraggingTile,
     setIsStageDragOver: args.setIsStageDragOver,
+    onPinTile: args.onPinTile,
   };
 }

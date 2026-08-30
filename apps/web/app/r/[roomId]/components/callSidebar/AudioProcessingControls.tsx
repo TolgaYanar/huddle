@@ -22,7 +22,9 @@ function Toggle({
       <div className="min-w-0">
         <span className="text-xs text-slate-300">{label}</span>
         {description && (
-          <span className="block text-[10px] text-slate-500 leading-tight">{description}</span>
+          <span className="block text-[10px] text-slate-500 leading-tight">
+            {description}
+          </span>
         )}
       </div>
       <div

@@ -275,7 +275,8 @@ export function shouldEmbedWebpage(rawUrl: string) {
   if (/wistia\.com|wi\.st/i.test(normalized)) return false;
   if (/spotify\.com/i.test(normalized)) return false;
   if (/tiktok\.com/i.test(normalized)) return false;
-  if (/\/videos\/(?:watch|embed)\/[0-9a-f-]{36,}/i.test(normalized)) return false; // PeerTube
+  if (/\/videos\/(?:watch|embed)\/[0-9a-f-]{36,}/i.test(normalized))
+    return false; // PeerTube
   // Tier-3 DRM platforms — we never embed these; the player swaps to a CTA.
   if (
     /(disneyplus|hbomax|max\.com|hulu\.com|tv\.apple\.com|paramountplus|peacocktv)/i.test(
@@ -318,7 +319,7 @@ export function isTwitchUrl(rawUrl: string) {
 
 export function getTwitchEmbedSrc(
   rawUrl: string,
-  parent: string
+  parent: string,
 ): string | null {
   // Twitch embeds require `parent=<your domain>` or the iframe shows blank.
   // Supports:

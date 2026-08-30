@@ -5,7 +5,7 @@ export type DraggedTilePayload =
   | { kind: "remote"; peerId: string };
 
 export function parseDraggedTilePayload(
-  raw: string
+  raw: string,
 ): DraggedTilePayload | null {
   if (!raw) return null;
   try {

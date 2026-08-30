@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const runtime = "edge";
+import { PopcornMark } from "./_components/PopcornMark";
 
 export const size = {
   width: 180,
@@ -22,10 +22,10 @@ export default function AppleIcon() {
         background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)",
       }}
     >
-      <div style={{ fontSize: 96 }}>🍿</div>
+      <PopcornMark size={132} />
     </div>,
     {
       ...size,
-    }
+    },
   );
 }

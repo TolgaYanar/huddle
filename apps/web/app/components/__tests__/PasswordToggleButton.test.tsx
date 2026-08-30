@@ -6,12 +6,16 @@ import { PasswordToggleButton } from "../PasswordToggleButton";
 describe("PasswordToggleButton", () => {
   it("renders with aria-label 'Show password' when show=false", () => {
     render(<PasswordToggleButton show={false} onToggle={vi.fn()} />);
-    expect(screen.getByRole("button", { name: "Show password" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Show password" }),
+    ).toBeInTheDocument();
   });
 
   it("renders with aria-label 'Hide password' when show=true", () => {
     render(<PasswordToggleButton show={true} onToggle={vi.fn()} />);
-    expect(screen.getByRole("button", { name: "Hide password" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Hide password" }),
+    ).toBeInTheDocument();
   });
 
   it("calls onToggle when clicked", () => {

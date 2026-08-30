@@ -41,9 +41,7 @@ export function buildPlayerSectionProps(args: {
   onAudioSyncEnabledChange: (enabled: boolean) => void;
 
   fullscreenChatMessages: RoomClientViewProps["playerSectionProps"]["fullscreenChatMessages"];
-  chatText: string;
-  setChatText: React.Dispatch<React.SetStateAction<string>>;
-  handleSendChat: (e: React.FormEvent) => void;
+  sendChat: (text: string) => boolean;
 
   onVideoEnded: () => void;
 
@@ -67,9 +65,7 @@ export function buildPlayerSectionProps(args: {
     audioSyncEnabled,
     onAudioSyncEnabledChange,
     fullscreenChatMessages,
-    chatText,
-    setChatText,
-    handleSendChat,
+    sendChat,
     onVideoEnded,
     isTheatreMode,
     onToggleTheatreMode,
@@ -176,9 +172,7 @@ export function buildPlayerSectionProps(args: {
     fullscreenChatOpen: fullscreen.fullscreenChatOpen,
     setFullscreenChatOpen: fullscreen.setFullscreenChatOpen,
     fullscreenChatMessages,
-    chatText,
-    setChatText,
-    handleSendChat,
+    sendChat,
 
     isTheatreMode,
     onToggleTheatreMode,

@@ -17,7 +17,9 @@ function getCurrentGuesserSocketId(game) {
 
   // Skip players who have already guessed correctly this round
   const questioner = getActiveQuestioner(game);
-  const round = questioner ? questioner.rounds[questioner.currentRoundIndex] : null;
+  const round = questioner
+    ? questioner.rounds[questioner.currentRoundIndex]
+    : null;
   const winners = round ? new Set(round.winners) : new Set();
   const remaining = guessers.filter((id) => !winners.has(id));
   if (remaining.length === 0) return null;
@@ -78,8 +80,7 @@ function buildGamePayload(state, game, forSocketId) {
         if (!id) continue;
         if (!scoreboard[id]) {
           scoreboard[id] = {
-            username:
-              state.socketIdToUsername.get(id) || w.username || null,
+            username: state.socketIdToUsername.get(id) || w.username || null,
             wins: 0,
             score: 0,
           };
@@ -118,7 +119,9 @@ function buildGamePayload(state, game, forSocketId) {
     session: {
       currentQuestionerIdx: game.session.currentQuestionerIdx,
       currentQuestionerId: activeQuestioner ? activeQuestioner.socketId : null,
-      currentQuestionerName: activeQuestioner ? activeQuestioner.username : null,
+      currentQuestionerName: activeQuestioner
+        ? activeQuestioner.username
+        : null,
       currentGuesserSocketId,
       participants: game.session.participants,
       participantUsernames,
@@ -149,10 +152,26 @@ function emitGameStateTo(state, socket, roomId) {
 function emitGameStateToRoom(io, state, roomId) {
   const room = io.sockets.adapter.rooms.get(roomId);
   if (!room) return;
+  const games = state.roomGames.get(roomId);
+  const privateViewerIds = new Set();
+  for (const game of games?.values() || []) {
+    for (const questioner of game.questioners || []) {
+      privateViewerIds.add(questioner.socketId);
+    }
+  }
+  const payloadCache = new Map();
   for (const socketId of room) {
     const s = io.sockets.sockets.get(socketId);
-    if (s)
-      s.emit("game_state", buildRoomGamesPayload(state, roomId, socketId));
+    if (!s) continue;
+    // Non-questioners all receive the same public view. Questioners retain a
+    // private payload because their current answer is visible only to them.
+    const visibilityKey = privateViewerIds.has(socketId) ? socketId : "public";
+    let payload = payloadCache.get(visibilityKey);
+    if (!payload) {
+      payload = buildRoomGamesPayload(state, roomId, socketId);
+      payloadCache.set(visibilityKey, payload);
+    }
+    s.emit("game_state", payload);
   }
 }
 
