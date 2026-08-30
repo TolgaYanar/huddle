@@ -1,0 +1,15 @@
+# Build outputs and caches
+.next
+.turbo
+dist
+out
+coverage
+node_modules
+
+# Lockfiles and generated artefacts
+package-lock.json
+apps/web/next-env.d.ts
+
+# The Android client is a separate Gradle project outside the npm workspaces;
+# its files are formatted by Android Studio, not by this repo's Prettier.
+mobile/android

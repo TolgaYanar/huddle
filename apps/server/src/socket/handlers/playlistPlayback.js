@@ -1,5 +1,8 @@
 const { emitPlaylistStateToRoom } = require("../helpers/playlists");
-const { applyPlaylistPlaybackToRoomState, persistRoomState } = require("../helpers/sync");
+const {
+  applyPlaylistPlaybackToRoomState,
+  persistRoomState,
+} = require("../helpers/sync");
 const { isRoomMember } = require("../helpers/membership");
 
 function attachPlaylistPlaybackHandlers(io, state, socket, deps) {

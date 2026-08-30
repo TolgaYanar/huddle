@@ -15,9 +15,5 @@
     ".next/types/**/*.ts",
     "types/**/*.d.ts"
   ],
-  "exclude": [
-    "node_modules",
-    "vitest.config.ts",
-    "vitest.setup.ts"
-  ]
+  "exclude": ["node_modules", "vitest.config.ts", "vitest.setup.ts"]
 }

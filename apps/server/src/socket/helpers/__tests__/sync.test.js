@@ -31,7 +31,10 @@ describe("getEstimatedTimestampForState", () => {
     };
     const estimated = getEstimatedTimestampForState(state, now);
     // Should be ~105 (100 + 5 seconds elapsed)
-    assert.ok(estimated >= 104.9 && estimated <= 105.1, `Expected ~105, got ${estimated}`);
+    assert.ok(
+      estimated >= 104.9 && estimated <= 105.1,
+      `Expected ~105, got ${estimated}`,
+    );
   });
 
   it("respects playback speed", () => {
@@ -44,7 +47,10 @@ describe("getEstimatedTimestampForState", () => {
     };
     const estimated = getEstimatedTimestampForState(state, now);
     // 4s elapsed × 2 = 8s
-    assert.ok(estimated >= 7.9 && estimated <= 8.1, `Expected ~8, got ${estimated}`);
+    assert.ok(
+      estimated >= 7.9 && estimated <= 8.1,
+      `Expected ~8, got ${estimated}`,
+    );
   });
 
   it("never returns a negative timestamp when updatedAt is in the future", () => {
@@ -69,7 +75,10 @@ describe("getEstimatedTimestampForState", () => {
       // no playbackSpeed
     };
     const estimated = getEstimatedTimestampForState(state, now);
-    assert.ok(estimated >= 52.9 && estimated <= 53.1, `Expected ~53, got ${estimated}`);
+    assert.ok(
+      estimated >= 52.9 && estimated <= 53.1,
+      `Expected ~53, got ${estimated}`,
+    );
   });
 
   it("returns baseTimestamp when isPlaying is absent", () => {
@@ -99,7 +108,10 @@ describe("getEstimatedTimestampForState", () => {
       playbackSpeed: 1,
     };
     const estimated = getEstimatedTimestampForState(state, now);
-    assert.ok(estimated >= 14.9 && estimated <= 15.1, `Expected ~15, got ${estimated}`);
+    assert.ok(
+      estimated >= 14.9 && estimated <= 15.1,
+      `Expected ~15, got ${estimated}`,
+    );
   });
 });
 
@@ -155,7 +167,10 @@ describe("buildRoomStatePayload", () => {
     };
     const result = buildRoomStatePayload("r", state, now);
     // estimated ≈ 22
-    assert.ok(result.timestamp >= 21.9 && result.timestamp <= 22.1, `Expected ~22, got ${result.timestamp}`);
+    assert.ok(
+      result.timestamp >= 21.9 && result.timestamp <= 22.1,
+      `Expected ~22, got ${result.timestamp}`,
+    );
   });
 
   it("does not advance timestamp when paused", () => {
@@ -205,7 +220,10 @@ describe("anchorRoomStateOnEmpty", () => {
     assert.equal(result.action, "pause");
     assert.equal(result.rev, 5);
     // Anchored ~ original + 5s of elapsed playback.
-    assert.ok(result.timestamp >= 104.9 && result.timestamp <= 105.1, `Expected ~105, got ${result.timestamp}`);
+    assert.ok(
+      result.timestamp >= 104.9 && result.timestamp <= 105.1,
+      `Expected ~105, got ${result.timestamp}`,
+    );
     // Preserves unrelated fields.
     assert.equal(result.videoUrl, "https://youtube.com/watch?v=abc");
     // Stored back into the map.

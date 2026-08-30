@@ -132,7 +132,10 @@ describe("room data request gating", () => {
 
     const roomState = emittedEvents(socket, "room_state");
     assert.equal(roomState.length, 1);
-    assert.equal(roomState[0].payload.videoUrl, "https://youtube.com/watch?v=abc");
+    assert.equal(
+      roomState[0].payload.videoUrl,
+      "https://youtube.com/watch?v=abc",
+    );
     assert.equal(roomState[0].payload.rev, 3);
   });
 

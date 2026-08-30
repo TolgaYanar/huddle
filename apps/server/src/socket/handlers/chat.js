@@ -35,7 +35,10 @@ function attachChatHandlers(io, state, socket, deps, isSocketInRoom) {
 
     // Rate limiting: max CHAT_RATE_MAX messages per CHAT_RATE_WINDOW_MS.
     const now = Date.now();
-    while (chatTimestamps.length > 0 && now - chatTimestamps[0] >= CHAT_RATE_WINDOW_MS) {
+    while (
+      chatTimestamps.length > 0 &&
+      now - chatTimestamps[0] >= CHAT_RATE_WINDOW_MS
+    ) {
       chatTimestamps.shift();
     }
     if (chatTimestamps.length >= CHAT_RATE_MAX) {

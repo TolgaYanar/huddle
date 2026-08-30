@@ -246,7 +246,10 @@ describe("grace-period room cleanup", () => {
     state.gameTurnTimers = new Map([["g1", setTimeout(() => {}, 60000)]]);
     const cupGame = { id: "c1" };
     state.roomCupGames.set("room1", new Map([["c1", cupGame]]));
-    state.cupGameTurnTimers.set("c1", setTimeout(() => {}, 60000));
+    state.cupGameTurnTimers.set(
+      "c1",
+      setTimeout(() => {}, 60000),
+    );
 
     // Pretend a cleanup was scheduled.
     scheduleRoomCleanup(io, state, "room1");
@@ -322,7 +325,9 @@ describe("grace-period room cleanup", () => {
     scheduleRoomCleanup(io, state, "room1");
     assert.equal(state.roomCleanupTimers.has("room1"), true);
 
-    const banned = createFakeSocket(io, "banned-new", { authUser: { id: "u1" } });
+    const banned = createFakeSocket(io, "banned-new", {
+      authUser: { id: "u1" },
+    });
     attachJoinRoomHandler(io, state, banned, new Set(), noopDeps);
     banned.handlers.get("join_room")("room1");
     await banned.data.pendingJoins.get("room1");

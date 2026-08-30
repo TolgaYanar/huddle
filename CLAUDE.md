@@ -36,12 +36,15 @@ npm run build          # turbo run build (web: next build, server: prisma genera
 npm run check-types    # turbo run check-types — only web + extension define this task
 npm run test           # turbo run test — web + extension (vitest), server (node:test)
 npm run lint           # turbo run lint — only web defines this task
-npm run format         # prettier --write "**/*.{ts,tsx,md}"
+npm run format         # prettier --write (ts/tsx/js/json/css/md/yml)
+npm run format:check   # the same set, verified in CI
 ```
 
-`.github/workflows/ci.yml` runs lint → check-types → test → build on every push and
-PR against `main`, on Node 22.19.0 (`.nvmrc`). A second, non-blocking job runs
-`npm audit --omit=dev`.
+`.github/workflows/ci.yml` runs format → lint → check-types → test → build on
+every push and PR against `main`, on Node 22.19.0 (`.nvmrc`). A second job
+reports `npm audit --omit=dev` but always exits 0 — see the comment there for
+why it is not blocking. `mobile/android` is excluded from Prettier via
+`.prettierignore`; it is a separate Gradle project.
 
 Per package:
 
