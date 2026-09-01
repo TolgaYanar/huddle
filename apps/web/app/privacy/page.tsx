@@ -4,7 +4,7 @@ import Link from "next/link";
 export const metadata: Metadata = {
   title: "Privacy Policy",
   description:
-    "Privacy Policy for WeHuddle and the Huddle for Netflix extension.",
+    "Privacy Policy for WeHuddle and the Huddle Watch Party extension.",
   alternates: {
     canonical: "/privacy",
   },
@@ -54,9 +54,12 @@ export default function PrivacyPolicyPage() {
               1) What this product does
             </h2>
             <p>
-              WeHuddle (including the “Huddle for Netflix” browser extension)
+              WeHuddle (including the “Huddle Watch Party” browser extension)
               helps users watch content together by synchronizing playback
-              (e.g., play/pause/seek) and enabling room-based chat.
+              (e.g., play/pause/seek) and enabling room-based chat. The
+              extension works on Netflix, and on Prime Video only if you
+              explicitly enable it — Prime access is an optional permission that
+              is requested when you turn it on, never at install.
             </p>
           </section>
 
@@ -80,8 +83,8 @@ export default function PrivacyPolicyPage() {
               </li>
               <li>
                 <span className="font-medium text-slate-100">Page URL</span>{" "}
-                (e.g., Netflix watch URL) to keep participants synchronized on
-                the same title.
+                (e.g., a Netflix or Prime Video watch URL) to keep participants
+                synchronized on the same title.
               </li>
               <li>
                 <span className="font-medium text-slate-100">
@@ -102,6 +105,32 @@ export default function PrivacyPolicyPage() {
                 <span className="font-medium text-slate-100">Saved rooms</span>{" "}
                 that you bookmark while logged in. These are stored on our
                 servers and tied to your account.
+              </li>
+              <li>
+                <span className="font-medium text-slate-100">
+                  Content fingerprint
+                </span>{" "}
+                on Prime Video only. Prime’s page address can keep pointing at
+                the previous episode after you move to the next one, so the
+                extension also sends a short label for what is actually playing:
+                the season and episode number, plus a 32-bit FNV-1a fingerprint
+                of the series name. We do not send the series name itself. To be
+                precise rather than reassuring: that fingerprint is a fast,
+                non-cryptographic checksum, not an anonymisation measure —
+                someone holding it could test a list of candidate titles against
+                it. It exists so a room can tell whether everyone is on the same
+                episode, and it is stored with the room’s playback state.
+              </li>
+              <li>
+                <span className="font-medium text-slate-100">
+                  Sync quality measurements
+                </span>{" "}
+                — counts of events such as how often playback drifted or a
+                command failed. These are cumulative counters tied to a random
+                session identifier, with no room, user, title or URL attached,
+                and they are deleted after 30 days. They tell us whether syncing
+                works on a given service; they are never used for product,
+                account or billing decisions.
               </li>
               <li>
                 <span className="font-medium text-slate-100">
@@ -133,7 +162,8 @@ export default function PrivacyPolicyPage() {
             </ul>
             <p>
               We do <span className="font-medium text-slate-100">not</span>{" "}
-              collect your Netflix credentials (username/password) or payment
+              collect your streaming service credentials (for example your
+              Netflix or Prime Video username and password) or payment
               information.
             </p>
           </section>
@@ -191,6 +221,10 @@ export default function PrivacyPolicyPage() {
               <li>
                 In some cases (e.g., during outages), data may be handled
                 temporarily and could be lost on server restart.
+              </li>
+              <li>
+                Sync quality measurements are deleted 30 days after they are
+                recorded.
               </li>
               <li>
                 We retain data only as long as necessary to provide the service
