@@ -38,13 +38,22 @@ npm run test           # turbo run test — web + extension (vitest), server (no
 npm run lint           # turbo run lint — only web defines this task
 npm run format         # prettier --write (ts/tsx/js/json/css/md/yml)
 npm run format:check   # the same set, verified in CI
+npm run check-duplicates  # rejects macOS "name 2.ext" copies
 ```
 
-`.github/workflows/ci.yml` runs format → lint → check-types → test → build on
+`.github/workflows/ci.yml` runs duplicates → format → lint → check-types → test → build on
 every push and PR against `main`, on Node 22.19.0 (`.nvmrc`). A second job
 reports `npm audit --omit=dev` but always exits 0 — see the comment there for
 why it is not blocking. `mobile/android` is excluded from Prettier via
 `.prettierignore`; it is a separate Gradle project.
+
+macOS iCloud/FileProvider copies (`name 2.ext` beside `name.ext`) are
+deliberately **not** gitignored: a `* 2.*` pattern also matches legitimate
+names such as `docs/OAuth 2.md` and would silently drop them from every
+commit. `scripts/check-duplicate-files.sh` rejects them in CI instead. It
+keys on the sibling — a copy is only flagged when the original exists beside
+it — and checks directory components too, because one such copy once landed
+inside a Prisma migration directory and another shadowed a Next type file.
 
 Per package:
 

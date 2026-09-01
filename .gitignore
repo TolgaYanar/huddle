@@ -42,8 +42,8 @@ yarn-error.log*
 *.db
 *.db-journal
 
-# macOS iCloud/FileProvider duplicates. These appear as "name 2.ext" beside the
-# original and have already broken a type-check run once by shadowing a Next
-# type file. They are never wanted in the repository.
-* 2.*
-* 3.*
+# macOS iCloud/FileProvider duplicates ("name 2.ext" beside "name.ext") have
+# broken a type-check run once by shadowing a Next type file. They are NOT
+# ignored here: a "* 2.*" pattern also hides legitimate names such as
+# "docs/OAuth 2.md", silently dropping real files from commits. They are caught
+# instead by scripts/check-duplicate-files.sh, which fails CI loudly.
