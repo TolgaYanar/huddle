@@ -14,6 +14,7 @@ const { attachRoomSettingsHandlers } = require("./handlers/roomSettings");
 const { attachTimerHandlers } = require("./handlers/timer");
 const { attachWebRTCHandlers } = require("./handlers/webrtc");
 const { attachChatHandlers } = require("./handlers/chat");
+const { attachTelemetryHandlers } = require("./handlers/telemetry");
 const { attachActivityHandlers } = require("./handlers/activity");
 const { attachSyncHandlers } = require("./handlers/syncVideo");
 const { attachDisconnectHandler } = require("./handlers/disconnect");
@@ -66,6 +67,8 @@ function registerSocket(io, deps) {
     attachCupGameHandlers(io, state, socket);
     attachUsernameHandlers(io, state, socket);
     attachReactionHandlers(io, state, socket);
+
+    attachTelemetryHandlers(socket, deps);
 
     attachDisconnectHandler(io, state, socket, joinedRooms, deps);
   });

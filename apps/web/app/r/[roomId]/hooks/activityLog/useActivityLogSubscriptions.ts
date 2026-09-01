@@ -15,6 +15,7 @@ import { applyChatHistory, applyChatMessage } from "./chatLog";
 import { applyActivityEvent, applyActivityHistory } from "./activityLog";
 import { handleSyncEvent } from "./syncLog";
 import { applyRoomState } from "./roomState";
+import { useSyncTelemetry } from "../useSyncTelemetry";
 
 export function useActivityLogSubscriptions({
   roomId,
@@ -47,6 +48,7 @@ export function useActivityLogSubscriptions({
 }: UseActivityLogProps & {
   setLogs: React.Dispatch<React.SetStateAction<LogEntry[]>>;
 }) {
+  const telemetry = useSyncTelemetry();
   const remoteSyncResetTimeoutRef = useRef<number | null>(null);
   const lastAppliedRoomRevRef = useRef<number>(0);
   const lastLoggedRevRef = useRef<number>(0);
@@ -144,6 +146,9 @@ export function useActivityLogSubscriptions({
     });
 
     const cleanup = onSyncEvent((data: SyncData) => {
+      if (!data.senderId || data.senderId !== socketId) {
+        telemetry.record("commandsApplied");
+      }
       handleSyncEvent({
         data,
         userId,
@@ -201,5 +206,6 @@ export function useActivityLogSubscriptions({
     setLogs,
     setPlayerReady,
     setPlayerError,
+    telemetry,
   ]);
 }

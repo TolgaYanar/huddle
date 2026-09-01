@@ -3,6 +3,14 @@
 const nextConfig = {
   transpilePackages: ["shared-logic"],
   poweredByHeader: false,
+  env: {
+    // Public build identifier only; never place secrets here. Vercel exposes
+    // its git SHA at build time, while local/other deployments may override it.
+    NEXT_PUBLIC_APP_RELEASE:
+      process.env.NEXT_PUBLIC_APP_RELEASE ||
+      process.env.VERCEL_GIT_COMMIT_SHA ||
+      "",
+  },
   // Socket.IO WebSocket upgrades cannot follow redirects.
   // Vercel/Next may normalize trailing slashes with a 308 which breaks the
   // Engine.IO websocket handshake on `/socket.io/`.
@@ -74,6 +82,11 @@ const nextConfig = {
           source: "/api/auth/:path*",
           destination: `${target}/api/auth/:path*`,
         },
+        // Sync-quality telemetry
+        {
+          source: "/api/telemetry/:path*",
+          destination: `${target}/api/telemetry/:path*`,
+        },
         // Saved rooms endpoints
         {
           source: "/api/saved-rooms/:path*",
@@ -90,4 +103,33 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+// Source maps are uploaded to Sentry only when CI supplies the credentials.
+// Without SENTRY_AUTH_TOKEN the config is exported untouched, so a local build
+// and a deployment with no Sentry project behave exactly as before — the
+// plugin is not even loaded.
+//
+// SENTRY_AUTH_TOKEN is the one value here that is genuinely secret; the DSN is
+// a public identifier and ships in the client bundle by design.
+const sentryAuthToken = process.env.SENTRY_AUTH_TOKEN;
+const sentryOrg = process.env.SENTRY_ORG;
+const sentryProject = process.env.SENTRY_PROJECT;
+
+async function withOptionalSentry(config) {
+  if (!sentryAuthToken || !sentryOrg || !sentryProject) return config;
+
+  const { withSentryConfig } = await import("@sentry/nextjs/config");
+  return withSentryConfig(config, {
+    org: sentryOrg,
+    project: sentryProject,
+    authToken: sentryAuthToken,
+    silent: true,
+    // Strip the maps from the deployed assets after upload: they are for
+    // Sentry to resolve stack traces, not for visitors to download.
+    sourcemaps: { deleteSourcemapsAfterUpload: true },
+    // The SDK's own instrumentation of Vercel Cron and tunnelling is not used
+    // here; keep the build output minimal.
+    disableLogger: true,
+  });
+}
+
+export default await withOptionalSentry(nextConfig);

@@ -100,6 +100,10 @@ Gotcha: `YOUTUBE_API_KEY` is a **web** variable, not a server one. Nothing in
 return "YouTube browsing is not configured". `apps/web/.gitignore` ignores
 `.env*` but negates `!.env.example`, so the template stays committed.
 
+`NEXT_PUBLIC_APP_RELEASE` is an optional, public sync-telemetry build label.
+`next.config.js` falls back to Vercel's build-time `VERCEL_GIT_COMMIT_SHA`; it
+must contain only a version or SHA token, never a secret.
+
 The server reads exactly: `DATABASE_URL`, `PORT`, `CORS_ORIGINS`, `NODE_ENV`,
 `ALLOW_EXTENSION_ORIGINS`, `COOKIE_DOMAIN`, `VERBOSE_LOGS`. Anything else in
 `apps/server/.env` is dead configuration.
@@ -144,7 +148,8 @@ shares a parent domain with the web app and `COOKIE_DOMAIN` is set to it.
 cookie never reaches the handshake, and the socket connects unauthenticated.
 
 **Next.js rewrites.** `apps/web/next.config.js` (`beforeFiles`) proxies only
-`/health`, `/socket.io*`, `/api/auth/*` and `/api/saved-rooms*` to
+`/health`, `/socket.io*`, `/api/auth/*`, `/api/telemetry/*` and
+`/api/saved-rooms*` to
 `API_PROXY_TARGET`. Everything else under `/api` is a real Next route handler in
 `apps/web/app/api/` (url-preview, video-info, youtube-search, image-search,
 image-generate, ...) — do not add a blanket `/api/:path*` rewrite or those break.
@@ -182,6 +187,26 @@ state and `components/playerSection/useRoomCatchup.ts` handles drift/catch-up.
 Local playback events are broadcast through `sendSyncEvent`; guard flags such as
 `applyingRemoteSyncRef` exist to stop remote-applied changes from echoing back as
 new local events. Removing a guard causes sync feedback loops, not just jitter.
+
+**Sync telemetry.** `SyncMetric` is one cumulative, anonymous summary per
+`sessionId` + source, not an event log. Web counters live in refs under
+`hooks/useSyncTelemetry.tsx`; extension counters live in
+`apps/extension-netflix-party/src/content/telemetry.ts`. Every flush carries a
+monotonically increasing `sequence`, and the server ignores duplicates or
+older network deliveries. A reconnect rotates the extension session; a late
+failure from the old request must never mark the new session dirty. Player and
+autoplay counters represent lifecycle transitions, not every repeated room
+snapshot. The extension manifest version is its public release label. Chrome
+content scripts are bound to the Netflix page's same-origin policy, so the
+collector sends its fixed-shape payload over the extension's existing socket
+through `socket/handlers/telemetry.js`; do not restore a cross-origin content
+script fetch or add a mandatory API host permission merely for measurement.
+Never add room, user, socket, title or URL fields. The telemetry route owns its
+16 KB JSON parser, so `index.js` must continue skipping `/api/telemetry/*` in
+the global 1 MB parser; the socket handler mirrors that 16 KB boundary and
+reuses the same parser/storage functions. Metrics expire after 30 days through
+the shared `expiryCleanup` driver and must never influence product, auth or
+billing logic.
 
 **WebRTC.** Signaling goes through `socket/handlers/webrtc.js`; peer management is
 in `apps/web/app/r/[roomId]/hooks/webrtcPeers/`. `Permissions-Policy` in
@@ -234,6 +259,16 @@ version — the source tree can already be ahead of what is published.
   calls `markAsUncloneable` and therefore cannot run on Node 20 — the web
   build fails at page-data collection there, not at install. Prisma 7
   additionally excludes Node 21, early Node 22 and Node 23.
+
+**Error reporting.** `apps/server/src/observability/sentry.js` and the web's
+`instrumentation.ts` / `instrumentation-client.ts` are inert without a DSN, so
+the project builds, deploys and runs with no Sentry account. Keep it that way:
+the DSN is read at init and the SDK is only imported when one is present. The
+server validates the DSN shape first because `Sentry.init` accepts a malformed
+one and carries on, which would report "enabled" while delivering nothing.
+Tracing, profiling and Session Replay are off by design — sync quality has its
+own collector in `src/telemetry`, and replay would capture the video title,
+room name and chat.
 
 ## Documentation
 

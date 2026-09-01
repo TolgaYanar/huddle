@@ -60,6 +60,7 @@ npm run build      # Generate Prisma client
 ```env
 API_PROXY_TARGET=http://localhost:4000
 YOUTUBE_API_KEY=<your-youtube-data-api-v3-key>
+# Optional outside Vercel: NEXT_PUBLIC_APP_RELEASE=<git-sha-or-version>
 ```
 
 `YOUTUBE_API_KEY` is read by the Next.js route handlers in `apps/web/app/api/`
@@ -108,6 +109,8 @@ NODE_ENV=production
 ```env
 API_PROXY_TARGET=https://your-backend.railway.app
 YOUTUBE_API_KEY=<your-youtube-data-api-v3-key>
+# Optional override; otherwise VERCEL_GIT_COMMIT_SHA is used automatically.
+NEXT_PUBLIC_APP_RELEASE=<git-sha-or-version>
 ```
 
 Leave `NEXT_PUBLIC_SOCKET_SERVER_URL` unset. The client then connects to the web

@@ -1,6 +1,7 @@
 import type { Socket } from "socket.io-client";
 
 import type { ChatMessage, RoomState } from "./types";
+import type { ExtensionTelemetry } from "./telemetry";
 
 export type OverlayElements = {
   status: HTMLSpanElement;
@@ -17,6 +18,14 @@ export type OverlayElements = {
 export type WatchIdMismatch = { expected: string; actual: string };
 
 export type ContentState = {
+  // Optional so tests and any future entry point can run without it; every
+  // call site must tolerate its absence rather than assume a collector.
+  telemetry?: ExtensionTelemetry;
+  // The initial collector can observe player presence before the socket joins.
+  // Keep that same session on the first connection; rotate only on subsequent
+  // manual or transport reconnects.
+  telemetryHasConnectedOnce: boolean;
+
   socket: Socket | null;
   currentRoomId: string | null;
   isApplyingRemote: boolean;
@@ -91,10 +100,15 @@ export type ContentState = {
   overlayEls: OverlayElements | null;
 
   listenersAttachedTo: HTMLVideoElement | null;
+  // Last player-presence state reported to telemetry. MutationObserver can
+  // call the attachment probe many times for one DOM state, so only presence
+  // transitions should increment playerFound/playerMissing.
+  telemetryPlayerPresent: boolean | null;
 };
 
 export function createInitialState(): ContentState {
   return {
+    telemetryHasConnectedOnce: false,
     socket: null,
     currentRoomId: null,
     isApplyingRemote: false,
@@ -143,5 +157,6 @@ export function createInitialState(): ContentState {
     overlayEls: null,
 
     listenersAttachedTo: null,
+    telemetryPlayerPresent: null,
   };
 }

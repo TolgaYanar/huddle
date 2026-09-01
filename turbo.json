@@ -1,7 +1,18 @@
 {
   "$schema": "https://turborepo.com/schema.json",
   "ui": "tui",
-  "globalEnv": ["YOUTUBE_API_KEY", "API_PROXY_TARGET", "NODE_ENV"],
+  "globalEnv": [
+    "YOUTUBE_API_KEY",
+    "API_PROXY_TARGET",
+    "NEXT_PUBLIC_APP_RELEASE",
+    "VERCEL_GIT_COMMIT_SHA",
+    "NODE_ENV",
+    "NEXT_PUBLIC_SENTRY_DSN",
+    "SENTRY_DSN",
+    "SENTRY_AUTH_TOKEN",
+    "SENTRY_ORG",
+    "SENTRY_PROJECT"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

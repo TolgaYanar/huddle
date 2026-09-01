@@ -13,6 +13,7 @@ import { useRoomCatchup } from "./playerSection/useRoomCatchup";
 import { useYouTubePlayback } from "./playerSection/useYouTubePlayback";
 
 import type { PlayerSectionProps } from "./playerSection/types";
+import { useSyncTelemetry } from "../hooks/useSyncTelemetry";
 
 export const PlayerSection = React.memo(function PlayerSection({
   inputUrl,
@@ -117,6 +118,36 @@ export const PlayerSection = React.memo(function PlayerSection({
   isTheatreMode,
   onToggleTheatreMode,
 }: PlayerSectionProps) {
+  const telemetry = useSyncTelemetry();
+  const observedPlayerRef = React.useRef({
+    url: "",
+    found: false,
+    missing: false,
+  });
+
+  React.useEffect(() => {
+    if (observedPlayerRef.current.url === normalizedUrl) return;
+    observedPlayerRef.current = {
+      url: normalizedUrl,
+      found: false,
+      missing: false,
+    };
+  }, [normalizedUrl]);
+
+  React.useEffect(() => {
+    if (!normalizedUrl || !playerReady || observedPlayerRef.current.found)
+      return;
+    observedPlayerRef.current.found = true;
+    telemetry.record("playerFound");
+  }, [normalizedUrl, playerReady, telemetry]);
+
+  React.useEffect(() => {
+    if (!normalizedUrl || !playerError || observedPlayerRef.current.missing)
+      return;
+    observedPlayerRef.current.missing = true;
+    telemetry.record("playerMissing");
+  }, [normalizedUrl, playerError, telemetry]);
+
   const { playerConfig } = usePlayerConfig(
     normalizedUrl,
     roomPlaybackAnchorRef,

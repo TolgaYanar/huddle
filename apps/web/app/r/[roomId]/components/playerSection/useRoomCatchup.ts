@@ -6,6 +6,7 @@ import {
   seekToFromRef,
 } from "../../lib/player";
 import { USER_PAUSE_INTENT_WINDOW_MS } from "../../hooks/useVideoPlayer/constants";
+import { useSyncTelemetry } from "../../hooks/useSyncTelemetry";
 
 // Max retry attempts before giving up on a pending catchup.
 // YouTube iframes can take 5–8 seconds to become seekable on slow connections,
@@ -80,6 +81,7 @@ export function useRoomCatchup({
   handlePlay,
   handleSeekTo,
 }: UseRoomCatchupParams) {
+  const telemetry = useSyncTelemetry();
   const lastRoomSyncAtRef = React.useRef(0);
 
   const pendingRoomCatchupRef = React.useRef<PendingRoomCatchup | null>(null);
@@ -114,11 +116,10 @@ export function useRoomCatchup({
 
     // Drop if expired or the room changed to a different video.
     const anchor = roomPlaybackAnchorRef.current;
-    if (
-      Date.now() > pending.until ||
-      pending.attempts >= CATCHUP_MAX_ATTEMPTS ||
-      pending.url !== anchor?.url
-    ) {
+    const exhausted =
+      Date.now() > pending.until || pending.attempts >= CATCHUP_MAX_ATTEMPTS;
+    if (exhausted || pending.url !== anchor?.url) {
+      if (exhausted) telemetry.record("catchupExhausted");
       pendingRoomCatchupRef.current = null;
       return;
     }
@@ -197,6 +198,7 @@ export function useRoomCatchup({
     lastUserPauseAtRef,
     playerRef,
     suppressNextSeekBroadcast,
+    telemetry,
   ]);
 
   const syncToRoomTimeIfNeeded = React.useCallback(() => {
@@ -244,6 +246,7 @@ export function useRoomCatchup({
     const target = Math.max(0, Math.min(expected, duration || Infinity));
 
     const drift = Math.abs(current - target);
+    telemetry.recordDrift(drift);
 
     // ALWAYS sync if we're at the beginning but should be much further ahead.
     // This handles the case where player loads after room state arrived.
@@ -259,6 +262,7 @@ export function useRoomCatchup({
         until: Date.now() + CATCHUP_RETRY_WINDOW_MS,
         attempts: 0,
       };
+      telemetry.record("hardSeeks");
       tryApplyPendingRoomCatchup();
       return;
     }
@@ -280,6 +284,7 @@ export function useRoomCatchup({
     }, 350);
 
     lastRoomSyncAtRef.current = Date.now();
+    telemetry.record("hardSeeks");
     suppressNextSeekBroadcast(2500);
     seekToFromRef(playerRef, target);
   }, [
@@ -292,6 +297,7 @@ export function useRoomCatchup({
     playerRef,
     roomPlaybackAnchorRef,
     suppressNextSeekBroadcast,
+    telemetry,
     // lastRoomSyncAtRef is a ref; intentionally omitted.
   ]);
 

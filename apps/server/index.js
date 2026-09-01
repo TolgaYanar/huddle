@@ -6,6 +6,7 @@ const os = require("os");
 require("dotenv").config();
 
 const { vLog, requestId } = require("./src/logging");
+const { initSentry } = require("./src/observability/sentry");
 const {
   parseAllowedOrigins,
   readBooleanEnv,
@@ -32,10 +33,15 @@ const {
 } = require("./src/auth/validators");
 const { createRequireAuth } = require("./src/auth/middleware");
 const { createSessionCleanup } = require("./src/auth/sessionCleanup");
+const { createTelemetryCleanup } = require("./src/telemetry/telemetryCleanup");
 
 const { registerRoutes } = require("./src/routes");
 const { createIo } = require("./src/socket/createIo");
 const { registerSocket } = require("./src/socket/register");
+
+// Before anything else, so a failure during wiring is still reported. A
+// missing SENTRY_DSN makes this a no-op.
+initSentry();
 
 const app = express();
 
@@ -73,7 +79,16 @@ app.use((req, res, next) => {
 
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
-app.use(express.json({ limit: "1mb" }));
+// Telemetry parses its own body with a much tighter limit. Skipping it here
+// is what makes that limit real: once this middleware has parsed the body,
+// a route-level express.json() sees req.body already set and passes through,
+// so the narrower cap would never reject anything.
+const TELEMETRY_PATH_PREFIX = "/api/telemetry/";
+const globalJson = express.json({ limit: "1mb" });
+app.use((req, res, next) => {
+  if (req.path.startsWith(TELEMETRY_PATH_PREFIX)) return next();
+  return globalJson(req, res, next);
+});
 
 if (process.env.NODE_ENV === "production" && allowedOrigins.length === 0) {
   console.warn(
@@ -89,6 +104,13 @@ const session = createSessionService({ getPrisma, isDbConnected });
 const requireAuth = createRequireAuth({ getAuthUser: session.getAuthUser });
 const sessionCleanup = createSessionCleanup({ getPrisma, isDbConnected, vLog });
 sessionCleanup.start();
+
+const telemetryCleanup = createTelemetryCleanup({
+  getPrisma,
+  isDbConnected,
+  vLog,
+});
+telemetryCleanup.start();
 
 let io;
 
@@ -180,6 +202,7 @@ async function shutdown() {
   if (shuttingDown) return;
   shuttingDown = true;
   sessionCleanup.stop();
+  telemetryCleanup.stop();
   try {
     const prisma = getPrisma();
     if (prisma) await prisma.$disconnect();

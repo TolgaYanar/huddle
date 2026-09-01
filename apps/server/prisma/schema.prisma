@@ -7,10 +7,10 @@ datasource db {
 }
 
 model User {
-  id           String      @id @default(cuid())
-  username     String      @unique
+  id           String   @id @default(cuid())
+  username     String   @unique
   passwordHash String
-  createdAt    DateTime    @default(now())
+  createdAt    DateTime @default(now())
 
   sessions   Session[]
   savedRooms SavedRoom[]
@@ -42,26 +42,26 @@ model SavedRoom {
 }
 
 model RoomMessage {
-  id        String   @id @default(cuid())
-  roomId    String
-  senderId  String
+  id             String   @id @default(cuid())
+  roomId         String
+  senderId       String
   senderUsername String?
-  text      String
-  createdAt DateTime @default(now())
+  text           String
+  createdAt      DateTime @default(now())
 
   @@index([roomId, createdAt])
 }
 
 model RoomActivity {
-  id        String   @id @default(cuid())
-  roomId    String
-  kind      String
-  action    String?
-  timestamp Float?
-  videoUrl  String?
-  senderId  String?
+  id             String   @id @default(cuid())
+  roomId         String
+  kind           String
+  action         String?
+  timestamp      Float?
+  videoUrl       String?
+  senderId       String?
   senderUsername String?
-  createdAt DateTime @default(now())
+  createdAt      DateTime @default(now())
 
   @@index([roomId, createdAt])
 }
@@ -78,18 +78,18 @@ model RoomState {
 }
 
 model RoomPlaylist {
-  id               String   @id @default(cuid())
-  roomId           String
-  name             String
-  description      String?
-  createdBy        String
+  id                String   @id @default(cuid())
+  roomId            String
+  name              String
+  description       String?
+  createdBy         String
   createdByUsername String?
-  isDefault        Boolean  @default(false)
-  loop             Boolean  @default(false)
-  shuffle          Boolean  @default(false)
-  autoPlay         Boolean  @default(true)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  isDefault         Boolean  @default(false)
+  loop              Boolean  @default(false)
+  shuffle           Boolean  @default(false)
+  autoPlay          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   items RoomPlaylistItem[]
 
@@ -111,4 +111,62 @@ model RoomPlaylistItem {
   playlist RoomPlaylist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
 
   @@index([playlistId, position])
+}
+
+// One row per client session, written when the session ends (or is flushed).
+//
+// Deliberately a summary, not an event log: a room emits sync activity every
+// few hundred milliseconds, so per-event rows would dwarf every other table
+// and answer the same questions at far higher cost.
+//
+// Contains no room id, user id, socket id, content title or URL. `sessionId`
+// is random and regenerated for every room page/platform segment, so rows
+// cannot be joined back to a person. This is untrusted client input and must never inform an
+// authorization, security or billing decision.
+model SyncMetric {
+  id        String  @id @default(cuid())
+  sessionId String
+  // Monotonic flush number. Older/duplicate snapshots never overwrite newer
+  // cumulative counters when network delivery is reordered.
+  sequence  Int
+  // "web" | "extension"
+  source    String
+  // "youtube" | "netflix" | "twitch" | ... — never a URL.
+  platform  String
+  // Client build, so a regression can be attributed to a release.
+  release   String?
+
+  // Playback attachment
+  playerFound   Int @default(0)
+  playerMissing Int @default(0)
+
+  // Command delivery: sent vs. actually applied by the player
+  commandsSent    Int @default(0)
+  commandsApplied Int @default(0)
+  commandsFailed  Int @default(0)
+
+  // Sync quality events
+  joinAttempts     Int @default(0)
+  joinSuccess      Int @default(0)
+  reconnects       Int @default(0)
+  hardSeeks        Int @default(0)
+  catchupExhausted Int @default(0)
+  autoplayBlocked  Int @default(0)
+  contentMismatch  Int @default(0)
+
+  // Drift histogram in seconds. Buckets rather than raw samples so a single
+  // row stays small and p95 stays computable across sessions.
+  driftLt1   Int @default(0)
+  driftLt3   Int @default(0)
+  driftLt5   Int @default(0)
+  driftLt10  Int @default(0)
+  driftGte10 Int @default(0)
+
+  createdAt DateTime @default(now())
+  // Retention horizon. telemetryCleanup sweeps rows past this.
+  expiresAt DateTime
+
+  @@unique([sessionId, source])
+  @@index([expiresAt])
+  @@index([platform, createdAt])
 }

@@ -22,11 +22,13 @@ import { useRoomClientRtc } from "./useRoomClientRtc";
 import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
 import { useTimer } from "../hooks/useTimer";
 import { writeRoomHistory } from "../../../lib/roomHistory";
+import { useSyncTelemetry } from "../hooks/useSyncTelemetry";
 
 const capitalize = (value: string) =>
   value.charAt(0).toUpperCase() + value.slice(1);
 
 export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
+  const telemetry = useSyncTelemetry();
   const [userId, setUserId] = useState("");
   const [isClient, setIsClient] = useState(false);
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
@@ -79,6 +81,10 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
 
   const room = useRoom(roomId, userId);
   const setRoomUsername = room.setUsername;
+
+  useEffect(() => {
+    telemetry.record("joinAttempts");
+  }, [telemetry]);
 
   const sendSyncEvent = useGuardedSendSyncEvent(
     room.sendSyncEvent,
@@ -183,6 +189,10 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
     normalizedUrl: playback.video.normalizedUrl,
     url: playback.video.url,
   });
+
+  useEffect(() => {
+    telemetry.setPlatform(videoEmbed.platform);
+  }, [telemetry, videoEmbed.platform]);
 
   const remotesForPlayer = useMemo(() => {
     return rtc.remoteStreams.map((s) => ({
