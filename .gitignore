@@ -41,3 +41,9 @@ yarn-error.log*
 # The project uses PostgreSQL; local SQLite files are artifacts, not the dev DB.
 *.db
 *.db-journal
+
+# macOS iCloud/FileProvider duplicates. These appear as "name 2.ext" beside the
+# original and have already broken a type-check run once by shadowing a Next
+# type file. They are never wanted in the repository.
+* 2.*
+* 3.*
