@@ -89,9 +89,10 @@ Score each answer 0–2: **2** works plainly, **1** works through a workaround,
 | 6   | Survives in-page navigation | —       | 1           |
 | 7   | Tier timelines match        | —       | 0           |
 
-Prime Video scores **10 / 14**, with both gates passed. Disney+ is unmeasured —
-there is no subscription to run it against, so its column stays empty rather
-than guessed.
+Prime Video scores **10 / 14**. The position gate passes outright. The identity
+gate passes only conditionally — the URL is wrong after an in-player episode
+change, and identity survives on a single non-contractual DOM hook; see finding 5. Disney+ is unmeasured — there is no subscription to run it against, so its
+column stays empty rather than guessed.
 
 Two questions are gates rather than points. A **0 on 3** (position not
 writable by any means found) means the platform cannot be synchronised at all
@@ -143,7 +144,31 @@ no re-assertion by the platform, and `play()` resolved rather than rejecting.
 (`/detail/0J7QWO0J4F3V3KB4XSIJRBERI1`) and survives a reload — the reloaded page
 resumed the same title at 175.8s. The season carries a different id
 (`0PYX2Q4NVYSYMVUZJHDR5QEO70`), so series and episode are cleanly separable.
-It is a 1 rather than a 2 because of finding 6.
+
+It is a 1 rather than a 2 because the URL stops being true mid-session, and a 1
+rather than a 0 because something else stays true. Both halves were measured
+across one real episode transition:
+
+| signal                          | before                                          | after                            |
+| ------------------------------- | ----------------------------------------------- | -------------------------------- |
+| URL path id                     | `0J7QWO0J4F3V3KB4XSIJRBERI1`                    | `0J7QWO0J4F3V3KB4XSIJRBERI1`     |
+| `video.duration`                | 2698                                            | 2601                             |
+| `.atvwebplayersdk-episode-info` | `S1 E1 The Mentalist: Season 1 Episode 1 Pilot` | `S1 E2 Red Hair and Silver Tape` |
+| `<video>` element               | tagged `g1`                                     | still `g1` — the same element    |
+
+The content changed, the URL did not, and the player's own overlay did. Two
+other candidate sources were ruled out by measurement rather than assumption:
+`navigator.mediaSession.metadata` is `null` before and after, and the player
+container holds no `amzn1.dv.gti` of its own — the 69 GTIs in the document are
+the season's full episode list, which names every episode and so identifies
+none.
+
+That leaves exactly one workable source, and it is a CSS class rather than an
+API. Amazon owes us nothing for `.atvwebplayersdk-episode-info` and can rename
+it in any release. The adapter must therefore **fail closed**: when the episode
+string cannot be read, report identity as unknown and refuse to synchronise
+rather than falling back to the URL — in that exact situation the URL is not
+merely stale, it is confidently wrong.
 
 **6 — In-page navigation (1) — the dangerous one.** Clicking the player's
 "Sonraki Bölüm" (Next Episode) changed the content — `duration` went from 2698
@@ -156,13 +181,14 @@ different episodes, and an adapter that identifies content by URL would report
 them as synchronised. Reloading afterwards makes it worse, because the reload
 returns to the episode named in the URL, not the one that was playing.
 
-The mitigation is available and cheap: the element is reused, so the content
-change necessarily fires `durationchange` / `loadedmetadata` on it. The adapter
-must treat those events as "the content may have changed" and re-derive
-identity, and must never trust the URL alone. Note this for the interface: what
-Netflix needs is a way to _write_ position, what Prime needs is a way to
-_invalidate_ identity. An interface designed for either one alone would miss
-the other.
+The mitigation is cheap but it is two steps, not one. The element is reused, so
+the swap necessarily fires `durationchange` / `loadedmetadata` on it — that is
+the _invalidation_ signal. It says only that the content may have changed; it
+does not say what the content now is, and two episodes can share a duration.
+Re-deriving identity is the second step, and per finding 5 it has exactly one
+source. Note this for the interface: what Netflix needs is a way to _write_
+position, what Prime needs is a way to _invalidate and re-derive_ identity. An
+interface designed for either one alone would miss the other.
 
 **7 — Ad tier (0, undetermined).** No ad break occurred during the session and
 the account reads as "Prime'a Dahil" (included with Prime), so nothing could be
@@ -187,6 +213,25 @@ domains such as `amazon.com.tr` appeared only during sign-in.
 One caveat to confirm before shipping: this session was EU-routed
 (`/region/eu/...`) under `www.primevideo.com`. Whether other regions serve the
 watch page from a different host has not been tested.
+
+### Designing with only one spike measured
+
+The rule below says to design the interface against three platforms, including
+the losing spike, so that it is not shaped by a single implementation. Disney+
+is unmeasured, so the rule cannot be followed as written. It is not discarded
+either: the reason behind it still holds, and Netflix plus Prime already supply
+the two opposing pressures it exists to create — Netflix will not have its
+position written directly, and Prime will not have its identity trusted.
+
+Two consequences follow, and both belong in the interface review rather than in
+someone's memory:
+
+1. The interface is **provisional** until a third platform is measured against
+   it. Review it against Disney+ before treating it as settled, and expect that
+   review to change it.
+2. Any capability that exists solely to serve Netflix, or solely to serve
+   Prime, must say so where it is defined — so a later reader can tell a
+   general capability from a workaround that happened to arrive first.
 
 ## After both spikes
 
