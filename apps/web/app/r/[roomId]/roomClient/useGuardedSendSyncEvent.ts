@@ -1,10 +1,12 @@
 import React from "react";
+import { useSyncTelemetry } from "../hooks/useSyncTelemetry";
 
 export function useGuardedSendSyncEvent<Args extends unknown[]>(
   rawSendSyncEvent: (...args: Args) => void,
   hasInitialSyncRef: React.RefObject<boolean>,
   mountTimeRef: React.RefObject<number>,
 ) {
+  const { record } = useSyncTelemetry();
   return React.useCallback(
     (...args: Args) => {
       const action = args[0];
@@ -16,7 +18,8 @@ export function useGuardedSendSyncEvent<Args extends unknown[]>(
       }
 
       rawSendSyncEvent(...args);
+      record("commandsSent");
     },
-    [rawSendSyncEvent, hasInitialSyncRef, mountTimeRef],
+    [rawSendSyncEvent, hasInitialSyncRef, mountTimeRef, record],
   );
 }

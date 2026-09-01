@@ -128,8 +128,9 @@ export function applyRoomStateToVideo(
   if (!seekEnabled && !autoPlayPauseEnabled) return;
 
   const v = getBestVideo();
-  if (!v) return;
-
+  if (!v) {
+    return;
+  }
   // Avoid hammering the player; Netflix can be sensitive to rapid seek/play.
   // The server emits receive_sync and room_state back to back for every
   // event, so throttling both dropped the full snapshot microseconds after
@@ -162,6 +163,19 @@ export function applyRoomStateToVideo(
       : null;
   const actualWatchId = getLocalWatchId();
   if (expectedWatchId && actualWatchId && expectedWatchId !== actualWatchId) {
+    // Count the mismatch regardless of how it is resolved. Previously only
+    // the passive fallback was measured, hiding the auto-follow and
+    // room-leading cases that matter most for platform sync quality.
+    if (
+      state.lastWatchIdMismatch?.expected !== expectedWatchId ||
+      state.lastWatchIdMismatch.actual !== actualWatchId
+    ) {
+      state.telemetry?.record("contentMismatch");
+    }
+    state.lastWatchIdMismatch = {
+      expected: expectedWatchId,
+      actual: actualWatchId,
+    };
     // Two very different cases produce this mismatch:
     //
     //   A. FIRST room_state after a fresh connect — we just started up on
@@ -220,10 +234,6 @@ export function applyRoomStateToVideo(
 
     // Either the target isn't a watch URL or we just navigated; fall back
     // to the passive hint behaviour.
-    state.lastWatchIdMismatch = {
-      expected: expectedWatchId,
-      actual: actualWatchId,
-    };
     updateOverlay();
     return;
   }
@@ -285,8 +295,14 @@ export function applyRoomStateToVideo(
           state.lastLocalEmitTimestamp !== null &&
           Math.abs(desiredTime - state.lastLocalEmitTimestamp) < 3.0;
 
+        // Measured before the correction decision, so the histogram reflects
+        // how far off viewers actually are, not only the corrected cases.
+        state.telemetry?.recordDrift(drift);
+
         if (drift > 1.0 && !isOwnEcho) {
           if (!state.hasUserGesture) return;
+          state.telemetry?.record("hardSeeks");
+          state.telemetry?.record("commandsSent");
 
           state.lastCatchUpNote = `Syncing to ${desiredTime.toFixed(1)}s…`;
           updateOverlay();
@@ -296,6 +312,9 @@ export function applyRoomStateToVideo(
           state.lastRemoteApplyAt = Date.now();
 
           void safeNetflixSeekViaBackground(desiredTime).then((res) => {
+            state.telemetry?.record(
+              res.ok ? "commandsApplied" : "commandsFailed",
+            );
             if (res.ok) {
               // The background seek resolves asynchronously; lastRemoteApplyAt
               // was stamped before the await, so by the time the resulting
@@ -321,6 +340,12 @@ export function applyRoomStateToVideo(
         if (v.paused) {
           if (!autoPlayPauseEnabled) return;
           if (!state.hasUserGesture) {
+            // receive_sync and room_state can arrive back to back for the
+            // same play request. Count the blocked transition once, not once
+            // per snapshot while the same gesture is still pending.
+            if (!state.pendingPlayOnGesture) {
+              state.telemetry?.record("autoplayBlocked");
+            }
             state.pendingPlayOnGesture = true;
             state.lastCatchUpNote = "Click anywhere to resume playback.";
             updateOverlay();
@@ -330,8 +355,12 @@ export function applyRoomStateToVideo(
           state.lastRemoteAction = "play";
           state.lastRemoteTimestamp = v.currentTime;
           state.lastRemoteApplyAt = Date.now();
+          state.telemetry?.record("commandsSent");
 
           void safeNetflixSetPlayingViaBackground(true).then((res) => {
+            state.telemetry?.record(
+              res.ok ? "commandsApplied" : "commandsFailed",
+            );
             state.lastCatchUpNote = res.ok
               ? null
               : `Play failed: ${res.error || "unknown"}`;
@@ -367,8 +396,20 @@ export function attachVideoListeners(
   },
 ) {
   const v = getBestVideo();
-  if (!v) return false;
+  if (!v) {
+    if (state.telemetryPlayerPresent !== false) {
+      state.telemetry?.record("playerMissing");
+      state.telemetryPlayerPresent = false;
+    }
+    return false;
+  }
   if (state.listenersAttachedTo === v) return true;
+
+  // This is the player lifecycle boundary: attachVideoListeners is
+  // idempotent and runs once for each new <video>. Counting in the remote
+  // apply path inflated playerFound on every room snapshot.
+  state.telemetry?.record("playerFound");
+  state.telemetryPlayerPresent = true;
 
   const canEmitNow = (action: string, timestamp: number) => {
     if (state.isApplyingRemote) return false;

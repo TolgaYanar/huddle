@@ -6,6 +6,7 @@ import Link from "next/link";
 import { RoomClientView } from "./roomClient/RoomClientView";
 import { useRoomClientViewModel } from "./roomClient/useRoomClientViewModel";
 import { ErrorBoundary } from "../../components/ErrorBoundary";
+import { SyncTelemetryProvider } from "./hooks/useSyncTelemetry";
 
 function RoomErrorFallback({
   roomId,
@@ -75,10 +76,14 @@ function RoomClientInner({ roomId }: { roomId: string }) {
 
 export default function RoomClient({ roomId }: { roomId: string }) {
   return (
-    <ErrorBoundary
-      fallback={(error) => <RoomErrorFallback roomId={roomId} error={error} />}
-    >
-      <RoomClientInner roomId={roomId} />
-    </ErrorBoundary>
+    <SyncTelemetryProvider>
+      <ErrorBoundary
+        fallback={(error) => (
+          <RoomErrorFallback roomId={roomId} error={error} />
+        )}
+      >
+        <RoomClientInner roomId={roomId} />
+      </ErrorBoundary>
+    </SyncTelemetryProvider>
   );
 }

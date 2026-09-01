@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { reportError } from "../lib/reportError";
 
 interface Props {
   children: React.ReactNode;
@@ -34,6 +35,9 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     this.props.onError?.(error, info);
+    // A render crash blanks the room, so it is the single most valuable thing
+    // to report. reportError is a no-op without a Sentry DSN.
+    void reportError(error, { componentStack: info.componentStack });
     // Keep a console trace in development.
     if (process.env.NODE_ENV !== "production") {
       console.error(

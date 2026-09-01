@@ -3,8 +3,14 @@
  * Periodically cleans up stale entries to avoid unbounded memory growth.
  */
 
-function createRateLimiter({ windowMs, max, message = "rate_limited" }) {
-  // ip -> array of timestamps (hits within current window)
+function createRateLimiter({
+  windowMs,
+  max,
+  message = "rate_limited",
+  keyGenerator,
+  onLimit,
+}) {
+  // key -> array of timestamps (hits within current window)
   const store = new Map();
 
   // Clean up expired entries every windowMs to prevent memory leaks.
@@ -26,20 +32,24 @@ function createRateLimiter({ windowMs, max, message = "rate_limited" }) {
       (req.headers["x-forwarded-for"] || "").split(",")[0].trim() ||
       req.connection?.remoteAddress ||
       "unknown";
+    const key = typeof keyGenerator === "function" ? keyGenerator(req) : ip;
 
     const now = Date.now();
-    const raw = store.get(ip) || [];
+    const raw = store.get(key) || [];
     const hits = raw.filter((t) => now - t < windowMs);
 
     if (hits.length >= max) {
       const oldest = hits[0];
       const retryAfter = Math.ceil((oldest + windowMs - now) / 1000);
       res.set("Retry-After", String(retryAfter));
+      if (typeof onLimit === "function") {
+        return onLimit(req, res, { message, retryAfter });
+      }
       return res.status(429).json({ error: message, retryAfter });
     }
 
     hits.push(now);
-    store.set(ip, hits);
+    store.set(key, hits);
     next();
   };
 }

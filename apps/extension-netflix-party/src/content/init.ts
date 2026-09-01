@@ -7,9 +7,16 @@ import { ensureVideoListeners } from "./playerSync";
 import { extractNetflixMetadata } from "./metadata";
 import { safeNetflixSetPlayingViaBackground } from "./netflixBackground";
 import { connect, disconnect, emitSync, shouldEmitLocalSync } from "./socket";
+import { createSocketSender, createTelemetry } from "./telemetry";
 
 export function initContentScript() {
   const state = createInitialState();
+
+  // Sync-quality telemetry. Anonymous and cumulative; see telemetry.ts. It is
+  // attached to state so no call site needs a new parameter, and every read is
+  // optional so playback works identically if it is ever absent.
+  state.telemetry = createTelemetry(createSocketSender(() => state.socket));
+  state.telemetry.start();
 
   const ensureOverlayBound = () =>
     ensureOverlay(state, {
@@ -117,7 +124,11 @@ export function initContentScript() {
 
       if (state.pendingPlayOnGesture) {
         state.pendingPlayOnGesture = false;
+        state.telemetry?.record("commandsSent");
         void safeNetflixSetPlayingViaBackground(true).then((res) => {
+          state.telemetry?.record(
+            res.ok ? "commandsApplied" : "commandsFailed",
+          );
           state.lastCatchUpNote = res.ok
             ? null
             : `Play failed: ${res.error || "unknown"}`;

@@ -164,4 +164,24 @@ describe("createRateLimiter", () => {
       assert.equal(res._status, 429);
     });
   });
+
+  describe("custom telemetry policy", () => {
+    it("can key by session and return a non-blocking response", () => {
+      const limiter = createRateLimiter({
+        windowMs: 60_000,
+        max: 1,
+        keyGenerator: (req) => req.sessionId,
+        onLimit: (_req, res) => res.status(202).json({ accepted: false }),
+      });
+      const first = { ...makeReq("10.0.0.1"), sessionId: "session-a" };
+      const second = { ...makeReq("10.0.0.2"), sessionId: "session-a" };
+
+      limiter(first, makeRes(), () => {});
+      const res = makeRes();
+      limiter(second, res, () => {});
+
+      assert.equal(res._status, 202);
+      assert.deepEqual(res._body, { accepted: false });
+    });
+  });
 });

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Socket } from "socket.io-client";
 import type { UserPresenceData } from "shared-logic";
+import { useSyncTelemetry } from "./useSyncTelemetry";
 
 interface UseRoomStateProps {
   roomId: string;
@@ -40,6 +41,7 @@ export function useRoomState({
   onRoomPasswordRequired,
   joinRoom,
 }: UseRoomStateProps) {
+  const telemetry = useSyncTelemetry();
   const [hostId, setHostId] = useState<string | null>(null);
   const [roomName, setRoomNameState] = useState<string | null>(null);
   const [participants, setParticipants] = useState<string[]>([]);
@@ -52,12 +54,23 @@ export function useRoomState({
   const [passwordInput, setPasswordInput] = useState("");
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const lastSubmittedPasswordRef = useRef<string | null>(null);
+  const joinedSocketIdRef = useRef<string | null>(null);
 
   // Track the room host
   useEffect(() => {
     if (!onRoomUsers) return;
     const cleanup = onRoomUsers((data) => {
       if (data.roomId !== roomId) return;
+      const currentSocketId = socket?.id;
+      if (
+        typeof currentSocketId === "string" &&
+        currentSocketId &&
+        joinedSocketIdRef.current !== currentSocketId
+      ) {
+        if (joinedSocketIdRef.current) telemetry.record("reconnects");
+        telemetry.record("joinSuccess");
+        joinedSocketIdRef.current = currentSocketId;
+      }
       const nextHost = data.hostId;
       if (typeof nextHost !== "undefined") {
         setHostId(nextHost ?? null);
@@ -95,7 +108,7 @@ export function useRoomState({
     return () => {
       cleanup?.();
     };
-  }, [onRoomUsers, roomId, userId]);
+  }, [onRoomUsers, roomId, socket?.id, telemetry, userId]);
 
   // Password status + required events
   useEffect(() => {
@@ -217,6 +230,7 @@ export function useRoomState({
   const submitRoomPassword = () => {
     const pw = passwordInput.trim();
     lastSubmittedPasswordRef.current = pw;
+    telemetry.record("joinAttempts");
     joinRoom(pw);
   };
 

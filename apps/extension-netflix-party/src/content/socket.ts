@@ -89,8 +89,26 @@ export function connect(
   });
 
   const socket = state.socket;
+  let hasJoinedOnce = false;
+  let awaitingJoinTelemetry = false;
 
   socket.on("connect", () => {
+    // Player presence can be measured before the first socket connection, so
+    // keep that initial collector session and add the join counters to it.
+    // Every later connection starts a fresh anonymous segment and re-states
+    // the current player presence because no DOM lifecycle transition occurs.
+    if (state.telemetryHasConnectedOnce) {
+      state.telemetry?.rotateSession();
+      if (state.telemetryPlayerPresent === true) {
+        state.telemetry?.record("playerFound");
+      } else if (state.telemetryPlayerPresent === false) {
+        state.telemetry?.record("playerMissing");
+      }
+    } else {
+      state.telemetryHasConnectedOnce = true;
+    }
+    state.telemetry?.record("joinAttempts");
+    awaitingJoinTelemetry = true;
     state.localSenderId = socket?.id || null;
     state.lastConnectionError = null;
     // NOTE: we deliberately do NOT reset hasAppliedRoomStateSinceConnect
@@ -237,6 +255,14 @@ export function connect(
       hostId?: string | null;
     }) => {
       if (!payload || payload.roomId !== state.currentRoomId) return;
+      // room_users is the first authoritative acknowledgement that join_room
+      // succeeded. A socket transport connection alone is not a room join.
+      if (awaitingJoinTelemetry) {
+        state.telemetry?.record("joinSuccess");
+        if (hasJoinedOnce) state.telemetry?.record("reconnects");
+        hasJoinedOnce = true;
+        awaitingJoinTelemetry = false;
+      }
       const ids = Array.isArray(payload.users) ? payload.users : [];
       state.roomMembers = ids.map((socketId) => ({
         socketId,

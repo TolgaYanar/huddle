@@ -2,9 +2,15 @@ import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ErrorBoundary } from "../ErrorBoundary";
+import { reportError } from "../../lib/reportError";
+
+vi.mock("../../lib/reportError", () => ({
+  reportError: vi.fn().mockResolvedValue(true),
+}));
 
 // Suppress React's error boundary console.error noise during tests
 beforeEach(() => {
+  vi.clearAllMocks();
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
@@ -59,6 +65,7 @@ describe("ErrorBoundary", () => {
     );
     expect(onError).toHaveBeenCalledOnce();
     expect(onError.mock.calls[0]?.[0]).toBeInstanceOf(Error);
+    expect(reportError).toHaveBeenCalledOnce();
   });
 
   it("resets and shows children again after 'Try again'", () => {
