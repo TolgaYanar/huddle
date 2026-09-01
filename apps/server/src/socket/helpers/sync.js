@@ -1,3 +1,5 @@
+const { detectPlatform } = require("../../shared/platform");
+
 function emitServerSyncToRoom(io, roomId, payload) {
   io.to(roomId).emit("receive_sync", {
     roomId,
@@ -188,11 +190,17 @@ async function persistRoomState(deps, state, roomId) {
   const pl = state.roomPlaylistActive.get(roomId);
   const name = state.roomName.get(roomId) || null;
   try {
+    const videoUrl = st?.videoUrl || null;
+    // Derived here rather than trusted from the client: this value is stored
+    // and reported on, so a client must not be able to mislabel it.
+    const platform = detectPlatform(videoUrl);
+
     await prisma.roomState.upsert({
       where: { roomId },
       update: {
         name,
-        videoUrl: st?.videoUrl || null,
+        videoUrl,
+        platform,
         timestamp: typeof st?.timestamp === "number" ? st.timestamp : 0,
         isPlaying: st?.isPlaying === true,
         activePlaylistId: pl?.activePlaylistId || null,
@@ -201,7 +209,8 @@ async function persistRoomState(deps, state, roomId) {
       create: {
         roomId,
         name,
-        videoUrl: st?.videoUrl || null,
+        videoUrl,
+        platform,
         timestamp: typeof st?.timestamp === "number" ? st.timestamp : 0,
         isPlaying: st?.isPlaying === true,
         activePlaylistId: pl?.activePlaylistId || null,
