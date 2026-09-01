@@ -81,13 +81,17 @@ Score each answer 0–2: **2** works plainly, **1** works through a workaround,
 
 | #   | Question                    | Disney+ | Prime Video |
 | --- | --------------------------- | ------- | ----------- |
-| 1   | Real `<video>` element      |         |             |
-| 2   | Position readable           |         |             |
-| 3   | Position writable           |         |             |
-| 4   | Play/pause drivable         |         |             |
-| 5   | Stable content id           |         |             |
-| 6   | Survives in-page navigation |         |             |
-| 7   | Tier timelines match        |         |             |
+| 1   | Real `<video>` element      | —       | 2           |
+| 2   | Position readable           | —       | 2           |
+| 3   | Position writable           | —       | 2           |
+| 4   | Play/pause drivable         | —       | 2           |
+| 5   | Stable content id           | —       | 1           |
+| 6   | Survives in-page navigation | —       | 1           |
+| 7   | Tier timelines match        | —       | 0           |
+
+Prime Video scores **10 / 14**, with both gates passed. Disney+ is unmeasured —
+there is no subscription to run it against, so its column stays empty rather
+than guessed.
 
 Two questions are gates rather than points. A **0 on 3** (position not
 writable by any means found) means the platform cannot be synchronised at all
@@ -111,6 +115,78 @@ the extension for every existing install until the user re-accepts it in
 For each platform: the seven answers, the score, the hostnames, and — most
 valuable — anything that surprised you. The adapter interface is designed from
 these notes, not from Netflix.
+
+## Prime Video results
+
+Measured 2026-09-01 against a live Turkish Prime account, real Google Chrome
+(Widevine is required, so a bundled Chromium cannot play the content), one
+episode of a 45-minute series. Raw numbers are quoted so a later run can be
+compared against them rather than re-argued.
+
+**1 — Real `<video>` element (2).** Exactly one element, `duration` 2698s,
+`readyState` 4, `currentTime` advanced 3.00s in 3s. `currentSrc` is a
+`blob:` URL, so the content is fed through Media Source Extensions.
+
+**2 — Position readable (2).** `currentTime` tracks the visible position and
+`seekable` covers the whole title, `[0, 2698]`.
+
+**3 — Position writable (2).** This is the headline result: a plain
+`video.currentTime = 128` landed at 128.87 and kept running (131.87 three
+seconds later), with no snap-back. Netflix ignores exactly this assignment and
+needs its internal player API reached from the MAIN world, which is the entire
+reason `netflixBackground.ts` exists. Prime needs none of that.
+
+**4 — Play/pause drivable (2).** `pause()` held for at least three seconds with
+no re-assertion by the platform, and `play()` resolved rather than rejecting.
+
+**5 — Stable content id (1, not 2).** The episode id sits in the path
+(`/detail/0J7QWO0J4F3V3KB4XSIJRBERI1`) and survives a reload — the reloaded page
+resumed the same title at 175.8s. The season carries a different id
+(`0PYX2Q4NVYSYMVUZJHDR5QEO70`), so series and episode are cleanly separable.
+It is a 1 rather than a 2 because of finding 6.
+
+**6 — In-page navigation (1) — the dangerous one.** Clicking the player's
+"Sonraki Bölüm" (Next Episode) changed the content — `duration` went from 2698
+to 2601 — while **the URL did not change at all** and the _same_ `<video>`
+element was reused. A `data-spikeTag` written before the click was still on the
+element afterwards.
+
+The consequence is specific: two viewers can sit on an identical URL and watch
+different episodes, and an adapter that identifies content by URL would report
+them as synchronised. Reloading afterwards makes it worse, because the reload
+returns to the episode named in the URL, not the one that was playing.
+
+The mitigation is available and cheap: the element is reused, so the content
+change necessarily fires `durationchange` / `loadedmetadata` on it. The adapter
+must treat those events as "the content may have changed" and re-derive
+identity, and must never trust the URL alone. Note this for the interface: what
+Netflix needs is a way to _write_ position, what Prime needs is a way to
+_invalidate_ identity. An interface designed for either one alone would miss
+the other.
+
+**7 — Ad tier (0, undetermined).** No ad break occurred during the session and
+the account reads as "Prime'a Dahil" (included with Prime), so nothing could be
+concluded. Recorded as unanswered, which the protocol treats as a finding, not
+a gap to fill by guessing.
+
+### Permission surface — better than expected
+
+The protocol predicted Prime would score worse here. It does not. Playback ran
+entirely under a single origin the content script would need to match:
+
+```
+https://www.primevideo.com/*
+```
+
+Media arrives from CDN hosts — `a264vod-dash-pv-ta-amazon.akamaized.net`,
+`*.main.amazon.pv-cdn.net`, `cf-trickplay.aux.pv-cdn.net` — and telemetry from
+`*.a2z.com`, but those are fetches made _by_ the page. A content script never
+runs there, so they do not belong in the permission request. Amazon country
+domains such as `amazon.com.tr` appeared only during sign-in.
+
+One caveat to confirm before shipping: this session was EU-routed
+(`/region/eu/...`) under `www.primevideo.com`. Whether other regions serve the
+watch page from a different host has not been tested.
 
 ## After both spikes
 
