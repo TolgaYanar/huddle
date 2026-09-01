@@ -270,6 +270,20 @@ Tracing, profiling and Session Replay are off by design — sync quality has its
 own collector in `src/telemetry`, and replay would capture the video title,
 room name and chat.
 
+## Roadmap
+
+The product direction is platform breadth: the video is the point, and the web
+app already supports seven services. The gap is DRM platforms, which need the
+extension.
+
+Phase 0 (sync telemetry and error reporting) and Phase 3 (`RoomState.platform`)
+are done and live. Phase 1 is two throwaway spikes — see
+`docs/platform-spike.md` — and it gates everything after it. Do not design the
+extension's platform adapter before those spikes: an interface derived from
+Netflix alone generalises Netflix and fits nothing else. `playerSync.ts` alone
+carries 38 Netflix references, so the coupling is real and the seam is not yet
+where it needs to be.
+
 ## Documentation
 
 `README.md` is the user-facing setup guide and its structure/env sections match
