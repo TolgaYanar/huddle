@@ -68,4 +68,35 @@ describe("socket telemetry lifecycle", () => {
     expect(rotateSession).toHaveBeenCalledTimes(1);
     expect(record.mock.calls).toEqual([["playerFound"], ["joinAttempts"]]);
   });
+
+  it("does not carry authoritative playback state into a manually selected room", () => {
+    const state = createInitialState();
+    state.currentRoomId = "old-room";
+    state.lastKnownRoomVideoUrl =
+      "https://www.primevideo.com/detail/OLD_EPISODE";
+    state.pendingRoomState = {
+      roomId: "old-room",
+      videoUrl: "https://www.primevideo.com/detail/OLD_EPISODE",
+      contentId: "prime:s1:e1:old",
+    };
+    state.hasAppliedRoomStateSinceConnect = true;
+    state.lastContentIdMismatch = {
+      expected: "prime:s1:e1:old",
+      actual: "prime:s1:e2:old",
+    };
+    state.lastCatchUpNote = "Old room note";
+
+    connect(
+      state,
+      { roomId: "new-room", serverUrl: "https://api.wehuddle.tv" },
+      { ensureOverlay: vi.fn(), updateOverlay: vi.fn() },
+    );
+
+    expect(state.currentRoomId).toBe("new-room");
+    expect(state.lastKnownRoomVideoUrl).toBeNull();
+    expect(state.pendingRoomState).toBeNull();
+    expect(state.hasAppliedRoomStateSinceConnect).toBe(false);
+    expect(state.lastContentIdMismatch).toBeNull();
+    expect(state.lastCatchUpNote).toBeNull();
+  });
 });

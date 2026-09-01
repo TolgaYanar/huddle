@@ -158,6 +158,37 @@ export function applyRoomStateToVideo(
         ? adapter.getContentIdFromUrl(roomState.videoUrl)
         : null;
   const actualContentId = adapter.getCurrentContentId();
+
+  // A brand-new room has no URL to mismatch against. Without this seed, a
+  // Prime tab stays permanently passive: local play/pause/seek events are
+  // gated until the room belongs to Prime, but nothing ever makes it belong
+  // to Prime. Lead only from the authoritative empty room_state (never a
+  // partial receive_sync) and only when the live identity is verified.
+  if (
+    opts?.source === "room_state" &&
+    effectiveRoomUrl === null &&
+    actualContentId &&
+    !state.hasAppliedRoomStateSinceConnect &&
+    adapter.isPlaybackUrl(location.href)
+  ) {
+    state.hasAppliedRoomStateSinceConnect = true;
+    state.lastLocalEmitAt = Date.now();
+    state.lastLocalEmitAction = "change_url";
+    state.lastLocalEmitTimestamp = 0;
+    state.lastCatchUpNote = `Starting room with ${adapter.formatContentId(actualContentId)}…`;
+    updateOverlay();
+    if (state.socket?.connected && state.currentRoomId) {
+      state.socket.emit("sync_video", {
+        roomId: state.currentRoomId,
+        action: "change_url",
+        timestamp: 0,
+        videoUrl: location.href,
+        contentId: actualContentId,
+      });
+    }
+    return;
+  }
+
   if (
     adapter.requiresVerifiedContentIdentity &&
     (!expectedContentId || !actualContentId)
@@ -224,6 +255,7 @@ export function applyRoomStateToVideo(
             action: "change_url",
             timestamp: 0,
             videoUrl: currentUrl,
+            contentId: actualContentId,
           });
         }
         return;
@@ -231,12 +263,21 @@ export function applyRoomStateToVideo(
       // We're on a non-watch URL (shouldn't normally happen — manifest
       // gates us — but defensive). Fall through to the passive hint.
     } else if (targetUsesPlatform && !recentlyNavigatedToSame) {
+      const navigationUrl = adapter.getNavigationUrl(
+        targetUrl,
+        expectedContentId,
+      );
+      if (!navigationUrl) {
+        state.lastCatchUpNote = `${adapter.displayName} changed content; open ${adapter.formatContentId(expectedContentId)} manually`;
+        updateOverlay();
+        return;
+      }
       // Case B: the room moved while we were watching — follow it.
-      state.lastAutoNavigatedTo = targetUrl;
+      state.lastAutoNavigatedTo = navigationUrl;
       state.lastAutoNavigatedAt = Date.now();
       state.lastCatchUpNote = `Following room to ${adapter.formatContentId(expectedContentId)}…`;
       updateOverlay();
-      window.location.assign(targetUrl);
+      window.location.assign(navigationUrl);
       return;
     }
 
@@ -506,13 +547,16 @@ export function ensureVideoListeners(
   // the host could move to /watch/<next> and every other member would stay
   // stuck on the previous episode. Throttled per-URL so Netflix's hash
   // changes during a single watch don't spam emits.
-  let lastEmittedUrl: string | null = null;
-  const maybeBroadcastUrlChange = () => {
+  let lastEmittedContentKey: string | null = null;
+  const maybeBroadcastContentChange = () => {
     if (!shouldEmitLocalSync()) return;
     const url = location.href;
-    if (url === lastEmittedUrl) return;
     if (!adapter.isPlaybackUrl(url)) return;
-    lastEmittedUrl = url;
+    const contentId = adapter.getCurrentContentId();
+    if (adapter.requiresVerifiedContentIdentity && !contentId) return;
+    const contentKey = `${url}|${contentId ?? ""}`;
+    if (contentKey === lastEmittedContentKey) return;
+    lastEmittedContentKey = contentKey;
     // Stamp the local emit so applyRoomStateToVideo treats the echo as our
     // own (mirrors the play/pause/seek path).
     state.lastLocalEmitAt = Date.now();
@@ -524,7 +568,7 @@ export function ensureVideoListeners(
   };
 
   adapter.subscribeToPotentialContentChanges(() => {
-    maybeBroadcastUrlChange();
+    maybeBroadcastContentChange();
     attachVideoListeners(state, { emitSync, shouldEmitLocalSync });
   });
 }

@@ -307,13 +307,14 @@ The product direction is platform breadth: the video is the point, and the web
 app already supports seven services. The gap is DRM platforms, which need the
 extension.
 
-Phase 0 (sync telemetry and error reporting) and Phase 3 (`RoomState.platform`)
-are done and live. Phase 1 is two throwaway spikes — see
-`docs/platform-spike.md` — and it gates everything after it. Do not design the
-extension's platform adapter before those spikes: an interface derived from
-Netflix alone generalises Netflix and fits nothing else. `playerSync.ts` alone
-carries 38 Netflix references, so the coupling is real and the seam is not yet
-where it needs to be.
+Phase 0 (sync telemetry and error reporting), Phase 2 (the provisional adapter
+boundary plus Netflix migration), and Phase 3 (`RoomState.platform`) are done.
+The measured Prime half of Phase 1 lives in `docs/platform-spike.md`; Disney+
+remains unmeasured because no test account is available. Phase 4 ships Prime
+behind an optional host permission in extension v1.3.0, with identity failing
+closed when Prime's DOM hook disappears. The adapter remains provisional until
+it can be reviewed against that third platform; do not pretend an unmeasured
+Disney+ implementation validates the boundary.
 
 ## Documentation
 

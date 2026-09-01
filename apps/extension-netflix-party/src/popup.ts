@@ -1,3 +1,12 @@
+import {
+  activatePrimeForTab,
+  detectSupportedTab,
+  enablePrimeForTab,
+  ensurePrimeContentScriptRegistered,
+  hasPrimePermission,
+  type SupportedTab,
+} from "./platformPermissions";
+
 type ExtensionConfig = {
   serverUrl: string;
   roomId: string;
@@ -5,6 +14,7 @@ type ExtensionConfig = {
 
 // Shape of the response from the content script's HUDDLE_GET_STATUS handler.
 type StatusResponse = {
+  platform?: "netflix" | "prime";
   connected: boolean;
   roomId: string | null;
   currentUrl?: string;
@@ -48,6 +58,9 @@ const disconnectBtn = qs<HTMLButtonElement>("disconnect");
 const hintEl = qs<HTMLParagraphElement>("hint");
 
 const emptyOffNetflix = qs<HTMLDivElement>("emptyOffNetflix");
+const emptyTitleEl = qs<HTMLDivElement>("emptyTitle");
+const emptyBodyEl = qs<HTMLDivElement>("emptyBody");
+const enablePrimeBtn = qs<HTMLButtonElement>("enablePrime");
 const nowPlaying = qs<HTMLDivElement>("nowPlaying");
 const posterWrap = qs<HTMLDivElement>("posterWrap");
 const posterEl = qs<HTMLImageElement>("poster");
@@ -92,10 +105,9 @@ async function getActiveTabId(): Promise<number | null> {
   return typeof tab?.id === "number" ? tab.id : null;
 }
 
-async function isActiveTabNetflixWatch(): Promise<boolean> {
+async function getActiveTab(): Promise<chrome.tabs.Tab | null> {
   const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-  const url = tabs?.[0]?.url ?? "";
-  return /^https:\/\/www\.netflix\.com\/watch\//i.test(url);
+  return tabs?.[0] ?? null;
 }
 
 async function sendToActiveTab(message: unknown): Promise<unknown> {
@@ -264,13 +276,13 @@ function renderInviteLink(status: StatusResponse): void {
 
 function renderOnboarding(
   status: StatusResponse | null,
-  onNetflix: boolean,
+  onSupportedPlaybackPage: boolean,
 ): void {
   // Show the numbered "How to start a watch party" card whenever the user
   // is on Netflix but isn't yet connected. Skip it once a connection is
   // established — the now-playing + members cards take that real estate.
   const isConnected = !!status?.connected;
-  onboardingStepsEl.hidden = !(onNetflix && !isConnected);
+  onboardingStepsEl.hidden = !(onSupportedPlaybackPage && !isConnected);
 }
 
 function renderNote(status: StatusResponse): void {
@@ -296,27 +308,77 @@ async function saveConfig(cfg: ExtensionConfig): Promise<void> {
 
 let lastPollAt = 0;
 let pollInFlight = false;
+let lastActiveTabId: number | null = null;
+const primeInjectionAttempts = new Set<number>();
+
+function showEmptyState(
+  title: string,
+  body: string,
+  { enablePrime = false }: { enablePrime?: boolean } = {},
+) {
+  emptyOffNetflix.hidden = false;
+  emptyTitleEl.textContent = title;
+  emptyBodyEl.textContent = body;
+  enablePrimeBtn.hidden = !enablePrime;
+  nowPlaying.hidden = true;
+  membersEl.hidden = true;
+  inviteLinkEl.hidden = true;
+  noteEl.hidden = true;
+  onboardingStepsEl.hidden = true;
+  connectBtn.disabled = true;
+  disconnectBtn.disabled = true;
+  hintEl.hidden = true;
+}
+
+async function resolveActivePlatform(
+  tab: chrome.tabs.Tab | null,
+): Promise<{ tabId: number; supported: SupportedTab } | null> {
+  const url = tab?.url ?? "";
+  const supported = detectSupportedTab(url);
+  return typeof tab?.id === "number" && supported
+    ? { tabId: tab.id, supported }
+    : null;
+}
 
 async function refreshStatus(): Promise<void> {
   if (pollInFlight) return;
   pollInFlight = true;
   try {
-    const onNetflix = await isActiveTabNetflixWatch();
-    if (!onNetflix) {
-      setStatus("Open a Netflix watch page", "idle");
-      connectBtn.disabled = true;
-      disconnectBtn.disabled = true;
-      hintEl.hidden = true;
-      emptyOffNetflix.hidden = false;
-      nowPlaying.hidden = true;
-      membersEl.hidden = true;
-      inviteLinkEl.hidden = true;
-      noteEl.hidden = true;
-      onboardingStepsEl.hidden = true;
+    const active = await resolveActivePlatform(await getActiveTab());
+    if (!active) {
+      setStatus("Open a supported watch page", "idle");
+      showEmptyState(
+        "Open Netflix or Prime Video",
+        "Choose a title on Netflix or Prime Video, then open Huddle again.",
+      );
+      return;
+    }
+
+    const { tabId, supported } = active;
+    lastActiveTabId = tabId;
+    if (supported.platform === "prime" && !(await hasPrimePermission())) {
+      setStatus("Prime Video needs permission", "idle");
+      showEmptyState(
+        "Enable Prime Video",
+        "Huddle requests access only to primevideo.com and only after you enable it.",
+        { enablePrime: true },
+      );
+      return;
+    }
+
+    if (!supported.isPlaybackPage) {
+      const contentLabel =
+        supported.platform === "prime" ? "series episode" : "title";
+      setStatus(`Open a ${supported.displayName} ${contentLabel}`, "idle");
+      showEmptyState(
+        `Open a ${supported.displayName} ${contentLabel}`,
+        `Start playing a ${contentLabel} on ${supported.displayName}, then open Huddle again.`,
+      );
       return;
     }
 
     emptyOffNetflix.hidden = true;
+    enablePrimeBtn.hidden = true;
     connectBtn.disabled = false;
 
     let resp: StatusResponse | undefined;
@@ -325,9 +387,25 @@ async function refreshStatus(): Promise<void> {
         | StatusResponse
         | undefined;
     } catch {
-      // sendMessage throws when the content script hasn't initialized yet
-      // (Netflix page still loading, or extension just reloaded).
-      setStatus("Waiting for Netflix to finish loading…", "connecting");
+      // A Prime tab that was already open when permission was granted needs
+      // one immediate injection; future navigations use the persisted dynamic
+      // content-script registration.
+      if (
+        supported.platform === "prime" &&
+        !primeInjectionAttempts.has(tabId)
+      ) {
+        primeInjectionAttempts.add(tabId);
+        try {
+          await activatePrimeForTab(tabId);
+          setTimeout(refreshStatus, 300);
+        } catch {
+          // The waiting state below remains accurate and retry-safe.
+        }
+      }
+      setStatus(
+        `Waiting for ${supported.displayName} to finish loading…`,
+        "connecting",
+      );
       connectBtn.disabled = true;
       disconnectBtn.disabled = true;
       nowPlaying.hidden = true;
@@ -347,7 +425,7 @@ async function refreshStatus(): Promise<void> {
       membersEl.hidden = true;
       inviteLinkEl.hidden = true;
       noteEl.hidden = true;
-      renderOnboarding(null, onNetflix);
+      renderOnboarding(null, supported.isPlaybackPage);
       return;
     }
 
@@ -365,7 +443,7 @@ async function refreshStatus(): Promise<void> {
     renderMembers(resp);
     renderInviteLink(resp);
     renderNote(resp);
-    renderOnboarding(resp, onNetflix);
+    renderOnboarding(resp, supported.isPlaybackPage);
   } finally {
     pollInFlight = false;
     lastPollAt = Date.now();
@@ -387,7 +465,31 @@ connectBtn.addEventListener("click", async () => {
     await sendToActiveTab({ type: "HUDDLE_CONNECT", ...cfg });
     setTimeout(refreshStatus, 600);
   } catch {
-    setStatus("Open a Netflix watch page first", "error");
+    setStatus("Open a supported watch page first", "error");
+  }
+});
+
+enablePrimeBtn.addEventListener("click", async () => {
+  // Keep permissions.request in the direct click call chain. Querying tabs
+  // first would cross an async boundary and can consume Chrome's transient
+  // user activation before the permission prompt is opened.
+  const tabId = lastActiveTabId;
+  if (tabId === null) {
+    setStatus("No active tab", "error");
+    return;
+  }
+  setStatus("Requesting Prime Video access…", "connecting");
+  try {
+    const granted = await enablePrimeForTab(tabId);
+    if (!granted) {
+      setStatus("Prime Video permission was not granted", "error");
+      return;
+    }
+    primeInjectionAttempts.add(tabId);
+    setStatus("Prime Video enabled", "connecting");
+    setTimeout(refreshStatus, 300);
+  } catch {
+    setStatus("Could not enable Prime Video", "error");
   }
 });
 
@@ -442,5 +544,8 @@ window.addEventListener("unload", () => clearInterval(pollHandle));
 
   const cfg = await loadConfig();
   roomIdInput.value = cfg.roomId;
+  if (await hasPrimePermission()) {
+    await ensurePrimeContentScriptRegistered().catch(() => {});
+  }
   await refreshStatus();
 })();

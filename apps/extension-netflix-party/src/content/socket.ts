@@ -14,6 +14,7 @@ import {
   roomUsesActivePlatform,
 } from "./playerSync";
 import { receiveSyncCarriesPosition } from "./syncUtils";
+import { getActivePlatformAdapter } from "./platforms";
 
 export function shouldEmitLocalSync(state: ContentState) {
   return Boolean(state.socket && state.socket.connected && state.currentRoomId);
@@ -48,7 +49,10 @@ export function emitSync(
     roomId,
     action,
     timestamp,
-    ...(action === "change_url" && { videoUrl: location.href }),
+    ...(action === "change_url" && {
+      videoUrl: location.href,
+      contentId: getActivePlatformAdapter().getCurrentContentId(),
+    }),
   });
 }
 
@@ -72,7 +76,29 @@ export function connect(
   state.currentRoomId = roomId;
   state.chatMessages = [];
   state.lastRenderedChatSignature = "";
+  // A manual connect starts a new logical room session. Transport reconnects
+  // below deliberately keep these fields, but carrying them across a popup-
+  // initiated room switch can make an empty room inherit the previous room's
+  // platform URL and permanently block its first change_url seed.
   state.lastAppliedRev = 0;
+  state.lastKnownRoomVideoUrl = null;
+  state.pendingRoomState = null;
+  state.pendingDriftSeconds = null;
+  state.pendingRoomStateReceivedAt = 0;
+  state.hasAppliedRoomStateSinceConnect = false;
+  state.lastContentIdMismatch = null;
+  state.lastAutoNavigatedTo = null;
+  state.lastAutoNavigatedAt = 0;
+  state.lastRemoteApplyAt = 0;
+  state.lastRemoteAction = null;
+  state.lastRemoteTimestamp = null;
+  state.lastLocalEmitAt = 0;
+  state.lastLocalEmitAction = null;
+  state.lastLocalEmitTimestamp = null;
+  state.pendingPlayOnGesture = false;
+  state.lastCatchUpNote = null;
+  state.roomMembers = [];
+  state.hostId = null;
   state.lastConnectionError = null;
 
   ensureOverlay();
@@ -174,6 +200,7 @@ export function connect(
       action: string;
       timestamp?: number;
       videoUrl?: string;
+      contentId?: string | null;
       updatedAt?: number;
       rev?: number;
       volume?: number;
@@ -216,6 +243,7 @@ export function connect(
         roomId: payload.roomId,
         ...(carriesPosition ? { timestamp: payload.timestamp } : {}),
         videoUrl: payload.videoUrl,
+        contentId: payload.contentId,
         updatedAt: payload.updatedAt,
         rev: payload.rev,
         volume: payload.volume,

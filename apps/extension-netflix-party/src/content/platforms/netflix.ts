@@ -24,6 +24,15 @@ function isPlaybackUrl(url: string): boolean {
   return getContentIdFromUrl(url) !== null;
 }
 
+function matchesOrigin(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "https:" && parsed.hostname === NETFLIX_HOST;
+  } catch {
+    return false;
+  }
+}
+
 function getCurrentContentId(): string | null {
   return getContentIdFromUrl(location.href);
 }
@@ -57,11 +66,14 @@ function subscribeToPotentialContentChanges(
 export const netflixAdapter: PlatformAdapter = {
   id: "netflix",
   displayName: "Netflix",
+  matchesOrigin,
   isPlaybackUrl,
   getPlayer: getBestVideo,
   getContentIdFromUrl,
   getCurrentContentId,
   formatContentId: (contentId) => `/watch/${contentId}`,
+  getNavigationUrl: (targetUrl) =>
+    isPlaybackUrl(targetUrl) ? targetUrl : null,
   requiresVerifiedContentIdentity: false,
   getMetadata: extractNetflixMetadata,
   seek: safeNetflixSeekViaBackground,

@@ -30,6 +30,7 @@ export type PlatformAdapter = {
   id: PlatformId;
   displayName: string;
 
+  matchesOrigin: (url: string) => boolean;
   isPlaybackUrl: (url: string) => boolean;
   getPlayer: () => HTMLVideoElement | null;
 
@@ -38,6 +39,11 @@ export type PlatformAdapter = {
   /** Current identity from the live player/page; may intentionally fail closed. */
   getCurrentContentId: () => string | null;
   formatContentId: (contentId: string) => string;
+  /** Returns null when the platform cannot safely navigate to this identity. */
+  getNavigationUrl: (
+    targetUrl: string,
+    expectedContentId: string,
+  ) => string | null;
   /**
    * Prime-only requirement discovered by the spike: its URL can stay stale
    * after an episode change, so sync must stop when live identity is unknown.

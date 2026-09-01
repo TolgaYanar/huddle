@@ -81,6 +81,57 @@ describe("sync_video URL-set guard (S1)", () => {
     );
   });
 
+  it("stores a bounded content identity only with change_url", async () => {
+    const { state, socket } = createHarness();
+    const sync = socket.handlers.get("sync_video");
+
+    await sync({
+      roomId: "room1",
+      action: "change_url",
+      timestamp: 0,
+      videoUrl: "https://www.primevideo.com/detail/EPISODE",
+      contentId: "prime:s1:e2:abc123",
+    });
+    assert.equal(state.roomState.get("room1").contentId, "prime:s1:e2:abc123");
+
+    await sync({
+      roomId: "room1",
+      action: "play",
+      timestamp: 1,
+      contentId: "attacker:replacement",
+    });
+    assert.equal(state.roomState.get("room1").contentId, "prime:s1:e2:abc123");
+  });
+
+  it("clears stale content identity when a new URL omits it", async () => {
+    const { state, socket } = createHarness();
+    const sync = socket.handlers.get("sync_video");
+    await sync({
+      roomId: "room1",
+      action: "change_url",
+      videoUrl: "https://www.primevideo.com/detail/EPISODE",
+      contentId: "prime:s1:e2:abc123",
+    });
+    await sync({
+      roomId: "room1",
+      action: "change_url",
+      videoUrl: "https://youtube.com/watch?v=next",
+    });
+    assert.equal(state.roomState.get("room1").contentId, null);
+  });
+
+  it("drops invalid content identities without mutating room state", async () => {
+    const { state, socket, vLogs } = createHarness();
+    await socket.handlers.get("sync_video")({
+      roomId: "room1",
+      action: "change_url",
+      videoUrl: "https://www.primevideo.com/detail/EPISODE",
+      contentId: "https://private.example/title",
+    });
+    assert.equal(state.roomState.has("room1"), false);
+    assert.ok(vLogs.some((line) => line.includes("invalid contentId")));
+  });
+
   it("play/pause/seek cannot overwrite the room videoUrl (hijack defense)", async () => {
     const { state, socket } = createHarness();
     const sync = socket.handlers.get("sync_video");

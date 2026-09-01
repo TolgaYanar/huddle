@@ -1,17 +1,17 @@
-# Huddle for Netflix — Chrome extension
+# Huddle Watch Party — Chrome extension
 
-Syncs Netflix playback across friends watching together in the same Huddle
-room. Pairs with the website at [wehuddle.tv](https://wehuddle.tv) and the
+Syncs Netflix and measured Prime Video series playback across friends in the
+same Huddle room. Prime access is optional and requested only when the user
+enables it. Pairs with the website at [wehuddle.tv](https://wehuddle.tv) and the
 Android app — all three clients speak the same `sync_video` socket protocol
 against `api.wehuddle.tv`.
 
 ## What it does
 
-When you load a `netflix.com/watch/<id>` URL with the extension active and
-connected to a room, it:
+When you load a supported title with the extension active and connected to a
+room, it:
 
-1. Finds the page's `<video>` element (handles Netflix's Shadow DOM + iframe
-   reparenting).
+1. Selects the platform adapter and finds the page's `<video>` element.
 2. Listens for `play` / `pause` / `seeked` events and forwards them to the
    room's socket server.
 3. Receives the same events from other room members and applies them locally
@@ -19,17 +19,16 @@ connected to a room, it:
 4. Shows a small overlay on the page with the current sync state and an
    embedded chat input.
 
-Each user signs into their own Netflix account — Huddle never proxies the
-content stream itself. Playback uses Netflix's own Widevine session on each
-client.
+Each user signs into their own streaming account — Huddle never proxies the
+content stream itself. Playback uses the service's own Widevine session on
+each client.
 
 ## Why an extension at all
 
-Netflix can't be embedded in a regular webpage. It sets
-`X-Frame-Options: DENY` on every response and Widevine DRM is bound to the
-top-level browsing context. The only realistic paths are (a) a browser
-extension running inside the netflix.com tab, or (b) a native app with an
-embedded WebView. This is the (a) path. The Android app is the (b) path.
+DRM services cannot reliably be embedded in a regular webpage. Their playback
+sessions are bound to the top-level browsing context, so Huddle uses a browser
+extension running inside the streaming-service tab. The Android app covers the
+native client path.
 
 ## Architecture
 
@@ -44,7 +43,8 @@ src/
                       sync emit, sync receive.
     playerSync.ts     The <video> element binding. Applies remote events
                       and broadcasts local ones with feedback-loop guard.
-    video.ts          Finds the <video> across Shadow DOM and iframes.
+    video.ts          Finds the active <video> element.
+    platforms/        Provisional Netflix + Prime player adapters.
     overlay.ts        In-page floating sync status + chat input.
     chat.ts           Chat overlay message rendering.
     netflixBackground.ts  Helpers that send commands to the background
@@ -60,8 +60,8 @@ src/
   types.d.ts          chrome.* ambient types.
 
 public/
-  manifest.json       MV3 manifest. Permissions: storage, activeTab, scripting.
-                      Host: https://www.netflix.com/*.
+  manifest.json       MV3 manifest. Netflix is a required host; Prime is an
+                      optional host enabled from the popup.
   popup.html          Popup markup + styles.
   icon{16,48,128}.png Extension icons.
 ```
@@ -91,12 +91,14 @@ Reload the extension in `chrome://extensions/` after each rebuild.
 
 ## Testing
 
-The extension only activates on `https://www.netflix.com/watch/*`. To test:
+The extension activates on Netflix watch pages and, after explicit permission,
+supported Prime Video series episode pages. To test:
 
 1. Build + load unpacked
 2. Create a room at [wehuddle.tv](https://wehuddle.tv) and copy the room ID
    from the URL (the bit after `/r/`)
-3. Open `https://www.netflix.com/watch/<title-id>` (sign in if needed)
+3. Open a Netflix title or Prime Video series episode (sign in if needed); on
+   Prime, click **Enable Prime Video** in the popup once.
 4. Click the Huddle extension icon → paste the room ID → **Connect**
 5. The overlay should show "Connected: \<room id\>"; play/pause/seek should
    now broadcast to everyone else in the room
@@ -106,9 +108,10 @@ window, both should stay in sync.
 
 ## Publishing a new version
 
-1. Bump `version` in `public/manifest.json` (e.g. `1.1.0`)
+1. Bump `version` in both `public/manifest.json` and `package.json`
 2. `npm run build`
-3. Zip `dist/`: `cd dist && zip -r ../huddle-netflix-party-<version>.zip .`
+3. Zip `dist/` without source maps or macOS conflict copies:
+   `cd dist && zip -r ../huddle-watch-party-<version>.zip . -x '*.map' '* 2.*'`
 4. Upload to the Chrome Web Store developer dashboard
 5. Submit for review (~1-3 days)
 
@@ -116,9 +119,16 @@ The `version` in manifest.json must be monotonically increasing.
 
 ## Known limitations
 
-- **Netflix UI redesigns** can break the `<video>` element selector or the
-  Shadow DOM walker in `content/video.ts`. When that happens, playback still
-  works but sync stops. Watch for it after any major Netflix client update.
+- **Platform UI redesigns** can break player discovery or content identity.
+  Prime intentionally fails closed if its episode identity DOM hook disappears.
+- **Prime in-player episode changes** cannot be followed by URL because Prime
+  leaves the URL stale; other viewers are prompted to select the shown episode.
+- **Prime movies and non-English/Turkish episode labels** are not yet claimed
+  as supported because the discovery session measured only English and Turkish
+  season/episode identity; unverified identities fail closed instead of risking
+  synchronization to the wrong title.
+- **Prime ad-tier timeline parity** is not yet measured, so mixed ad/no-ad
+  parties are not claimed as supported.
 - **Multi-user volume** isn't synced — each viewer controls their own audio.
 - **Subtitles + audio track** aren't synced. Each viewer picks their own.
 - **No iOS support** — Safari extensions need an Xcode wrapper app + Apple
@@ -126,9 +136,8 @@ The `version` in manifest.json must be monotonically increasing.
 
 ## Maintenance treadmill
 
-This is a Netflix-style player wrapper, which means Netflix can break us at
-any time. Every major Netflix UI redesign has historically required fixes
-within 1-2 weeks. Plan for at least quarterly maintenance touchups; monitor
+This is a streaming-site player wrapper, which means platform UI changes can
+break it at any time. Plan for at least quarterly maintenance touchups; monitor
 the [Chrome Web Store listing's reviews](https://chromewebstore.google.com/detail/huddle-for-netflix/mmghgnlloogcifdblldihfmjoefabohc)
 for user reports of broken playback.
 

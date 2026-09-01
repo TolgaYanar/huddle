@@ -1,15 +1,15 @@
 {
   "manifest_version": 3,
-  "name": "Huddle for Netflix",
-  "version": "1.2.0",
-  "description": "Watch Netflix together by syncing playback via Huddle rooms.",
+  "name": "Huddle Watch Party",
+  "version": "1.3.0",
+  "description": "Watch Netflix and supported Prime Video series together by syncing playback via Huddle rooms.",
   "icons": {
     "16": "icon16.png",
     "48": "icon48.png",
     "128": "icon128.png"
   },
   "action": {
-    "default_title": "Huddle for Netflix",
+    "default_title": "Huddle Watch Party",
     "default_popup": "popup.html",
     "default_icon": {
       "16": "icon16.png",
@@ -19,6 +19,7 @@
   },
   "permissions": ["storage", "activeTab", "scripting"],
   "host_permissions": ["https://www.netflix.com/*"],
+  "optional_host_permissions": ["https://www.primevideo.com/*"],
   "background": {
     "service_worker": "background.js",
     "type": "module"

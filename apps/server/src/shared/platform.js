@@ -15,6 +15,8 @@
 // more specific matches.
 const MATCHERS = [
   ["netflix", /(^|\.)netflix\.com$/],
+  ["prime", /(^|\.)primevideo\.com$/],
+  ["disney_plus", /(^|\.)disneyplus\.com$/],
   ["youtube", /(^|\.)(youtube\.com|youtu\.be|youtube-nocookie\.com)$/],
   ["twitch", /(^|\.)twitch\.tv$/],
   ["kick", /(^|\.)kick\.com$/],

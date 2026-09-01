@@ -85,6 +85,7 @@ export function initContentScript() {
         })();
 
         sendResponse({
+          platform: adapter.id,
           connected: Boolean(state.socket && state.socket.connected),
           roomId: state.currentRoomId,
           // Current page URL (lets popup show "/watch/<id>" badge).
@@ -117,8 +118,14 @@ export function initContentScript() {
     },
   );
 
-  (async () => {
-    if (!adapter.isPlaybackUrl(location.href)) return;
+  let playbackStarted = false;
+  let stopWaitingForPlayback: (() => void) | null = null;
+
+  const startPlaybackIntegration = async () => {
+    if (playbackStarted || !adapter.isPlaybackUrl(location.href)) return;
+    playbackStarted = true;
+    stopWaitingForPlayback?.();
+    stopWaitingForPlayback = null;
 
     const markGesture = () => {
       state.lastUserGestureAt = Date.now();
@@ -161,5 +168,16 @@ export function initContentScript() {
         // ignore
       }
     }
-  })();
+  };
+
+  if (adapter.isPlaybackUrl(location.href)) {
+    void startPlaybackIntegration();
+  } else {
+    // Prime's browse -> detail transition can be an SPA navigation in the
+    // same document. Stay dormant until the adapter reports a possible
+    // content change, then initialise exactly once on the playback page.
+    stopWaitingForPlayback = adapter.subscribeToPotentialContentChanges(() => {
+      void startPlaybackIntegration();
+    });
+  }
 }
