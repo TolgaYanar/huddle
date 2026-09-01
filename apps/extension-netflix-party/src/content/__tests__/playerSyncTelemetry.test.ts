@@ -2,23 +2,36 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createInitialState } from "../state";
 
-const videoMocks = vi.hoisted(() => ({
+const platformMocks = vi.hoisted(() => ({
   getBestVideo: vi.fn(),
-  getNetflixWatchIdFromUrl: vi.fn(() => "200"),
-  getLocalWatchId: vi.fn(() => "100"),
+  getContentIdFromUrl: vi.fn<(url: string) => string | null>(() => "200"),
+  getCurrentContentId: vi.fn<() => string | null>(() => "100"),
+  isPlaybackUrl: vi.fn(() => true),
+  seek: vi.fn(),
+  play: vi.fn(),
+  requiresVerifiedContentIdentity: false,
 }));
 
 vi.mock("../video", () => ({
-  getBestVideo: videoMocks.getBestVideo,
   computeDesiredTimestampNow: vi.fn(() => null),
-  getNetflixWatchIdFromUrl: videoMocks.getNetflixWatchIdFromUrl,
-  getLocalWatchId: videoMocks.getLocalWatchId,
-  isNetflixWatchUrl: vi.fn(() => true),
 }));
 
-vi.mock("../netflixBackground", () => ({
-  safeNetflixSeekViaBackground: vi.fn(),
-  safeNetflixSetPlayingViaBackground: vi.fn(),
+vi.mock("../platforms", () => ({
+  getActivePlatformAdapter: () => ({
+    id: "netflix",
+    displayName: "Netflix",
+    getPlayer: platformMocks.getBestVideo,
+    getContentIdFromUrl: platformMocks.getContentIdFromUrl,
+    getCurrentContentId: platformMocks.getCurrentContentId,
+    isPlaybackUrl: platformMocks.isPlaybackUrl,
+    formatContentId: (id: string) => `/watch/${id}`,
+    requiresVerifiedContentIdentity:
+      platformMocks.requiresVerifiedContentIdentity,
+    seek: platformMocks.seek,
+    play: platformMocks.play,
+    getMetadata: vi.fn(),
+    subscribeToPotentialContentChanges: vi.fn(),
+  }),
 }));
 
 import { applyRoomStateToVideo, attachVideoListeners } from "../playerSync";
@@ -36,6 +49,7 @@ function fakeVideo() {
 
 describe("player sync telemetry", () => {
   beforeEach(() => {
+    platformMocks.requiresVerifiedContentIdentity = false;
     vi.stubGlobal("window", {
       setTimeout: vi.fn(),
       location: { assign: vi.fn() },
@@ -56,7 +70,7 @@ describe("player sync telemetry", () => {
     const record = vi.fn();
     state.telemetry = { record } as never;
 
-    videoMocks.getBestVideo.mockReturnValue(null);
+    platformMocks.getBestVideo.mockReturnValue(null);
     expect(
       attachVideoListeners(state, {
         emitSync: vi.fn(),
@@ -68,7 +82,7 @@ describe("player sync telemetry", () => {
       shouldEmitLocalSync: () => false,
     });
 
-    videoMocks.getBestVideo.mockReturnValue(fakeVideo());
+    platformMocks.getBestVideo.mockReturnValue(fakeVideo());
     attachVideoListeners(state, {
       emitSync: vi.fn(),
       shouldEmitLocalSync: () => false,
@@ -85,8 +99,9 @@ describe("player sync telemetry", () => {
     const state = createInitialState();
     const record = vi.fn();
     state.telemetry = { record } as never;
-    videoMocks.getBestVideo.mockReturnValue(fakeVideo());
-    videoMocks.getNetflixWatchIdFromUrl.mockReturnValue("100");
+    platformMocks.getBestVideo.mockReturnValue(fakeVideo());
+    platformMocks.getContentIdFromUrl.mockReturnValue("100");
+    platformMocks.getCurrentContentId.mockReturnValue("100");
 
     const roomState = {
       roomId: "room",
@@ -122,8 +137,9 @@ describe("player sync telemetry", () => {
     state.hasAppliedRoomStateSinceConnect = true;
     state.lastAutoNavigatedTo = "https://www.netflix.com/watch/200";
     state.lastAutoNavigatedAt = Date.now();
-    videoMocks.getBestVideo.mockReturnValue(fakeVideo());
-    videoMocks.getNetflixWatchIdFromUrl.mockReturnValue("200");
+    platformMocks.getBestVideo.mockReturnValue(fakeVideo());
+    platformMocks.getContentIdFromUrl.mockReturnValue("200");
+    platformMocks.getCurrentContentId.mockReturnValue("100");
 
     const roomState = {
       roomId: "room",
@@ -135,5 +151,30 @@ describe("player sync telemetry", () => {
     expect(
       record.mock.calls.filter(([counter]) => counter === "contentMismatch"),
     ).toHaveLength(1);
+  });
+
+  it("fails closed when a platform requires a live identity that is unavailable", () => {
+    const state = createInitialState();
+    state.hasUserGesture = true;
+    platformMocks.requiresVerifiedContentIdentity = true;
+    platformMocks.getBestVideo.mockReturnValue(fakeVideo());
+    platformMocks.getContentIdFromUrl.mockReturnValue(null);
+    platformMocks.getCurrentContentId.mockReturnValue(null);
+
+    const updateOverlay = vi.fn();
+    applyRoomStateToVideo(
+      state,
+      {
+        roomId: "room",
+        videoUrl: "https://www.primevideo.com/detail/stale",
+        isPlaying: true,
+      },
+      { updateOverlay },
+      { source: "room_state" },
+    );
+
+    expect(platformMocks.play).not.toHaveBeenCalled();
+    expect(state.lastCatchUpNote).toContain("identity is unavailable");
+    expect(updateOverlay).toHaveBeenCalledOnce();
   });
 });

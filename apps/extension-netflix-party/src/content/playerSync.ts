@@ -1,18 +1,9 @@
 import type { ContentState } from "./state";
 import type { RoomState } from "./types";
 import { autoPlayPauseEnabled, followEnabled, seekEnabled } from "./constants";
-import {
-  safeNetflixSeekViaBackground,
-  safeNetflixSetPlayingViaBackground,
-} from "./netflixBackground";
 import { debugLog } from "./log";
-import {
-  getBestVideo,
-  computeDesiredTimestampNow,
-  getNetflixWatchIdFromUrl,
-  getLocalWatchId,
-  isNetflixWatchUrl,
-} from "./video";
+import { getActivePlatformAdapter } from "./platforms";
+import { computeDesiredTimestampNow } from "./video";
 import {
   isLikelyEchoEvent,
   resolvePlaybackIntent,
@@ -20,16 +11,17 @@ import {
   withRemoteGuard,
 } from "./syncUtils";
 
-// True only when the room is known to be watching a Netflix /watch URL.
+// True only when the room is known to be watching the active platform.
 // Gates local gesture emits (play/pause/seek/set_speed) so a Netflix tab
-// can't inject playback into a non-Netflix room. Returns false when we
+// can't inject playback into a room owned by another adapter. Returns false when we
 // don't yet know the room's URL — gestures stay local until the first
 // room_state confirms the room is on Netflix. (change_url is NOT gated: it
 // is exactly how a room transitions TO Netflix.)
-export function roomIsOnNetflix(state: ContentState): boolean {
+export function roomUsesActivePlatform(state: ContentState): boolean {
+  const adapter = getActivePlatformAdapter();
   return state.lastKnownRoomVideoUrl === null
     ? false
-    : isNetflixWatchUrl(state.lastKnownRoomVideoUrl);
+    : adapter.isPlaybackUrl(state.lastKnownRoomVideoUrl);
 }
 
 export function stopPlayPausePoll(state: ContentState) {
@@ -53,7 +45,8 @@ export function startPlayPausePoll(
   if (state.playPausePollTimer !== null) return;
 
   state.playPausePollTimer = window.setInterval(() => {
-    const v = getBestVideo();
+    const adapter = getActivePlatformAdapter();
+    const v = adapter.getPlayer();
     if (!v) return;
 
     const paused = Boolean(v.paused);
@@ -74,8 +67,8 @@ export function startPlayPausePoll(
 
     if (state.isApplyingRemote) return;
     if (!shouldEmitLocalSync()) return;
-    // Don't inject local play/pause into a room that isn't on Netflix.
-    if (!roomIsOnNetflix(state)) return;
+    // Don't inject local play/pause into a room owned by another adapter.
+    if (!roomUsesActivePlatform(state)) return;
     if (
       typeof timestamp === "number" &&
       isLikelyEchoEvent(state, action, timestamp)
@@ -103,7 +96,7 @@ export function recordPendingRoomState(
     state.lastKnownRoomVideoUrl = roomState.videoUrl;
   }
 
-  const v = getBestVideo();
+  const v = getActivePlatformAdapter().getPlayer();
   const t = computeDesiredTimestampNow(
     roomState,
     state.pendingRoomStateReceivedAt,
@@ -127,7 +120,8 @@ export function applyRoomStateToVideo(
 ) {
   if (!seekEnabled && !autoPlayPauseEnabled) return;
 
-  const v = getBestVideo();
+  const adapter = getActivePlatformAdapter();
+  const v = adapter.getPlayer();
   if (!v) {
     return;
   }
@@ -141,8 +135,8 @@ export function applyRoomStateToVideo(
     return;
   }
 
-  // If the room is watching something that isn't Netflix (e.g. a YouTube
-  // room), do NOT touch the local Netflix video. expectedWatchId would be
+  // If the room is watching something owned by another adapter (e.g. a
+  // YouTube room), do NOT touch the local platform video. The expected id would be
   // null below, the mismatch branch would be skipped, and the room's
   // timestamps/play/pause would be applied to our unrelated Netflix video —
   // and local gestures would echo back, compounding the hijack. Bail with a
@@ -151,30 +145,44 @@ export function applyRoomStateToVideo(
   const effectiveRoomUrl =
     (typeof roomState.videoUrl === "string" ? roomState.videoUrl : null) ??
     state.lastKnownRoomVideoUrl;
-  if (effectiveRoomUrl !== null && !isNetflixWatchUrl(effectiveRoomUrl)) {
+  if (effectiveRoomUrl !== null && !adapter.isPlaybackUrl(effectiveRoomUrl)) {
     state.lastCatchUpNote = "Room is watching something else";
     updateOverlay();
     return;
   }
 
-  const expectedWatchId =
-    typeof roomState.videoUrl === "string"
-      ? getNetflixWatchIdFromUrl(roomState.videoUrl)
-      : null;
-  const actualWatchId = getLocalWatchId();
-  if (expectedWatchId && actualWatchId && expectedWatchId !== actualWatchId) {
+  const expectedContentId =
+    typeof roomState.contentId === "string"
+      ? roomState.contentId
+      : typeof roomState.videoUrl === "string"
+        ? adapter.getContentIdFromUrl(roomState.videoUrl)
+        : null;
+  const actualContentId = adapter.getCurrentContentId();
+  if (
+    adapter.requiresVerifiedContentIdentity &&
+    (!expectedContentId || !actualContentId)
+  ) {
+    state.lastCatchUpNote = `${adapter.displayName} content identity is unavailable; sync paused`;
+    updateOverlay();
+    return;
+  }
+  if (
+    expectedContentId &&
+    actualContentId &&
+    expectedContentId !== actualContentId
+  ) {
     // Count the mismatch regardless of how it is resolved. Previously only
     // the passive fallback was measured, hiding the auto-follow and
     // room-leading cases that matter most for platform sync quality.
     if (
-      state.lastWatchIdMismatch?.expected !== expectedWatchId ||
-      state.lastWatchIdMismatch.actual !== actualWatchId
+      state.lastContentIdMismatch?.expected !== expectedContentId ||
+      state.lastContentIdMismatch.actual !== actualContentId
     ) {
       state.telemetry?.record("contentMismatch");
     }
-    state.lastWatchIdMismatch = {
-      expected: expectedWatchId,
-      actual: actualWatchId,
+    state.lastContentIdMismatch = {
+      expected: expectedContentId,
+      actual: actualContentId,
     };
     // Two very different cases produce this mismatch:
     //
@@ -190,7 +198,7 @@ export function applyRoomStateToVideo(
     //
     // We can tell them apart with hasAppliedRoomStateSinceConnect.
     const targetUrl = roomState.videoUrl ?? "";
-    const targetIsNetflixWatch = isNetflixWatchUrl(targetUrl);
+    const targetUsesPlatform = adapter.isPlaybackUrl(targetUrl);
     const recentlyNavigatedToSame =
       state.lastAutoNavigatedTo === targetUrl &&
       Date.now() - state.lastAutoNavigatedAt < 5000;
@@ -201,14 +209,14 @@ export function applyRoomStateToVideo(
       // something new — the "navigate to different content and the
       // extension keeps yanking me back" bug.
       const currentUrl = location.href;
-      if (/^https:\/\/www\.netflix\.com\/watch\//i.test(currentUrl)) {
+      if (adapter.isPlaybackUrl(currentUrl)) {
         state.lastLocalEmitAt = Date.now();
         state.lastLocalEmitAction = "change_url";
         state.lastLocalEmitTimestamp = 0;
         // Mark the flag BEFORE emitting so the echo doesn't re-trigger
         // this branch.
         state.hasAppliedRoomStateSinceConnect = true;
-        state.lastCatchUpNote = `Updating room to /watch/${actualWatchId}…`;
+        state.lastCatchUpNote = `Updating room to ${adapter.formatContentId(actualContentId)}…`;
         updateOverlay();
         if (state.socket?.connected && state.currentRoomId) {
           state.socket.emit("sync_video", {
@@ -222,11 +230,11 @@ export function applyRoomStateToVideo(
       }
       // We're on a non-watch URL (shouldn't normally happen — manifest
       // gates us — but defensive). Fall through to the passive hint.
-    } else if (targetIsNetflixWatch && !recentlyNavigatedToSame) {
+    } else if (targetUsesPlatform && !recentlyNavigatedToSame) {
       // Case B: the room moved while we were watching — follow it.
       state.lastAutoNavigatedTo = targetUrl;
       state.lastAutoNavigatedAt = Date.now();
-      state.lastCatchUpNote = `Following room to /watch/${expectedWatchId}…`;
+      state.lastCatchUpNote = `Following room to ${adapter.formatContentId(expectedContentId)}…`;
       updateOverlay();
       window.location.assign(targetUrl);
       return;
@@ -242,8 +250,8 @@ export function applyRoomStateToVideo(
   // least one usable room_state on this connection.
   state.hasAppliedRoomStateSinceConnect = true;
 
-  if (state.lastWatchIdMismatch) {
-    state.lastWatchIdMismatch = null;
+  if (state.lastContentIdMismatch) {
+    state.lastContentIdMismatch = null;
     updateOverlay();
   }
 
@@ -311,7 +319,7 @@ export function applyRoomStateToVideo(
           state.lastRemoteTimestamp = desiredTime;
           state.lastRemoteApplyAt = Date.now();
 
-          void safeNetflixSeekViaBackground(desiredTime).then((res) => {
+          void adapter.seek(desiredTime).then((res) => {
             state.telemetry?.record(
               res.ok ? "commandsApplied" : "commandsFailed",
             );
@@ -357,7 +365,7 @@ export function applyRoomStateToVideo(
           state.lastRemoteApplyAt = Date.now();
           state.telemetry?.record("commandsSent");
 
-          void safeNetflixSetPlayingViaBackground(true).then((res) => {
+          void adapter.play().then((res) => {
             state.telemetry?.record(
               res.ok ? "commandsApplied" : "commandsFailed",
             );
@@ -395,7 +403,8 @@ export function attachVideoListeners(
     shouldEmitLocalSync: () => boolean;
   },
 ) {
-  const v = getBestVideo();
+  const adapter = getActivePlatformAdapter();
+  const v = adapter.getPlayer();
   if (!v) {
     if (state.telemetryPlayerPresent !== false) {
       state.telemetry?.record("playerMissing");
@@ -414,8 +423,8 @@ export function attachVideoListeners(
   const canEmitNow = (action: string, timestamp: number) => {
     if (state.isApplyingRemote) return false;
     if (!shouldEmitLocalSync()) return false;
-    // Don't inject local play/pause/seek into a room that isn't on Netflix.
-    if (!roomIsOnNetflix(state)) return false;
+    // Don't inject local play/pause/seek into another platform's room.
+    if (!roomUsesActivePlatform(state)) return false;
     // Suppress echoes of a remote-applied action. This must run BEFORE we
     // treat the event as user-initiated: a remote seek that lands shortly
     // after a user gesture would otherwise be re-broadcast as a user seek
@@ -442,8 +451,8 @@ export function attachVideoListeners(
   const onRate = () => {
     if (state.isApplyingRemote) return;
     if (!shouldEmitLocalSync()) return;
-    // Don't inject local speed changes into a room that isn't on Netflix.
-    if (!roomIsOnNetflix(state)) return;
+    // Don't inject local speed changes into another platform's room.
+    if (!roomUsesActivePlatform(state)) return;
     const s = state.socket;
     const roomId = state.currentRoomId;
     if (!s || !roomId) return;
@@ -478,6 +487,7 @@ export function ensureVideoListeners(
     shouldEmitLocalSync: () => boolean;
   },
 ) {
+  const adapter = getActivePlatformAdapter();
   attachVideoListeners(state, { emitSync, shouldEmitLocalSync });
 
   // Keep observing forever — previously this disconnected once the initial
@@ -491,25 +501,6 @@ export function ensureVideoListeners(
   });
   obs.observe(document.documentElement, { childList: true, subtree: true });
 
-  // SPA-nav fallback: even when the DOM doesn't change in a way the
-  // MutationObserver above catches (e.g. Netflix uses replaceState), the
-  // URL changes. Patch history to fire a custom event we listen for so we
-  // can re-check after every client-side nav.
-  const origPush = history.pushState.bind(history);
-  const origReplace = history.replaceState.bind(history);
-  history.pushState = (...args: Parameters<typeof history.pushState>) => {
-    const r = origPush(...args);
-    window.dispatchEvent(new Event("huddle:locationchange"));
-    return r;
-  };
-  history.replaceState = (...args: Parameters<typeof history.replaceState>) => {
-    const r = origReplace(...args);
-    window.dispatchEvent(new Event("huddle:locationchange"));
-    return r;
-  };
-  window.addEventListener("popstate", () =>
-    window.dispatchEvent(new Event("huddle:locationchange")),
-  );
   // When our own location changes (Next-episode autoplay or explicit
   // navigation), broadcast it so the rest of the room follows. Without this
   // the host could move to /watch/<next> and every other member would stay
@@ -520,7 +511,7 @@ export function ensureVideoListeners(
     if (!shouldEmitLocalSync()) return;
     const url = location.href;
     if (url === lastEmittedUrl) return;
-    if (!/^https:\/\/www\.netflix\.com\/watch\//i.test(url)) return;
+    if (!adapter.isPlaybackUrl(url)) return;
     lastEmittedUrl = url;
     // Stamp the local emit so applyRoomStateToVideo treats the echo as our
     // own (mirrors the play/pause/seek path).
@@ -532,7 +523,7 @@ export function ensureVideoListeners(
     emitSync("change_url", 0);
   };
 
-  window.addEventListener("huddle:locationchange", () => {
+  adapter.subscribeToPotentialContentChanges(() => {
     maybeBroadcastUrlChange();
     attachVideoListeners(state, { emitSync, shouldEmitLocalSync });
   });

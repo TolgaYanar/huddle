@@ -4,18 +4,21 @@ import { createInitialState } from "./state";
 import { ensureOverlay, updateOverlay } from "./overlay";
 import { loadConfig } from "./config";
 import { ensureVideoListeners } from "./playerSync";
-import { extractNetflixMetadata } from "./metadata";
-import { safeNetflixSetPlayingViaBackground } from "./netflixBackground";
+import { getActivePlatformAdapter } from "./platforms";
 import { connect, disconnect, emitSync, shouldEmitLocalSync } from "./socket";
 import { createSocketSender, createTelemetry } from "./telemetry";
 
 export function initContentScript() {
   const state = createInitialState();
+  const adapter = getActivePlatformAdapter();
 
   // Sync-quality telemetry. Anonymous and cumulative; see telemetry.ts. It is
   // attached to state so no call site needs a new parameter, and every read is
   // optional so playback works identically if it is ever absent.
-  state.telemetry = createTelemetry(createSocketSender(() => state.socket));
+  state.telemetry = createTelemetry(
+    createSocketSender(() => state.socket),
+    adapter.id,
+  );
   state.telemetry.start();
 
   const ensureOverlayBound = () =>
@@ -75,7 +78,7 @@ export function initContentScript() {
 
         const metadata = (() => {
           try {
-            return extractNetflixMetadata();
+            return adapter.getMetadata();
           } catch {
             return { title: null, posterUrl: null, episode: null };
           }
@@ -115,7 +118,7 @@ export function initContentScript() {
   );
 
   (async () => {
-    if (!location.pathname.startsWith("/watch/")) return;
+    if (!adapter.isPlaybackUrl(location.href)) return;
 
     const markGesture = () => {
       state.lastUserGestureAt = Date.now();
@@ -125,7 +128,7 @@ export function initContentScript() {
       if (state.pendingPlayOnGesture) {
         state.pendingPlayOnGesture = false;
         state.telemetry?.record("commandsSent");
-        void safeNetflixSetPlayingViaBackground(true).then((res) => {
+        void adapter.play().then((res) => {
           state.telemetry?.record(
             res.ok ? "commandsApplied" : "commandsFailed",
           );

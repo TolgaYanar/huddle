@@ -15,7 +15,7 @@ export type OverlayElements = {
   chatSend: HTMLButtonElement;
 };
 
-export type WatchIdMismatch = { expected: string; actual: string };
+export type ContentIdMismatch = { expected: string; actual: string };
 
 export type ContentState = {
   // Optional so tests and any future entry point can run without it; every
@@ -34,7 +34,7 @@ export type ContentState = {
   localSenderId: string | null;
   lastConnectionError: string | null;
 
-  lastWatchIdMismatch: WatchIdMismatch | null;
+  lastContentIdMismatch: ContentIdMismatch | null;
 
   hasUserGesture: boolean;
   lastUserGestureAt: number;
@@ -117,7 +117,7 @@ export function createInitialState(): ContentState {
     localSenderId: null,
     lastConnectionError: null,
 
-    lastWatchIdMismatch: null,
+    lastContentIdMismatch: null,
 
     hasUserGesture: false,
     lastUserGestureAt: 0,
