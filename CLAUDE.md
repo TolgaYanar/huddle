@@ -131,6 +131,28 @@ With an adapter the pg pool connects lazily, so `$connect()` resolves even
 against an unreachable database. The startup probe therefore uses a real
 round-trip (`$queryRaw\`SELECT 1\``); reverting it to `$connect()`would pin`dbConnected`to true and silently kill the memory-only degradation path that`/health`, `auth/session.js`and`sessionCleanup.js` depend on.
 
+The production database was **baselined**, not migrated: `_prisma_migrations`
+records `20260427000000_init` with `applied_steps_count = 0`, so its DDL never
+ran there. Production therefore can, and did, differ from what migration
+history claims — `RoomState` was missing while history said the table existed,
+and the first migration to touch it failed mid-deploy. A failed migration is
+not a single bad release: `migrate deploy` runs in the container start command,
+so P3009 blocks every subsequent boot until the record is resolved, which takes
+the API down entirely.
+
+Before merging any migration, diff it against production rather than trusting
+history:
+
+```bash
+cd apps/server
+railway run --service Postgres -- sh -c \
+  'DATABASE_URL="$DATABASE_PUBLIC_URL" npx prisma migrate diff \
+     --from-config-datasource --to-schema prisma/schema.prisma --script'
+```
+
+An empty result means the migration is safe to deploy. Anything else must be
+repaired first, in a separate step, before the migration lands.
+
 Prisma provider is **postgresql**. `apps/server/prisma/dev.db` is a leftover
 SQLite artifact left on disk but no longer tracked (`*.db` is git-ignored) — do
 not treat it as the dev database.
