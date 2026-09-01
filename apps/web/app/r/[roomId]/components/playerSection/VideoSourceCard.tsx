@@ -138,13 +138,16 @@ export function VideoSourceCard({
           </div>
         </div>
 
-        <form onSubmit={handleUrlChange} className="flex gap-2 w-full">
+        <form
+          onSubmit={handleUrlChange}
+          className="flex flex-wrap items-center gap-2 w-full"
+        >
           <input
             type="text"
             value={inputUrl}
             onChange={(e) => setInputUrl(e.target.value)}
             placeholder="e.g. youtube.com/watch?v=..., netflix.com/watch/..."
-            className="flex-1 bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500/40 transition"
+            className="w-full sm:w-auto sm:flex-1 min-w-0 bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500/40 transition"
           />
           <button
             type="button"
@@ -152,7 +155,7 @@ export function VideoSourceCard({
               setYoutubePickerOpen((v) => !v);
               setYoutubeError(null);
             }}
-            className="h-11 px-4 bg-black/20 hover:bg-black/30 border border-white/10 rounded-xl transition-colors text-sm font-medium text-slate-50"
+            className="h-11 flex-1 sm:flex-none px-3 sm:px-4 bg-black/20 hover:bg-black/30 border border-white/10 rounded-xl transition-colors text-sm font-medium text-slate-50 whitespace-nowrap"
             title="Search YouTube and load into the room"
           >
             Browse YouTube
@@ -166,14 +169,14 @@ export function VideoSourceCard({
                 "noopener,noreferrer",
               );
             }}
-            className="h-11 px-4 bg-black/20 hover:bg-black/30 border border-white/10 rounded-xl transition-colors text-sm font-medium text-slate-50"
+            className="h-11 flex-1 sm:flex-none px-3 sm:px-4 bg-black/20 hover:bg-black/30 border border-white/10 rounded-xl transition-colors text-sm font-medium text-slate-50 whitespace-nowrap"
             title="Open YouTube in a new tab to pick from your recommendations"
           >
             Open YouTube
           </button>
           <button
             type="submit"
-            className="h-11 px-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-colors text-sm font-medium text-slate-50"
+            className="h-11 flex-1 sm:flex-none px-3 sm:px-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-colors text-sm font-medium text-slate-50 whitespace-nowrap"
           >
             Load
           </button>
