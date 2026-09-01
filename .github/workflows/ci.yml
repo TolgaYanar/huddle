@@ -28,6 +28,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # macOS iCloud duplicates ("name 2.ext") are not gitignored, because a
+      # "* 2.*" pattern also hides legitimate names like "docs/OAuth 2.md".
+      # They are rejected here instead, where the failure is visible.
+      - name: Reject macOS FileProvider duplicates
+        run: npm run check-duplicates
+
       - name: Format check
         run: npm run format:check
 

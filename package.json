@@ -8,6 +8,7 @@
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,mjs,cjs,json,css,md,yml,yaml}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,mjs,cjs,json,css,md,yml,yaml}\"",
     "check-types": "turbo run check-types",
+    "check-duplicates": "bash scripts/check-duplicate-files.sh",
     "test": "turbo run test"
   },
   "devDependencies": {
