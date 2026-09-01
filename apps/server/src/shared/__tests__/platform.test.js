@@ -7,6 +7,8 @@ test("recognises every service the product supports", () => {
   const cases = {
     "https://www.netflix.com/watch/81234": "netflix",
     "https://netflix.com/watch/81234": "netflix",
+    "https://www.primevideo.com/region/eu/detail/ABC123": "prime",
+    "https://www.disneyplus.com/video/abc": "disney_plus",
     "https://www.youtube.com/watch?v=abc": "youtube",
     "https://youtu.be/abc": "youtube",
     "https://www.youtube-nocookie.com/embed/abc": "youtube",
@@ -66,6 +68,14 @@ test("is not fooled by a platform name appearing elsewhere in the URL", () => {
   assert.equal(detectPlatform("https://notnetflix.com/watch/1"), "other");
   assert.equal(
     detectPlatform("https://netflix.com.evil.test/watch/1"),
+    "other",
+  );
+  assert.equal(
+    detectPlatform("https://primevideo.com.evil.test/detail/ABC"),
+    "other",
+  );
+  assert.equal(
+    detectPlatform("https://disneyplus.com.evil.test/video/ABC"),
     "other",
   );
 });

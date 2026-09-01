@@ -140,6 +140,7 @@ describe("buildRoomStatePayload", () => {
     const now = Date.now();
     const state = {
       videoUrl: "https://youtube.com/watch?v=abc",
+      contentId: "prime:s1:e2:abc123",
       isPlaying: true,
       volume: 0.8,
       isMuted: false,
@@ -150,6 +151,7 @@ describe("buildRoomStatePayload", () => {
     };
     const result = buildRoomStatePayload("room42", state, now);
     assert.equal(result.videoUrl, state.videoUrl);
+    assert.equal(result.contentId, state.contentId);
     assert.equal(result.isPlaying, true);
     assert.equal(result.volume, 0.8);
     assert.equal(result.rev, 7);

@@ -1,11 +1,14 @@
 import { netflixAdapter } from "./netflix";
+import { primeAdapter } from "./prime";
 import type { PlatformAdapter } from "./types";
 
-// This resolver becomes permission-aware when Prime ships. For now the
-// content script is injected only on Netflix, so returning the sole measured
-// production adapter keeps every existing call deterministic.
-export function getActivePlatformAdapter(): PlatformAdapter {
-  return netflixAdapter;
+// Host permission decides where the content script may run; once injected,
+// exact-origin matching chooses the adapter and rejects lookalike domains.
+export function getActivePlatformAdapter(url = location.href): PlatformAdapter {
+  for (const adapter of [netflixAdapter, primeAdapter]) {
+    if (adapter.matchesOrigin(url)) return adapter;
+  }
+  throw new Error("No Huddle platform adapter matches this page");
 }
 
 export type {

@@ -8,4 +8,16 @@
 // up to match.
 import { initContentScript } from "./content/init";
 
-initContentScript();
+declare global {
+  interface Window {
+    __huddleContentScriptLoaded?: boolean;
+  }
+}
+
+// Dynamic registration plus an immediate executeScript can overlap on the
+// first enabled Prime tab. The isolated world is shared by this extension, so
+// this guard makes injection idempotent without leaking anything to the page.
+if (!window.__huddleContentScriptLoaded) {
+  window.__huddleContentScriptLoaded = true;
+  initContentScript();
+}

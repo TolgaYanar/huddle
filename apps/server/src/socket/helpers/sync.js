@@ -135,6 +135,7 @@ function applyPlaylistPlaybackToRoomState(io, state, roomId, videoUrl) {
   const changeState = {
     ...prev,
     videoUrl,
+    contentId: null,
     timestamp: startTimestamp,
     updatedAt: now,
     playbackSpeed: prevSpeed,
@@ -149,6 +150,7 @@ function applyPlaylistPlaybackToRoomState(io, state, roomId, videoUrl) {
     action: "change_url",
     timestamp: startTimestamp,
     videoUrl,
+    contentId: null,
     updatedAt: now,
     rev: changeRev,
     volume: changeState.volume,
@@ -171,6 +173,7 @@ function applyPlaylistPlaybackToRoomState(io, state, roomId, videoUrl) {
     action: "play",
     timestamp: startTimestamp,
     videoUrl,
+    contentId: null,
     updatedAt: now,
     rev: playRev,
     volume: playState.volume,
@@ -200,6 +203,7 @@ async function persistRoomState(deps, state, roomId) {
       update: {
         name,
         videoUrl,
+        contentId: st?.contentId || null,
         platform,
         timestamp: typeof st?.timestamp === "number" ? st.timestamp : 0,
         isPlaying: st?.isPlaying === true,
@@ -210,6 +214,7 @@ async function persistRoomState(deps, state, roomId) {
         roomId,
         name,
         videoUrl,
+        contentId: st?.contentId || null,
         platform,
         timestamp: typeof st?.timestamp === "number" ? st.timestamp : 0,
         isPlaying: st?.isPlaying === true,
@@ -236,6 +241,7 @@ async function restoreRoomStateFromDB(deps, state, roomId) {
     if (saved.videoUrl && !state.roomState.has(roomId)) {
       state.roomState.set(roomId, {
         videoUrl: saved.videoUrl,
+        contentId: saved.contentId || null,
         timestamp: saved.timestamp ?? 0,
         // Always restore as paused — the video may be hours ahead in real time.
         isPlaying: false,

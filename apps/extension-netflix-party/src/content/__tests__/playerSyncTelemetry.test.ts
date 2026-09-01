@@ -25,6 +25,7 @@ vi.mock("../platforms", () => ({
     getCurrentContentId: platformMocks.getCurrentContentId,
     isPlaybackUrl: platformMocks.isPlaybackUrl,
     formatContentId: (id: string) => `/watch/${id}`,
+    getNavigationUrl: (url: string) => url,
     requiresVerifiedContentIdentity:
       platformMocks.requiresVerifiedContentIdentity,
     seek: platformMocks.seek,
@@ -176,5 +177,35 @@ describe("player sync telemetry", () => {
     expect(platformMocks.play).not.toHaveBeenCalled();
     expect(state.lastCatchUpNote).toContain("identity is unavailable");
     expect(updateOverlay).toHaveBeenCalledOnce();
+  });
+
+  it("seeds an empty room from a verified Prime title", () => {
+    const state = createInitialState();
+    const emit = vi.fn();
+    state.socket = { connected: true, emit } as never;
+    state.currentRoomId = "room";
+    platformMocks.requiresVerifiedContentIdentity = true;
+    platformMocks.getBestVideo.mockReturnValue(fakeVideo());
+    platformMocks.getCurrentContentId.mockReturnValue("prime:s1:e2:abc");
+    vi.stubGlobal("location", {
+      href: "https://www.primevideo.com/detail/STALE",
+      pathname: "/detail/STALE",
+    });
+
+    applyRoomStateToVideo(
+      state,
+      { roomId: "room", isPlaying: false },
+      { updateOverlay: vi.fn() },
+      { source: "room_state" },
+    );
+
+    expect(emit).toHaveBeenCalledWith("sync_video", {
+      roomId: "room",
+      action: "change_url",
+      timestamp: 0,
+      videoUrl: "https://www.primevideo.com/detail/STALE",
+      contentId: "prime:s1:e2:abc",
+    });
+    expect(state.hasAppliedRoomStateSinceConnect).toBe(true);
   });
 });

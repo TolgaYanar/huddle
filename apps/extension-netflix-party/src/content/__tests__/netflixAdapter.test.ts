@@ -49,6 +49,18 @@ describe("Netflix platform adapter", () => {
     }
   });
 
+  it("can safely navigate to a verified Netflix watch URL", () => {
+    expect(
+      netflixAdapter.getNavigationUrl(
+        "https://www.netflix.com/watch/200",
+        "200",
+      ),
+    ).toBe("https://www.netflix.com/watch/200");
+    expect(
+      netflixAdapter.getNavigationUrl("https://example.com/watch/200", "200"),
+    ).toBeNull();
+  });
+
   it("reads the current identity from the live location", () => {
     vi.stubGlobal("location", {
       href: "https://www.netflix.com/watch/100?foo=bar",

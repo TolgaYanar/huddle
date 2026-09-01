@@ -70,6 +70,10 @@ model RoomState {
   roomId            String   @id
   name              String?
   videoUrl          String?
+  // Opaque, non-title identity supplied only on change_url. Prime can keep a
+  // stale URL across episodes, so videoUrl alone cannot prove two viewers are
+  // watching the same content.
+  contentId         String?
   // Derived from videoUrl on the server, never taken from the client. Answers
   // "which services do rooms actually watch", which is the evidence needed to
   // choose the next platform to support. Null means nothing is playing.

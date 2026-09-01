@@ -12,6 +12,8 @@ const { isRoomMember } = require("../helpers/membership");
 // A change_url payload IS the URL; nothing legitimate approaches this length.
 // An overlong URL is invalid, so we drop the event rather than store garbage.
 const MAX_VIDEO_URL_LENGTH = 2048;
+const MAX_CONTENT_ID_LENGTH = 160;
+const CONTENT_ID_PATTERN = /^[A-Za-z0-9:_-]+$/;
 
 // Exhaustive set of sync actions any real client (web SyncAction type,
 // Android SyncAction enum, extension emit literals) or the server's own
@@ -60,6 +62,7 @@ function attachSyncHandlers(io, state, socket, deps) {
       action,
       timestamp,
       videoUrl,
+      contentId,
       volume,
       isMuted,
       playbackSpeed,
@@ -93,6 +96,25 @@ function attachSyncHandlers(io, state, socket, deps) {
       return;
     }
 
+    // CONTENT ID: an opaque comparison token, never a title or URL. Only a
+    // change_url may set it, and a new URL without one clears the old token so
+    // identity from the previous platform cannot leak into the next source.
+    if (
+      action === "change_url" &&
+      contentId !== undefined &&
+      (typeof contentId !== "string" ||
+        contentId.length < 1 ||
+        contentId.length > MAX_CONTENT_ID_LENGTH ||
+        !CONTENT_ID_PATTERN.test(contentId))
+    ) {
+      if (typeof deps.vLog === "function") {
+        deps.vLog(
+          `Room ${roomId}: Dropping change_url with invalid contentId from ${socket.id}`,
+        );
+      }
+      return;
+    }
+
     // RATE LIMIT: bound the sync hot-path per socket. Dropped here before any
     // state mutation/broadcast. Self-healing — the next accepted event from
     // any member re-broadcasts room_state, snapping this client back in line.
@@ -110,7 +132,7 @@ function attachSyncHandlers(io, state, socket, deps) {
     // ExoPlayer state callbacks, and React StrictMode mounts. Per-socket so
     // legitimate near-simultaneous events from different members still flow.
     if (typeof action === "string") {
-      const dedupeKey = `${action}|${typeof timestamp === "number" ? timestamp.toFixed(2) : ""}|${typeof videoUrl === "string" ? videoUrl : ""}|${typeof volume === "number" ? volume.toFixed(3) : ""}|${typeof isMuted === "boolean" ? isMuted : ""}|${typeof playbackSpeed === "number" ? playbackSpeed.toFixed(3) : ""}|${typeof audioSyncEnabled === "boolean" ? audioSyncEnabled : ""}`;
+      const dedupeKey = `${action}|${typeof timestamp === "number" ? timestamp.toFixed(2) : ""}|${typeof videoUrl === "string" ? videoUrl : ""}|${typeof contentId === "string" ? contentId : ""}|${typeof volume === "number" ? volume.toFixed(3) : ""}|${typeof isMuted === "boolean" ? isMuted : ""}|${typeof playbackSpeed === "number" ? playbackSpeed.toFixed(3) : ""}|${typeof audioSyncEnabled === "boolean" ? audioSyncEnabled : ""}`;
       const dedupeBag = (socket.data ||= {});
       const lastSync = dedupeBag.__lastSyncEvent;
       const nowMs = Date.now();
@@ -229,6 +251,12 @@ function attachSyncHandlers(io, state, socket, deps) {
         action === "change_url" && typeof videoUrl === "string"
           ? videoUrl
           : prev.videoUrl,
+      contentId:
+        action === "change_url"
+          ? typeof contentId === "string"
+            ? contentId
+            : null
+          : prev.contentId,
       timestamp: nextTimestamp,
       action: typeof action === "string" ? action : prev.action,
       updatedAt: nextUpdatedAt,
@@ -282,6 +310,7 @@ function attachSyncHandlers(io, state, socket, deps) {
       action,
       timestamp: next.timestamp,
       videoUrl: next.videoUrl,
+      contentId: next.contentId,
       updatedAt: next.updatedAt,
       rev: next.rev,
       volume: next.volume,
