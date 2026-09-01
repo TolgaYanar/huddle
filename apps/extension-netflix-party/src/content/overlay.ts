@@ -1,5 +1,6 @@
 import type { ContentState, OverlayElements } from "./state";
 import { renderChat } from "./chat";
+import { getActivePlatformAdapter } from "./platforms";
 
 export function ensureOverlay(
   state: ContentState,
@@ -201,8 +202,12 @@ export function updateOverlay(state: ContentState) {
     state.overlayEls.hint.textContent = state.lastConnectionError
       ? `Connection error: ${state.lastConnectionError}`
       : "Open the extension popup to connect to a room.";
-  } else if (state.lastWatchIdMismatch) {
-    state.overlayEls.hint.textContent = `This room is watching a different title (${state.lastWatchIdMismatch.expected}). Open /watch/${state.lastWatchIdMismatch.expected} first.`;
+  } else if (state.lastContentIdMismatch) {
+    const adapter = getActivePlatformAdapter();
+    const target = adapter.formatContentId(
+      state.lastContentIdMismatch.expected,
+    );
+    state.overlayEls.hint.textContent = `This room is watching a different title (${state.lastContentIdMismatch.expected}). Open ${target} first.`;
   } else if (!state.hasUserGesture) {
     state.overlayEls.hint.textContent =
       "Click anywhere on the page once to allow playback sync.";

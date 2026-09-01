@@ -7,6 +7,9 @@ export type RoomState = {
   roomId: string;
   serverNow?: number;
   videoUrl?: string;
+  // Future platform adapters can provide a live identity that is more
+  // trustworthy than the URL. Netflix currently derives this from videoUrl.
+  contentId?: string | null;
   timestamp?: number;
   updatedAt?: number;
   isPlaying?: boolean;

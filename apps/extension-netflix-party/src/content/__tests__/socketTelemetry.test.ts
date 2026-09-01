@@ -22,7 +22,7 @@ vi.mock("socket.io-client", () => ({ io: () => socketMock.socket }));
 vi.mock("../playerSync", () => ({
   applyRoomStateToVideo: vi.fn(),
   recordPendingRoomState: vi.fn(),
-  roomIsOnNetflix: vi.fn(() => true),
+  roomUsesActivePlatform: vi.fn(() => true),
   shouldApplyFollow: vi.fn(() => false),
   startPlayPausePoll: vi.fn(),
   stopPlayPausePoll: vi.fn(),

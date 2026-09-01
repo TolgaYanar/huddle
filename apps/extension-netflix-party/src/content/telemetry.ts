@@ -1,3 +1,5 @@
+import type { PlatformId } from "./platforms";
+
 /**
  * Sync-quality telemetry for the extension.
  *
@@ -100,7 +102,10 @@ function readRelease(): string | null {
   }
 }
 
-export function createTelemetry(sendPayload: TelemetrySender) {
+export function createTelemetry(
+  sendPayload: TelemetrySender,
+  platform: PlatformId = "netflix",
+) {
   let sessionId = newSessionId();
   let counters: Counters = {};
   let sequence = 0;
@@ -131,7 +136,7 @@ export function createTelemetry(sendPayload: TelemetrySender) {
     const payload = JSON.stringify({
       sessionId,
       source: "extension",
-      platform: "netflix",
+      platform,
       release: readRelease(),
       sequence,
       ...counters,

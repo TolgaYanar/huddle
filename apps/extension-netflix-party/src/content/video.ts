@@ -37,26 +37,6 @@ export function getBestVideo(): HTMLVideoElement | null {
   return best || vids[0];
 }
 
-export function getNetflixWatchIdFromUrl(url: string): string | null {
-  try {
-    const u = new URL(url);
-    const m = u.pathname.match(/^\/watch\/(\d+)/);
-    return m?.[1] ? m[1] : null;
-  } catch {
-    const m = String(url).match(/\/watch\/(\d+)/);
-    return m?.[1] ? m[1] : null;
-  }
-}
-
-export function getLocalWatchId(): string | null {
-  const m = location.pathname.match(/^\/watch\/(\d+)/);
-  return m?.[1] ? m[1] : null;
-}
-
-export function isNetflixWatchUrl(url: string): boolean {
-  return /^https:\/\/www\.netflix\.com\/watch\//i.test(url);
-}
-
 export function computeDesiredTimestampNow(
   state: RoomState,
   receivedAtMs: number,

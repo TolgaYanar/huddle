@@ -11,7 +11,7 @@ import {
   startPlayPausePoll,
   stopPlayPausePoll,
   shouldApplyFollow,
-  roomIsOnNetflix,
+  roomUsesActivePlatform,
 } from "./playerSync";
 import { receiveSyncCarriesPosition } from "./syncUtils";
 
@@ -348,8 +348,8 @@ export function setPlaybackSpeed(state: ContentState, playbackSpeed: number) {
 
   if (state.isApplyingRemote) return;
   if (!shouldEmitLocalSync(state)) return;
-  // Don't inject local speed changes into a room that isn't on Netflix.
-  if (!roomIsOnNetflix(state)) return;
+  // Don't inject local speed changes into another platform's room.
+  if (!roomUsesActivePlatform(state)) return;
 
   const s = state.socket;
   const roomId = state.currentRoomId;

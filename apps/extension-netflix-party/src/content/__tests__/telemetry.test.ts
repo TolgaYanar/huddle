@@ -58,6 +58,16 @@ describe("extension telemetry", () => {
     }
   });
 
+  it("attributes a summary to the active platform", () => {
+    const t = createTelemetry(
+      sendPayload as (payload: string) => Promise<void>,
+      "prime",
+    );
+    t.record("playerFound");
+    t.flush();
+    expect(lastBody().platform).toBe("prime");
+  });
+
   it("includes the extension version as a safe release identifier", () => {
     const t = createCollector();
     t.record("hardSeeks");
