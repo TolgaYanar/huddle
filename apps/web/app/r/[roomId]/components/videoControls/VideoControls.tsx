@@ -119,7 +119,7 @@ export function VideoControls({
       )}
 
       {/* Main Controls */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 sm:gap-4">
         {/* Left: Play controls */}
         <div className="flex items-center gap-2">
           {/* Skip Back */}
@@ -185,7 +185,7 @@ export function VideoControls({
         />
 
         {/* Right: Speed & Settings */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 ml-auto sm:ml-0">
           {/* Playback Speed */}
           {capabilities.canChangeSpeed && (
             <PlaybackSpeedMenu
