@@ -79,14 +79,14 @@ export function VolumeControl({
         onClick={onToggleMute}
         disabled={!canMute}
         aria-label={displayMuted ? "Unmute" : "Mute"}
-        className="h-9 w-9 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        className="h-9 w-9 rounded-[var(--radius-control)] bg-surface hover:bg-raised border border-hairline flex items-center justify-center text-ink disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         title={displayMuted ? "Unmute" : "Mute"}
       >
         <Icon />
       </button>
 
       {showVolumeSlider && canChangeVolume && (
-        <div className="absolute left-full ml-2 flex items-center gap-2 px-3 py-2 bg-black/80 rounded-lg border border-white/10">
+        <div className="absolute left-full ml-2 flex items-center gap-2 px-3 py-2 bg-black/80 rounded-[var(--radius-control)] border border-hairline">
           <input
             type="range"
             aria-label="Volume"
@@ -98,9 +98,9 @@ export function VolumeControl({
               const next = parseFloat(e.target.value);
               onChangeVolume(next);
             }}
-            className="w-20 h-1 accent-white bg-white/20 rounded-full appearance-none cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-4 focus-visible:ring-offset-black [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow"
+            className="w-20 h-1 accent-white bg-hairline-strong rounded-full appearance-none cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-4 focus-visible:ring-offset-black [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow"
           />
-          <span className="text-xs text-slate-300 w-8 text-right">
+          <span className="text-xs text-ink-muted w-8 text-right">
             {Math.round((displayMuted ? 0 : displayVolume) * 100)}%
           </span>
         </div>

@@ -127,13 +127,13 @@ export function PlaylistPanel({
   if (!isOpen) return null;
 
   return (
-    <div className="backdrop-blur-md bg-white/5 rounded-2xl border border-white/10 flex flex-col overflow-hidden h-full">
-      <div className="flex items-center justify-between p-4 border-b border-white/10 bg-white/5">
-        <h3 className="font-semibold text-slate-50">Playlists</h3>
+    <div className="backdrop-blur-md bg-surface rounded-[var(--radius-panel)] border border-hairline flex flex-col overflow-hidden h-full">
+      <div className="flex items-center justify-between p-4 border-b border-hairline bg-surface">
+        <h3 className="font-semibold text-ink">Playlists</h3>
         <button
           type="button"
           onClick={onClose}
-          className="p-1 text-slate-400 hover:text-slate-200 transition"
+          className="p-1 text-ink-muted hover:text-ink transition"
           title="Close playlist panel"
           aria-label="Close playlist panel"
         >
@@ -142,14 +142,14 @@ export function PlaylistPanel({
       </div>
 
       {activePlaylist && activePlaylist.items[currentItemIndex] && (
-        <div className="p-3 bg-linear-to-r from-sky-500/10 to-purple-500/10 border-b border-white/10">
-          <div className="text-xs text-slate-400 uppercase tracking-wider mb-2">
+        <div className="p-3 bg-linear-to-r from-sky-500/10 to-purple-500/10 border-b border-hairline">
+          <div className="text-xs text-ink-muted uppercase tracking-wider mb-2">
             Now Playing
           </div>
 
           <div className="flex gap-3 items-start mb-2">
             {activePlaylist.items[currentItemIndex].thumbnail && (
-              <div className="w-24 h-13.5 shrink-0 rounded overflow-hidden bg-black/30">
+              <div className="w-24 h-13.5 shrink-0 rounded overflow-hidden bg-sunken">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={activePlaylist.items[currentItemIndex].thumbnail}
@@ -161,10 +161,10 @@ export function PlaylistPanel({
             )}
 
             <div className="flex-1 min-w-0">
-              <div className="text-sm text-slate-200 line-clamp-2 leading-snug">
+              <div className="text-sm text-ink line-clamp-2 leading-snug">
                 {activePlaylist.items[currentItemIndex].title}
               </div>
-              <div className="text-xs text-slate-500 mt-1">
+              <div className="text-xs text-ink0 mt-1">
                 {activePlaylist.name}
               </div>
             </div>
@@ -175,7 +175,7 @@ export function PlaylistPanel({
               type="button"
               onClick={onPlayPrevious}
               aria-label="Previous video"
-              className="p-1.5 text-slate-400 hover:text-slate-200 transition"
+              className="p-1.5 text-ink-muted hover:text-ink transition"
               title="Previous"
             >
               <SkipPrevIcon />
@@ -184,20 +184,20 @@ export function PlaylistPanel({
               type="button"
               onClick={onPlayNext}
               aria-label="Next video"
-              className="p-1.5 text-slate-400 hover:text-slate-200 transition"
+              className="p-1.5 text-ink-muted hover:text-ink transition"
               title="Next"
             >
               <SkipNextIcon />
             </button>
             <div className="flex-1" />
             <span
-              className={`p-1 rounded ${activePlaylist.settings.loop ? "text-sky-400" : "text-slate-600"}`}
+              className={`p-1 rounded ${activePlaylist.settings.loop ? "text-sky-400" : "text-ink-faint"}`}
               title="Loop"
             >
               <LoopIcon />
             </span>
             <span
-              className={`p-1 rounded ${activePlaylist.settings.shuffle ? "text-sky-400" : "text-slate-600"}`}
+              className={`p-1 rounded ${activePlaylist.settings.shuffle ? "text-sky-400" : "text-ink-faint"}`}
               title="Shuffle"
             >
               <ShuffleIcon />
@@ -206,17 +206,17 @@ export function PlaylistPanel({
         </div>
       )}
 
-      <div className="flex items-center gap-1 p-2 border-b border-white/10 overflow-x-auto">
+      <div className="flex items-center gap-1 p-2 border-b border-hairline overflow-x-auto">
         {playlists.map((playlist) => (
           <button
             key={playlist.id}
             type="button"
             onClick={() => handleSelectPlaylist(playlist.id)}
             aria-pressed={selectedPlaylistId === playlist.id ? "true" : "false"}
-            className={`px-3 py-1.5 text-sm rounded-lg whitespace-nowrap transition ${
+            className={`px-3 py-1.5 text-sm rounded-[var(--radius-control)] whitespace-nowrap transition ${
               selectedPlaylistId === playlist.id
-                ? "bg-sky-500/20 text-sky-300 border border-sky-500/30"
-                : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
+                ? "bg-accent/20 text-sky-300 border border-sky-500/30"
+                : "text-ink-muted hover:text-ink hover:bg-surface"
             }`}
           >
             {playlist.name}
@@ -230,7 +230,7 @@ export function PlaylistPanel({
         <button
           type="button"
           onClick={() => setIsCreating(true)}
-          className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-white/5 rounded-lg transition"
+          className="p-1.5 text-ink-muted hover:text-ink hover:bg-surface rounded-[var(--radius-control)] transition"
           title="Create playlist"
           aria-label="Create new playlist"
         >
@@ -270,15 +270,15 @@ export function PlaylistPanel({
           <>
             <div className="flex items-center justify-between mb-2">
               <div>
-                <h4 className="text-sm font-medium text-slate-200">
+                <h4 className="text-sm font-medium text-ink">
                   {selectedPlaylist.name}
                 </h4>
                 {selectedPlaylist.description && (
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-ink0">
                     {selectedPlaylist.description}
                   </p>
                 )}
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-ink0">
                   {selectedPlaylist.items.length} items
                 </p>
               </div>
@@ -288,7 +288,7 @@ export function PlaylistPanel({
                     <button
                       type="button"
                       onClick={() => onSetActive(selectedPlaylistId)}
-                      className="px-2 py-1 text-xs bg-sky-600 hover:bg-sky-500 text-white rounded-lg transition"
+                      className="px-2 py-1 text-xs bg-sky-600 hover:bg-accent text-white rounded-[var(--radius-control)] transition"
                     >
                       Set Active
                     </button>
@@ -296,7 +296,7 @@ export function PlaylistPanel({
                 <button
                   type="button"
                   onClick={() => setSettingsPlaylistId(selectedPlaylistId)}
-                  className="p-1.5 text-slate-400 hover:text-slate-200 transition"
+                  className="p-1.5 text-ink-muted hover:text-ink transition"
                   title="Playlist settings"
                   aria-label="Open playlist settings"
                 >
@@ -310,7 +310,7 @@ export function PlaylistPanel({
                 <button
                   type="button"
                   onClick={onOpenAddVideos}
-                  className="flex-1 p-2 text-sm text-slate-200 bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 hover:border-indigo-500/50 rounded-lg transition flex items-center justify-center gap-2"
+                  className="flex-1 p-2 text-sm text-ink bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 hover:border-indigo-500/50 rounded-[var(--radius-control)] transition flex items-center justify-center gap-2"
                 >
                   <PlusIcon />
                   Add Videos
@@ -320,7 +320,7 @@ export function PlaylistPanel({
                 <button
                   type="button"
                   onClick={onAddCurrentVideo}
-                  className="flex-1 p-2 text-sm text-slate-400 hover:text-slate-200 border border-dashed border-white/20 hover:border-white/40 rounded-lg transition flex items-center justify-center gap-2"
+                  className="flex-1 p-2 text-sm text-ink-muted hover:text-ink border border-dashed border-hairline-strong hover:border-white/40 rounded-[var(--radius-control)] transition flex items-center justify-center gap-2"
                   title="Add the currently playing video"
                 >
                   <PlusIcon />
@@ -330,7 +330,7 @@ export function PlaylistPanel({
             </div>
 
             {selectedPlaylist.items.length === 0 ? (
-              <div className="text-center text-slate-500 py-8 text-sm">
+              <div className="text-center text-ink0 py-8 text-sm">
                 No videos in this playlist yet.
                 <br />
                 <span className="text-xs">
@@ -372,7 +372,7 @@ export function PlaylistPanel({
         )}
 
         {playlists.length === 0 && !isCreating && (
-          <div className="text-center text-slate-500 py-8 text-sm">
+          <div className="text-center text-ink0 py-8 text-sm">
             No playlists yet.
             <br />
             <button

@@ -84,7 +84,7 @@ export function RemoteTile({
 
   return (
     <div
-      className={`rounded-2xl border border-white/10 bg-black/20 overflow-hidden relative ${
+      className={`rounded-[var(--radius-panel)] border border-hairline bg-sunken overflow-hidden relative ${
         speaking ? "ring-2 ring-emerald-500/20" : ""
       }`}
       draggable={Boolean(draggablePayload)}
@@ -115,7 +115,7 @@ export function RemoteTile({
       title="Drag to the main player to pin"
     >
       <div className="absolute top-2 left-2 z-10 flex items-center gap-2">
-        <span className="text-[11px] px-2 py-1 rounded-full bg-black/40 border border-white/10 text-slate-200">
+        <span className="text-[11px] px-2 py-1 rounded-full bg-sunken border border-hairline text-ink">
           {label}
         </span>
         {speaking && (
@@ -138,14 +138,14 @@ export function RemoteTile({
             e.stopPropagation();
             void toggleFullscreen();
           }}
-          className="h-9 w-9 inline-flex items-center justify-center rounded-xl border border-white/20 bg-black/60 text-slate-50 text-sm hover:bg-white/10 transition-colors"
+          className="h-9 w-9 inline-flex items-center justify-center rounded-[var(--radius-control)] border border-hairline-strong bg-sunken text-white text-sm hover:bg-raised transition-colors"
           title="Fullscreen"
           aria-label={`Toggle fullscreen for ${label}`}
         >
           <span aria-hidden="true">⛶</span>
         </button>
 
-        <span className="text-[11px] px-2 py-1 rounded-full bg-black/40 border border-white/10 text-slate-300">
+        <span className="text-[11px] px-2 py-1 rounded-full bg-sunken border border-hairline text-ink-muted">
           {media?.screen ? "🖥" : media?.cam ? "📷" : ""}
           {media?.mic ? " 🎙" : ""}
         </span>
@@ -162,12 +162,12 @@ export function RemoteTile({
       <audio ref={audioRef} autoPlay className="hidden" />
 
       {!hasVideo && (
-        <div className="absolute inset-0 flex items-center justify-center text-slate-400 text-sm">
+        <div className="absolute inset-0 flex items-center justify-center text-ink-muted text-sm">
           Video off
         </div>
       )}
       {!hasAudio && (
-        <div className="absolute bottom-2 left-2 text-[11px] px-2 py-1 rounded-full bg-black/40 border border-white/10 text-slate-400">
+        <div className="absolute bottom-2 left-2 text-[11px] px-2 py-1 rounded-full bg-sunken border border-hairline text-ink-muted">
           Mic off
         </div>
       )}

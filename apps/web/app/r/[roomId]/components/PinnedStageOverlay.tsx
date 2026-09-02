@@ -23,7 +23,7 @@ export function PinnedStageOverlay({
   return (
     <div className="absolute inset-0 z-20 bg-black" ref={containerRef}>
       <div className="absolute top-3 left-3 z-30">
-        <span className="px-2.5 py-1 rounded-full text-[11px] font-medium border border-white/10 bg-black/40 text-slate-200">
+        <span className="px-2.5 py-1 rounded-full text-[11px] font-medium border border-hairline bg-sunken text-ink">
           Pinned {isLocal ? "(You)" : stageId.slice(0, 6)}
         </span>
       </div>
@@ -32,7 +32,7 @@ export function PinnedStageOverlay({
           <button
             type="button"
             onClick={onUnpin}
-            className="h-8 px-3 rounded-lg border border-white/10 bg-white/5 text-slate-200 text-xs font-medium hover:bg-white/10 transition-colors"
+            className="h-8 px-3 rounded-[var(--radius-control)] border border-hairline bg-surface text-ink text-xs font-medium hover:bg-raised transition-colors"
             title="Unpin"
           >
             Unpin
@@ -40,7 +40,7 @@ export function PinnedStageOverlay({
           <button
             type="button"
             onClick={onToggleFullscreen}
-            className="h-10 px-4 rounded-xl border border-white/20 bg-slate-50 text-slate-950 text-sm font-semibold hover:bg-slate-50/90 transition-colors shadow-sm"
+            className="h-10 px-4 rounded-[var(--radius-control)] border border-hairline-strong bg-accent text-accent-ink text-sm font-semibold hover:bg-slate-50/90 transition-colors shadow-sm"
             title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
           >
             {isFullscreen ? "Exit" : "⛶ Fullscreen"}

@@ -51,10 +51,13 @@ export function Tier3CtaCard({
   }, []);
 
   return (
-    <div className="absolute inset-0 flex items-center justify-center p-6 bg-linear-to-b from-slate-950 via-black to-slate-950 text-slate-100 overflow-y-auto">
-      <div className="max-w-md w-full bg-white/5 backdrop-blur-md rounded-2xl border border-white/10 p-6 flex flex-col gap-4 shadow-2xl">
+    <div // Sits on the video stage, which is black in both themes, so its ink is
+      // fixed light rather than themed.
+      className="absolute inset-0 flex items-center justify-center p-6 bg-black text-white overflow-y-auto"
+    >
+      <div className="max-w-md w-full bg-surface backdrop-blur-md rounded-[var(--radius-panel)] border border-hairline p-6 flex flex-col gap-4 shadow-2xl">
         <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-400/15 border border-amber-400/30 flex items-center justify-center shrink-0">
+          <div className="w-10 h-10 rounded-[var(--radius-control)] bg-amber-400/15 border border-amber-400/30 flex items-center justify-center shrink-0">
             <svg
               className="w-5 h-5 text-amber-300"
               viewBox="0 0 24 24"
@@ -69,10 +72,10 @@ export function Tier3CtaCard({
             </svg>
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-base font-semibold text-slate-50">
+            <div className="text-base font-semibold text-ink">
               {name} can&rsquo;t play inside Huddle
             </div>
-            <div className="text-xs text-slate-400 mt-1 leading-relaxed">
+            <div className="text-xs text-ink-muted mt-1 leading-relaxed">
               {name} is DRM-protected — browsers don&rsquo;t allow it to be
               embedded in a normal webpage.
               {isNetflix
@@ -87,7 +90,7 @@ export function Tier3CtaCard({
             href={roomUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="h-11 rounded-xl border border-emerald-500/40 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-100 text-sm font-medium inline-flex items-center justify-center gap-2 transition-colors"
+            className="h-11 rounded-[var(--radius-control)] border border-emerald-500/40 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-100 text-sm font-medium inline-flex items-center justify-center gap-2 transition-colors"
           >
             <svg
               className="w-4 h-4"
@@ -110,7 +113,7 @@ export function Tier3CtaCard({
             href="https://chromewebstore.google.com/detail/huddle-for-netflix/mmghgnlloogcifdblldihfmjoefabohc"
             target="_blank"
             rel="noopener noreferrer"
-            className="h-10 rounded-xl border border-indigo-500/40 bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-100 text-sm font-medium inline-flex items-center justify-center gap-2 transition-colors"
+            className="h-10 rounded-[var(--radius-control)] border border-accent bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-100 text-sm font-medium inline-flex items-center justify-center gap-2 transition-colors"
           >
             <svg
               className="w-4 h-4"
@@ -132,7 +135,7 @@ export function Tier3CtaCard({
           href={url}
           target="_blank"
           rel="noopener noreferrer"
-          className="h-10 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-slate-100 text-sm font-medium inline-flex items-center justify-center gap-2 transition-colors"
+          className="h-10 rounded-[var(--radius-control)] border border-hairline bg-surface hover:bg-raised text-ink text-sm font-medium inline-flex items-center justify-center gap-2 transition-colors"
         >
           Open {name} in a new tab
           <svg
@@ -148,7 +151,7 @@ export function Tier3CtaCard({
           </svg>
         </a>
 
-        <div className="text-[11px] text-slate-500 leading-relaxed">
+        <div className="text-[11px] text-ink0 leading-relaxed">
           {isNetflix
             ? "Inside the Huddle app, signing into your own Netflix account is required (we don't share accounts). Playback uses the device's native DRM."
             : "The room's chat, voice, and reactions still work — they just play alongside whatever you're watching in the other tab."}

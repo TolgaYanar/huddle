@@ -374,7 +374,7 @@ function CupGameHeader({
     if (game.session.status === "lobby")
       return {
         text: "Setting up",
-        color: "bg-sky-500/20 text-sky-300 border-sky-400/30",
+        color: "bg-accent/20 text-sky-300 border-sky-400/30",
       };
     if (game.session.status === "placing")
       return {
@@ -388,7 +388,7 @@ function CupGameHeader({
       };
     return {
       text: "Game over",
-      color: "bg-slate-500/20 text-slate-300 border-slate-400/30",
+      color: "bg-ink-faint/20 text-ink-muted border-slate-400/30",
     };
   })();
   return (
@@ -399,7 +399,7 @@ function CupGameHeader({
         >
           {phaseBadge.text}
         </span>
-        <span className="text-slate-400">
+        <span className="text-ink-muted">
           {game.config.rows}×{game.config.cols} board ·{" "}
           {game.config.startingLives}{" "}
           {game.config.startingLives === 1 ? "life" : "lives"} each
@@ -409,7 +409,7 @@ function CupGameHeader({
         <button
           type="button"
           onClick={onToggleMute}
-          className="h-8 px-3 text-xs rounded-lg border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10"
+          className="h-8 px-3 text-xs rounded-[var(--radius-control)] border border-hairline bg-surface text-ink hover:bg-raised"
           aria-label={muted ? "Unmute sounds" : "Mute sounds"}
         >
           {muted ? "🔇 Sound off" : "🔊 Sound on"}
@@ -418,13 +418,13 @@ function CupGameHeader({
           <button
             type="button"
             onClick={() => setResetArmed(true)}
-            className="h-8 px-3 text-xs rounded-lg border border-rose-400/30 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20"
+            className="h-8 px-3 text-xs rounded-[var(--radius-control)] border border-rose-400/30 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20"
           >
             Reset
           </button>
         )}
         {onReset && resetArmed && (
-          <div className="flex items-center gap-1 rounded-lg border border-rose-400/40 bg-rose-500/10 px-2 py-1">
+          <div className="flex items-center gap-1 rounded-[var(--radius-control)] border border-rose-400/40 bg-rose-500/10 px-2 py-1">
             <span className="text-[11px] text-rose-200">End this game?</span>
             <button
               type="button"
@@ -439,7 +439,7 @@ function CupGameHeader({
             <button
               type="button"
               onClick={() => setResetArmed(false)}
-              className="h-6 px-2 text-[11px] rounded-md border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10"
+              className="h-6 px-2 text-[11px] rounded-md border border-hairline bg-surface text-ink hover:bg-raised"
             >
               Cancel
             </button>
@@ -460,20 +460,20 @@ function CupGameLobby(props: CupGamePanelProps) {
   const [timer, setTimer] = useState<20 | 30 | 60 | null>(20);
   return (
     <div className="flex flex-col gap-5">
-      <div className="rounded-xl border border-white/10 bg-white/5 p-5">
+      <div className="rounded-[var(--radius-control)] border border-hairline bg-surface p-5">
         <div className="flex items-center gap-3 mb-2">
           <span className="text-3xl" aria-hidden>
             🥤
           </span>
           <div>
-            <h3 className="text-lg font-bold text-slate-100">Cup Spider</h3>
-            <p className="text-xs text-slate-400">
+            <h3 className="text-lg font-bold text-ink">Cup Spider</h3>
+            <p className="text-xs text-ink-muted">
               A push-your-luck party game: hide spiders under cups, take turns
               flipping, and gamble on cards when you don&rsquo;t want to flip.
             </p>
           </div>
         </div>
-        <ul className="text-xs text-slate-300/90 mt-3 space-y-1.5 list-disc pl-5">
+        <ul className="text-xs text-ink-muted/90 mt-3 space-y-1.5 list-disc pl-5">
           <li>
             Before the game starts, each player secretly hides up to {lives}{" "}
             spider{lives === 1 ? "" : "s"} under cups they choose.
@@ -495,11 +495,11 @@ function CupGameLobby(props: CupGamePanelProps) {
         </ul>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-          <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">
+        <div className="rounded-[var(--radius-control)] border border-hairline bg-surface p-3">
+          <div className="text-[10px] uppercase tracking-wider text-ink-muted font-semibold mb-1">
             Lives per player
           </div>
-          <div className="text-[10px] text-slate-500 mb-1.5">
+          <div className="text-[10px] text-ink0 mb-1.5">
             Also caps how many spiders each player can hide.
           </div>
           <div className="flex items-center gap-1">
@@ -508,10 +508,10 @@ function CupGameLobby(props: CupGamePanelProps) {
                 key={n}
                 type="button"
                 onClick={() => setLives(n)}
-                className={`flex-1 h-8 rounded-lg text-sm border transition-colors ${
+                className={`flex-1 h-8 rounded-[var(--radius-control)] text-sm border transition-colors ${
                   lives === n
-                    ? "border-sky-400/60 bg-sky-500/20 text-sky-200"
-                    : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"
+                    ? "border-sky-400/60 bg-accent/20 text-sky-200"
+                    : "border-hairline bg-surface text-ink-muted hover:bg-raised"
                 }`}
                 aria-pressed={lives === n ? "true" : "false"}
               >
@@ -520,11 +520,11 @@ function CupGameLobby(props: CupGamePanelProps) {
             ))}
           </div>
         </div>
-        <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-          <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">
+        <div className="rounded-[var(--radius-control)] border border-hairline bg-surface p-3">
+          <div className="text-[10px] uppercase tracking-wider text-ink-muted font-semibold mb-1">
             Board size
           </div>
-          <div className="text-[10px] text-slate-500 mb-1.5">
+          <div className="text-[10px] text-ink0 mb-1.5">
             Larger boards = safer flips, longer games.
           </div>
           <div className="flex items-center gap-1">
@@ -539,10 +539,10 @@ function CupGameLobby(props: CupGamePanelProps) {
                 key={g.value}
                 type="button"
                 onClick={() => setGridSize(g.value)}
-                className={`flex-1 h-8 rounded-lg text-xs border transition-colors ${
+                className={`flex-1 h-8 rounded-[var(--radius-control)] text-xs border transition-colors ${
                   gridSize === g.value
-                    ? "border-sky-400/60 bg-sky-500/20 text-sky-200"
-                    : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"
+                    ? "border-sky-400/60 bg-accent/20 text-sky-200"
+                    : "border-hairline bg-surface text-ink-muted hover:bg-raised"
                 }`}
                 aria-pressed={gridSize === g.value ? "true" : "false"}
               >
@@ -551,11 +551,11 @@ function CupGameLobby(props: CupGamePanelProps) {
             ))}
           </div>
         </div>
-        <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-          <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">
+        <div className="rounded-[var(--radius-control)] border border-hairline bg-surface p-3">
+          <div className="text-[10px] uppercase tracking-wider text-ink-muted font-semibold mb-1">
             Time per turn
           </div>
-          <div className="text-[10px] text-slate-500 mb-1.5">
+          <div className="text-[10px] text-ink0 mb-1.5">
             Auto-skips slow players. Set to none for casual play.
           </div>
           <div className="flex items-center gap-1">
@@ -564,10 +564,10 @@ function CupGameLobby(props: CupGamePanelProps) {
                 key={String(t)}
                 type="button"
                 onClick={() => setTimer(t as 20 | 30 | 60 | null)}
-                className={`flex-1 h-8 rounded-lg text-xs border transition-colors ${
+                className={`flex-1 h-8 rounded-[var(--radius-control)] text-xs border transition-colors ${
                   timer === t
-                    ? "border-sky-400/60 bg-sky-500/20 text-sky-200"
-                    : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"
+                    ? "border-sky-400/60 bg-accent/20 text-sky-200"
+                    : "border-hairline bg-surface text-ink-muted hover:bg-raised"
                 }`}
                 aria-pressed={timer === t ? "true" : "false"}
               >
@@ -586,7 +586,7 @@ function CupGameLobby(props: CupGamePanelProps) {
             turnTimerSeconds: timer,
           })
         }
-        className="h-11 px-4 rounded-xl border border-emerald-400/30 bg-emerald-500/15 text-emerald-200 text-sm font-semibold hover:bg-emerald-500/25 transition"
+        className="h-11 px-4 rounded-[var(--radius-control)] border border-emerald-400/30 bg-emerald-500/15 text-emerald-200 text-sm font-semibold hover:bg-emerald-500/25 transition"
       >
         Open the table
       </button>
@@ -615,7 +615,7 @@ function LobbyView(props: CupGamePanelProps & { game: CupGameData }) {
           type="button"
           disabled={!canStart}
           onClick={() => props.startCupGamePlacement(game.gameId)}
-          className="h-11 rounded-xl border border-emerald-400/30 bg-emerald-500/15 text-emerald-200 text-sm font-semibold hover:bg-emerald-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="h-11 rounded-[var(--radius-control)] border border-emerald-400/30 bg-emerald-500/15 text-emerald-200 text-sm font-semibold hover:bg-emerald-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isCreator
             ? eligible.length < 2
@@ -624,11 +624,9 @@ function LobbyView(props: CupGamePanelProps & { game: CupGameData }) {
             : "Waiting for the host to start the game…"}
         </button>
       </div>
-      <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-        <h4 className="text-sm font-semibold text-slate-100 mb-2">
-          How to play
-        </h4>
-        <ol className="text-xs text-slate-300 space-y-1.5 list-decimal pl-4">
+      <div className="rounded-[var(--radius-control)] border border-hairline bg-surface p-4">
+        <h4 className="text-sm font-semibold text-ink mb-2">How to play</h4>
+        <ol className="text-xs text-ink-muted space-y-1.5 list-decimal pl-4">
           <li>
             When the host starts the game, each player secretly hides up to{" "}
             {game.config.startingLives} spider
@@ -666,15 +664,15 @@ function ConfigEditor({
   onChange: (opts: CreateCupGameOptions) => void;
 }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-white/5 p-3 flex flex-col gap-3">
-      <div className="text-[11px] text-slate-400 font-medium">
+    <div className="rounded-[var(--radius-control)] border border-hairline bg-surface p-3 flex flex-col gap-3">
+      <div className="text-[11px] text-ink-muted font-medium">
         Host settings — change anything before starting.
       </div>
       <div>
-        <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">
+        <div className="text-[10px] uppercase tracking-wider text-ink-muted font-semibold mb-1">
           Lives per player
         </div>
-        <div className="text-[10px] text-slate-500 mb-1.5">
+        <div className="text-[10px] text-ink0 mb-1.5">
           Also caps how many spiders each player can hide.
         </div>
         <div className="flex gap-1">
@@ -683,10 +681,10 @@ function ConfigEditor({
               key={n}
               type="button"
               onClick={() => onChange({ startingLives: n })}
-              className={`flex-1 h-8 rounded-lg text-sm border ${
+              className={`flex-1 h-8 rounded-[var(--radius-control)] text-sm border ${
                 game.config.startingLives === n
-                  ? "border-sky-400/60 bg-sky-500/20 text-sky-200"
-                  : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"
+                  ? "border-sky-400/60 bg-accent/20 text-sky-200"
+                  : "border-hairline bg-surface text-ink-muted hover:bg-raised"
               }`}
               aria-pressed={game.config.startingLives === n ? "true" : "false"}
             >
@@ -696,10 +694,10 @@ function ConfigEditor({
         </div>
       </div>
       <div>
-        <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">
+        <div className="text-[10px] uppercase tracking-wider text-ink-muted font-semibold mb-1">
           Board size
         </div>
-        <div className="text-[10px] text-slate-500 mb-1.5">
+        <div className="text-[10px] text-ink0 mb-1.5">
           Larger boards = safer flips, longer games.
         </div>
         <div className="flex gap-1">
@@ -714,7 +712,7 @@ function ConfigEditor({
               key={g.value}
               type="button"
               onClick={() => onChange({ gridSize: g.value })}
-              className="flex-1 h-8 rounded-lg text-xs border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"
+              className="flex-1 h-8 rounded-[var(--radius-control)] text-xs border border-hairline bg-surface text-ink-muted hover:bg-raised"
             >
               {g.label}
             </button>
@@ -722,10 +720,10 @@ function ConfigEditor({
         </div>
       </div>
       <div>
-        <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">
+        <div className="text-[10px] uppercase tracking-wider text-ink-muted font-semibold mb-1">
           Time per turn
         </div>
-        <div className="text-[10px] text-slate-500 mb-1.5">
+        <div className="text-[10px] text-ink0 mb-1.5">
           Auto-skips slow players. Set to none for casual play.
         </div>
         <div className="flex gap-1">
@@ -736,10 +734,10 @@ function ConfigEditor({
               onClick={() =>
                 onChange({ turnTimerSeconds: t as 20 | 30 | 60 | null })
               }
-              className={`flex-1 h-8 rounded-lg text-xs border ${
+              className={`flex-1 h-8 rounded-[var(--radius-control)] text-xs border ${
                 game.config.turnTimerSeconds === t
-                  ? "border-sky-400/60 bg-sky-500/20 text-sky-200"
-                  : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"
+                  ? "border-sky-400/60 bg-accent/20 text-sky-200"
+                  : "border-hairline bg-surface text-ink-muted hover:bg-raised"
               }`}
               aria-pressed={
                 game.config.turnTimerSeconds === t ? "true" : "false"
@@ -775,7 +773,7 @@ function PlacingView(props: CupGamePanelProps & { game: CupGameData }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px] gap-4 lg:gap-5">
       <div className="flex flex-col gap-3">
-        <div className="rounded-xl border border-fuchsia-400/20 bg-fuchsia-500/10 px-4 py-3 text-sm text-fuchsia-200">
+        <div className="rounded-[var(--radius-control)] border border-fuchsia-400/20 bg-fuchsia-500/10 px-4 py-3 text-sm text-fuchsia-200">
           <strong>Hide your spiders.</strong> Tap up to{" "}
           <span className="font-semibold">{me?.spiderBudget ?? 0}</span> cups to
           put a spider under each. So far:{" "}
@@ -806,7 +804,7 @@ function PlacingView(props: CupGamePanelProps & { game: CupGameData }) {
                 ? props.unlockCupGamePlacement(game.gameId)
                 : props.lockCupGamePlacement(game.gameId)
             }
-            className={`h-11 rounded-xl text-sm font-semibold border transition ${
+            className={`h-11 rounded-[var(--radius-control)] text-sm font-semibold border transition ${
               me.isPlacementLocked
                 ? "border-amber-400/40 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20"
                 : "border-emerald-400/30 bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/25"
@@ -976,7 +974,7 @@ function PlayingView(
           }
         />
         {peekResult && (
-          <div className="rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200 flex items-center justify-between gap-3">
+          <div className="rounded-[var(--radius-control)] border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200 flex items-center justify-between gap-3">
             <span>
               <span className="font-semibold">Peek:</span> Cup #
               {peekResult.cupIndex + 1} hides{" "}
@@ -992,7 +990,7 @@ function PlayingView(
             <button
               type="button"
               onClick={dismissPeek}
-              className="text-xs px-2 py-1 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-slate-200"
+              className="text-xs px-2 py-1 rounded-[var(--radius-control)] border border-hairline bg-surface hover:bg-raised text-ink"
             >
               Got it
             </button>
@@ -1038,7 +1036,7 @@ function PlayingView(
             <button
               type="button"
               onClick={() => props.cancelCupGameCard(game.gameId)}
-              className="h-9 rounded-xl border border-rose-400/30 bg-rose-500/10 text-rose-300 text-xs font-semibold hover:bg-rose-500/20"
+              className="h-9 rounded-[var(--radius-control)] border border-rose-400/30 bg-rose-500/10 text-rose-300 text-xs font-semibold hover:bg-rose-500/20"
             >
               Cancel card
             </button>
@@ -1103,12 +1101,12 @@ function TurnBanner({
       action = "is choosing where to move it";
     return (
       <div
-        className={`rounded-xl border px-4 py-3 ${meta.category === "good" ? "border-emerald-400/30 bg-emerald-500/10" : "border-rose-400/30 bg-rose-500/10"}`}
+        className={`rounded-[var(--radius-control)] border px-4 py-3 ${meta.category === "good" ? "border-emerald-400/30 bg-emerald-500/10" : "border-rose-400/30 bg-rose-500/10"}`}
       >
         <div className="flex items-center gap-3">
           {drawnCard && drawnCard.kind === pending.kind && (
             <div
-              className={`cup-card-flip-in shrink-0 w-14 h-20 rounded-xl border ${meta.category === "good" ? "border-emerald-300/60 bg-emerald-900/40" : "border-rose-300/60 bg-rose-900/40"} flex flex-col items-center justify-center`}
+              className={`cup-card-flip-in shrink-0 w-14 h-20 rounded-[var(--radius-control)] border ${meta.category === "good" ? "border-emerald-300/60 bg-emerald-900/40" : "border-rose-300/60 bg-rose-900/40"} flex flex-col items-center justify-center`}
             >
               <div className="text-2xl" aria-hidden>
                 {meta.emoji}
@@ -1119,10 +1117,10 @@ function TurnBanner({
             </div>
           )}
           <div className="text-sm">
-            <div className="font-semibold text-slate-100">
+            <div className="font-semibold text-ink">
               {drawerName} drew {meta.label}
             </div>
-            <div className="text-xs text-slate-300/90">
+            <div className="text-xs text-ink-muted/90">
               {meta.blurb} — {action}.
             </div>
           </div>
@@ -1133,23 +1131,23 @@ function TurnBanner({
   if (game.session.status !== "playing") return null;
   return (
     <div
-      className={`rounded-xl border px-4 py-3 flex items-center justify-between ${myTurn ? "border-sky-400/40 bg-sky-500/10" : "border-white/10 bg-white/5"}`}
+      className={`rounded-[var(--radius-control)] border px-4 py-3 flex items-center justify-between ${myTurn ? "border-sky-400/40 bg-accent/10" : "border-hairline bg-surface"}`}
     >
       <div className="flex items-center gap-2 text-sm">
         <span
           className={`inline-block w-2 h-2 rounded-full ${myTurn ? "bg-sky-300 animate-pulse" : "bg-slate-400"}`}
         />
-        <span className="font-semibold text-slate-100">
+        <span className="font-semibold text-ink">
           {myTurn ? "Your turn" : `${turnPlayer?.username || "Someone"}'s turn`}
         </span>
         {turnPlayer && (
-          <span className="text-xs text-slate-400">
+          <span className="text-xs text-ink-muted">
             · {turnPlayer.lives} {turnPlayer.lives === 1 ? "life" : "lives"}{" "}
             left
           </span>
         )}
         {me?.hasMirror && myTurn && (
-          <span className="text-xs px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-200 border border-sky-400/30">
+          <span className="text-xs px-2 py-0.5 rounded-full bg-accent/20 text-sky-200 border border-sky-400/30">
             🪞 Mirror up
           </span>
         )}
@@ -1181,7 +1179,7 @@ function TurnCountdown({
   const seconds = Math.ceil(remainingMs / 1000);
   return (
     <span
-      className={`text-xs font-mono px-2 py-0.5 rounded-full border ${seconds <= 5 ? "border-rose-400/40 bg-rose-500/10 text-rose-300" : "border-white/10 bg-white/5 text-slate-300"}`}
+      className={`text-xs font-mono px-2 py-0.5 rounded-full border ${seconds <= 5 ? "border-rose-400/40 bg-rose-500/10 text-rose-300" : "border-hairline bg-surface text-ink-muted"}`}
     >
       ⏱ {seconds}s
     </span>
@@ -1228,7 +1226,7 @@ function CupGrid({
               <button
                 type="button"
                 onClick={() => onRowClick(r)}
-                className="h-12 px-2 rounded-xl border border-amber-400/40 bg-amber-500/10 text-amber-200 text-xs font-semibold hover:bg-amber-500/20"
+                className="h-12 px-2 rounded-[var(--radius-control)] border border-amber-400/40 bg-amber-500/10 text-amber-200 text-xs font-semibold hover:bg-amber-500/20"
               >
                 Row {r + 1}
               </button>
@@ -1301,8 +1299,8 @@ function PlayerList({
   heartPopOnSocket?: string | null;
 }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-white/5 overflow-hidden">
-      <div className="px-3 py-2 border-b border-white/10 text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
+    <div className="rounded-[var(--radius-control)] border border-hairline bg-surface overflow-hidden">
+      <div className="px-3 py-2 border-b border-hairline text-[10px] uppercase tracking-wider text-ink-muted font-semibold">
         Players
       </div>
       <ul className="divide-y divide-white/5">
@@ -1314,14 +1312,14 @@ function PlayerList({
             <li
               key={p.socketId}
               className={`relative flex items-center gap-2 px-3 py-2 ${
-                isTurn ? "bg-sky-500/10" : ""
+                isTurn ? "bg-accent/10" : ""
               } ${p.eliminated ? "opacity-50" : ""}`}
             >
               <span
-                className={`inline-block w-2 h-2 rounded-full ${isTurn ? "bg-sky-300 animate-pulse" : "bg-slate-500"}`}
+                className={`inline-block w-2 h-2 rounded-full ${isTurn ? "bg-sky-300 animate-pulse" : "bg-ink-faint"}`}
               />
               <span
-                className={`text-sm font-medium truncate ${isMe ? "text-sky-200" : "text-slate-200"}`}
+                className={`text-sm font-medium truncate ${isMe ? "text-sky-200" : "text-ink"}`}
               >
                 {p.username || "Player"}
                 {isMe && " (you)"}
@@ -1343,7 +1341,7 @@ function PlayerList({
                 )}
                 {p.skipNextTurn && <span className="text-xs">💤</span>}
                 {p.isSpectator && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-500/20 text-slate-300 border border-slate-400/30">
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-ink-faint/20 text-ink-muted border border-slate-400/30">
                     Spectator
                   </span>
                 )}
@@ -1394,8 +1392,8 @@ function TargetPicker({
   );
   const meta = CARD_META[kind];
   return (
-    <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-      <div className="text-xs font-semibold text-slate-100 mb-2 flex items-center gap-2">
+    <div className="rounded-[var(--radius-control)] border border-hairline bg-surface p-3">
+      <div className="text-xs font-semibold text-ink mb-2 flex items-center gap-2">
         <span aria-hidden>{meta.emoji}</span>
         Pick a target
       </div>
@@ -1405,10 +1403,10 @@ function TargetPicker({
             key={p.socketId}
             type="button"
             onClick={() => onPick(p.socketId)}
-            className="h-9 px-3 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-sm text-slate-200 text-left flex items-center justify-between"
+            className="h-9 px-3 rounded-[var(--radius-control)] border border-hairline bg-surface hover:bg-raised text-sm text-ink text-left flex items-center justify-between"
           >
             <span>{p.username || "Player"}</span>
-            <span className="text-xs text-slate-400">{p.lives} ❤️</span>
+            <span className="text-xs text-ink-muted">{p.lives} ❤️</span>
           </button>
         ))}
       </div>
@@ -1431,7 +1429,7 @@ function FinishedView(props: CupGamePanelProps & { game: CupGameData }) {
     <div className="relative grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px] gap-4 lg:gap-5">
       {(winner || drawWinners.length > 0) && <Confetti />}
       <div className="flex flex-col gap-4">
-        <div className="relative overflow-hidden rounded-xl border border-amber-400/40 bg-gradient-to-br from-amber-500/15 to-orange-500/10 p-6 text-center">
+        <div className="relative overflow-hidden rounded-[var(--radius-control)] border border-amber-400/40 bg-gradient-to-br from-amber-500/15 to-orange-500/10 p-6 text-center">
           <div className="text-5xl mb-2" aria-hidden>
             🏆
           </div>
@@ -1457,8 +1455,8 @@ function FinishedView(props: CupGamePanelProps & { game: CupGameData }) {
             <div className="text-lg font-bold text-amber-100">Game over</div>
           )}
         </div>
-        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-          <div className="text-xs uppercase tracking-wider text-slate-400 font-semibold mb-2">
+        <div className="rounded-[var(--radius-control)] border border-hairline bg-surface p-4">
+          <div className="text-xs uppercase tracking-wider text-ink-muted font-semibold mb-2">
             Final grid
           </div>
           {/* Final grid shows exactly what was uncovered during play. Cups
@@ -1476,7 +1474,7 @@ function FinishedView(props: CupGamePanelProps & { game: CupGameData }) {
         <button
           type="button"
           onClick={() => props.resetCupGame(game.gameId)}
-          className="h-11 rounded-xl border border-emerald-400/30 bg-emerald-500/15 text-emerald-200 text-sm font-semibold hover:bg-emerald-500/25"
+          className="h-11 rounded-[var(--radius-control)] border border-emerald-400/30 bg-emerald-500/15 text-emerald-200 text-sm font-semibold hover:bg-emerald-500/25"
         >
           New game
         </button>

@@ -4,6 +4,8 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+import { ThemeToggle } from "./components/ThemeToggle";
+
 import {
   apiAuthMe,
   apiListSavedRooms,
@@ -110,21 +112,9 @@ export function HomeClient() {
   }, [user]);
 
   return (
-    <div className="relative min-h-screen flex flex-col bg-linear-to-b from-slate-900 via-slate-950 to-black text-slate-200 overflow-x-hidden">
-      {/* Ambient gradient mesh — purely decorative, sits behind everything */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
-      >
-        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[80rem] h-[40rem] rounded-full bg-indigo-500/20 blur-3xl" />
-        <div className="absolute top-1/3 -right-32 w-[28rem] h-[28rem] rounded-full bg-fuchsia-500/15 blur-3xl" />
-        <div className="absolute bottom-0 -left-32 w-[32rem] h-[32rem] rounded-full bg-sky-500/15 blur-3xl" />
-        {/* Subtle grain via radial gradient stops on a tiny mask */}
-        <div className="absolute inset-0 [background-image:radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.04),transparent_40%)]" />
-      </div>
-
-      <header className="h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8 border-b border-white/10 backdrop-blur-xl bg-slate-950/60 sticky top-0 z-50">
-        <div className="font-semibold text-lg sm:text-xl flex items-center gap-2 text-slate-50 tracking-tight group">
+    <div className="relative min-h-screen flex flex-col bg-bg text-ink overflow-x-hidden">
+      <header className="relative z-10 h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8 border-b border-hairline bg-bg/85 backdrop-blur-sm sticky top-0">
+        <div className="font-semibold text-lg sm:text-xl flex items-center gap-2 text-ink tracking-tight group">
           <picture>
             <source srcSet="/favicon.svg?v=2" type="image/svg+xml" />
             <img
@@ -139,17 +129,16 @@ export function HomeClient() {
         </div>
 
         <div className="flex items-center gap-2">
+          <ThemeToggle />
           {user ? (
             <>
-              <div className="hidden sm:flex items-center gap-1.5 text-xs border border-white/10 bg-black/20 rounded-full px-3 py-1 text-slate-300">
-                <span className="text-slate-500">@</span>
-                <span className="text-slate-200 font-medium">
-                  {user.username}
-                </span>
+              <div className="hidden sm:flex items-center gap-1.5 text-xs border border-hairline bg-sunken rounded-full px-3 py-1 text-ink-muted">
+                <span className="text-ink0">@</span>
+                <span className="text-ink font-medium">{user.username}</span>
               </div>
               <button
                 type="button"
-                className="h-8 px-3 rounded-lg border border-white/10 bg-white/5 text-slate-300 text-xs font-medium hover:bg-white/10 hover:text-slate-100 transition-colors"
+                className="h-8 px-3 rounded-[var(--radius-control)] border border-hairline bg-surface text-ink-muted text-xs font-medium hover:bg-raised hover:text-ink transition-colors"
                 onClick={async () => {
                   try {
                     await apiLogout();
@@ -166,13 +155,13 @@ export function HomeClient() {
             <>
               <Link
                 href="/login"
-                className="h-8 px-3 rounded-lg border border-white/10 bg-white/5 text-slate-200 text-xs font-medium hover:bg-white/10 transition-colors inline-flex items-center"
+                className="h-8 px-3 rounded-[var(--radius-control)] border border-hairline bg-surface text-ink text-xs font-medium hover:bg-raised transition-colors inline-flex items-center"
               >
                 Log in
               </Link>
               <Link
                 href="/register"
-                className="h-8 px-3 rounded-lg border border-indigo-500/40 bg-indigo-500/10 text-indigo-200 text-xs font-medium hover:bg-indigo-500/20 transition-colors inline-flex items-center"
+                className="h-8 px-3 rounded-[var(--radius-control)] border border-accent bg-accent-soft text-accent text-xs font-medium hover:bg-accent-soft transition-colors inline-flex items-center"
               >
                 Register
               </Link>
@@ -184,46 +173,39 @@ export function HomeClient() {
       <main className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 py-10 sm:py-16 gap-12">
         {/* Hero */}
         <div className="w-full max-w-2xl flex flex-col items-center text-center gap-3">
-          <span className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1 rounded-full border border-white/10 bg-white/5 text-slate-300">
-            <span className="relative flex h-1.5 w-1.5">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
-            </span>
-            Live with friends — no install needed
+          <span className="inline-flex items-center gap-2 text-xs font-medium text-ink-muted">
+            <span
+              aria-hidden="true"
+              className="h-1.5 w-1.5 rounded-full bg-positive"
+            />
+            No install, no account
           </span>
-          <h1 className="font-semibold text-slate-50 text-3xl sm:text-4xl lg:text-5xl tracking-tight bg-clip-text bg-linear-to-b from-white to-slate-300 text-transparent">
-            Watch videos together,
+          <h1 className="font-semibold text-ink text-4xl sm:text-5xl lg:text-6xl tracking-[-0.03em] leading-[1.05] text-balance">
+            Watch together,
             <br />
-            <span className="bg-clip-text bg-linear-to-r from-indigo-300 via-fuchsia-300 to-sky-300 text-transparent">
-              perfectly in sync.
-            </span>
+            in sync to the frame.
           </h1>
-          <p className="text-sm sm:text-base text-slate-400 max-w-md">
-            Create a private room, share the link, and hit play together. Voice
-            and video chat, reactions, and games all built in.
+          <p className="text-base text-ink-muted max-w-md text-pretty">
+            Create a private room, share the link, hit play. Voice and video
+            chat, reactions and games come with it.
           </p>
         </div>
 
         <div className="w-full max-w-xl">
-          <div className="relative backdrop-blur-md bg-white/5 rounded-2xl border border-white/10 p-5 sm:p-6 shadow-2xl shadow-black/40">
-            {/* Subtle inner glow */}
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-0 rounded-2xl bg-linear-to-b from-white/5 to-transparent"
-            />
+          <div className="relative rounded-[var(--radius-panel)] border border-hairline bg-surface p-5 sm:p-6">
             <div className="relative">
-              <h2 className="font-semibold text-slate-50 text-lg">
+              <h2 className="font-semibold text-ink text-lg">
                 Start a watch party
               </h2>
-              <p className="text-sm text-slate-400 mt-1">
+              <p className="text-sm text-ink-muted mt-1">
                 Create a private room, share the link, and hit play together.
               </p>
 
               <div className="mt-5 grid gap-3">
                 {roomHistory.length > 0 && (
-                  <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+                  <div className="rounded-[var(--radius-control)] border border-hairline bg-sunken p-3">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-medium text-slate-300">
+                      <span className="text-xs font-medium text-ink-muted">
                         Recent rooms
                       </span>
                       <button
@@ -232,7 +214,7 @@ export function HomeClient() {
                           clearRoomHistory();
                           setRoomHistory([]);
                         }}
-                        className="text-xs text-slate-600 hover:text-slate-400 transition-colors"
+                        className="text-xs text-ink-faint hover:text-ink-muted transition-colors"
                         aria-label="Clear recent rooms"
                       >
                         Clear
@@ -247,19 +229,19 @@ export function HomeClient() {
                           <button
                             key={r.roomId}
                             type="button"
-                            className="group/item w-full rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 transition-colors text-left px-3 py-2 flex items-center gap-3"
+                            className="group/item w-full rounded-[var(--radius-control)] bg-surface border border-hairline hover:bg-raised hover:border-hairline-strong transition-colors text-left px-3 py-2 flex items-center gap-3"
                             onClick={() => router.push(`/r/${r.roomId}`)}
                           >
                             <div className="flex-1 min-w-0">
-                              <div className="text-sm font-medium text-slate-100 truncate">
+                              <div className="text-sm font-medium text-ink truncate">
                                 {r.name ?? (
-                                  <span className="font-mono text-slate-300">
+                                  <span className="font-mono text-ink-muted">
                                     {r.roomId}
                                   </span>
                                 )}
                               </div>
                               {r.name && (
-                                <div className="text-xs text-slate-500 font-mono truncate">
+                                <div className="text-xs text-ink0 font-mono truncate">
                                   {r.roomId}
                                 </div>
                               )}
@@ -277,10 +259,10 @@ export function HomeClient() {
                                   Saved
                                 </span>
                               )}
-                              <span className="text-xs text-slate-500">
+                              <span className="text-xs text-ink0">
                                 {timeAgo(r.visitedAt)}
                               </span>
-                              <span className="text-slate-600 group-hover/item:text-slate-400 group-hover/item:translate-x-0.5 transition-all">
+                              <span className="text-ink-faint group-hover/item:text-ink-muted group-hover/item:translate-x-0.5 transition-all">
                                 →
                               </span>
                             </div>
@@ -292,8 +274,8 @@ export function HomeClient() {
                 )}
 
                 {roomHistory.length === 0 && user && savedRooms.length > 0 && (
-                  <div className="rounded-xl border border-white/10 bg-black/20 p-3">
-                    <div className="text-xs font-medium text-slate-300 mb-2">
+                  <div className="rounded-[var(--radius-control)] border border-hairline bg-sunken p-3">
+                    <div className="text-xs font-medium text-ink-muted mb-2">
                       Saved rooms
                     </div>
                     <div className="grid gap-1.5">
@@ -301,7 +283,7 @@ export function HomeClient() {
                         <button
                           key={r.roomId}
                           type="button"
-                          className="h-10 w-full rounded-xl font-medium text-sm transition-colors bg-white/5 border border-white/10 hover:bg-white/10 text-slate-50 text-left px-4"
+                          className="h-10 w-full rounded-[var(--radius-control)] font-medium text-sm transition-colors bg-surface border border-hairline hover:bg-raised text-ink text-left px-4"
                           onClick={() => router.push(`/r/${r.roomId}`)}
                         >
                           <span className="font-mono">{r.roomId}</span>
@@ -313,7 +295,7 @@ export function HomeClient() {
 
                 <button
                   type="button"
-                  className="group relative h-12 w-full rounded-xl font-semibold text-sm transition-all bg-slate-50 text-slate-950 hover:bg-white hover:shadow-lg hover:shadow-indigo-500/20 active:scale-[0.99] inline-flex items-center justify-center gap-2"
+                  className="group relative h-12 w-full rounded-[var(--radius-control)] font-semibold text-sm transition-colors duration-150 bg-accent text-accent-ink hover:brightness-110 inline-flex items-center justify-center gap-2"
                   onClick={() => {
                     router.push(`/r/${generateRoomId()}`);
                   }}
@@ -330,7 +312,13 @@ export function HomeClient() {
                     <path d="M12 5v14M5 12h14" />
                   </svg>
                   Create a new room
-                  <span className="text-slate-400 font-normal text-xs ml-1 hidden sm:inline">
+                  {/*
+                    Sits on the accent fill, so it takes the accent's own ink at
+                    full strength. The muted body colour is a page-background
+                    token and vanished here; dimming with opacity only moved the
+                    problem, so the secondary weight comes from size instead.
+                  */}
+                  <span className="text-accent-ink font-normal text-xs ml-1 hidden sm:inline">
                     (instant link)
                   </span>
                 </button>
@@ -347,14 +335,14 @@ export function HomeClient() {
                     }}
                     placeholder="Enter room name or paste invite link…"
                     aria-label="Room name or invite link"
-                    className="flex-1 min-w-0 bg-black/30 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500/40 hover:border-white/20 transition"
+                    className="flex-1 min-w-0 bg-sunken border border-hairline rounded-[var(--radius-control)] px-4 py-2.5 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:border-accent hover:border-hairline-strong transition-colors duration-150"
                   />
                   <button
                     type="button"
-                    className={`h-11 px-5 rounded-xl border text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5 ${
+                    className={`h-11 px-5 rounded-[var(--radius-control)] border text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5 ${
                       normalizedJoin
                         ? "border-indigo-500/50 bg-indigo-500/20 text-indigo-100 hover:bg-indigo-500/30"
-                        : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"
+                        : "border-hairline bg-surface text-ink-muted hover:bg-raised"
                     }`}
                     disabled={!normalizedJoin}
                     onClick={() => {
@@ -377,7 +365,7 @@ export function HomeClient() {
                   </button>
                 </div>
 
-                <div className="text-xs text-slate-500">
+                <div className="text-xs text-ink0">
                   Tip: share a room by sending its URL (e.g.{" "}
                   <span className="font-mono">/r/neon-penguin-42</span>). No
                   account required.
@@ -458,23 +446,13 @@ export function HomeClient() {
           ].map(({ icon, title, description }, i) => (
             <div
               key={title}
-              className="group/feat relative backdrop-blur-md bg-white/5 rounded-2xl border border-white/10 p-4 flex flex-col gap-2 hover:bg-white/[0.07] hover:border-white/20 transition-colors"
+              className={`flex flex-col gap-2 py-4 sm:py-0 sm:px-6 first:sm:pl-0 last:sm:pr-0 border-t border-hairline sm:border-t-0 first:border-t-0 ${
+                i > 0 ? "sm:border-l sm:border-hairline" : ""
+              }`}
             >
-              <div
-                className={`w-9 h-9 rounded-xl flex items-center justify-center mb-1 transition-colors ${
-                  i === 0
-                    ? "bg-indigo-500/15 text-indigo-300 border border-indigo-500/20"
-                    : i === 1
-                      ? "bg-fuchsia-500/15 text-fuchsia-300 border border-fuchsia-500/20"
-                      : "bg-sky-500/15 text-sky-300 border border-sky-500/20"
-                }`}
-              >
-                {icon}
-              </div>
-              <div className="text-sm font-semibold text-slate-100">
-                {title}
-              </div>
-              <div className="text-xs text-slate-400 leading-relaxed">
+              <div className="text-accent">{icon}</div>
+              <div className="text-sm font-semibold text-ink">{title}</div>
+              <div className="text-sm text-ink-muted leading-relaxed text-pretty">
                 {description}
               </div>
             </div>
@@ -482,15 +460,15 @@ export function HomeClient() {
         </div>
       </main>
 
-      <footer className="py-5 px-6 border-t border-white/5 flex items-center justify-center gap-4 text-xs text-slate-500">
+      <footer className="py-5 px-6 border-t border-white/5 flex items-center justify-center gap-4 text-xs text-ink0">
         <Link
           href="/privacy"
-          className="hover:text-slate-300 transition-colors"
+          className="hover:text-ink-muted transition-colors"
         >
           Privacy Policy
         </Link>
         <span className="text-slate-700">·</span>
-        <Link href="/terms" className="hover:text-slate-300 transition-colors">
+        <Link href="/terms" className="hover:text-ink-muted transition-colors">
           Terms
         </Link>
         <span className="text-slate-700">·</span>

@@ -100,15 +100,25 @@ export default function RootLayout({
   };
 
   return (
-    <html lang="en" suppressHydrationWarning className="[color-scheme:dark]">
+    <html lang="en" suppressHydrationWarning>
       <head>
+        {/*
+          Runs before first paint so a dark-mode user never sees a white flash.
+          It has to be inline and blocking for that reason; anything deferred is
+          already too late. Kept to one statement and no dependencies.
+        */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var p=localStorage.getItem("huddle-theme");var d=p==="dark"||(p!=="light"&&window.matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.classList.toggle("dark",d);}catch(e){}})();`,
+          }}
+        />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} bg-slate-950 text-slate-50 antialiased selection:bg-indigo-500/35 selection:text-slate-50 [font-feature-settings:'ss01','cv02','cv11']`}
+        className={`${geistSans.variable} ${geistMono.variable} bg-bg text-ink antialiased selection:bg-accent selection:text-accent-ink [font-feature-settings:'ss01','cv02','cv11']`}
         suppressHydrationWarning
       >
         <ErrorBoundary>{children}</ErrorBoundary>

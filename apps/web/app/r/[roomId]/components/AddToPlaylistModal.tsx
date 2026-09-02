@@ -138,17 +138,17 @@ export function AddToPlaylistModal({
       open={isOpen}
       onClose={onClose}
       labelledBy={titleId}
-      panelClassName="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden"
+      panelClassName="bg-surface border border-hairline rounded-[var(--radius-panel)] shadow-2xl w-full max-w-md mx-4 overflow-hidden"
     >
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-white/10">
-        <h3 id={titleId} className="text-lg font-semibold text-slate-50">
+      <div className="flex items-center justify-between p-4 border-b border-hairline">
+        <h3 id={titleId} className="text-lg font-semibold text-ink">
           Add to Playlist
         </h3>
         <button
           type="button"
           onClick={onClose}
-          className="p-1 text-slate-400 hover:text-slate-200 transition"
+          className="p-1 text-ink-muted hover:text-ink transition"
           title="Close modal"
           aria-label="Close modal"
         >
@@ -159,8 +159,8 @@ export function AddToPlaylistModal({
       {/* Content */}
       <div className="p-4 space-y-4">
         {/* Video URL preview */}
-        <div className="bg-black/20 rounded-lg px-3 py-2">
-          <div className="text-xs text-slate-500 truncate">{videoUrl}</div>
+        <div className="bg-sunken rounded-[var(--radius-control)] px-3 py-2">
+          <div className="text-xs text-ink0 truncate">{videoUrl}</div>
           {(() => {
             const startTime = getYouTubeStartTime(videoUrl);
             if (startTime && startTime > 0) {
@@ -176,7 +176,7 @@ export function AddToPlaylistModal({
 
         {/* Custom title input */}
         <div>
-          <label className="block text-sm font-medium text-slate-300 mb-1.5">
+          <label className="block text-sm font-medium text-ink-muted mb-1.5">
             Video Title
           </label>
           <input
@@ -184,20 +184,20 @@ export function AddToPlaylistModal({
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Enter a custom title..."
-            className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500/25 focus:border-sky-500/30"
+            className="w-full bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2 text-sm text-ink placeholder:text-ink0 focus:outline-none focus:ring-2 focus:ring-sky-500/25 focus:border-sky-500/30"
             autoFocus
           />
         </div>
 
         {/* Playlist selection */}
         <div>
-          <label className="block text-sm font-medium text-slate-300 mb-1.5">
+          <label className="block text-sm font-medium text-ink-muted mb-1.5">
             Select Playlist
           </label>
 
           {playlists.length === 0 && !isCreatingPlaylist ? (
             <div className="text-center py-4">
-              <p className="text-sm text-slate-500 mb-2">No playlists yet</p>
+              <p className="text-sm text-ink0 mb-2">No playlists yet</p>
               <button
                 type="button"
                 onClick={() => setIsCreatingPlaylist(true)}
@@ -220,21 +220,21 @@ export function AddToPlaylistModal({
                       !isAdded && setSelectedPlaylistId(playlist.id)
                     }
                     disabled={isAdded}
-                    className={`w-full flex items-center gap-3 p-3 rounded-lg border transition text-left ${
+                    className={`w-full flex items-center gap-3 p-3 rounded-[var(--radius-control)] border transition text-left ${
                       isAdded
                         ? "bg-emerald-500/10 border-emerald-500/30 cursor-default"
                         : isSelected
-                          ? "bg-sky-500/20 border-sky-500/30"
-                          : "bg-black/20 border-white/10 hover:bg-white/5 hover:border-white/20"
+                          ? "bg-accent/20 border-sky-500/30"
+                          : "bg-sunken border-hairline hover:bg-surface hover:border-hairline-strong"
                     }`}
                   >
                     <div className="flex-1 min-w-0">
                       <div
-                        className={`text-sm font-medium ${isAdded ? "text-emerald-300" : "text-slate-200"}`}
+                        className={`text-sm font-medium ${isAdded ? "text-emerald-300" : "text-ink"}`}
                       >
                         {playlist.name}
                       </div>
-                      <div className="text-xs text-slate-500">
+                      <div className="text-xs text-ink0">
                         {playlist.items.length} items
                       </div>
                     </div>
@@ -251,13 +251,13 @@ export function AddToPlaylistModal({
 
           {/* Create new playlist */}
           {isCreatingPlaylist ? (
-            <div className="mt-2 p-3 bg-black/20 rounded-lg border border-white/10 space-y-2">
+            <div className="mt-2 p-3 bg-sunken rounded-[var(--radius-control)] border border-hairline space-y-2">
               <input
                 type="text"
                 value={newPlaylistName}
                 onChange={(e) => setNewPlaylistName(e.target.value)}
                 placeholder="New playlist name..."
-                className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500/25"
+                className="w-full bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2 text-sm text-ink placeholder:text-ink0 focus:outline-none focus:ring-2 focus:ring-sky-500/25"
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     handleCreatePlaylist();
@@ -268,7 +268,7 @@ export function AddToPlaylistModal({
                 <button
                   type="button"
                   onClick={() => setIsCreatingPlaylist(false)}
-                  className="px-3 py-1.5 text-sm text-slate-400 hover:text-slate-200 transition"
+                  className="px-3 py-1.5 text-sm text-ink-muted hover:text-ink transition"
                 >
                   Cancel
                 </button>
@@ -276,7 +276,7 @@ export function AddToPlaylistModal({
                   type="button"
                   onClick={handleCreatePlaylist}
                   disabled={!newPlaylistName.trim()}
-                  className="px-3 py-1.5 text-sm bg-sky-600 hover:bg-sky-500 text-white rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-3 py-1.5 text-sm bg-sky-600 hover:bg-accent text-white rounded-[var(--radius-control)] transition disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Create
                 </button>
@@ -287,7 +287,7 @@ export function AddToPlaylistModal({
               <button
                 type="button"
                 onClick={() => setIsCreatingPlaylist(true)}
-                className="mt-2 w-full p-2 text-sm text-slate-400 hover:text-slate-200 border border-dashed border-white/20 hover:border-white/40 rounded-lg transition flex items-center justify-center gap-2"
+                className="mt-2 w-full p-2 text-sm text-ink-muted hover:text-ink border border-dashed border-hairline-strong hover:border-white/40 rounded-[var(--radius-control)] transition flex items-center justify-center gap-2"
               >
                 <PlusIcon />
                 Create new playlist
@@ -298,11 +298,11 @@ export function AddToPlaylistModal({
       </div>
 
       {/* Footer */}
-      <div className="flex items-center justify-end gap-2 p-4 border-t border-white/10 bg-black/20">
+      <div className="flex items-center justify-end gap-2 p-4 border-t border-hairline bg-sunken">
         <button
           type="button"
           onClick={onClose}
-          className="px-4 py-2 text-sm text-slate-400 hover:text-slate-200 transition"
+          className="px-4 py-2 text-sm text-ink-muted hover:text-ink transition"
         >
           Close
         </button>
@@ -314,7 +314,7 @@ export function AddToPlaylistModal({
             !title.trim() ||
             addedToPlaylists.has(selectedPlaylistId || "")
           }
-          className="px-4 py-2 text-sm bg-sky-600 hover:bg-sky-500 text-white rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-4 py-2 text-sm bg-sky-600 hover:bg-accent text-white rounded-[var(--radius-control)] transition disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Add to Playlist
         </button>

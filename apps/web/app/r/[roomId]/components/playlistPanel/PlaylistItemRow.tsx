@@ -43,14 +43,14 @@ export function PlaylistItemRow({
         onDrop(index);
       }}
       onDragEnd={onDragEnd}
-      className={`group flex items-center gap-2 p-2 rounded-lg transition cursor-grab active:cursor-grabbing ${
+      className={`group flex items-center gap-2 p-2 rounded-[var(--radius-control)] transition cursor-grab active:cursor-grabbing ${
         isDragging
-          ? "opacity-50 bg-white/10 border border-dashed border-white/30"
+          ? "opacity-50 bg-raised border border-dashed border-white/30"
           : isDragOver
             ? "bg-indigo-500/20 border border-indigo-500/50"
             : isActive
-              ? "bg-sky-500/20 border border-sky-500/30"
-              : "hover:bg-white/5 border border-transparent"
+              ? "bg-accent/20 border border-sky-500/30"
+              : "hover:bg-surface border border-transparent"
       }`}
     >
       <button
@@ -62,13 +62,13 @@ export function PlaylistItemRow({
       >
         <span
           aria-hidden="true"
-          className="shrink-0 text-slate-500 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
+          className="shrink-0 text-ink0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
         >
           <DragHandleIcon />
         </span>
 
         {item.thumbnail ? (
-          <span className="w-16 h-9 shrink-0 rounded overflow-hidden bg-black/30 relative">
+          <span className="w-16 h-9 shrink-0 rounded overflow-hidden bg-sunken relative">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={item.thumbnail}
@@ -77,14 +77,14 @@ export function PlaylistItemRow({
               loading="lazy"
             />
             {isPlaying && (
-              <span className="absolute inset-0 bg-black/40 flex items-center justify-center">
+              <span className="absolute inset-0 bg-sunken flex items-center justify-center">
                 <span className="text-sky-400">
                   <PauseIcon />
                 </span>
               </span>
             )}
             {!isPlaying && isActive && (
-              <span className="absolute inset-0 bg-black/20 flex items-center justify-center">
+              <span className="absolute inset-0 bg-sunken flex items-center justify-center">
                 <span className="text-sky-400 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
                   <PlayIcon />
                 </span>
@@ -99,7 +99,7 @@ export function PlaylistItemRow({
               </span>
             ) : (
               <span
-                className={`${isActive ? "text-sky-400" : "text-slate-500 group-hover:text-slate-300"}`}
+                className={`${isActive ? "text-sky-400" : "text-ink0 group-hover:text-ink-muted"}`}
               >
                 <PlayIcon />
               </span>
@@ -108,11 +108,9 @@ export function PlaylistItemRow({
         )}
 
         <span className="flex-1 min-w-0">
-          <span className="block text-sm text-slate-200 truncate">
-            {item.title}
-          </span>
+          <span className="block text-sm text-ink truncate">{item.title}</span>
           {item.duration && (
-            <span className="block text-xs text-slate-500">
+            <span className="block text-xs text-ink0">
               {formatDuration(item.duration)}
             </span>
           )}
@@ -129,7 +127,7 @@ export function PlaylistItemRow({
             type="button"
             onClick={onMoveUp}
             disabled={!canMoveUp}
-            className="h-7 min-w-7 rounded text-slate-400 opacity-70 transition hover:bg-white/10 hover:text-slate-200 focus:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 disabled:cursor-not-allowed disabled:opacity-25"
+            className="h-7 min-w-7 rounded text-ink-muted opacity-70 transition hover:bg-raised hover:text-ink focus:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 disabled:cursor-not-allowed disabled:opacity-25"
             title="Move up"
             aria-label={`Move ${item.title} up`}
           >
@@ -139,7 +137,7 @@ export function PlaylistItemRow({
             type="button"
             onClick={onMoveDown}
             disabled={!canMoveDown}
-            className="h-7 min-w-7 rounded text-slate-400 opacity-70 transition hover:bg-white/10 hover:text-slate-200 focus:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 disabled:cursor-not-allowed disabled:opacity-25"
+            className="h-7 min-w-7 rounded text-ink-muted opacity-70 transition hover:bg-raised hover:text-ink focus:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 disabled:cursor-not-allowed disabled:opacity-25"
             title="Move down"
             aria-label={`Move ${item.title} down`}
           >
@@ -149,7 +147,7 @@ export function PlaylistItemRow({
         <button
           type="button"
           onClick={onRemove}
-          className="opacity-60 group-hover:opacity-100 group-focus-within:opacity-100 focus:opacity-100 p-1.5 text-slate-500 hover:text-red-400 focus-visible:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/70 rounded transition"
+          className="opacity-60 group-hover:opacity-100 group-focus-within:opacity-100 focus:opacity-100 p-1.5 text-ink0 hover:text-red-400 focus-visible:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/70 rounded transition"
           title="Remove from playlist"
           aria-label="Remove from playlist"
         >

@@ -173,17 +173,17 @@ export function WheelPickerModal(props: {
       open={open}
       onClose={onClose}
       labelledBy="wheel-picker-title"
-      panelClassName="relative w-full max-w-4xl rounded-3xl border border-white/10 bg-black/40 shadow-xl overflow-hidden"
+      panelClassName="relative w-full max-w-4xl rounded-3xl border border-hairline bg-sunken shadow-xl overflow-hidden"
     >
-      <div className="p-5 border-b border-white/10 bg-black/20 flex items-center justify-between gap-4">
+      <div className="p-5 border-b border-hairline bg-sunken flex items-center justify-between gap-4">
         <div>
           <h2
             id="wheel-picker-title"
-            className="text-xl font-semibold text-slate-50"
+            className="text-xl font-semibold text-ink"
           >
             Wheel Picker
           </h2>
-          <div className="text-sm text-slate-300 mt-0.5">
+          <div className="text-sm text-ink-muted mt-0.5">
             Add entries one by one, then spin.
           </div>
         </div>
@@ -193,14 +193,14 @@ export function WheelPickerModal(props: {
             type="button"
             onClick={onClear}
             disabled={!isConnected || entries.length === 0 || isSpinning}
-            className="h-10 px-4 rounded-xl border border-white/10 bg-white/5 text-slate-100 text-sm font-medium hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="h-10 px-4 rounded-[var(--radius-control)] border border-hairline bg-surface text-ink text-sm font-medium hover:bg-raised transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Clear
           </button>
           <button
             type="button"
             onClick={onClose}
-            className="h-10 px-4 rounded-xl border border-white/10 bg-white/5 text-slate-100 text-sm font-medium hover:bg-white/10 transition-colors"
+            className="h-10 px-4 rounded-[var(--radius-control)] border border-hairline bg-surface text-ink text-sm font-medium hover:bg-raised transition-colors"
           >
             Close
           </button>
@@ -212,12 +212,12 @@ export function WheelPickerModal(props: {
           <div className="relative w-72 h-72">
             <div className="absolute left-1/2 -top-1 -translate-x-1/2 z-10 w-0 h-0 border-l-12 border-r-12 border-b-20 border-l-transparent border-r-transparent border-b-white/60" />
 
-            <div className="absolute inset-0 rounded-full border border-white/10 bg-black/30 overflow-hidden">
+            <div className="absolute inset-0 rounded-full border border-hairline bg-sunken overflow-hidden">
               <div className="w-full h-full wheel-rotator" />
             </div>
 
             <div className="absolute inset-0 flex items-center justify-center">
-              <div className="px-4 py-2 rounded-2xl border border-white/10 bg-black/60 text-sm text-slate-100">
+              <div className="px-4 py-2 rounded-[var(--radius-panel)] border border-hairline bg-sunken text-sm text-white">
                 {effectiveEntries.length} entries
               </div>
             </div>
@@ -233,13 +233,13 @@ export function WheelPickerModal(props: {
               onSpin();
             }}
             disabled={!isConnected || entries.length === 0 || isSpinning}
-            className="h-12 w-full rounded-2xl border border-white/10 bg-white/5 text-slate-50 text-base font-semibold hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="h-12 w-full rounded-[var(--radius-panel)] border border-hairline bg-surface text-ink text-base font-semibold hover:bg-raised transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSpinning ? "Spinning…" : "Spin"}
           </button>
 
-          <div className="w-full rounded-2xl border border-white/10 bg-black/20 p-4">
-            <div className="text-xs uppercase tracking-wider font-bold text-slate-400">
+          <div className="w-full rounded-[var(--radius-panel)] border border-hairline bg-sunken p-4">
+            <div className="text-xs uppercase tracking-wider font-bold text-ink-muted">
               Result
             </div>
             <div className="mt-2 min-h-7 flex items-center gap-2">
@@ -261,11 +261,11 @@ export function WheelPickerModal(props: {
                   />
                 </svg>
               ) : null}
-              <span className="text-lg text-slate-100 font-semibold">
+              <span className="text-lg text-ink font-semibold">
                 {revealedPick ? revealedPick : isSpinning ? "…" : ""}
               </span>
             </div>
-            <div className="mt-1 text-xs text-slate-400">
+            <div className="mt-1 text-xs text-ink-muted">
               Result appears only after the wheel stops.
             </div>
           </div>
@@ -279,27 +279,25 @@ export function WheelPickerModal(props: {
               onChange={(e) => setInput(e.target.value)}
               placeholder={isConnected ? "Add entry…" : "Connecting…"}
               disabled={!isConnected || isSpinning}
-              className="flex-1 h-12 bg-black/30 border border-white/10 rounded-2xl px-4 text-base text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500/25 focus:border-sky-500/30 transition disabled:opacity-60"
+              className="flex-1 h-12 bg-sunken border border-hairline rounded-[var(--radius-panel)] px-4 text-base text-ink placeholder:text-ink0 focus:outline-none focus:ring-2 focus:ring-sky-500/25 focus:border-sky-500/30 transition disabled:opacity-60"
             />
             <button
               type="submit"
               disabled={!isConnected || isSpinning || !input.trim()}
-              className="h-12 px-5 rounded-2xl border border-white/10 bg-white/5 text-slate-50 text-sm font-semibold hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="h-12 px-5 rounded-[var(--radius-panel)] border border-hairline bg-surface text-ink text-sm font-semibold hover:bg-raised transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Add
             </button>
           </form>
 
-          <div className="mt-4 flex-1 min-h-0 rounded-2xl border border-white/10 bg-black/20 overflow-hidden">
-            <div className="p-3 border-b border-white/10 text-sm text-slate-300 flex items-center justify-between">
+          <div className="mt-4 flex-1 min-h-0 rounded-[var(--radius-panel)] border border-hairline bg-sunken overflow-hidden">
+            <div className="p-3 border-b border-hairline text-sm text-ink-muted flex items-center justify-between">
               <span>Entries</span>
-              <span className="text-xs text-slate-500">Click remove</span>
+              <span className="text-xs text-ink0">Click remove</span>
             </div>
             <div className="max-h-105 overflow-y-auto divide-y divide-white/10">
               {effectiveEntries.length === 0 ? (
-                <div className="p-6 text-sm text-slate-500">
-                  No entries yet.
-                </div>
+                <div className="p-6 text-sm text-ink0">No entries yet.</div>
               ) : (
                 effectiveEntries.map((entry, idx) => {
                   const c = colorForIndex(idx);
@@ -309,7 +307,7 @@ export function WheelPickerModal(props: {
                     <div
                       key={`${idx}:${entry}`}
                       className={`flex items-center gap-3 px-4 py-3 ${
-                        isWinner ? "bg-white/5" : ""
+                        isWinner ? "bg-surface" : ""
                       }`}
                     >
                       <svg
@@ -329,15 +327,13 @@ export function WheelPickerModal(props: {
                         />
                       </svg>
                       <div className="flex-1 min-w-0">
-                        <div className="text-slate-100 text-sm truncate">
-                          {entry}
-                        </div>
+                        <div className="text-ink text-sm truncate">{entry}</div>
                       </div>
                       <button
                         type="button"
                         onClick={() => onRemoveEntry(idx)}
                         disabled={!isConnected || isSpinning}
-                        className="h-9 px-3 rounded-xl border border-white/10 bg-white/5 text-slate-50 text-xs font-semibold hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="h-9 px-3 rounded-[var(--radius-control)] border border-hairline bg-surface text-ink text-xs font-semibold hover:bg-raised transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Remove
                       </button>

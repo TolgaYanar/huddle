@@ -10,16 +10,16 @@ export function CallHeader(props: {
   return (
     <div className="flex items-center justify-between gap-2">
       <div className="flex items-center gap-2">
-        <span className="font-semibold text-sm text-slate-100">Call</span>
+        <span className="font-semibold text-sm text-ink">Call</span>
         <span
           className={`inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full border transition-colors ${
             localSpeaking
               ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
-              : "bg-black/20 border-white/10 text-slate-400"
+              : "bg-sunken border-hairline text-ink-muted"
           }`}
         >
           <span
-            className={`w-1.5 h-1.5 rounded-full ${localSpeaking ? "bg-emerald-400" : "bg-slate-500"}`}
+            className={`w-1.5 h-1.5 rounded-full ${localSpeaking ? "bg-emerald-400" : "bg-ink-faint"}`}
           />
           {localSpeaking ? "Speaking" : "Muted"}
         </span>
@@ -28,7 +28,7 @@ export function CallHeader(props: {
       <button
         type="button"
         onClick={() => setIsCallCollapsed((v) => !v)}
-        className="h-7 px-2.5 rounded-lg border border-white/10 bg-white/5 text-slate-400 text-xs hover:bg-white/10 hover:text-slate-200 transition-colors"
+        className="h-7 px-2.5 rounded-[var(--radius-control)] border border-hairline bg-surface text-ink-muted text-xs hover:bg-raised hover:text-ink transition-colors"
         title={isCallCollapsed ? "Expand call" : "Collapse call"}
       >
         {isCallCollapsed ? "Expand" : "Collapse"}

@@ -41,14 +41,14 @@ export function UnmuteHint({
 
   return (
     <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 pointer-events-auto">
-      <div className="flex items-center gap-2 px-3 py-2 rounded-2xl border border-white/15 bg-black/70 backdrop-blur-md shadow-xl">
+      <div className="flex items-center gap-2 px-3 py-2 rounded-[var(--radius-panel)] border border-hairline bg-sunken backdrop-blur-md shadow-xl">
         <button
           type="button"
           onClick={() => {
             onUnmute();
             setDismissed(true);
           }}
-          className="flex items-center gap-2 px-3 h-8 rounded-xl bg-white text-slate-900 text-sm font-semibold hover:bg-slate-100 transition-colors"
+          className="flex items-center gap-2 px-3 h-8 rounded-[var(--radius-control)] bg-white text-slate-900 text-sm font-semibold hover:bg-slate-100 transition-colors"
           aria-label="Tap for sound"
         >
           <svg
@@ -71,7 +71,7 @@ export function UnmuteHint({
           type="button"
           onClick={() => setDismissed(true)}
           aria-label="Dismiss unmute prompt"
-          className="h-8 w-8 inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-300 text-sm hover:bg-white/10 hover:text-white transition-colors"
+          className="h-8 w-8 inline-flex items-center justify-center rounded-[var(--radius-control)] border border-hairline bg-surface text-ink-muted text-sm hover:bg-raised hover:text-white transition-colors"
         >
           <span aria-hidden="true">✕</span>
         </button>

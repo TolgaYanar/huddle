@@ -58,17 +58,17 @@ export function TimerModal({
       open={open}
       onClose={onClose}
       labelledBy={titleId}
-      panelClassName="w-full max-w-sm bg-slate-900/95 border border-white/10 rounded-2xl shadow-2xl p-6 flex flex-col gap-5"
+      panelClassName="w-full max-w-sm bg-surface/95 border border-hairline rounded-[var(--radius-panel)] shadow-2xl p-6 flex flex-col gap-5"
     >
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 id={titleId} className="text-base font-semibold text-slate-100">
+        <h2 id={titleId} className="text-base font-semibold text-ink">
           Shared timer
         </h2>
         <button
           type="button"
           onClick={onClose}
-          className="h-7 w-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-200 hover:bg-white/10 transition-colors"
+          className="h-7 w-7 rounded-[var(--radius-control)] flex items-center justify-center text-ink-muted hover:text-ink hover:bg-raised transition-colors"
           aria-label="Close timer"
         >
           ✕
@@ -107,13 +107,13 @@ export function TimerModal({
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <span
               className={`text-3xl font-mono font-bold tabular-nums ${
-                isFinished ? "text-rose-400" : "text-slate-100"
+                isFinished ? "text-rose-400" : "text-ink"
               }`}
               aria-live="polite"
             >
               {formatTimer(displayMs)}
             </span>
-            <span className="text-xs text-slate-500 mt-0.5 capitalize">
+            <span className="text-xs text-ink0 mt-0.5 capitalize">
               {status}
             </span>
           </div>
@@ -130,7 +130,7 @@ export function TimerModal({
           type="button"
           onClick={onReset}
           disabled={!isConnected || isIdle}
-          className="h-9 px-4 rounded-xl border border-white/10 bg-white/5 text-slate-300 text-sm font-medium hover:bg-white/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className="h-9 px-4 rounded-[var(--radius-control)] border border-hairline bg-surface text-ink-muted text-sm font-medium hover:bg-raised transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Reset
         </button>
@@ -140,7 +140,7 @@ export function TimerModal({
             type="button"
             onClick={onPause}
             disabled={!isConnected}
-            className="h-9 px-5 rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-200 text-sm font-semibold hover:bg-amber-500/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="h-9 px-5 rounded-[var(--radius-control)] border border-amber-500/40 bg-amber-500/10 text-amber-200 text-sm font-semibold hover:bg-amber-500/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Pause
           </button>
@@ -149,18 +149,18 @@ export function TimerModal({
             type="button"
             onClick={onStart}
             disabled={!isConnected || displayMs <= 0}
-            className="h-9 px-5 rounded-xl border border-indigo-500/40 bg-indigo-500/20 text-indigo-200 text-sm font-semibold hover:bg-indigo-500/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="h-9 px-5 rounded-[var(--radius-control)] border border-accent bg-indigo-500/20 text-accent text-sm font-semibold hover:bg-indigo-500/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {status === "paused" ? "Resume" : "Start"}
           </button>
         )}
       </div>
 
-      <div className="border-t border-white/10" />
+      <div className="border-t border-hairline" />
 
       {/* Presets */}
       <div>
-        <p className="text-xs text-slate-500 mb-2">Presets</p>
+        <p className="text-xs text-ink0 mb-2">Presets</p>
         <div className="flex flex-wrap gap-1.5">
           {PRESETS.map((p) => (
             <button
@@ -168,10 +168,10 @@ export function TimerModal({
               type="button"
               onClick={() => onSetDuration(p.ms)}
               disabled={!isConnected}
-              className={`h-7 px-3 rounded-lg text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+              className={`h-7 px-3 rounded-[var(--radius-control)] text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
                 durationMs === p.ms
-                  ? "border border-indigo-500/50 bg-indigo-500/20 text-indigo-200"
-                  : "border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"
+                  ? "border border-indigo-500/50 bg-indigo-500/20 text-accent"
+                  : "border border-hairline bg-surface text-ink-muted hover:bg-raised"
               }`}
             >
               {p.label}
@@ -182,7 +182,7 @@ export function TimerModal({
 
       {/* Custom duration */}
       <div>
-        <p className="text-xs text-slate-500 mb-2">Custom (minutes)</p>
+        <p className="text-xs text-ink0 mb-2">Custom (minutes)</p>
         <div className="flex gap-2">
           <input
             type="number"
@@ -200,7 +200,7 @@ export function TimerModal({
               }
             }}
             placeholder="e.g. 45"
-            className="flex-1 h-9 rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-slate-100 placeholder:text-slate-600 outline-none focus:ring-2 focus:ring-indigo-500/40"
+            className="flex-1 h-9 rounded-[var(--radius-control)] border border-hairline bg-surface px-3 text-sm text-ink placeholder:text-ink-faint outline-none focus:ring-2 focus:ring-indigo-500/40"
             aria-label="Custom duration in minutes"
           />
           <button
@@ -213,7 +213,7 @@ export function TimerModal({
                 setCustomMin("");
               }
             }}
-            className="h-9 px-3 rounded-xl border border-white/10 bg-indigo-500/20 text-indigo-200 text-sm font-medium hover:bg-indigo-500/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="h-9 px-3 rounded-[var(--radius-control)] border border-hairline bg-indigo-500/20 text-accent text-sm font-medium hover:bg-indigo-500/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Set
           </button>

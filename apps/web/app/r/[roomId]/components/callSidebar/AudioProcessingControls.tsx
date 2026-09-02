@@ -17,19 +17,19 @@ function Toggle({
       role="switch"
       aria-checked={checked ? "true" : "false"}
       onClick={onChange}
-      className="flex items-center justify-between w-full gap-3 text-left hover:bg-white/5 rounded-lg px-1 py-1 transition-colors"
+      className="flex items-center justify-between w-full gap-3 text-left hover:bg-surface rounded-[var(--radius-control)] px-1 py-1 transition-colors"
     >
       <div className="min-w-0">
-        <span className="text-xs text-slate-300">{label}</span>
+        <span className="text-xs text-ink-muted">{label}</span>
         {description && (
-          <span className="block text-[10px] text-slate-500 leading-tight">
+          <span className="block text-[10px] text-ink0 leading-tight">
             {description}
           </span>
         )}
       </div>
       <div
         className={`relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors ${
-          checked ? "bg-sky-500" : "bg-white/10"
+          checked ? "bg-accent" : "bg-raised"
         }`}
       >
         <span
@@ -60,8 +60,8 @@ export function AudioProcessingControls(props: {
   } = props;
 
   return (
-    <div className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 flex flex-col gap-0.5">
-      <div className="text-[10px] font-medium text-slate-500 uppercase tracking-wide mb-1">
+    <div className="rounded-[var(--radius-control)] border border-hairline bg-sunken px-3 py-2 flex flex-col gap-0.5">
+      <div className="text-[10px] font-medium text-ink0 uppercase tracking-wide mb-1">
         Audio
       </div>
       <Toggle

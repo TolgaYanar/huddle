@@ -26,7 +26,7 @@ export function InitialPrompt(props: {
       <button
         type="button"
         onClick={onOpenNetflix}
-        className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-medium px-6 py-3 rounded-lg transition-colors"
+        className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-medium px-6 py-3 rounded-[var(--radius-control)] transition-colors"
       >
         <ExternalLink className="w-5 h-5" />
         Open Netflix

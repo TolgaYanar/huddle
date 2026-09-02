@@ -43,7 +43,7 @@ export function SyncedControls(props: {
         <span className="text-sm font-medium">Synced with room</span>
       </div>
 
-      <div className="bg-zinc-900 rounded-lg p-6 w-full">
+      <div className="bg-zinc-900 rounded-[var(--radius-control)] p-6 w-full">
         <div className="text-center mb-4">
           <div className="text-4xl font-mono text-white mb-1">
             {formatTime(localTime)}
@@ -60,7 +60,7 @@ export function SyncedControls(props: {
             type="button"
             onClick={() => onSeekDelta(-10)}
             aria-label="Skip back 10 seconds"
-            className="p-2 hover:bg-zinc-800 rounded-lg transition-colors"
+            className="p-2 hover:bg-zinc-800 rounded-[var(--radius-control)] transition-colors"
             title="Back 10s"
           >
             <SkipBack className="w-6 h-6 text-zinc-400" />
@@ -83,7 +83,7 @@ export function SyncedControls(props: {
             type="button"
             onClick={() => onSeekDelta(10)}
             aria-label="Skip forward 10 seconds"
-            className="p-2 hover:bg-zinc-800 rounded-lg transition-colors"
+            className="p-2 hover:bg-zinc-800 rounded-[var(--radius-control)] transition-colors"
             title="Forward 10s"
           >
             <SkipForward className="w-6 h-6 text-zinc-400" />
@@ -95,7 +95,7 @@ export function SyncedControls(props: {
         <button
           type="button"
           onClick={onCopyTimestamp}
-          className="flex items-center gap-2 text-zinc-400 hover:text-white text-sm transition-colors px-3 py-2 rounded-lg hover:bg-zinc-800"
+          className="flex items-center gap-2 text-zinc-400 hover:text-white text-sm transition-colors px-3 py-2 rounded-[var(--radius-control)] hover:bg-zinc-800"
         >
           {copied ? (
             <Check className="w-4 h-4 text-green-500" />
@@ -108,7 +108,7 @@ export function SyncedControls(props: {
         <button
           type="button"
           onClick={onResync}
-          className="flex items-center gap-2 text-zinc-400 hover:text-white text-sm transition-colors px-3 py-2 rounded-lg hover:bg-zinc-800"
+          className="flex items-center gap-2 text-zinc-400 hover:text-white text-sm transition-colors px-3 py-2 rounded-[var(--radius-control)] hover:bg-zinc-800"
         >
           <RefreshCw className="w-4 h-4" />
           Re-sync
@@ -117,7 +117,7 @@ export function SyncedControls(props: {
         <button
           type="button"
           onClick={onOpenNetflix}
-          className="flex items-center gap-2 text-zinc-400 hover:text-white text-sm transition-colors px-3 py-2 rounded-lg hover:bg-zinc-800"
+          className="flex items-center gap-2 text-zinc-400 hover:text-white text-sm transition-colors px-3 py-2 rounded-[var(--radius-control)] hover:bg-zinc-800"
         >
           <ExternalLink className="w-4 h-4" />
           Open Netflix
@@ -132,7 +132,7 @@ export function SyncedControls(props: {
           <input
             type="text"
             placeholder="e.g., 1:45:30"
-            className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm placeholder:text-zinc-600"
+            className="flex-1 bg-zinc-800 border border-zinc-700 rounded-[var(--radius-control)] px-3 py-2 text-white text-sm placeholder:text-zinc-600"
             onBlur={(e) => {
               const duration = parseTime(e.target.value);
               if (duration > 0) {

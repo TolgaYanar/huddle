@@ -30,7 +30,7 @@ function GameLoading() {
     <div
       role="status"
       aria-live="polite"
-      className="flex items-center justify-center py-16 text-sm text-slate-400"
+      className="flex items-center justify-center py-16 text-sm text-ink-muted"
     >
       Loading game…
     </div>
@@ -79,16 +79,16 @@ export function GameModal({
       open={openGameId !== null}
       onClose={onClose}
       labelledBy={titleId}
-      panelClassName="relative z-10 w-full max-w-5xl max-h-[92vh] flex flex-col rounded-2xl border border-white/10 bg-slate-900/95 backdrop-blur-xl shadow-2xl"
+      panelClassName="relative z-10 w-full max-w-5xl max-h-[92vh] flex flex-col rounded-[var(--radius-panel)] border border-hairline bg-surface/95 backdrop-blur-xl shadow-2xl"
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 shrink-0">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-hairline shrink-0">
         <div className="flex items-center gap-3">
           <span className="text-2xl" aria-hidden>
             {emoji}
           </span>
           <div>
-            <h2 id={titleId} className="text-lg font-bold text-slate-100">
+            <h2 id={titleId} className="text-lg font-bold text-ink">
               {title}
             </h2>
             {showActiveBadge && (
@@ -99,7 +99,7 @@ export function GameModal({
         <button
           type="button"
           onClick={onClose}
-          className="h-9 w-9 rounded-xl border border-white/10 bg-white/5 text-slate-400 hover:text-slate-100 hover:bg-white/10 transition-colors inline-flex items-center justify-center text-lg"
+          className="h-9 w-9 rounded-[var(--radius-control)] border border-hairline bg-surface text-ink-muted hover:text-ink hover:bg-raised transition-colors inline-flex items-center justify-center text-lg"
           aria-label="Close game"
         >
           ×

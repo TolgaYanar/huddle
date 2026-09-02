@@ -29,7 +29,7 @@ export function VideoPreviewModal({
       open={showPreviewModal}
       onClose={onClose}
       labelledBy="video-preview-title"
-      panelClassName="max-w-2xl w-full rounded-2xl border border-white/20 bg-slate-900 overflow-hidden shadow-2xl"
+      panelClassName="max-w-2xl w-full rounded-[var(--radius-panel)] border border-hairline-strong bg-surface overflow-hidden shadow-2xl"
     >
       {/* Thumbnail */}
       {videoPreview.thumbnail && (
@@ -54,17 +54,17 @@ export function VideoPreviewModal({
       <div className="p-6">
         <h2
           id="video-preview-title"
-          className="text-xl font-bold text-slate-50 mb-2"
+          className="text-xl font-bold text-ink mb-2"
         >
           {videoPreview.title}
         </h2>
-        <div className="text-sm text-slate-400 mb-1 font-medium uppercase tracking-wide">
+        <div className="text-sm text-ink-muted mb-1 font-medium uppercase tracking-wide">
           {videoPreview.platform}
         </div>
-        <div className="text-sm text-slate-400 mb-4 flex flex-wrap gap-x-4 gap-y-1">
+        <div className="text-sm text-ink-muted mb-4 flex flex-wrap gap-x-4 gap-y-1">
           <span>
             Duration:{" "}
-            <span className="text-slate-300 font-semibold">
+            <span className="text-ink-muted font-semibold">
               {videoPreview.duration ?? "Unavailable"}
             </span>
           </span>
@@ -83,7 +83,7 @@ export function VideoPreviewModal({
             return null;
           })()}
         </div>
-        <div className="text-sm text-slate-500 font-mono break-all mb-6">
+        <div className="text-sm text-ink0 font-mono break-all mb-6">
           {videoPreview.url}
         </div>
 
@@ -92,7 +92,7 @@ export function VideoPreviewModal({
           <button
             type="button"
             onClick={() => onLoadVideo(videoPreview.url)}
-            className="flex-1 h-11 rounded-xl font-semibold text-sm transition-colors bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-50 disabled:hover:bg-indigo-600"
+            className="flex-1 h-11 rounded-[var(--radius-control)] font-semibold text-sm transition-colors bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-50 disabled:hover:bg-indigo-600"
             disabled={isPreviewLoading}
             autoFocus
           >
@@ -101,7 +101,7 @@ export function VideoPreviewModal({
           <button
             type="button"
             onClick={onClose}
-            className="h-11 px-6 rounded-xl font-semibold text-sm transition-colors border border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"
+            className="h-11 px-6 rounded-[var(--radius-control)] font-semibold text-sm transition-colors border border-hairline bg-surface text-ink hover:bg-raised"
           >
             Cancel
           </button>

@@ -24,7 +24,7 @@ function GuestNameEditor({
   };
 
   return (
-    <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/20 px-3 py-2">
+    <div className="flex items-center gap-2 rounded-[var(--radius-control)] border border-hairline bg-sunken px-3 py-2">
       {editing ? (
         <>
           <input
@@ -37,7 +37,7 @@ function GuestNameEditor({
             }}
             maxLength={30}
             placeholder="Your display name"
-            className="flex-1 bg-transparent text-sm text-slate-100 placeholder:text-slate-500 outline-none min-w-0"
+            className="flex-1 bg-transparent text-sm text-ink placeholder:text-ink0 outline-none min-w-0"
           />
           <button
             type="button"
@@ -50,23 +50,23 @@ function GuestNameEditor({
           <button
             type="button"
             onClick={() => setEditing(false)}
-            className="text-xs text-slate-500 hover:text-slate-300 shrink-0"
+            className="text-xs text-ink0 hover:text-ink-muted shrink-0"
           >
             ✕
           </button>
         </>
       ) : (
         <>
-          <span className="text-xs text-slate-400 shrink-0">You</span>
-          <span className="flex-1 text-sm font-medium text-slate-200 truncate min-w-0">
+          <span className="text-xs text-ink-muted shrink-0">You</span>
+          <span className="flex-1 text-sm font-medium text-ink truncate min-w-0">
             {guestUsername || (
-              <span className="text-slate-500 font-normal">Set your name…</span>
+              <span className="text-ink0 font-normal">Set your name…</span>
             )}
           </span>
           <button
             type="button"
             onClick={startEdit}
-            className="text-xs text-slate-500 hover:text-slate-300 transition-colors shrink-0"
+            className="text-xs text-ink0 hover:text-ink-muted transition-colors shrink-0"
             title="Edit display name"
           >
             ✎
@@ -138,7 +138,7 @@ export const CallSidebar = React.memo(function CallSidebar(
   );
 
   return (
-    <aside className="backdrop-blur-md bg-white/5 rounded-2xl border border-white/10 p-4 sm:p-5 lg:col-start-1 lg:row-start-1">
+    <aside className="backdrop-blur-md bg-surface rounded-[var(--radius-panel)] border border-hairline p-4 sm:p-5 lg:col-start-1 lg:row-start-1">
       <div className="flex flex-col gap-3">
         <CallHeader
           localSpeaking={localSpeaking}
@@ -160,7 +160,7 @@ export const CallSidebar = React.memo(function CallSidebar(
               className={`w-2 h-2 rounded-full ${screenEnabled ? "bg-rose-400" : "bg-slate-600"}`}
               title={screenEnabled ? "Screen sharing" : "Screen off"}
             />
-            <span className="text-xs text-slate-500">
+            <span className="text-xs text-ink0">
               {[
                 remoteStreams.length + 1,
                 participantsWithoutStream.length,

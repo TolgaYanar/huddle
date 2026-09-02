@@ -16,10 +16,10 @@ function RoomErrorFallback({
   error: Error;
 }) {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-200 p-6">
-      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-white/5 p-6 flex flex-col gap-4">
+    <div className="min-h-screen flex items-center justify-center bg-bg text-ink p-6">
+      <div className="w-full max-w-md rounded-[var(--radius-panel)] border border-hairline bg-surface p-6 flex flex-col gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center shrink-0">
+          <div className="w-9 h-9 rounded-[var(--radius-control)] bg-rose-500/15 border border-rose-500/30 flex items-center justify-center shrink-0">
             <svg
               className="w-5 h-5 text-rose-400"
               fill="none"
@@ -35,17 +35,15 @@ function RoomErrorFallback({
             </svg>
           </div>
           <div>
-            <div className="font-semibold text-slate-50 text-sm">
-              Room crashed
-            </div>
-            <div className="text-xs text-slate-400 mt-0.5">
+            <div className="font-semibold text-ink text-sm">Room crashed</div>
+            <div className="text-xs text-ink-muted mt-0.5">
               Something went wrong in room{" "}
-              <span className="font-mono text-slate-300">{roomId}</span>.
+              <span className="font-mono text-ink-muted">{roomId}</span>.
             </div>
           </div>
         </div>
         {process.env.NODE_ENV !== "production" && (
-          <pre className="text-xs text-rose-300 bg-rose-500/5 border border-rose-500/15 rounded-xl p-3 overflow-auto max-h-40 whitespace-pre-wrap break-all">
+          <pre className="text-xs text-rose-300 bg-rose-500/5 border border-rose-500/15 rounded-[var(--radius-control)] p-3 overflow-auto max-h-40 whitespace-pre-wrap break-all">
             {error.message}
           </pre>
         )}
@@ -53,13 +51,13 @@ function RoomErrorFallback({
           <button
             type="button"
             onClick={() => window.location.reload()}
-            className="flex-1 h-9 rounded-xl border border-white/10 bg-white/5 text-slate-100 text-sm font-medium hover:bg-white/10 transition-colors"
+            className="flex-1 h-9 rounded-[var(--radius-control)] border border-hairline bg-surface text-ink text-sm font-medium hover:bg-raised transition-colors"
           >
             Reload room
           </button>
           <Link
             href="/"
-            className="flex-1 h-9 rounded-xl border border-white/10 bg-white/5 text-slate-100 text-sm font-medium hover:bg-white/10 transition-colors flex items-center justify-center"
+            className="flex-1 h-9 rounded-[var(--radius-control)] border border-hairline bg-surface text-ink text-sm font-medium hover:bg-raised transition-colors flex items-center justify-center"
           >
             Go home
           </Link>
