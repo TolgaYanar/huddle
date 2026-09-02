@@ -38,14 +38,20 @@ export type ActivityLogEntry = {
 const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥"] as const;
 const VISIBLE_LOG_PAGE_SIZE = 100;
 
+/*
+ * One hue per event type was a palette, not a signal: violet, indigo and red
+ * meant nothing to a reader, and `text-violet-400` measured 1.28:1 on the dark
+ * surface. The icon already names the event, so colour is reserved for the
+ * three states that actually differ — good, bad, and everything else.
+ */
 const EVENT_COLORS: Record<string, string> = {
   play: "text-positive",
   pause: "text-accent",
-  seek: "text-indigo-400",
-  change_url: "text-negative",
-  join: "text-violet-400",
+  seek: "text-ink-muted",
+  change_url: "text-accent",
+  join: "text-ink-muted",
   leave: "text-ink-faint",
-  error: "text-red-400",
+  error: "text-negative",
 };
 
 const EVENT_ICONS: Record<string, string> = {
