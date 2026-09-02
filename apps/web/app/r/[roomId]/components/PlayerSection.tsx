@@ -311,7 +311,7 @@ export const PlayerSection = React.memo(function PlayerSection({
 
   return (
     <section
-      className={`flex flex-col gap-6 lg:row-start-1 lg:min-w-0 transition-[grid-column] duration-300 ${
+      className={`relative flex flex-col gap-6 lg:row-start-1 lg:min-w-0 transition-[grid-column] duration-300 lg:film-edge ${
         isTheatreMode ? "lg:col-start-1" : "lg:col-start-2"
       }`}
     >

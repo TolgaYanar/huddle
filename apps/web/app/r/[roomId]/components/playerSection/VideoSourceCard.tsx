@@ -109,7 +109,7 @@ export function VideoSourceCard({
   }, [youtubeQuery]);
 
   return (
-    <div className="backdrop-blur-md bg-surface rounded-[var(--radius-panel)] border border-hairline p-4 sm:p-5">
+    <div className="panel p-4 sm:p-5">
       <div className="flex flex-col gap-3">
         <div className="flex items-baseline justify-between gap-4">
           <div>

@@ -37,8 +37,14 @@
   --c-negative-soft: #f6e0da;
   --c-accent-tint: #f2e6d2;
 
-  --grain-opacity: 0.035;
-  --scanline-opacity: 0.02;
+  /* Paper takes grain well but shows a beam badly, so the light is barely on. */
+  --grain-opacity: 0.075;
+  --scanline-opacity: 0.018;
+  --beam-opacity: 0.05;
+  --beam-color: 168 78 8;
+  --panel-lift:
+    0 1px 2px rgb(60 46 28 / 0.06), 0 8px 24px -12px rgb(60 46 28 / 0.14);
+  --panel-edge: inset 0 1px 0 rgb(255 255 255 / 0.7);
 }
 
 .dark {
@@ -65,8 +71,13 @@
   --c-negative-soft: #2a1a16;
   --c-accent-tint: #2a2015;
 
-  --grain-opacity: 0.05;
-  --scanline-opacity: 0.035;
+  /* The dark room is where the projector reads; grain and beam both carry. */
+  --grain-opacity: 0.115;
+  --scanline-opacity: 0.03;
+  --beam-opacity: 0.16;
+  --beam-color: 232 163 61;
+  --panel-lift: 0 1px 2px rgb(0 0 0 / 0.4), 0 10px 28px -14px rgb(0 0 0 / 0.7);
+  --panel-edge: inset 0 1px 0 rgb(255 255 255 / 0.045);
 }
 
 @custom-variant dark (&:where(.dark, .dark *));
@@ -100,9 +111,18 @@
 }
 
 /*
- * Grain and a faint horizontal rake, applied once to the page rather than to
- * every card. It is the texture of projected light; at these opacities it is
- * felt rather than seen, and it never sits on top of interactive content.
+ * The page is a dark room with one projector in it. Three layers, in order:
+ *
+ *   beam    a single warm light from the booth, top-centre
+ *   grain   two noise frequencies, because one reads as digital dither
+ *   rake    a faint horizontal scan, the trace of a projected frame
+ *
+ * All three are fixed, pointer-events-none and sit under the content. They are
+ * applied once to the page instead of to every card: texture that repeats per
+ * component stops reading as light and starts reading as decoration.
+ *
+ * The grain also does real work beyond mood — noise over a large flat fill is
+ * what stops 8-bit colour banding on wide-gamut displays.
  */
 body::before {
   content: "";
@@ -110,8 +130,12 @@ body::before {
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  opacity: var(--grain-opacity);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+  background: radial-gradient(
+    120% 70% at 50% -18%,
+    rgb(var(--beam-color) / var(--beam-opacity)) 0%,
+    rgb(var(--beam-color) / calc(var(--beam-opacity) * 0.35)) 32%,
+    transparent 68%
+  );
 }
 
 body::after {
@@ -120,17 +144,69 @@ body::after {
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  opacity: var(--scanline-opacity);
-  background-image: repeating-linear-gradient(
-    to bottom,
-    currentColor 0px,
-    currentColor 1px,
-    transparent 1px,
-    transparent 4px
-  );
+  opacity: var(--grain-opacity);
+  /* Two frequencies: coarse grain for the film stock, fine for the emulsion. */
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='c'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.42' numOctaves='2'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23c)'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.95' numOctaves='3'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23f)'/%3E%3C/svg%3E"),
+    repeating-linear-gradient(
+      to bottom,
+      currentColor 0px,
+      currentColor 1px,
+      transparent 1px,
+      transparent 5px
+    );
+  background-size:
+    180px 180px,
+    120px 120px,
+    100% 5px;
 }
 
-@media (prefers-reduced-motion: reduce) {
+/*
+ * A surface with a lit top edge and a shadow beneath it, rather than a flat
+ * fill with a border. This is where the depth comes from; it is deliberately
+ * tight — a shadow larger than the element it lifts reads as a sticker.
+ */
+.panel {
+  background-color: var(--c-surface);
+  border: 1px solid var(--c-hairline);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--panel-edge), var(--panel-lift);
+}
+
+/*
+ * Sprocket holes. The one piece of ornament in the system, and it is not a
+ * flourish: it says "film" in a product about watching one together. Used on
+ * the edge of the column that holds the picture, and nowhere else — an
+ * ornament that appears everywhere is a texture, and this one has a job.
+ */
+@media (min-width: 1024px) {
+  .lg\:film-edge::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -13px;
+    width: 6px;
+    pointer-events: none;
+    border-radius: 999px;
+    background-image: repeating-linear-gradient(
+      to bottom,
+      var(--c-hairline-strong) 0px,
+      var(--c-hairline-strong) 9px,
+      transparent 9px,
+      transparent 22px
+    );
+    opacity: 0.55;
+  }
+}
+
+/*
+ * None of this moves, so reduced motion is not the right switch. Reduced
+ * transparency is: it is the setting for people who find overlaid texture
+ * hard to read through.
+ */
+@media (prefers-reduced-transparency: reduce) {
   body::before,
   body::after {
     display: none;

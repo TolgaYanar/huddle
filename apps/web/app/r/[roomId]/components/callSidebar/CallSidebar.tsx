@@ -138,7 +138,7 @@ export const CallSidebar = React.memo(function CallSidebar(
   );
 
   return (
-    <aside className="backdrop-blur-md bg-surface rounded-[var(--radius-panel)] border border-hairline p-4 sm:p-5 lg:col-start-1 lg:row-start-1">
+    <aside className="panel p-4 sm:p-5 lg:col-start-1 lg:row-start-1">
       <div className="flex flex-col gap-3">
         <CallHeader
           localSpeaking={localSpeaking}

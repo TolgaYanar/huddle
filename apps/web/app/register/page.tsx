@@ -150,7 +150,7 @@ function RegisterPageInner() {
       <main className="relative z-10 flex-1 flex items-center justify-center p-6">
         <div className="w-full max-w-sm">
           {/* Card */}
-          <div className="rounded-[var(--radius-panel)] border border-hairline bg-surface shadow-2xl shadow-black/40 p-7">
+          <div className="panel shadow-2xl shadow-black/40 p-7">
             {/* Header */}
             <div className="mb-6">
               <div className="flex items-center gap-3 mb-3">

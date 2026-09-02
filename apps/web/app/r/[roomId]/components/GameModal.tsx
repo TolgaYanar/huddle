@@ -79,7 +79,7 @@ export function GameModal({
       open={openGameId !== null}
       onClose={onClose}
       labelledBy={titleId}
-      panelClassName="relative z-10 w-full max-w-5xl max-h-[92vh] flex flex-col rounded-[var(--radius-panel)] border border-hairline bg-surface/95 backdrop-blur-xl shadow-2xl"
+      panelClassName="relative z-10 w-full max-w-5xl max-h-[92vh] flex flex-col panel/95 backdrop-blur-xl shadow-2xl"
     >
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-hairline shrink-0">

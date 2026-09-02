@@ -10,7 +10,7 @@ export function RoomAccessError({ error }: RoomAccessErrorProps) {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-950 text-ink p-6">
-      <div className="max-w-md w-full rounded-[var(--radius-panel)] border border-hairline bg-surface p-6">
+      <div className="max-w-md w-full panel p-6">
         <div className="text-lg font-semibold">Room access</div>
         <div className="text-sm text-ink-muted mt-2">{error}</div>
         <div className="mt-5 flex items-center gap-3">

@@ -234,7 +234,7 @@ export const ActivitySidebar = React.memo(function ActivitySidebar(props: {
 
   return (
     <aside
-      className={`backdrop-blur-md bg-surface rounded-[var(--radius-panel)] border border-hairline flex flex-col overflow-hidden min-h-0 max-h-[calc(100vh-4rem-3rem)] lg:max-h-[calc(100vh-4rem-4rem)] lg:row-start-1 ${
+      className={`panel flex flex-col overflow-hidden min-h-0 max-h-[calc(100vh-4rem-3rem)] lg:max-h-[calc(100vh-4rem-4rem)] lg:row-start-1 ${
         isTheatreMode ? "lg:col-start-2" : "lg:col-start-3"
       }`}
     >

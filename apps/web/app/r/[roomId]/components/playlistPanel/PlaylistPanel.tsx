@@ -127,7 +127,7 @@ export function PlaylistPanel({
   if (!isOpen) return null;
 
   return (
-    <div className="backdrop-blur-md bg-surface rounded-[var(--radius-panel)] border border-hairline flex flex-col overflow-hidden h-full">
+    <div className="panel flex flex-col overflow-hidden h-full">
       <div className="flex items-center justify-between p-4 border-b border-hairline bg-surface">
         <h3 className="font-semibold text-ink">Playlists</h3>
         <button
