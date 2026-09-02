@@ -167,11 +167,19 @@ body::after {
  * fill with a border. This is where the depth comes from; it is deliberately
  * tight — a shadow larger than the element it lifts reads as a sticker.
  */
-.panel {
-  background-color: var(--c-surface);
-  border: 1px solid var(--c-hairline);
-  border-radius: var(--radius-panel);
-  box-shadow: var(--panel-edge), var(--panel-lift);
+/*
+ * In the components layer on purpose. An unlayered rule outranks every
+ * Tailwind utility regardless of source order, so an unlayered `.panel` ate
+ * the `hover:bg-raised` on any element that used both — the hover simply
+ * stopped happening, with nothing failing anywhere.
+ */
+@layer components {
+  .panel {
+    background-color: var(--c-surface);
+    border: 1px solid var(--c-hairline);
+    border-radius: var(--radius-panel);
+    box-shadow: var(--panel-edge), var(--panel-lift);
+  }
 }
 
 /*
@@ -180,33 +188,43 @@ body::after {
  * the edge of the column that holds the picture, and nowhere else — an
  * ornament that appears everywhere is a texture, and this one has a job.
  */
-@media (min-width: 1024px) {
-  .lg\:film-edge::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: -13px;
-    width: 6px;
-    pointer-events: none;
-    border-radius: 999px;
-    background-image: repeating-linear-gradient(
-      to bottom,
-      var(--c-hairline-strong) 0px,
-      var(--c-hairline-strong) 9px,
-      transparent 9px,
-      transparent 22px
-    );
-    opacity: 0.55;
+@layer components {
+  @media (min-width: 1024px) {
+    .lg\:film-edge::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: -13px;
+      width: 6px;
+      pointer-events: none;
+      border-radius: 999px;
+      background-image: repeating-linear-gradient(
+        to bottom,
+        var(--c-hairline-strong) 0px,
+        var(--c-hairline-strong) 9px,
+        transparent 9px,
+        transparent 22px
+      );
+      opacity: 0.55;
+    }
   }
 }
 
 /*
- * None of this moves, so reduced motion is not the right switch. Reduced
- * transparency is: it is the setting for people who find overlaid texture
- * hard to read through.
+ * None of this moves, so reduced motion is not the right switch. Two settings
+ * are, and both are honoured because neither is enough on its own:
+ *
+ *   prefers-reduced-transparency  the exact request — but still Limited
+ *                                 availability across browsers
+ *   prefers-contrast: more        widely supported, and someone asking for
+ *                                 more contrast is telling us that texture
+ *                                 over text is working against them
+ *
+ * Between them the people who need the texture gone can actually get rid of
+ * it today, rather than when the first query finishes shipping.
  */
-@media (prefers-reduced-transparency: reduce) {
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
   body::before,
   body::after {
     display: none;

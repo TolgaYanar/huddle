@@ -72,3 +72,50 @@ describe("theme tokens", () => {
     ).toEqual([]);
   });
 });
+
+/**
+ * A custom class is not a Tailwind utility, so `panel/95` is not "panel at 95%"
+ * — it is a class nobody defined. The element then loses its background, border
+ * and radius entirely, which is how a game modal shipped with black-on-black
+ * text in light mode. Nothing failed; the class simply did not exist.
+ *
+ * This reads the component class names out of the stylesheet rather than
+ * hard-coding them, so a new one is covered the day it is written.
+ */
+function componentClasses(): string[] {
+  const css = readFileSync(join(APP, "globals.css"), "utf8");
+  const layer = css.match(/@layer components \{([\s\S]*)/);
+  if (!layer) throw new Error("Could not find the components layer");
+  return [
+    ...new Set(
+      [...layer[1]!.matchAll(/^\s{2,4}\.([a-z][a-z0-9\\:-]*)/gm)].map((m) =>
+        m[1]!.replace(/\\/g, ""),
+      ),
+    ),
+  ];
+}
+
+describe("component classes", () => {
+  it("are never used with an opacity modifier", () => {
+    const names = componentClasses();
+    expect(names.length).toBeGreaterThan(0);
+
+    const offenders: string[] = [];
+    for (const file of sourceFiles(APP)) {
+      const source = readFileSync(file, "utf8");
+      for (const name of names) {
+        const bare = name.replace(/^lg:/, "");
+        const pattern = new RegExp(`\\b(?:lg:)?${bare}\\/[0-9]`, "g");
+        for (const hit of source.matchAll(pattern)) {
+          offenders.push(`${file.replace(APP, "app")}: ${hit[0]}`);
+        }
+      }
+    }
+
+    expect(
+      offenders,
+      "A custom class with an opacity modifier is not a class at all, so the " +
+        "element loses everything the class was providing",
+    ).toEqual([]);
+  });
+});
