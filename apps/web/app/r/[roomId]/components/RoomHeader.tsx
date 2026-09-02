@@ -30,6 +30,8 @@ interface RoomHeaderProps {
   onSetRoomName: (name: string) => void;
   onOpenSettings: () => void;
   onOpenTimer: () => void;
+  isChatOnlyMode: boolean;
+  onToggleChatOnlyMode: () => void;
   timerWidgetProps: { timer: TimerState; onClick: () => void };
   authUser: AuthUser | null;
   onAuthUserChange: (user: AuthUser | null) => void;
@@ -52,6 +54,8 @@ export function RoomHeader({
   onSetRoomName,
   onOpenSettings,
   onOpenTimer,
+  isChatOnlyMode,
+  onToggleChatOnlyMode,
   timerWidgetProps,
   authUser,
   onAuthUserChange,
@@ -344,6 +348,45 @@ export function RoomHeader({
           )}
           <span className="hidden md:inline">
             {copied ? "Copied" : "Copy invite"}
+          </span>
+        </button>
+
+        {/*
+          Lives in the header, not in the player controls, because the player
+          is hidden in chat-only mode — a toggle inside it would be a one-way
+          door out of the room's video.
+        */}
+        <button
+          type="button"
+          onClick={onToggleChatOnlyMode}
+          disabled={passwordRequired}
+          aria-pressed={isChatOnlyMode}
+          className={`h-8 inline-flex items-center gap-1.5 px-2.5 sm:px-3 rounded-lg border text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+            isChatOnlyMode
+              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20"
+              : "border-white/10 bg-white/5 text-slate-200 hover:bg-white/10"
+          }`}
+          title={
+            passwordRequired
+              ? "Join with password first"
+              : isChatOnlyMode
+                ? "Show the video again"
+                : "Hide the video and just chat — sound keeps playing"
+          }
+        >
+          <svg
+            className="w-3.5 h-3.5"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.75}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+          </svg>
+          <span className="hidden lg:inline">
+            {isChatOnlyMode ? "Chat only" : "Chat mode"}
           </span>
         </button>
 
