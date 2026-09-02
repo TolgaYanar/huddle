@@ -60,7 +60,7 @@ export function RoomPasswordCard(props: {
             onChange={(e) => setPasswordDraft(e.target.value)}
             placeholder={hasRoomPassword ? "New password" : "Set a password"}
             type="password"
-            className="h-9 flex-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-3 text-sm text-ink placeholder:text-ink0 outline-none focus:ring-2 focus:ring-white/10"
+            className="h-9 flex-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-3 text-sm text-ink placeholder:text-ink-faint outline-none focus:ring-2 focus:ring-white/10"
           />
           <button
             type="button"

@@ -70,7 +70,7 @@ export function TileGrid(props: {
             You
           </span>
           {hostId && userId === hostId && (
-            <span className="text-[11px] px-2 py-1 rounded-full bg-amber-500/15 border border-amber-500/20 text-amber-200">
+            <span className="text-[11px] px-2 py-1 rounded-full bg-accent-tint border border-accent text-accent">
               Host
             </span>
           )}
@@ -79,7 +79,7 @@ export function TileGrid(props: {
           <button
             type="button"
             onClick={() => onPinTile({ kind: "local" })}
-            className="h-9 px-2 inline-flex items-center justify-center rounded-[var(--radius-control)] border border-hairline-strong bg-sunken text-white text-xs hover:bg-raised transition-colors"
+            className="h-9 px-2 inline-flex items-center justify-center rounded-[var(--radius-control)] border border-hairline-strong bg-black/65 text-white text-xs hover:bg-raised transition-colors"
             title="Pin your video to the main player"
             aria-label="Pin your video to the main player"
           >
@@ -103,7 +103,7 @@ export function TileGrid(props: {
                 // ignore
               }
             }}
-            className="h-9 w-9 inline-flex items-center justify-center rounded-[var(--radius-control)] border border-hairline-strong bg-sunken text-white text-sm hover:bg-raised transition-colors"
+            className="h-9 w-9 inline-flex items-center justify-center rounded-[var(--radius-control)] border border-hairline-strong bg-black/65 text-white text-sm hover:bg-raised transition-colors"
             title="Fullscreen"
             aria-label="Toggle fullscreen"
           >
@@ -149,7 +149,7 @@ export function TileGrid(props: {
                     e.stopPropagation();
                     onPinTile({ kind: "remote", peerId: id });
                   }}
-                  className="h-9 px-2 inline-flex items-center justify-center rounded-[var(--radius-control)] border border-hairline-strong bg-sunken text-white text-xs hover:bg-raised transition-colors"
+                  className="h-9 px-2 inline-flex items-center justify-center rounded-[var(--radius-control)] border border-hairline-strong bg-black/65 text-white text-xs hover:bg-raised transition-colors"
                   title={`Pin ${displayName} to the main player`}
                   aria-label={`Pin ${displayName} to the main player`}
                 >
@@ -166,7 +166,7 @@ export function TileGrid(props: {
                       e.stopPropagation();
                       onKickUser(id);
                     }}
-                    className="h-9 px-3 inline-flex items-center justify-center rounded-[var(--radius-control)] border border-hairline-strong bg-sunken text-white text-xs font-medium hover:bg-raised transition-colors"
+                    className="h-9 px-3 inline-flex items-center justify-center rounded-[var(--radius-control)] border border-hairline-strong bg-black/65 text-white text-xs font-medium hover:bg-raised transition-colors"
                     title="Kick user (host only)"
                   >
                     Kick

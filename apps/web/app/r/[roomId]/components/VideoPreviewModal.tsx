@@ -83,7 +83,7 @@ export function VideoPreviewModal({
             return null;
           })()}
         </div>
-        <div className="text-sm text-ink0 font-mono break-all mb-6">
+        <div className="text-sm text-ink-faint font-mono break-all mb-6">
           {videoPreview.url}
         </div>
 

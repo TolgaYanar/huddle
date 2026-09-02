@@ -107,20 +107,20 @@ export function TimerModal({
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <span
               className={`text-3xl font-mono font-bold tabular-nums ${
-                isFinished ? "text-rose-400" : "text-ink"
+                isFinished ? "text-negative" : "text-ink"
               }`}
               aria-live="polite"
             >
               {formatTimer(displayMs)}
             </span>
-            <span className="text-xs text-ink0 mt-0.5 capitalize">
+            <span className="text-xs text-ink-faint mt-0.5 capitalize">
               {status}
             </span>
           </div>
         </div>
 
         {isFinished && (
-          <p className="text-sm text-rose-300 font-medium">Time&apos;s up!</p>
+          <p className="text-sm text-negative font-medium">Time&apos;s up!</p>
         )}
       </div>
 
@@ -140,7 +140,7 @@ export function TimerModal({
             type="button"
             onClick={onPause}
             disabled={!isConnected}
-            className="h-9 px-5 rounded-[var(--radius-control)] border border-amber-500/40 bg-amber-500/10 text-amber-200 text-sm font-semibold hover:bg-amber-500/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="h-9 px-5 rounded-[var(--radius-control)] border border-amber-500/40 bg-amber-500/10 text-accent text-sm font-semibold hover:bg-amber-500/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Pause
           </button>
@@ -160,7 +160,7 @@ export function TimerModal({
 
       {/* Presets */}
       <div>
-        <p className="text-xs text-ink0 mb-2">Presets</p>
+        <p className="text-xs text-ink-faint mb-2">Presets</p>
         <div className="flex flex-wrap gap-1.5">
           {PRESETS.map((p) => (
             <button
@@ -182,7 +182,7 @@ export function TimerModal({
 
       {/* Custom duration */}
       <div>
-        <p className="text-xs text-ink0 mb-2">Custom (minutes)</p>
+        <p className="text-xs text-ink-faint mb-2">Custom (minutes)</p>
         <div className="flex gap-2">
           <input
             type="number"

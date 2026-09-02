@@ -117,7 +117,7 @@ export function RoomSettingsPanel({
                 }}
                 maxLength={40}
                 placeholder="No name set"
-                className="flex-1 h-9 rounded-[var(--radius-control)] border border-hairline bg-surface px-3 text-sm text-ink placeholder:text-ink0 outline-none focus:ring-2 focus:ring-indigo-500/40"
+                className="flex-1 h-9 rounded-[var(--radius-control)] border border-hairline bg-surface px-3 text-sm text-ink placeholder:text-ink-faint outline-none focus:ring-2 focus:ring-indigo-500/40"
               />
               <button
                 type="button"
@@ -134,7 +134,7 @@ export function RoomSettingsPanel({
                   onSetRoomName("");
                   setNameInput("");
                 }}
-                className="mt-1.5 text-xs text-ink0 hover:text-ink-muted transition-colors"
+                className="mt-1.5 text-xs text-ink-faint hover:text-ink-muted transition-colors"
               >
                 Clear name
               </button>
@@ -148,7 +148,7 @@ export function RoomSettingsPanel({
             <h3 className="text-xs font-semibold text-ink-muted uppercase tracking-wider mb-2">
               Password
               <span
-                className={`ml-2 font-normal normal-case tracking-normal ${hasRoomPassword ? "text-amber-300" : "text-ink0"}`}
+                className={`ml-2 font-normal normal-case tracking-normal ${hasRoomPassword ? "text-accent" : "text-ink-faint"}`}
               >
                 {hasRoomPassword ? "Enabled" : "Disabled"}
               </span>
@@ -169,7 +169,7 @@ export function RoomSettingsPanel({
                   placeholder={
                     hasRoomPassword ? "New password…" : "Set a password…"
                   }
-                  className="w-full h-9 rounded-[var(--radius-control)] border border-hairline bg-surface px-3 pr-10 text-sm text-ink placeholder:text-ink0 outline-none focus:ring-2 focus:ring-indigo-500/40"
+                  className="w-full h-9 rounded-[var(--radius-control)] border border-hairline bg-surface px-3 pr-10 text-sm text-ink placeholder:text-ink-faint outline-none focus:ring-2 focus:ring-indigo-500/40"
                 />
                 <PasswordToggleButton
                   show={showPassword}
@@ -192,7 +192,7 @@ export function RoomSettingsPanel({
               <button
                 type="button"
                 onClick={() => onSetRoomPassword("")}
-                className="mt-1.5 text-xs text-rose-400 hover:text-rose-300 transition-colors"
+                className="mt-1.5 text-xs text-negative hover:text-negative transition-colors"
               >
                 Remove password
               </button>
@@ -205,7 +205,7 @@ export function RoomSettingsPanel({
           <section>
             <h3 className="text-xs font-semibold text-ink-muted uppercase tracking-wider mb-2">
               Participants
-              <span className="ml-2 font-normal normal-case tracking-normal text-ink0">
+              <span className="ml-2 font-normal normal-case tracking-normal text-ink-faint">
                 {others.length + 1} in room
               </span>
             </h3>
@@ -251,7 +251,7 @@ export function RoomSettingsPanel({
                       <button
                         type="button"
                         onClick={() => setConfirmTransfer(null)}
-                        className="text-xs text-ink0 hover:text-ink-muted"
+                        className="text-xs text-ink-faint hover:text-ink-muted"
                       >
                         No
                       </button>
@@ -265,14 +265,14 @@ export function RoomSettingsPanel({
                           onKickUser(id);
                           setConfirmKick(null);
                         }}
-                        className="text-xs text-rose-400 hover:text-rose-300 font-medium"
+                        className="text-xs text-negative hover:text-negative font-medium"
                       >
                         Yes
                       </button>
                       <button
                         type="button"
                         onClick={() => setConfirmKick(null)}
-                        className="text-xs text-ink0 hover:text-ink-muted"
+                        className="text-xs text-ink-faint hover:text-ink-muted"
                       >
                         No
                       </button>
@@ -296,7 +296,7 @@ export function RoomSettingsPanel({
                           setConfirmTransfer(null);
                           setConfirmKick(id);
                         }}
-                        className="h-6 px-2 rounded-md text-xs text-rose-400 hover:bg-rose-500/20 transition-colors"
+                        className="h-6 px-2 rounded-md text-xs text-negative hover:bg-negative-soft transition-colors"
                         title="Kick"
                       >
                         Kick
@@ -307,7 +307,7 @@ export function RoomSettingsPanel({
               ))}
 
               {others.length === 0 && (
-                <li className="text-xs text-ink0 px-3 py-2">
+                <li className="text-xs text-ink-faint px-3 py-2">
                   No other participants
                 </li>
               )}

@@ -217,7 +217,7 @@ export function WheelPickerModal(props: {
             </div>
 
             <div className="absolute inset-0 flex items-center justify-center">
-              <div className="px-4 py-2 rounded-[var(--radius-panel)] border border-hairline bg-sunken text-sm text-white">
+              <div className="px-4 py-2 rounded-[var(--radius-panel)] border border-hairline bg-black/65 text-sm text-white">
                 {effectiveEntries.length} entries
               </div>
             </div>
@@ -279,7 +279,7 @@ export function WheelPickerModal(props: {
               onChange={(e) => setInput(e.target.value)}
               placeholder={isConnected ? "Add entry…" : "Connecting…"}
               disabled={!isConnected || isSpinning}
-              className="flex-1 h-12 bg-sunken border border-hairline rounded-[var(--radius-panel)] px-4 text-base text-ink placeholder:text-ink0 focus:outline-none focus:ring-2 focus:ring-sky-500/25 focus:border-sky-500/30 transition disabled:opacity-60"
+              className="flex-1 h-12 bg-sunken border border-hairline rounded-[var(--radius-panel)] px-4 text-base text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-sky-500/25 focus:border-sky-500/30 transition disabled:opacity-60"
             />
             <button
               type="submit"
@@ -293,11 +293,13 @@ export function WheelPickerModal(props: {
           <div className="mt-4 flex-1 min-h-0 rounded-[var(--radius-panel)] border border-hairline bg-sunken overflow-hidden">
             <div className="p-3 border-b border-hairline text-sm text-ink-muted flex items-center justify-between">
               <span>Entries</span>
-              <span className="text-xs text-ink0">Click remove</span>
+              <span className="text-xs text-ink-faint">Click remove</span>
             </div>
             <div className="max-h-105 overflow-y-auto divide-y divide-white/10">
               {effectiveEntries.length === 0 ? (
-                <div className="p-6 text-sm text-ink0">No entries yet.</div>
+                <div className="p-6 text-sm text-ink-faint">
+                  No entries yet.
+                </div>
               ) : (
                 effectiveEntries.map((entry, idx) => {
                   const c = colorForIndex(idx);

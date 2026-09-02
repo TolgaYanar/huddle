@@ -39,12 +39,12 @@ const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥"] as co
 const VISIBLE_LOG_PAGE_SIZE = 100;
 
 const EVENT_COLORS: Record<string, string> = {
-  play: "text-emerald-400",
-  pause: "text-amber-400",
+  play: "text-positive",
+  pause: "text-accent",
   seek: "text-indigo-400",
-  change_url: "text-rose-400",
+  change_url: "text-negative",
   join: "text-violet-400",
-  leave: "text-ink0",
+  leave: "text-ink-faint",
   error: "text-red-400",
 };
 
@@ -64,7 +64,7 @@ function userColor(name: string): string {
     "bg-violet-600/60 text-violet-100",
     "bg-emerald-600/60 text-emerald-100",
     "bg-rose-600/60 text-rose-100",
-    "bg-amber-600/60 text-amber-100",
+    "bg-amber-600/60 text-accent",
     "bg-indigo-600/60 text-indigo-100",
   ];
   let h = 0;
@@ -98,7 +98,7 @@ const ChatComposer = React.memo(function ChatComposer({
         onChange={(event) => setChatText(event.target.value)}
         placeholder={isConnected ? "Type a message…" : "Connecting…"}
         disabled={!isConnected}
-        className="flex-1 bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2 text-sm text-ink placeholder:text-ink0 focus:outline-none focus:ring-2 focus:ring-sky-500/25 focus:border-sky-500/30 transition disabled:opacity-60"
+        className="flex-1 bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-sky-500/25 focus:border-sky-500/30 transition disabled:opacity-60"
       />
       <button
         type="submit"
@@ -299,7 +299,7 @@ export const ActivitySidebar = React.memo(function ActivitySidebar(props: {
             className="flex-1 min-h-0 overflow-y-auto px-3 py-3 flex flex-col gap-0"
           >
             {logs.length === 0 && (
-              <div className="text-center text-ink0 mt-8 text-sm">
+              <div className="text-center text-ink-faint mt-8 text-sm">
                 No messages yet…
               </div>
             )}
@@ -358,7 +358,7 @@ export const ActivitySidebar = React.memo(function ActivitySidebar(props: {
                           <span className="text-xs font-semibold text-ink truncate">
                             {log.user}
                           </span>
-                          <span className="text-[10px] text-ink0 shrink-0">
+                          <span className="text-[10px] text-ink-faint shrink-0">
                             {log.time}
                           </span>
                         </div>
@@ -490,7 +490,7 @@ export const ActivitySidebar = React.memo(function ActivitySidebar(props: {
               }
 
               // System event — compact centered divider
-              const color = EVENT_COLORS[log.type] ?? "text-ink0";
+              const color = EVENT_COLORS[log.type] ?? "text-ink-faint";
               const icon = EVENT_ICONS[log.type] ?? "·";
 
               return (
@@ -519,7 +519,7 @@ export const ActivitySidebar = React.memo(function ActivitySidebar(props: {
       {!isActivityCollapsed && activeTab === "games" && (
         <div className="flex-1 min-h-0 overflow-y-auto p-4">
           <div className="flex flex-col gap-3">
-            <div className="text-xs text-ink0 font-medium uppercase tracking-wider">
+            <div className="text-xs text-ink-faint font-medium uppercase tracking-wider">
               Choose a game
             </div>
             {AVAILABLE_GAMES.map((g) => (
@@ -547,11 +547,11 @@ export const ActivitySidebar = React.memo(function ActivitySidebar(props: {
                         </span>
                       )}
                     </div>
-                    <div className="text-xs text-ink0 mt-0.5 leading-relaxed">
+                    <div className="text-xs text-ink-faint mt-0.5 leading-relaxed">
                       {g.description}
                     </div>
                   </div>
-                  <span className="text-ink0 group-hover:text-ink-muted text-lg transition-colors">
+                  <span className="text-ink-faint group-hover:text-ink-muted text-lg transition-colors">
                     →
                   </span>
                 </div>

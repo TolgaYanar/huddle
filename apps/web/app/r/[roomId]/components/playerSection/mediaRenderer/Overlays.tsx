@@ -71,7 +71,7 @@ export function MediaOverlays({
       )}
 
       {isPrime && (
-        <div className="absolute inset-0 flex items-center justify-center text-center px-6 text-white bg-sunken">
+        <div className="absolute inset-0 flex items-center justify-center text-center px-6 text-white bg-black/65">
           <div>
             <div className="font-semibold">
               Prime Video can&apos;t be embedded
@@ -98,7 +98,7 @@ export function MediaOverlays({
       )}
 
       {isBadYoutubeUrl && (
-        <div className="absolute inset-0 flex items-center justify-center text-center px-6 text-white bg-sunken">
+        <div className="absolute inset-0 flex items-center justify-center text-center px-6 text-white bg-black/65">
           <div>
             <div className="font-semibold">
               This YouTube link won&apos;t embed
@@ -132,7 +132,7 @@ export function MediaOverlays({
       )}
 
       {playerError && (
-        <div className="absolute inset-0 flex items-center justify-center text-center px-6 text-white bg-sunken">
+        <div className="absolute inset-0 flex items-center justify-center text-center px-6 text-white bg-black/65">
           <div>
             <div className="font-semibold">Player error</div>
             <div className="text-sm text-ink-muted mt-1 wrap-break-word">

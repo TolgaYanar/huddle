@@ -90,7 +90,7 @@ export function PlayerViewport({
           <button
             type="button"
             onClick={() => setFullscreenChatOpen((v) => !v)}
-            className="h-10 px-4 rounded-[var(--radius-control)] border border-hairline-strong bg-sunken text-white text-sm font-semibold hover:bg-raised transition-colors"
+            className="h-10 px-4 rounded-[var(--radius-control)] border border-hairline-strong bg-black/65 text-white text-sm font-semibold hover:bg-raised transition-colors"
             title={fullscreenChatOpen ? "Hide chat" : "Show chat"}
           >
             {fullscreenChatOpen ? "Hide chat" : "Chat"}

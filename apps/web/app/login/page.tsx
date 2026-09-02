@@ -2,6 +2,8 @@
 
 import React, { Suspense } from "react";
 import Link from "next/link";
+
+import { ThemeToggle } from "../components/ThemeToggle";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { apiLogin } from "../lib/api";
@@ -38,17 +40,11 @@ function LoginPageInner() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#0a0a0f] text-slate-200 overflow-hidden">
-      {/* Background glow */}
-      <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-150 h-150 rounded-full bg-indigo-600/10 blur-[120px]" />
-        <div className="absolute bottom-0 right-1/4 w-100 h-100 rounded-full bg-violet-600/8 blur-[100px]" />
-      </div>
-
-      <header className="relative z-10 h-16 flex items-center justify-between px-6 lg:px-8 border-b border-white/6 backdrop-blur-md bg-black/20">
+    <div className="min-h-screen flex flex-col bg-bg text-ink overflow-hidden">
+      <header className="relative z-10 h-16 flex items-center justify-between px-6 lg:px-8 border-b border-hairline bg-bg">
         <Link
           href="/"
-          className="font-semibold text-lg sm:text-xl flex items-center gap-2.5 text-white tracking-tight"
+          className="font-semibold text-lg sm:text-xl flex items-center gap-2.5 text-ink tracking-tight"
         >
           <picture>
             <source srcSet="/favicon.svg?v=2" type="image/svg+xml" />
@@ -64,22 +60,23 @@ function LoginPageInner() {
         </Link>
         <Link
           href={`/register?next=${encodeURIComponent(next)}`}
-          className="h-8 px-4 rounded-lg border border-white/8 bg-white/4 text-slate-300 text-xs font-medium hover:bg-white/8 hover:text-white transition-all flex items-center"
+          className="h-8 px-4 rounded-[var(--radius-control)] border border-hairline bg-surface text-ink-muted text-xs font-medium hover:bg-white/8 hover:text-ink transition-all flex items-center"
         >
           Register
         </Link>
+        <ThemeToggle />
       </header>
 
       <main className="relative z-10 flex-1 flex items-center justify-center p-6">
         <div className="w-full max-w-sm">
           {/* Card */}
-          <div className="rounded-2xl border border-white/8 bg-white/3 backdrop-blur-xl shadow-2xl shadow-black/40 p-7">
+          <div className="rounded-[var(--radius-panel)] border border-hairline bg-surface shadow-2xl shadow-black/40 p-7">
             {/* Header */}
             <div className="mb-6">
               <div className="flex items-center gap-3 mb-3">
-                <div className="h-9 w-9 rounded-xl bg-indigo-500/15 border border-indigo-500/20 flex items-center justify-center">
+                <div className="h-9 w-9 rounded-[var(--radius-control)] bg-accent-tint border border-accent flex items-center justify-center">
                   <svg
-                    className="w-4 h-4 text-indigo-400"
+                    className="w-4 h-4 text-accent"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -93,10 +90,10 @@ function LoginPageInner() {
                   </svg>
                 </div>
               </div>
-              <h1 className="text-xl font-semibold text-white tracking-tight">
+              <h1 className="text-xl font-semibold text-ink tracking-tight">
                 Welcome back
               </h1>
-              <p className="text-sm text-slate-400 mt-1">
+              <p className="text-sm text-ink-muted mt-1">
                 Log in to access your saved rooms.
               </p>
             </div>
@@ -124,7 +121,7 @@ function LoginPageInner() {
               <div className="space-y-1.5">
                 <label
                   htmlFor="login-username"
-                  className="text-xs font-medium text-slate-400"
+                  className="text-xs font-medium text-ink-muted"
                 >
                   Username
                 </label>
@@ -143,7 +140,7 @@ function LoginPageInner() {
                   autoCorrect="off"
                   spellCheck={false}
                   autoFocus
-                  className="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/25 focus:border-indigo-500/35 hover:border-white/12 transition-all"
+                  className="w-full bg-surface border border-hairline rounded-[var(--radius-control)] px-4 py-2.5 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent hover:border-hairline transition-all"
                 />
               </div>
 
@@ -151,7 +148,7 @@ function LoginPageInner() {
               <div className="space-y-1.5">
                 <label
                   htmlFor="login-password"
-                  className="text-xs font-medium text-slate-400"
+                  className="text-xs font-medium text-ink-muted"
                 >
                   Password
                 </label>
@@ -166,7 +163,7 @@ function LoginPageInner() {
                     placeholder="Enter your password"
                     type={showPassword ? "text" : "password"}
                     autoComplete="current-password"
-                    className="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-2.5 pr-10 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/25 focus:border-indigo-500/35 hover:border-white/12 transition-all"
+                    className="w-full bg-surface border border-hairline rounded-[var(--radius-control)] px-4 py-2.5 pr-10 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent hover:border-hairline transition-all"
                   />
                   <PasswordToggleButton
                     show={showPassword}
@@ -176,9 +173,9 @@ function LoginPageInner() {
               </div>
 
               {error && (
-                <div className="text-sm text-rose-300 bg-rose-500/8 border border-rose-500/20 rounded-xl px-4 py-3 flex items-start gap-2.5">
+                <div className="text-sm text-negative bg-rose-500/8 border border-rose-500/20 rounded-[var(--radius-control)] px-4 py-3 flex items-start gap-2.5">
                   <svg
-                    className="w-4 h-4 mt-0.5 shrink-0 text-rose-400"
+                    className="w-4 h-4 mt-0.5 shrink-0 text-negative"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -196,10 +193,10 @@ function LoginPageInner() {
 
               <button
                 disabled={!canSubmit}
-                className={`h-11 w-full rounded-xl font-semibold text-sm transition-all mt-1 ${
+                className={`h-11 w-full rounded-[var(--radius-control)] font-semibold text-sm transition-all mt-1 ${
                   canSubmit
-                    ? "bg-indigo-600 text-white hover:bg-indigo-500 active:scale-[0.98] shadow-lg shadow-indigo-500/20"
-                    : "bg-white/4 text-slate-600 border border-white/6 cursor-not-allowed"
+                    ? "bg-accent text-accent-ink hover:bg-accent  "
+                    : "bg-surface text-ink-faint border border-hairline cursor-not-allowed"
                 }`}
                 type="submit"
               >
@@ -231,11 +228,11 @@ function LoginPageInner() {
           </div>
 
           {/* Footer link */}
-          <p className="text-xs text-slate-500 text-center mt-5">
+          <p className="text-xs text-ink-faint text-center mt-5">
             Don&apos;t have an account?{" "}
             <Link
               href={`/register?next=${encodeURIComponent(next)}`}
-              className="text-indigo-400 hover:text-indigo-300 transition-colors"
+              className="text-accent hover:text-accent transition-colors"
             >
               Create one
             </Link>
@@ -250,8 +247,8 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center bg-[#0a0a0f] text-slate-200">
-          <div className="text-sm text-slate-500">Loading…</div>
+        <div className="min-h-screen flex items-center justify-center bg-bg text-ink">
+          <div className="text-sm text-ink-faint">Loading…</div>
         </div>
       }
     >

@@ -147,7 +147,7 @@ export function VideoSourceCard({
             value={inputUrl}
             onChange={(e) => setInputUrl(e.target.value)}
             placeholder="e.g. youtube.com/watch?v=..., netflix.com/watch/..."
-            className="w-full sm:w-auto sm:flex-1 min-w-0 bg-sunken border border-hairline rounded-[var(--radius-control)] px-4 py-2.5 text-sm text-ink placeholder:text-ink0 focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition"
+            className="w-full sm:w-auto sm:flex-1 min-w-0 bg-sunken border border-hairline rounded-[var(--radius-control)] px-4 py-2.5 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition"
           />
           <button
             type="button"
@@ -190,7 +190,7 @@ export function VideoSourceCard({
                 value={youtubeQuery}
                 onChange={(e) => setYoutubeQuery(e.target.value)}
                 placeholder="Search YouTube..."
-                className="flex-1 bg-sunken border border-hairline rounded-[var(--radius-control)] px-4 py-2.5 text-sm text-ink placeholder:text-ink0 focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition"
+                className="flex-1 bg-sunken border border-hairline rounded-[var(--radius-control)] px-4 py-2.5 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition"
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
@@ -216,7 +216,7 @@ export function VideoSourceCard({
             </div>
 
             {youtubeError && (
-              <div className="mt-2 text-xs text-rose-300">{youtubeError}</div>
+              <div className="mt-2 text-xs text-negative">{youtubeError}</div>
             )}
 
             {youtubeResults.length > 0 && (

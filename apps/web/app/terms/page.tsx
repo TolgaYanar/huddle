@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { ThemeToggle } from "../components/ThemeToggle";
+
 export const metadata: Metadata = {
   title: "Terms of Service",
   description:
@@ -11,11 +13,11 @@ export const metadata: Metadata = {
 
 export default function TermsOfServicePage() {
   return (
-    <div className="min-h-screen flex flex-col bg-linear-to-b from-slate-900 via-slate-950 to-black text-slate-200">
-      <header className="h-16 flex items-center justify-between px-6 lg:px-8 border-b border-white/10 backdrop-blur-md bg-black/30 sticky top-0 z-50">
+    <div className="min-h-screen flex flex-col bg-bg text-ink">
+      <header className="h-16 flex items-center justify-between px-6 lg:px-8 border-b border-hairline backdrop-blur-md bg-sunken sticky top-0 z-50">
         <Link
           href="/"
-          className="font-semibold text-lg sm:text-xl flex items-center gap-2 text-slate-50 tracking-tight"
+          className="font-semibold text-lg sm:text-xl flex items-center gap-2 text-ink tracking-tight"
         >
           <picture>
             <source srcSet="/favicon.svg?v=2" type="image/svg+xml" />
@@ -31,29 +33,30 @@ export default function TermsOfServicePage() {
         </Link>
         <Link
           href="/"
-          className="h-8 px-3 rounded-lg border border-white/10 bg-white/5 text-slate-200 text-xs font-medium hover:bg-white/10 transition-colors flex items-center"
+          className="h-8 px-3 rounded-[var(--radius-control)] border border-hairline bg-surface text-ink text-xs font-medium hover:bg-raised transition-colors flex items-center"
         >
           Back to home
         </Link>
+        <ThemeToggle />
       </header>
 
       <main className="flex-1 mx-auto w-full max-w-3xl px-5 py-12">
         <header className="mb-8">
-          <h1 className="text-3xl font-semibold tracking-tight text-slate-50">
+          <h1 className="text-3xl font-semibold tracking-tight text-ink">
             Terms of Service
           </h1>
-          <p className="mt-2 text-sm text-slate-400">
+          <p className="mt-2 text-sm text-ink-muted">
             Last updated: 2026-06-13
           </p>
         </header>
 
-        <div className="space-y-8 text-slate-200">
+        <div className="space-y-8 text-ink">
           <section className="space-y-3">
             <p>
               These Terms of Service (“Terms”) govern your use of WeHuddle,
               including the website at{" "}
               <a
-                className="text-indigo-300 hover:text-indigo-200 underline-offset-2 hover:underline"
+                className="text-accent hover:text-accent underline-offset-2 hover:underline"
                 href="https://wehuddle.tv/"
               >
                 wehuddle.tv
@@ -65,9 +68,7 @@ export default function TermsOfServicePage() {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-xl font-semibold text-slate-100">
-              1) Eligibility
-            </h2>
+            <h2 className="text-xl font-semibold text-ink">1) Eligibility</h2>
             <p>
               You must be at least 13 years old (or the minimum age required in
               your jurisdiction) to use the Service. By using it, you confirm
@@ -76,9 +77,7 @@ export default function TermsOfServicePage() {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-xl font-semibold text-slate-100">
-              2) The Service
-            </h2>
+            <h2 className="text-xl font-semibold text-ink">2) The Service</h2>
             <p>
               WeHuddle helps people watch content together by synchronizing
               playback (e.g., play/pause/seek) and enabling room-based chat and
@@ -90,9 +89,7 @@ export default function TermsOfServicePage() {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-xl font-semibold text-slate-100">
-              3) Accounts
-            </h2>
+            <h2 className="text-xl font-semibold text-ink">3) Accounts</h2>
             <p>
               An account is optional — rooms work without one. If you create an
               account, you are responsible for keeping your credentials secure
@@ -102,7 +99,7 @@ export default function TermsOfServicePage() {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-xl font-semibold text-slate-100">
+            <h2 className="text-xl font-semibold text-ink">
               4) Acceptable use
             </h2>
             <p>You agree not to use the Service to:</p>
@@ -128,7 +125,7 @@ export default function TermsOfServicePage() {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-xl font-semibold text-slate-100">
+            <h2 className="text-xl font-semibold text-ink">
               5) Rooms and moderation
             </h2>
             <p>
@@ -141,7 +138,7 @@ export default function TermsOfServicePage() {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-xl font-semibold text-slate-100">
+            <h2 className="text-xl font-semibold text-ink">
               6) Service availability and changes
             </h2>
             <p>
@@ -153,7 +150,7 @@ export default function TermsOfServicePage() {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-xl font-semibold text-slate-100">
+            <h2 className="text-xl font-semibold text-ink">
               7) Disclaimer of warranties
             </h2>
             <p>
@@ -166,7 +163,7 @@ export default function TermsOfServicePage() {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-xl font-semibold text-slate-100">
+            <h2 className="text-xl font-semibold text-ink">
               8) Limitation of liability
             </h2>
             <p>
@@ -179,12 +176,12 @@ export default function TermsOfServicePage() {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-xl font-semibold text-slate-100">9) Privacy</h2>
+            <h2 className="text-xl font-semibold text-ink">9) Privacy</h2>
             <p>
               Our handling of your information is described in our{" "}
               <Link
                 href="/privacy"
-                className="text-indigo-300 hover:text-indigo-200 underline-offset-2 hover:underline"
+                className="text-accent hover:text-accent underline-offset-2 hover:underline"
               >
                 Privacy Policy
               </Link>
@@ -193,7 +190,7 @@ export default function TermsOfServicePage() {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-xl font-semibold text-slate-100">
+            <h2 className="text-xl font-semibold text-ink">
               10) Changes to these Terms
             </h2>
             <p>
@@ -204,15 +201,13 @@ export default function TermsOfServicePage() {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-xl font-semibold text-slate-100">
-              11) Contact
-            </h2>
+            <h2 className="text-xl font-semibold text-ink">11) Contact</h2>
             <p>Questions about these Terms can be sent to:</p>
             <ul className="list-disc space-y-2 pl-6">
               <li>
                 Website:{" "}
                 <a
-                  className="text-indigo-300 hover:text-indigo-200 underline-offset-2 hover:underline"
+                  className="text-accent hover:text-accent underline-offset-2 hover:underline"
                   href="https://wehuddle.tv/"
                 >
                   https://wehuddle.tv/
@@ -221,7 +216,7 @@ export default function TermsOfServicePage() {
               <li>
                 Email:{" "}
                 <a
-                  className="text-indigo-300 hover:text-indigo-200 underline-offset-2 hover:underline"
+                  className="text-accent hover:text-accent underline-offset-2 hover:underline"
                   href="mailto:support@wehuddle.tv"
                 >
                   support@wehuddle.tv
@@ -232,7 +227,7 @@ export default function TermsOfServicePage() {
         </div>
       </main>
 
-      <footer className="py-4 px-6 border-t border-white/5 flex items-center justify-center text-xs text-slate-500">
+      <footer className="py-4 px-6 border-t border-white/5 flex items-center justify-center text-xs text-ink-faint">
         © {new Date().getFullYear()} WeHuddle
       </footer>
     </div>

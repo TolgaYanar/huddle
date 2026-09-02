@@ -59,7 +59,7 @@ export function Tier3CtaCard({
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 rounded-[var(--radius-control)] bg-amber-400/15 border border-amber-400/30 flex items-center justify-center shrink-0">
             <svg
-              className="w-5 h-5 text-amber-300"
+              className="w-5 h-5 text-accent"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -90,7 +90,7 @@ export function Tier3CtaCard({
             href={roomUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="h-11 rounded-[var(--radius-control)] border border-emerald-500/40 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-100 text-sm font-medium inline-flex items-center justify-center gap-2 transition-colors"
+            className="h-11 rounded-[var(--radius-control)] border border-positive bg-positive-soft hover:bg-positive/25 text-emerald-100 text-sm font-medium inline-flex items-center justify-center gap-2 transition-colors"
           >
             <svg
               className="w-4 h-4"
@@ -151,7 +151,7 @@ export function Tier3CtaCard({
           </svg>
         </a>
 
-        <div className="text-[11px] text-ink0 leading-relaxed">
+        <div className="text-[11px] text-ink-faint leading-relaxed">
           {isNetflix
             ? "Inside the Huddle app, signing into your own Netflix account is required (we don't share accounts). Playback uses the device's native DRM."
             : "The room's chat, voice, and reactions still work — they just play alongside whatever you're watching in the other tab."}

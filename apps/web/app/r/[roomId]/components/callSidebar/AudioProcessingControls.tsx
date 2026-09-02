@@ -22,7 +22,7 @@ function Toggle({
       <div className="min-w-0">
         <span className="text-xs text-ink-muted">{label}</span>
         {description && (
-          <span className="block text-[10px] text-ink0 leading-tight">
+          <span className="block text-[10px] text-ink-faint leading-tight">
             {description}
           </span>
         )}
@@ -61,7 +61,7 @@ export function AudioProcessingControls(props: {
 
   return (
     <div className="rounded-[var(--radius-control)] border border-hairline bg-sunken px-3 py-2 flex flex-col gap-0.5">
-      <div className="text-[10px] font-medium text-ink0 uppercase tracking-wide mb-1">
+      <div className="text-[10px] font-medium text-ink-faint uppercase tracking-wide mb-1">
         Audio
       </div>
       <Toggle

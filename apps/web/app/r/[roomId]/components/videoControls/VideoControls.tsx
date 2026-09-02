@@ -273,7 +273,7 @@ export function VideoControls({
 
       {/* Status indicator */}
       {disabled && effectiveDisabledReason && (
-        <div className="mt-3 text-center text-xs text-amber-400/80">
+        <div className="mt-3 text-center text-xs text-accent/80">
           ⚠ {effectiveDisabledReason}
         </div>
       )}

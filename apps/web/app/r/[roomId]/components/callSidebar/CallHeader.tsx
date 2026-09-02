@@ -14,12 +14,12 @@ export function CallHeader(props: {
         <span
           className={`inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full border transition-colors ${
             localSpeaking
-              ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
+              ? "bg-positive-soft border-positive text-positive"
               : "bg-sunken border-hairline text-ink-muted"
           }`}
         >
           <span
-            className={`w-1.5 h-1.5 rounded-full ${localSpeaking ? "bg-emerald-400" : "bg-ink-faint"}`}
+            className={`w-1.5 h-1.5 rounded-full ${localSpeaking ? "bg-positive" : "bg-ink-faint"}`}
           />
           {localSpeaking ? "Speaking" : "Muted"}
         </span>

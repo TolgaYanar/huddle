@@ -95,7 +95,7 @@ export function AddVideosToPlaylistModal(props: AddVideosToPlaylistModalProps) {
                 <label className="text-sm text-ink-muted mb-2 block">
                   Video or Playlist URL
                 </label>
-                <p className="text-xs text-ink0 mb-2">
+                <p className="text-xs text-ink-faint mb-2">
                   Paste a YouTube video URL, YouTube playlist URL, Twitch/Kick
                   stream, or direct video link. YouTube playlists will load all
                   videos for preview.
@@ -106,7 +106,7 @@ export function AddVideosToPlaylistModal(props: AddVideosToPlaylistModalProps) {
                     value={state.urlInput}
                     onChange={(e) => state.setUrlInput(e.target.value)}
                     placeholder="https://youtube.com/watch?v=... or playlist?list=..."
-                    className="flex-1 bg-sunken border border-hairline rounded-[var(--radius-control)] px-4 py-2.5 text-sm text-ink placeholder:text-ink0 focus:outline-none focus:ring-2 focus:ring-accent"
+                    className="flex-1 bg-sunken border border-hairline rounded-[var(--radius-control)] px-4 py-2.5 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-accent"
                     onKeyDown={(e) =>
                       e.key === "Enter" && state.handleAddFromUrl()
                     }
@@ -128,7 +128,7 @@ export function AddVideosToPlaylistModal(props: AddVideosToPlaylistModalProps) {
                   </button>
                 </div>
                 {state.urlError && (
-                  <p className="text-xs text-rose-400 mt-2">{state.urlError}</p>
+                  <p className="text-xs text-negative mt-2">{state.urlError}</p>
                 )}
               </div>
             </div>
@@ -142,7 +142,7 @@ export function AddVideosToPlaylistModal(props: AddVideosToPlaylistModalProps) {
                   value={state.searchQuery}
                   onChange={(e) => state.setSearchQuery(e.target.value)}
                   placeholder="Search YouTube..."
-                  className="flex-1 bg-sunken border border-hairline rounded-[var(--radius-control)] px-4 py-2.5 text-sm text-ink placeholder:text-ink0 focus:outline-none focus:ring-2 focus:ring-accent"
+                  className="flex-1 bg-sunken border border-hairline rounded-[var(--radius-control)] px-4 py-2.5 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-accent"
                   onKeyDown={(e) =>
                     e.key === "Enter" && state.runYouTubeSearch()
                   }
@@ -165,7 +165,7 @@ export function AddVideosToPlaylistModal(props: AddVideosToPlaylistModalProps) {
               </div>
 
               {state.searchError && (
-                <p className="text-xs text-rose-400">{state.searchError}</p>
+                <p className="text-xs text-negative">{state.searchError}</p>
               )}
 
               {state.searchResults.length > 0 && (
@@ -212,7 +212,7 @@ export function AddVideosToPlaylistModal(props: AddVideosToPlaylistModalProps) {
               {state.searchResults.length === 0 &&
                 !state.isSearching &&
                 !state.searchError && (
-                  <p className="text-xs text-ink0 text-center py-4">
+                  <p className="text-xs text-ink-faint text-center py-4">
                     Search for videos and click to add them to the preview
                     below.
                   </p>

@@ -178,7 +178,7 @@ export function DeviceControls(props: {
           aria-label={screenEnabled ? "Stop sharing screen" : "Share screen"}
           className={`flex flex-col items-center justify-center gap-1 py-2.5 rounded-[var(--radius-control)] border text-xs font-medium transition-colors ${
             screenEnabled
-              ? "bg-rose-500/15 border-rose-500/30 text-rose-300"
+              ? "bg-negative-soft border-negative text-negative"
               : "bg-sunken border-hairline text-ink-muted hover:bg-surface hover:text-ink"
           }`}
           title={screenEnabled ? "Stop sharing screen" : "Share screen"}
@@ -200,8 +200,8 @@ export function DeviceControls(props: {
           className={`flex-1 h-8 px-3 rounded-[var(--radius-control)] border text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
             pushToTalkEnabled
               ? pushToTalkDown
-                ? "bg-amber-500/30 border-amber-500/50 text-amber-200"
-                : "bg-amber-500/15 border-amber-500/30 text-amber-300"
+                ? "bg-accent-soft border-accent text-accent"
+                : "bg-accent-tint border-accent text-accent"
               : "bg-sunken border-hairline text-ink-muted hover:bg-surface hover:text-ink"
           }`}
           title={
@@ -223,7 +223,7 @@ export function DeviceControls(props: {
             onClick={() => setIsRebindingPushToTalkKey((v) => !v)}
             className={`h-8 px-2.5 rounded-[var(--radius-control)] border text-xs font-medium transition-colors ${
               isRebindingPushToTalkKey
-                ? "bg-amber-500/15 border-amber-500/30 text-amber-300"
+                ? "bg-accent-tint border-accent text-accent"
                 : "bg-sunken border-hairline text-ink-muted hover:bg-surface hover:text-ink"
             }`}
             title={

@@ -2,6 +2,8 @@
 
 import React, { Suspense } from "react";
 import Link from "next/link";
+
+import { ThemeToggle } from "../components/ThemeToggle";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { apiRegister } from "../lib/api";
@@ -48,7 +50,7 @@ function RequirementCheck({ met, label }: { met: boolean; label: string }) {
         className={`w-4 h-4 rounded flex items-center justify-center transition-colors shrink-0 ${
           met
             ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-400"
-            : "bg-white/4 border border-white/8 text-slate-600"
+            : "bg-surface border border-hairline text-ink-faint"
         }`}
       >
         {met ? (
@@ -67,7 +69,7 @@ function RequirementCheck({ met, label }: { met: boolean; label: string }) {
           </svg>
         ) : null}
       </div>
-      <span className={met ? "text-emerald-400" : "text-slate-500"}>
+      <span className={met ? "text-emerald-400" : "text-ink-faint"}>
         {label}
       </span>
     </div>
@@ -118,17 +120,11 @@ function RegisterPageInner() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#0a0a0f] text-slate-200 overflow-hidden">
-      {/* Background glow */}
-      <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-150 h-150 rounded-full bg-indigo-600/10 blur-[120px]" />
-        <div className="absolute bottom-0 right-1/4 w-100 h-100 rounded-full bg-violet-600/8 blur-[100px]" />
-      </div>
-
-      <header className="relative z-10 h-16 flex items-center justify-between px-6 lg:px-8 border-b border-white/6 backdrop-blur-md bg-black/20">
+    <div className="min-h-screen flex flex-col bg-bg text-ink overflow-hidden">
+      <header className="relative z-10 h-16 flex items-center justify-between px-6 lg:px-8 border-b border-hairline bg-bg">
         <Link
           href="/"
-          className="font-semibold text-lg sm:text-xl flex items-center gap-2.5 text-white tracking-tight"
+          className="font-semibold text-lg sm:text-xl flex items-center gap-2.5 text-ink tracking-tight"
         >
           <picture>
             <source srcSet="/favicon.svg?v=2" type="image/svg+xml" />
@@ -144,22 +140,23 @@ function RegisterPageInner() {
         </Link>
         <Link
           href={`/login?next=${encodeURIComponent(next)}`}
-          className="h-8 px-4 rounded-lg border border-white/8 bg-white/4 text-slate-300 text-xs font-medium hover:bg-white/8 hover:text-white transition-all flex items-center"
+          className="h-8 px-4 rounded-[var(--radius-control)] border border-hairline bg-surface text-ink-muted text-xs font-medium hover:bg-white/8 hover:text-ink transition-all flex items-center"
         >
           Log in
         </Link>
+        <ThemeToggle />
       </header>
 
       <main className="relative z-10 flex-1 flex items-center justify-center p-6">
         <div className="w-full max-w-sm">
           {/* Card */}
-          <div className="rounded-2xl border border-white/8 bg-white/3 backdrop-blur-xl shadow-2xl shadow-black/40 p-7">
+          <div className="rounded-[var(--radius-panel)] border border-hairline bg-surface shadow-2xl shadow-black/40 p-7">
             {/* Header */}
             <div className="mb-6">
               <div className="flex items-center gap-3 mb-3">
-                <div className="h-9 w-9 rounded-xl bg-indigo-500/15 border border-indigo-500/20 flex items-center justify-center">
+                <div className="h-9 w-9 rounded-[var(--radius-control)] bg-accent-tint border border-accent flex items-center justify-center">
                   <svg
-                    className="w-4 h-4 text-indigo-400"
+                    className="w-4 h-4 text-accent"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -173,10 +170,10 @@ function RegisterPageInner() {
                   </svg>
                 </div>
               </div>
-              <h1 className="text-xl font-semibold text-white tracking-tight">
+              <h1 className="text-xl font-semibold text-ink tracking-tight">
                 Create an account
               </h1>
-              <p className="text-sm text-slate-400 mt-1">
+              <p className="text-sm text-ink-muted mt-1">
                 Join WeHuddle to save your rooms and sync across devices.
               </p>
             </div>
@@ -204,7 +201,7 @@ function RegisterPageInner() {
               <div className="space-y-1.5">
                 <label
                   htmlFor="register-username"
-                  className="text-xs font-medium text-slate-400"
+                  className="text-xs font-medium text-ink-muted"
                 >
                   Username
                 </label>
@@ -223,12 +220,12 @@ function RegisterPageInner() {
                   autoCorrect="off"
                   spellCheck={false}
                   autoFocus
-                  className={`w-full bg-white/4 border rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-2 transition-all hover:border-white/12 ${
+                  className={`w-full bg-surface border rounded-[var(--radius-control)] px-4 py-2.5 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 transition-all hover:border-hairline ${
                     username.length > 0
                       ? usernameValid
                         ? "border-emerald-500/35 focus:ring-emerald-500/20"
                         : "border-rose-500/35 focus:ring-rose-500/20"
-                      : "border-white/8 focus:ring-indigo-500/25 focus:border-indigo-500/35"
+                      : "border-hairline focus:ring-accent focus:border-accent"
                   }`}
                 />
                 {username.length > 0 && (
@@ -248,7 +245,7 @@ function RegisterPageInner() {
               <div className="space-y-1.5">
                 <label
                   htmlFor="register-password"
-                  className="text-xs font-medium text-slate-400"
+                  className="text-xs font-medium text-ink-muted"
                 >
                   Password
                 </label>
@@ -265,12 +262,12 @@ function RegisterPageInner() {
                     placeholder="Create a strong password"
                     type={showPassword ? "text" : "password"}
                     autoComplete="new-password"
-                    className={`w-full bg-white/4 border rounded-xl px-4 py-2.5 pr-10 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-2 transition-all hover:border-white/12 ${
+                    className={`w-full bg-surface border rounded-[var(--radius-control)] px-4 py-2.5 pr-10 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 transition-all hover:border-hairline ${
                       password.length > 0
                         ? passwordValid
                           ? "border-emerald-500/35 focus:ring-emerald-500/20"
                           : "border-amber-500/35 focus:ring-amber-500/20"
-                        : "border-white/8 focus:ring-indigo-500/25 focus:border-indigo-500/35"
+                        : "border-hairline focus:ring-accent focus:border-accent"
                     }`}
                   />
                   <PasswordToggleButton
@@ -295,7 +292,7 @@ function RegisterPageInner() {
               <div className="space-y-1.5">
                 <label
                   htmlFor="register-confirm-password"
-                  className="text-xs font-medium text-slate-400"
+                  className="text-xs font-medium text-ink-muted"
                 >
                   Confirm Password
                 </label>
@@ -310,12 +307,12 @@ function RegisterPageInner() {
                     placeholder="Confirm your password"
                     type={showConfirmPassword ? "text" : "password"}
                     autoComplete="new-password"
-                    className={`w-full bg-white/4 border rounded-xl px-4 py-2.5 pr-10 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-2 transition-all hover:border-white/12 ${
+                    className={`w-full bg-surface border rounded-[var(--radius-control)] px-4 py-2.5 pr-10 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 transition-all hover:border-hairline ${
                       confirmPassword.length > 0
                         ? passwordsMatch
                           ? "border-emerald-500/35 focus:ring-emerald-500/20"
                           : "border-rose-500/35 focus:ring-rose-500/20"
-                        : "border-white/8 focus:ring-indigo-500/25 focus:border-indigo-500/35"
+                        : "border-hairline focus:ring-accent focus:border-accent"
                     }`}
                   />
                   <PasswordToggleButton
@@ -324,7 +321,7 @@ function RegisterPageInner() {
                   />
                 </div>
                 {confirmPassword.length > 0 && !passwordsMatch && (
-                  <p className="text-xs text-rose-400 mt-1">
+                  <p className="text-xs text-negative mt-1">
                     Passwords do not match
                   </p>
                 )}
@@ -349,9 +346,9 @@ function RegisterPageInner() {
               </div>
 
               {error && (
-                <div className="text-sm text-rose-300 bg-rose-500/8 border border-rose-500/20 rounded-xl px-4 py-3 flex items-start gap-2.5">
+                <div className="text-sm text-negative bg-rose-500/8 border border-rose-500/20 rounded-[var(--radius-control)] px-4 py-3 flex items-start gap-2.5">
                   <svg
-                    className="w-4 h-4 mt-0.5 shrink-0 text-rose-400"
+                    className="w-4 h-4 mt-0.5 shrink-0 text-negative"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -369,10 +366,10 @@ function RegisterPageInner() {
 
               <button
                 disabled={!canSubmit}
-                className={`h-11 w-full rounded-xl font-semibold text-sm transition-all mt-1 ${
+                className={`h-11 w-full rounded-[var(--radius-control)] font-semibold text-sm transition-all mt-1 ${
                   canSubmit
-                    ? "bg-indigo-600 text-white hover:bg-indigo-500 active:scale-[0.98] shadow-lg shadow-indigo-500/20"
-                    : "bg-white/4 text-slate-600 border border-white/6 cursor-not-allowed"
+                    ? "bg-accent text-accent-ink hover:bg-accent  "
+                    : "bg-surface text-ink-faint border border-hairline cursor-not-allowed"
                 }`}
                 type="submit"
               >
@@ -404,20 +401,20 @@ function RegisterPageInner() {
           </div>
 
           {/* Footer link */}
-          <p className="text-xs text-slate-500 text-center mt-5">
+          <p className="text-xs text-ink-faint text-center mt-5">
             Already have an account?{" "}
             <Link
               href={`/login?next=${encodeURIComponent(next)}`}
-              className="text-indigo-400 hover:text-indigo-300 transition-colors"
+              className="text-accent hover:text-accent transition-colors"
             >
               Log in
             </Link>
           </p>
-          <p className="text-xs text-slate-600 text-center mt-3">
+          <p className="text-xs text-ink-faint text-center mt-3">
             By creating an account you agree to our{" "}
             <Link
               href="/terms"
-              className="text-slate-500 hover:text-slate-400 transition-colors"
+              className="text-ink-faint hover:text-ink-muted transition-colors"
             >
               Terms
             </Link>
@@ -433,8 +430,8 @@ export default function RegisterPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center bg-[#0a0a0f] text-slate-200">
-          <div className="text-sm text-slate-500">Loading…</div>
+        <div className="min-h-screen flex items-center justify-center bg-bg text-ink">
+          <div className="text-sm text-ink-faint">Loading…</div>
         </div>
       }
     >

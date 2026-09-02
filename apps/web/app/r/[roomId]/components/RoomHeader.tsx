@@ -12,6 +12,7 @@ import {
 } from "../../../lib/api";
 import { TimerWidget } from "./TimerWidget";
 import type { TimerState } from "../hooks/useTimer";
+import { ThemeToggle } from "../../../components/ThemeToggle";
 
 interface RoomHeaderProps {
   roomId: string;
@@ -99,7 +100,7 @@ export function RoomHeader({
   }, [authUser, roomId]);
 
   return (
-    <header className="h-auto min-h-16 sm:h-16 flex items-center justify-between gap-3 px-4 sm:px-6 lg:px-8 py-2 sm:py-0 border-b border-hairline backdrop-blur-sm bg-bg/85 sticky top-0 z-50 ">
+    <header className="h-auto min-h-16 sm:h-16 flex items-center justify-between gap-3 px-4 sm:px-6 lg:px-8 py-2 sm:py-0 border-b border-hairline backdrop-blur-sm bg-bg sticky top-0 z-50 ">
       <div className="flex items-center gap-3 min-w-0">
         <Link
           href="/"
@@ -130,7 +131,7 @@ export function RoomHeader({
                 }}
                 maxLength={40}
                 placeholder={roomId}
-                className="bg-transparent text-ink outline-none w-36 placeholder:text-ink0"
+                className="bg-transparent text-ink outline-none w-36 placeholder:text-ink-faint"
               />
               <button
                 type="button"
@@ -142,7 +143,7 @@ export function RoomHeader({
               <button
                 type="button"
                 onClick={() => setEditingName(false)}
-                className="text-ink0 hover:text-ink-muted"
+                className="text-ink-faint hover:text-ink-muted"
               >
                 ✕
               </button>
@@ -158,7 +159,7 @@ export function RoomHeader({
                   type="button"
                   onClick={startEditName}
                   title="Rename room"
-                  className="text-ink0 hover:text-ink-muted transition-colors"
+                  className="text-ink-faint hover:text-ink-muted transition-colors"
                 >
                   ✎
                 </button>
@@ -172,7 +173,7 @@ export function RoomHeader({
         {authUser ? (
           <>
             <div className="hidden md:inline-flex items-center gap-1.5 text-xs border border-hairline bg-sunken rounded-full px-3 py-1 text-ink-muted">
-              <span className="text-ink0">@</span>
+              <span className="text-ink-faint">@</span>
               <span className="text-ink font-medium">{authUser.username}</span>
             </div>
             <button
@@ -222,7 +223,7 @@ export function RoomHeader({
           }}
           className={`h-8 inline-flex items-center gap-1.5 px-2.5 sm:px-3 rounded-[var(--radius-control)] border text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
             isSaved
-              ? "border-amber-400/40 bg-amber-400/10 text-amber-200 hover:bg-amber-400/20"
+              ? "border-accent bg-accent-tint text-accent hover:bg-accent-soft"
               : "border-hairline bg-surface text-ink hover:bg-raised"
           }`}
           title={
@@ -252,7 +253,7 @@ export function RoomHeader({
         </button>
 
         {saveError && (
-          <span className="text-xs text-rose-400">{saveError}</span>
+          <span className="text-xs text-negative">{saveError}</span>
         )}
 
         <button
@@ -313,7 +314,7 @@ export function RoomHeader({
           onClick={onCopyInvite}
           className={`h-8 inline-flex items-center gap-1.5 px-2.5 sm:px-3 rounded-[var(--radius-control)] border text-xs font-medium transition-colors ${
             copied
-              ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-200"
+              ? "border-positive bg-positive-soft text-positive"
               : "border-hairline bg-surface text-ink hover:bg-raised"
           }`}
           title={inviteLink || ""}
@@ -361,7 +362,7 @@ export function RoomHeader({
           aria-pressed={isChatOnlyMode}
           className={`h-8 inline-flex items-center gap-1.5 px-2.5 sm:px-3 rounded-[var(--radius-control)] border text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
             isChatOnlyMode
-              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20"
+              ? "border-positive bg-positive-soft text-positive hover:bg-positive-soft"
               : "border-hairline bg-surface text-ink hover:bg-raised"
           }`}
           title={
@@ -387,6 +388,8 @@ export function RoomHeader({
             {isChatOnlyMode ? "Chat only" : "Chat mode"}
           </span>
         </button>
+
+        <ThemeToggle />
 
         <TimerWidget {...timerWidgetProps} />
 
@@ -437,7 +440,7 @@ export function RoomHeader({
 
         {hasRoomPassword && (
           <span
-            className="hidden sm:inline-flex items-center gap-1.5 text-xs font-medium bg-amber-400/10 px-2.5 py-1 rounded-full border border-amber-400/30 text-amber-200"
+            className="hidden sm:inline-flex items-center gap-1.5 text-xs font-medium bg-accent-tint px-2.5 py-1 rounded-full border border-accent text-accent"
             title="This room is password-protected"
           >
             <svg
@@ -459,8 +462,8 @@ export function RoomHeader({
         <div
           className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border transition-colors ${
             isConnected
-              ? "bg-emerald-500/5 border-emerald-500/20 text-emerald-200"
-              : "bg-rose-500/10 border-rose-500/30 text-rose-200"
+              ? "bg-positive-soft border-positive text-positive"
+              : "bg-negative-soft border-negative text-negative"
           }`}
           title={
             isConnected
@@ -473,12 +476,9 @@ export function RoomHeader({
           <div className="relative shrink-0">
             <div
               className={`w-2 h-2 rounded-full ${
-                isConnected ? "bg-emerald-400" : "bg-rose-400"
+                isConnected ? "bg-positive" : "bg-negative"
               }`}
             />
-            {isConnected && (
-              <div className="absolute inset-0 w-2 h-2 rounded-full bg-emerald-400 animate-ping opacity-60" />
-            )}
           </div>
           <span className="hidden sm:inline">
             {isConnected

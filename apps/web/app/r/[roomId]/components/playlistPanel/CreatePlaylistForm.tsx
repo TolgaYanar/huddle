@@ -27,7 +27,7 @@ export function CreatePlaylistForm({
         value={name}
         onChange={(e) => setName(e.target.value)}
         placeholder="Playlist name..."
-        className="w-full bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2 text-sm text-ink placeholder:text-ink0 focus:outline-none focus:ring-2 focus:ring-sky-500/25"
+        className="w-full bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-sky-500/25"
         autoFocus
       />
       <input
@@ -35,7 +35,7 @@ export function CreatePlaylistForm({
         value={description}
         onChange={(e) => setDescription(e.target.value)}
         placeholder="Description (optional)..."
-        className="w-full bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2 text-sm text-ink placeholder:text-ink0 focus:outline-none focus:ring-2 focus:ring-sky-500/25"
+        className="w-full bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-sky-500/25"
       />
       <div className="flex gap-2 justify-end">
         <button

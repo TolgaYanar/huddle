@@ -48,7 +48,7 @@ export function UnmuteHint({
             onUnmute();
             setDismissed(true);
           }}
-          className="flex items-center gap-2 px-3 h-8 rounded-[var(--radius-control)] bg-white text-slate-900 text-sm font-semibold hover:bg-slate-100 transition-colors"
+          className="flex items-center gap-2 px-3 h-8 rounded-[var(--radius-control)] bg-white text-ink text-sm font-semibold hover:bg-slate-100 transition-colors"
           aria-label="Tap for sound"
         >
           <svg
