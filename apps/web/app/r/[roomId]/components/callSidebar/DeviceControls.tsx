@@ -136,10 +136,10 @@ export function DeviceControls(props: {
           onClick={() => setMicEnabled((v) => !v)}
           aria-pressed={micEnabled ? "true" : "false"}
           aria-label={micEnabled ? "Turn off microphone" : "Turn on microphone"}
-          className={`flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl border text-xs font-medium transition-colors ${
+          className={`flex flex-col items-center justify-center gap-1 py-2.5 rounded-[var(--radius-control)] border text-xs font-medium transition-colors ${
             micEnabled
-              ? "bg-sky-500/15 border-sky-500/30 text-sky-300"
-              : "bg-black/20 border-white/10 text-slate-400 hover:bg-white/5 hover:text-slate-200"
+              ? "bg-accent/15 border-sky-500/30 text-sky-300"
+              : "bg-sunken border-hairline text-ink-muted hover:bg-surface hover:text-ink"
           }`}
           title={micEnabled ? "Turn off microphone" : "Turn on microphone"}
         >
@@ -156,10 +156,10 @@ export function DeviceControls(props: {
           onClick={() => setCamEnabled((v) => !v)}
           aria-pressed={camEnabled ? "true" : "false"}
           aria-label={camEnabled ? "Turn off camera" : "Turn on camera"}
-          className={`flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl border text-xs font-medium transition-colors ${
+          className={`flex flex-col items-center justify-center gap-1 py-2.5 rounded-[var(--radius-control)] border text-xs font-medium transition-colors ${
             camEnabled
               ? "bg-indigo-500/15 border-indigo-500/30 text-indigo-300"
-              : "bg-black/20 border-white/10 text-slate-400 hover:bg-white/5 hover:text-slate-200"
+              : "bg-sunken border-hairline text-ink-muted hover:bg-surface hover:text-ink"
           }`}
           title={camEnabled ? "Turn off camera" : "Turn on camera"}
         >
@@ -176,10 +176,10 @@ export function DeviceControls(props: {
           onClick={() => setScreenEnabled((v) => !v)}
           aria-pressed={screenEnabled ? "true" : "false"}
           aria-label={screenEnabled ? "Stop sharing screen" : "Share screen"}
-          className={`flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl border text-xs font-medium transition-colors ${
+          className={`flex flex-col items-center justify-center gap-1 py-2.5 rounded-[var(--radius-control)] border text-xs font-medium transition-colors ${
             screenEnabled
               ? "bg-rose-500/15 border-rose-500/30 text-rose-300"
-              : "bg-black/20 border-white/10 text-slate-400 hover:bg-white/5 hover:text-slate-200"
+              : "bg-sunken border-hairline text-ink-muted hover:bg-surface hover:text-ink"
           }`}
           title={screenEnabled ? "Stop sharing screen" : "Share screen"}
         >
@@ -197,12 +197,12 @@ export function DeviceControls(props: {
             stopPushToTalkTransmit();
           }}
           disabled={!micEnabled}
-          className={`flex-1 h-8 px-3 rounded-xl border text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+          className={`flex-1 h-8 px-3 rounded-[var(--radius-control)] border text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
             pushToTalkEnabled
               ? pushToTalkDown
                 ? "bg-amber-500/30 border-amber-500/50 text-amber-200"
                 : "bg-amber-500/15 border-amber-500/30 text-amber-300"
-              : "bg-black/20 border-white/10 text-slate-400 hover:bg-white/5 hover:text-slate-200"
+              : "bg-sunken border-hairline text-ink-muted hover:bg-surface hover:text-ink"
           }`}
           title={
             micEnabled
@@ -221,10 +221,10 @@ export function DeviceControls(props: {
           <button
             type="button"
             onClick={() => setIsRebindingPushToTalkKey((v) => !v)}
-            className={`h-8 px-2.5 rounded-xl border text-xs font-medium transition-colors ${
+            className={`h-8 px-2.5 rounded-[var(--radius-control)] border text-xs font-medium transition-colors ${
               isRebindingPushToTalkKey
                 ? "bg-amber-500/15 border-amber-500/30 text-amber-300"
-                : "bg-black/20 border-white/10 text-slate-400 hover:bg-white/5 hover:text-slate-200"
+                : "bg-sunken border-hairline text-ink-muted hover:bg-surface hover:text-ink"
             }`}
             title={
               isRebindingPushToTalkKey

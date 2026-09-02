@@ -44,7 +44,7 @@ const EVENT_COLORS: Record<string, string> = {
   seek: "text-indigo-400",
   change_url: "text-rose-400",
   join: "text-violet-400",
-  leave: "text-slate-500",
+  leave: "text-ink0",
   error: "text-red-400",
 };
 
@@ -90,7 +90,7 @@ const ChatComposer = React.memo(function ChatComposer({
         event.preventDefault();
         if (sendChat(chatText)) setChatText("");
       }}
-      className="p-3 border-t border-white/10 bg-black/20 flex gap-2"
+      className="p-3 border-t border-hairline bg-sunken flex gap-2"
     >
       <input
         type="text"
@@ -98,12 +98,12 @@ const ChatComposer = React.memo(function ChatComposer({
         onChange={(event) => setChatText(event.target.value)}
         placeholder={isConnected ? "Type a message…" : "Connecting…"}
         disabled={!isConnected}
-        className="flex-1 bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500/25 focus:border-sky-500/30 transition disabled:opacity-60"
+        className="flex-1 bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2 text-sm text-ink placeholder:text-ink0 focus:outline-none focus:ring-2 focus:ring-sky-500/25 focus:border-sky-500/30 transition disabled:opacity-60"
       />
       <button
         type="submit"
         disabled={!isConnected || !chatText.trim()}
-        className="h-9 px-4 rounded-xl border border-white/10 bg-white/5 text-slate-50 text-sm font-medium hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        className="h-9 px-4 rounded-[var(--radius-control)] border border-hairline bg-surface text-ink text-sm font-medium hover:bg-raised transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
         Send
       </button>
@@ -228,13 +228,13 @@ export const ActivitySidebar = React.memo(function ActivitySidebar(props: {
 
   return (
     <aside
-      className={`backdrop-blur-md bg-white/5 rounded-2xl border border-white/10 flex flex-col overflow-hidden min-h-0 max-h-[calc(100vh-4rem-3rem)] lg:max-h-[calc(100vh-4rem-4rem)] lg:row-start-1 ${
+      className={`backdrop-blur-md bg-surface rounded-[var(--radius-panel)] border border-hairline flex flex-col overflow-hidden min-h-0 max-h-[calc(100vh-4rem-3rem)] lg:max-h-[calc(100vh-4rem-4rem)] lg:row-start-1 ${
         isTheatreMode ? "lg:col-start-2" : "lg:col-start-3"
       }`}
     >
       {/* Header */}
       <div
-        className={`border-b border-white/10 bg-white/5 ${
+        className={`border-b border-hairline bg-surface ${
           isActivityCollapsed ? "p-2" : "p-3"
         }`}
       >
@@ -244,10 +244,10 @@ export const ActivitySidebar = React.memo(function ActivitySidebar(props: {
               <button
                 type="button"
                 onClick={() => setActiveTab("activity")}
-                className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                className={`flex-1 py-1.5 rounded-[var(--radius-control)] text-xs font-medium transition-colors ${
                   activeTab === "activity"
-                    ? "bg-white/10 text-slate-100"
-                    : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
+                    ? "bg-raised text-ink"
+                    : "text-ink-muted hover:text-ink hover:bg-surface"
                 }`}
               >
                 Chat
@@ -255,10 +255,10 @@ export const ActivitySidebar = React.memo(function ActivitySidebar(props: {
               <button
                 type="button"
                 onClick={() => setActiveTab("games")}
-                className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors relative ${
+                className={`flex-1 py-1.5 rounded-[var(--radius-control)] text-xs font-medium transition-colors relative ${
                   activeTab === "games"
-                    ? "bg-white/10 text-slate-100"
-                    : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
+                    ? "bg-raised text-ink"
+                    : "text-ink-muted hover:text-ink hover:bg-surface"
                 }`}
               >
                 Games
@@ -278,7 +278,7 @@ export const ActivitySidebar = React.memo(function ActivitySidebar(props: {
           <button
             type="button"
             onClick={() => setIsActivityCollapsed((v) => !v)}
-            className="h-8 w-8 rounded-xl border border-white/20 bg-black/40 text-slate-50 text-sm font-semibold hover:bg-white/10 transition-colors inline-flex items-center justify-center shrink-0"
+            className="h-8 w-8 rounded-[var(--radius-control)] border border-hairline-strong bg-sunken text-ink text-sm font-semibold hover:bg-raised transition-colors inline-flex items-center justify-center shrink-0"
             title={
               isActivityCollapsed ? "Expand activity" : "Collapse activity"
             }
@@ -299,7 +299,7 @@ export const ActivitySidebar = React.memo(function ActivitySidebar(props: {
             className="flex-1 min-h-0 overflow-y-auto px-3 py-3 flex flex-col gap-0"
           >
             {logs.length === 0 && (
-              <div className="text-center text-slate-500 mt-8 text-sm">
+              <div className="text-center text-ink0 mt-8 text-sm">
                 No messages yet…
               </div>
             )}
@@ -308,7 +308,7 @@ export const ActivitySidebar = React.memo(function ActivitySidebar(props: {
               <button
                 type="button"
                 onClick={showEarlierLogs}
-                className="mx-auto mb-3 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-300 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+                className="mx-auto mb-3 rounded-[var(--radius-control)] border border-hairline bg-surface px-3 py-1.5 text-xs font-medium text-ink-muted transition-colors hover:bg-raised hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
               >
                 Show {Math.min(VISIBLE_LOG_PAGE_SIZE, firstVisibleLogIndex)}
                 {" earlier messages"}
@@ -355,10 +355,10 @@ export const ActivitySidebar = React.memo(function ActivitySidebar(props: {
                     <div className="flex-1 min-w-0">
                       {isFirstInGroup && (
                         <div className="flex items-baseline gap-2 mb-0.5">
-                          <span className="text-xs font-semibold text-slate-200 truncate">
+                          <span className="text-xs font-semibold text-ink truncate">
                             {log.user}
                           </span>
-                          <span className="text-[10px] text-slate-500 shrink-0">
+                          <span className="text-[10px] text-ink0 shrink-0">
                             {log.time}
                           </span>
                         </div>
@@ -402,7 +402,7 @@ export const ActivitySidebar = React.memo(function ActivitySidebar(props: {
                           }
                         }}
                       >
-                        <p className="text-sm text-slate-300 leading-relaxed break-words">
+                        <p className="text-sm text-ink-muted leading-relaxed break-words">
                           {log.msg}
                         </p>
 
@@ -417,7 +417,7 @@ export const ActivitySidebar = React.memo(function ActivitySidebar(props: {
                             onClick={() => setActiveReactionMsgId(log.id!)}
                             aria-label={`Add reaction to message from ${log.user}`}
                             aria-expanded={activeReactionMsgId === log.id}
-                            className="absolute -top-7 right-0 h-6 min-w-6 rounded-full border border-white/10 bg-slate-800/95 px-1 text-xs text-slate-300 opacity-60 shadow-lg transition hover:opacity-100 focus:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+                            className="absolute -top-7 right-0 h-6 min-w-6 rounded-full border border-hairline bg-raised/95 px-1 text-xs text-ink-muted opacity-60 shadow-lg transition hover:opacity-100 focus:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
                           >
                             <span aria-hidden="true">☺+</span>
                           </button>
@@ -428,7 +428,7 @@ export const ActivitySidebar = React.memo(function ActivitySidebar(props: {
                           <div
                             role="group"
                             aria-label="Choose a reaction"
-                            className="absolute -top-7 right-8 flex items-center gap-0.5 bg-slate-800/95 border border-white/10 rounded-full px-1.5 py-0.5 shadow-lg z-20"
+                            className="absolute -top-7 right-8 flex items-center gap-0.5 bg-raised/95 border border-hairline rounded-full px-1.5 py-0.5 shadow-lg z-20"
                           >
                             {REACTION_EMOJIS.map((emoji) => (
                               <button
@@ -465,8 +465,8 @@ export const ActivitySidebar = React.memo(function ActivitySidebar(props: {
                                   aria-label={`React with ${emoji}; ${userIds.length} ${userIds.length === 1 ? "reaction" : "reactions"}`}
                                   className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border transition-colors ${
                                     isMine
-                                      ? "bg-sky-500/20 border-sky-500/40 text-sky-200 hover:bg-sky-500/30"
-                                      : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10"
+                                      ? "bg-accent/20 border-sky-500/40 text-sky-200 hover:bg-accent/30"
+                                      : "bg-surface border-hairline text-ink-muted hover:bg-raised"
                                   }`}
                                 >
                                   <span>{emoji}</span>
@@ -480,7 +480,7 @@ export const ActivitySidebar = React.memo(function ActivitySidebar(props: {
 
                       {/* Timestamp for non-first messages in group (on last) */}
                       {!isFirstInGroup && isLastInGroup && (
-                        <div className="text-[10px] text-slate-600 mt-0.5">
+                        <div className="text-[10px] text-ink-faint mt-0.5">
                           {log.time}
                         </div>
                       )}
@@ -490,7 +490,7 @@ export const ActivitySidebar = React.memo(function ActivitySidebar(props: {
               }
 
               // System event — compact centered divider
-              const color = EVENT_COLORS[log.type] ?? "text-slate-500";
+              const color = EVENT_COLORS[log.type] ?? "text-ink0";
               const icon = EVENT_ICONS[log.type] ?? "·";
 
               return (
@@ -499,11 +499,11 @@ export const ActivitySidebar = React.memo(function ActivitySidebar(props: {
                   data-activity-entry
                   className="flex items-center gap-2 py-2 select-none"
                 >
-                  <div className="flex-1 h-px bg-white/5" />
+                  <div className="flex-1 h-px bg-surface" />
                   <span className={`text-[10px] ${color} shrink-0 font-medium`}>
                     {icon} {log.user} {log.msg} · {log.time}
                   </span>
-                  <div className="flex-1 h-px bg-white/5" />
+                  <div className="flex-1 h-px bg-surface" />
                 </div>
               );
             })}
@@ -519,7 +519,7 @@ export const ActivitySidebar = React.memo(function ActivitySidebar(props: {
       {!isActivityCollapsed && activeTab === "games" && (
         <div className="flex-1 min-h-0 overflow-y-auto p-4">
           <div className="flex flex-col gap-3">
-            <div className="text-xs text-slate-500 font-medium uppercase tracking-wider">
+            <div className="text-xs text-ink0 font-medium uppercase tracking-wider">
               Choose a game
             </div>
             {AVAILABLE_GAMES.map((g) => (
@@ -527,13 +527,13 @@ export const ActivitySidebar = React.memo(function ActivitySidebar(props: {
                 key={g.id}
                 type="button"
                 onClick={() => onOpenGame(g.id)}
-                className="w-full text-left p-4 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-colors group"
+                className="w-full text-left p-4 rounded-[var(--radius-control)] border border-hairline bg-surface hover:bg-raised transition-colors group"
               >
                 <div className="flex items-center gap-3">
                   <span className="text-3xl">{g.emoji}</span>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-slate-200 group-hover:text-white">
+                      <span className="text-sm font-semibold text-ink group-hover:text-white">
                         {g.name}
                       </span>
                       {g.id === "guess-it" && hasActiveGame && (
@@ -547,11 +547,11 @@ export const ActivitySidebar = React.memo(function ActivitySidebar(props: {
                         </span>
                       )}
                     </div>
-                    <div className="text-xs text-slate-500 mt-0.5 leading-relaxed">
+                    <div className="text-xs text-ink0 mt-0.5 leading-relaxed">
                       {g.description}
                     </div>
                   </div>
-                  <span className="text-slate-500 group-hover:text-slate-300 text-lg transition-colors">
+                  <span className="text-ink0 group-hover:text-ink-muted text-lg transition-colors">
                     →
                   </span>
                 </div>

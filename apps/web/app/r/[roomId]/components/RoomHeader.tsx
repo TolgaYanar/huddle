@@ -99,11 +99,11 @@ export function RoomHeader({
   }, [authUser, roomId]);
 
   return (
-    <header className="h-auto min-h-16 sm:h-16 flex items-center justify-between gap-3 px-4 sm:px-6 lg:px-8 py-2 sm:py-0 border-b border-white/10 backdrop-blur-xl bg-slate-950/60 sticky top-0 z-50 shadow-[0_1px_0_0_rgba(255,255,255,0.03)]">
+    <header className="h-auto min-h-16 sm:h-16 flex items-center justify-between gap-3 px-4 sm:px-6 lg:px-8 py-2 sm:py-0 border-b border-hairline backdrop-blur-sm bg-bg/85 sticky top-0 z-50 ">
       <div className="flex items-center gap-3 min-w-0">
         <Link
           href="/"
-          className="font-semibold text-lg sm:text-xl flex items-center gap-2 text-slate-50 tracking-tight shrink-0 group"
+          className="font-semibold text-lg sm:text-xl flex items-center gap-2 text-ink tracking-tight shrink-0 group"
         >
           <picture>
             <source srcSet="/favicon.svg?v=2" type="image/svg+xml" />
@@ -117,7 +117,7 @@ export function RoomHeader({
           </picture>
           <span className="hidden sm:inline">WeHuddle</span>
         </Link>
-        <span className="hidden sm:inline-flex items-center gap-1.5 text-xs border border-white/10 bg-black/20 rounded-full px-3 py-1 text-slate-300 min-w-0">
+        <span className="hidden sm:inline-flex items-center gap-1.5 text-xs border border-hairline bg-sunken rounded-full px-3 py-1 text-ink-muted min-w-0">
           {editingName ? (
             <>
               <input
@@ -130,27 +130,27 @@ export function RoomHeader({
                 }}
                 maxLength={40}
                 placeholder={roomId}
-                className="bg-transparent text-slate-200 outline-none w-36 placeholder:text-slate-500"
+                className="bg-transparent text-ink outline-none w-36 placeholder:text-ink0"
               />
               <button
                 type="button"
                 onClick={commitName}
-                className="text-indigo-300 hover:text-indigo-200 font-medium"
+                className="text-indigo-300 hover:text-accent font-medium"
               >
                 Save
               </button>
               <button
                 type="button"
                 onClick={() => setEditingName(false)}
-                className="text-slate-500 hover:text-slate-300"
+                className="text-ink0 hover:text-ink-muted"
               >
                 ✕
               </button>
             </>
           ) : (
             <>
-              <span className="text-slate-400">Room</span>
-              <span className="font-medium text-slate-200 max-w-[160px] truncate">
+              <span className="text-ink-muted">Room</span>
+              <span className="font-medium text-ink max-w-[160px] truncate">
                 {roomName ?? <span className="font-mono">{roomId}</span>}
               </span>
               {isHost && (
@@ -158,7 +158,7 @@ export function RoomHeader({
                   type="button"
                   onClick={startEditName}
                   title="Rename room"
-                  className="text-slate-500 hover:text-slate-300 transition-colors"
+                  className="text-ink0 hover:text-ink-muted transition-colors"
                 >
                   ✎
                 </button>
@@ -171,11 +171,9 @@ export function RoomHeader({
       <div className="flex flex-1 min-w-0 flex-wrap justify-end items-center gap-1.5 sm:flex-none sm:flex-nowrap sm:gap-2">
         {authUser ? (
           <>
-            <div className="hidden md:inline-flex items-center gap-1.5 text-xs border border-white/10 bg-black/20 rounded-full px-3 py-1 text-slate-300">
-              <span className="text-slate-500">@</span>
-              <span className="text-slate-200 font-medium">
-                {authUser.username}
-              </span>
+            <div className="hidden md:inline-flex items-center gap-1.5 text-xs border border-hairline bg-sunken rounded-full px-3 py-1 text-ink-muted">
+              <span className="text-ink0">@</span>
+              <span className="text-ink font-medium">{authUser.username}</span>
             </div>
             <button
               type="button"
@@ -187,7 +185,7 @@ export function RoomHeader({
                   setIsSaved(false);
                 }
               }}
-              className="hidden sm:inline-flex h-8 px-3 rounded-lg border border-white/10 bg-white/5 text-slate-300 text-xs font-medium hover:bg-white/10 hover:text-slate-100 transition-colors"
+              className="hidden sm:inline-flex h-8 px-3 rounded-[var(--radius-control)] border border-hairline bg-surface text-ink-muted text-xs font-medium hover:bg-raised hover:text-ink transition-colors"
             >
               Logout
             </button>
@@ -195,7 +193,7 @@ export function RoomHeader({
         ) : (
           <Link
             href={`/login?next=${encodeURIComponent(`/r/${roomId}`)}`}
-            className="h-8 px-3 rounded-lg border border-white/10 bg-white/5 text-slate-200 text-xs font-medium hover:bg-white/10 transition-colors inline-flex items-center"
+            className="h-8 px-3 rounded-[var(--radius-control)] border border-hairline bg-surface text-ink text-xs font-medium hover:bg-raised transition-colors inline-flex items-center"
           >
             Log in
           </Link>
@@ -222,10 +220,10 @@ export function RoomHeader({
               setSaveBusy(false);
             }
           }}
-          className={`h-8 inline-flex items-center gap-1.5 px-2.5 sm:px-3 rounded-lg border text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+          className={`h-8 inline-flex items-center gap-1.5 px-2.5 sm:px-3 rounded-[var(--radius-control)] border text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
             isSaved
               ? "border-amber-400/40 bg-amber-400/10 text-amber-200 hover:bg-amber-400/20"
-              : "border-white/10 bg-white/5 text-slate-200 hover:bg-white/10"
+              : "border-hairline bg-surface text-ink hover:bg-raised"
           }`}
           title={
             passwordRequired
@@ -261,7 +259,7 @@ export function RoomHeader({
           type="button"
           onClick={onOpenWheel}
           disabled={passwordRequired}
-          className="h-8 inline-flex items-center gap-1.5 px-2.5 sm:px-3 rounded-lg border border-white/10 bg-white/5 text-slate-200 text-xs font-medium hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="h-8 inline-flex items-center gap-1.5 px-2.5 sm:px-3 rounded-[var(--radius-control)] border border-hairline bg-surface text-ink text-xs font-medium hover:bg-raised transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           title={
             passwordRequired ? "Join with password first" : "Open wheel picker"
           }
@@ -285,10 +283,10 @@ export function RoomHeader({
           type="button"
           onClick={onOpenPlaylist}
           disabled={passwordRequired}
-          className={`h-8 inline-flex items-center gap-1.5 px-2.5 sm:px-3 rounded-lg border text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+          className={`h-8 inline-flex items-center gap-1.5 px-2.5 sm:px-3 rounded-[var(--radius-control)] border text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
             isPlaylistOpen
-              ? "border-indigo-500/50 bg-indigo-500/20 text-indigo-200 shadow-[0_0_0_1px_rgba(99,102,241,0.2)]"
-              : "border-white/10 bg-white/5 text-slate-200 hover:bg-white/10"
+              ? "border-indigo-500/50 bg-indigo-500/20 text-accent shadow-[0_0_0_1px_rgba(99,102,241,0.2)]"
+              : "border-hairline bg-surface text-ink hover:bg-raised"
           }`}
           title={
             passwordRequired
@@ -313,10 +311,10 @@ export function RoomHeader({
         <button
           type="button"
           onClick={onCopyInvite}
-          className={`h-8 inline-flex items-center gap-1.5 px-2.5 sm:px-3 rounded-lg border text-xs font-medium transition-colors ${
+          className={`h-8 inline-flex items-center gap-1.5 px-2.5 sm:px-3 rounded-[var(--radius-control)] border text-xs font-medium transition-colors ${
             copied
               ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-200"
-              : "border-white/10 bg-white/5 text-slate-200 hover:bg-white/10"
+              : "border-hairline bg-surface text-ink hover:bg-raised"
           }`}
           title={inviteLink || ""}
         >
@@ -361,10 +359,10 @@ export function RoomHeader({
           onClick={onToggleChatOnlyMode}
           disabled={passwordRequired}
           aria-pressed={isChatOnlyMode}
-          className={`h-8 inline-flex items-center gap-1.5 px-2.5 sm:px-3 rounded-lg border text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+          className={`h-8 inline-flex items-center gap-1.5 px-2.5 sm:px-3 rounded-[var(--radius-control)] border text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
             isChatOnlyMode
               ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20"
-              : "border-white/10 bg-white/5 text-slate-200 hover:bg-white/10"
+              : "border-hairline bg-surface text-ink hover:bg-raised"
           }`}
           title={
             passwordRequired
@@ -396,7 +394,7 @@ export function RoomHeader({
           type="button"
           onClick={onOpenTimer}
           disabled={passwordRequired}
-          className="h-8 inline-flex items-center gap-1.5 px-2.5 sm:px-3 rounded-lg border border-white/10 bg-white/5 text-slate-200 text-xs font-medium hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="h-8 inline-flex items-center gap-1.5 px-2.5 sm:px-3 rounded-[var(--radius-control)] border border-hairline bg-surface text-ink text-xs font-medium hover:bg-raised transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           title={passwordRequired ? "Join with password first" : "Open timer"}
         >
           <svg
@@ -418,7 +416,7 @@ export function RoomHeader({
           <button
             type="button"
             onClick={onOpenSettings}
-            className="h-8 inline-flex items-center gap-1.5 px-2.5 sm:px-3 rounded-lg border border-indigo-500/40 bg-indigo-500/10 text-indigo-200 text-xs font-medium hover:bg-indigo-500/20 transition-colors"
+            className="h-8 inline-flex items-center gap-1.5 px-2.5 sm:px-3 rounded-[var(--radius-control)] border border-accent bg-accent-soft text-accent text-xs font-medium hover:bg-accent-soft transition-colors"
             title="Room settings"
           >
             <svg

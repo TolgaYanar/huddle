@@ -269,25 +269,25 @@ export function ImageEditor({ src, onClose, onSave }: ImageEditorProps) {
       open={Boolean(src)}
       onClose={onClose}
       labelledBy="image-editor-title"
-      panelClassName="w-full max-w-2xl rounded-2xl border border-white/10 bg-slate-900 p-5 shadow-2xl"
+      panelClassName="w-full max-w-2xl rounded-[var(--radius-panel)] border border-hairline bg-surface p-5 shadow-2xl"
     >
       <div className="flex items-center justify-between mb-4">
         <h2
           id="image-editor-title"
-          className="text-base font-semibold text-slate-100"
+          className="text-base font-semibold text-ink"
         >
           Cover up parts of the image
         </h2>
         <button
           type="button"
           onClick={onClose}
-          className="text-slate-500 hover:text-slate-200 text-sm"
+          className="text-ink0 hover:text-ink text-sm"
         >
           Cancel
         </button>
       </div>
 
-      <p className="text-xs text-slate-500 mb-3 leading-relaxed">
+      <p className="text-xs text-ink0 mb-3 leading-relaxed">
         Click and drag to redact parts of the image. Use this to hide brand
         logos, text, or anything that gives away the answer.
       </p>
@@ -298,10 +298,10 @@ export function ImageEditor({ src, onClose, onSave }: ImageEditorProps) {
           type="button"
           onClick={() => setTool("black")}
           aria-pressed={tool === "black" ? "true" : "false"}
-          className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+          className={`px-3 py-1.5 rounded-[var(--radius-control)] text-xs font-medium border transition-colors ${
             tool === "black"
-              ? "border-sky-500/50 bg-sky-500/15 text-sky-200"
-              : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"
+              ? "border-sky-500/50 bg-accent/15 text-sky-200"
+              : "border-hairline bg-surface text-ink-muted hover:bg-raised"
           }`}
         >
           ▬ Black bar
@@ -310,10 +310,10 @@ export function ImageEditor({ src, onClose, onSave }: ImageEditorProps) {
           type="button"
           onClick={() => setTool("pixelate")}
           aria-pressed={tool === "pixelate" ? "true" : "false"}
-          className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+          className={`px-3 py-1.5 rounded-[var(--radius-control)] text-xs font-medium border transition-colors ${
             tool === "pixelate"
-              ? "border-sky-500/50 bg-sky-500/15 text-sky-200"
-              : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"
+              ? "border-sky-500/50 bg-accent/15 text-sky-200"
+              : "border-hairline bg-surface text-ink-muted hover:bg-raised"
           }`}
         >
           ▦ Pixelate
@@ -323,7 +323,7 @@ export function ImageEditor({ src, onClose, onSave }: ImageEditorProps) {
           type="button"
           onClick={undo}
           disabled={rects.length === 0}
-          className="px-3 py-1.5 rounded-lg text-xs font-medium border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className="px-3 py-1.5 rounded-[var(--radius-control)] text-xs font-medium border border-hairline bg-surface text-ink-muted hover:bg-raised transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Undo
         </button>
@@ -331,7 +331,7 @@ export function ImageEditor({ src, onClose, onSave }: ImageEditorProps) {
           type="button"
           onClick={clear}
           disabled={rects.length === 0}
-          className="px-3 py-1.5 rounded-lg text-xs font-medium border border-white/10 bg-white/5 text-slate-400 hover:bg-white/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className="px-3 py-1.5 rounded-[var(--radius-control)] text-xs font-medium border border-hairline bg-surface text-ink-muted hover:bg-raised transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Clear
         </button>
@@ -340,10 +340,10 @@ export function ImageEditor({ src, onClose, onSave }: ImageEditorProps) {
       {/* Canvas */}
       <div
         ref={containerRef}
-        className="rounded-xl border border-white/10 bg-black/30 overflow-hidden flex items-center justify-center min-h-48 select-none"
+        className="rounded-[var(--radius-control)] border border-hairline bg-sunken overflow-hidden flex items-center justify-center min-h-48 select-none"
       >
         {imgState === "loading" && (
-          <div className="text-sm text-slate-500 py-8">Loading image…</div>
+          <div className="text-sm text-ink0 py-8">Loading image…</div>
         )}
         {imgState === "error" && (
           <div className="text-sm text-rose-400 py-8 text-center px-4">
@@ -374,7 +374,7 @@ export function ImageEditor({ src, onClose, onSave }: ImageEditorProps) {
         <button
           type="button"
           onClick={onClose}
-          className="flex-1 py-2.5 rounded-xl border border-white/10 bg-white/5 text-slate-300 text-sm hover:bg-white/10 transition-colors"
+          className="flex-1 py-2.5 rounded-[var(--radius-control)] border border-hairline bg-surface text-ink-muted text-sm hover:bg-raised transition-colors"
         >
           Cancel
         </button>
@@ -382,7 +382,7 @@ export function ImageEditor({ src, onClose, onSave }: ImageEditorProps) {
           type="button"
           onClick={handleSave}
           disabled={imgState !== "ready"}
-          className="flex-1 py-2.5 rounded-xl bg-sky-600 text-white text-sm font-semibold hover:bg-sky-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex-1 py-2.5 rounded-[var(--radius-control)] bg-sky-600 text-white text-sm font-semibold hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {rects.length === 0
             ? "Use as-is"

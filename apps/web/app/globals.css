@@ -1,6 +1,130 @@
 @import "tailwindcss";
 
 /*
+ * "Night screening" — the room is a dark cinema and the accent is the warm
+ * light coming off the projector. One accent, on purpose: every other
+ * watch-together product is indigo/violet, so warmth is what makes this one
+ * recognisable at a glance.
+ *
+ * Colour lives in CSS variables so light and dark are the same components with
+ * a different cascade, not two sets of classes. `@theme inline` re-exports them
+ * as Tailwind utilities (bg-surface, text-ink, border-hairline, ...), so the
+ * utilities follow the theme instead of hard-coding a shade.
+ */
+
+:root {
+  color-scheme: light;
+
+  --c-bg: #f6f1e9; /* warm paper, not blue-white */
+  --c-surface: #fffdf9;
+  --c-raised: #ffffff;
+  --c-sunken: #efe8dd;
+  --c-hairline: #e2d9cb;
+  --c-hairline-strong: #cfc2ae;
+
+  --c-ink: #1a1713;
+  --c-ink-muted: #554e47;
+  --c-ink-faint: #7a7269;
+
+  /* Darker on light so text on the accent, and the accent on paper, both pass. */
+  --c-accent: #8a4f08;
+  --c-accent-soft: #f4e3cb;
+  --c-accent-ink: #fffdf9;
+
+  --c-positive: #3f6b3a;
+  --c-negative: #a33b28;
+
+  --grain-opacity: 0.035;
+  --scanline-opacity: 0.02;
+}
+
+.dark {
+  color-scheme: dark;
+
+  --c-bg: #12100e; /* warm black — a lit room at night, not a blue void */
+  --c-surface: #1b1815;
+  --c-raised: #232019;
+  --c-sunken: #0d0b0a;
+  --c-hairline: #2a2521;
+  --c-hairline-strong: #3d362f;
+
+  --c-ink: #f2ede6;
+  --c-ink-muted: #a39a90;
+  --c-ink-faint: #6e665e;
+
+  --c-accent: #e8a33d;
+  --c-accent-soft: #33261408;
+  --c-accent-ink: #12100e;
+
+  --c-positive: #6fa86a;
+  --c-negative: #d4715e;
+
+  --grain-opacity: 0.05;
+  --scanline-opacity: 0.035;
+}
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  --color-bg: var(--c-bg);
+  --color-surface: var(--c-surface);
+  --color-raised: var(--c-raised);
+  --color-sunken: var(--c-sunken);
+  --color-hairline: var(--c-hairline);
+  --color-hairline-strong: var(--c-hairline-strong);
+  --color-ink: var(--c-ink);
+  --color-ink-muted: var(--c-ink-muted);
+  --color-ink-faint: var(--c-ink-faint);
+  --color-accent: var(--c-accent);
+  --color-accent-soft: var(--c-accent-soft);
+  --color-accent-ink: var(--c-accent-ink);
+  --color-positive: var(--c-positive);
+  --color-negative: var(--c-negative);
+
+  /* One small radius. Pills stay pills, but only for real status. */
+  --radius-panel: 10px;
+  --radius-control: 8px;
+}
+
+/*
+ * Grain and a faint horizontal rake, applied once to the page rather than to
+ * every card. It is the texture of projected light; at these opacities it is
+ * felt rather than seen, and it never sits on top of interactive content.
+ */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: var(--grain-opacity);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: var(--scanline-opacity);
+  background-image: repeating-linear-gradient(
+    to bottom,
+    currentColor 0px,
+    currentColor 1px,
+    transparent 1px,
+    transparent 4px
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::before,
+  body::after {
+    display: none;
+  }
+}
+
+/*
  * Things below have no clean Tailwind utility equivalent:
  *  - WebKit/Firefox custom scrollbar styling
  *  - A unified :focus-visible ring that applies globally without having to
@@ -12,9 +136,9 @@
 :focus-visible {
   outline: none;
   box-shadow:
-    0 0 0 2px rgb(15 23 42),
-    0 0 0 4px rgb(99 102 241 / 0.6);
-  border-radius: 0.5rem;
+    0 0 0 2px var(--c-bg),
+    0 0 0 4px var(--c-accent);
+  border-radius: var(--radius-control);
 }
 
 ::-webkit-scrollbar {
@@ -27,13 +151,13 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background-color: rgb(148 163 184 / 0.18);
+  background-color: var(--c-hairline-strong);
   border-radius: 9999px;
   transition: background-color 0.2s ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background-color: rgb(148 163 184 / 0.35);
+  background-color: var(--c-ink-faint);
 }
 
 * {

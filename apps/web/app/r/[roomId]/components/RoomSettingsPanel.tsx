@@ -69,7 +69,7 @@ export function RoomSettingsPanel({
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+        className="fixed inset-0 z-40 bg-sunken backdrop-blur-sm"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -79,20 +79,20 @@ export function RoomSettingsPanel({
         role="dialog"
         aria-modal="true"
         aria-labelledby="room-settings-title"
-        className="fixed inset-y-0 right-0 z-50 w-80 max-w-full flex flex-col bg-slate-900/95 border-l border-white/10 shadow-2xl"
+        className="fixed inset-y-0 right-0 z-50 w-80 max-w-full flex flex-col bg-surface/95 border-l border-hairline shadow-2xl"
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-hairline">
           <h2
             id="room-settings-title"
-            className="text-sm font-semibold text-slate-100"
+            className="text-sm font-semibold text-ink"
           >
             Room settings
           </h2>
           <button
             type="button"
             onClick={onClose}
-            className="h-7 w-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-200 hover:bg-white/10 transition-colors"
+            className="h-7 w-7 rounded-[var(--radius-control)] flex items-center justify-center text-ink-muted hover:text-ink hover:bg-raised transition-colors"
             aria-label="Close room settings"
           >
             ✕
@@ -103,7 +103,7 @@ export function RoomSettingsPanel({
         <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-5">
           {/* Room name */}
           <section>
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+            <h3 className="text-xs font-semibold text-ink-muted uppercase tracking-wider mb-2">
               Room name
             </h3>
             <div className="flex gap-2">
@@ -117,12 +117,12 @@ export function RoomSettingsPanel({
                 }}
                 maxLength={40}
                 placeholder="No name set"
-                className="flex-1 h-9 rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-slate-100 placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-indigo-500/40"
+                className="flex-1 h-9 rounded-[var(--radius-control)] border border-hairline bg-surface px-3 text-sm text-ink placeholder:text-ink0 outline-none focus:ring-2 focus:ring-indigo-500/40"
               />
               <button
                 type="button"
                 onClick={() => onSetRoomName(nameInput.trim())}
-                className="h-9 px-3 rounded-xl border border-white/10 bg-indigo-500/20 text-indigo-200 text-sm font-medium hover:bg-indigo-500/30 transition-colors"
+                className="h-9 px-3 rounded-[var(--radius-control)] border border-hairline bg-indigo-500/20 text-accent text-sm font-medium hover:bg-indigo-500/30 transition-colors"
               >
                 Save
               </button>
@@ -134,21 +134,21 @@ export function RoomSettingsPanel({
                   onSetRoomName("");
                   setNameInput("");
                 }}
-                className="mt-1.5 text-xs text-slate-500 hover:text-slate-300 transition-colors"
+                className="mt-1.5 text-xs text-ink0 hover:text-ink-muted transition-colors"
               >
                 Clear name
               </button>
             )}
           </section>
 
-          <div className="border-t border-white/10" />
+          <div className="border-t border-hairline" />
 
           {/* Password */}
           <section>
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+            <h3 className="text-xs font-semibold text-ink-muted uppercase tracking-wider mb-2">
               Password
               <span
-                className={`ml-2 font-normal normal-case tracking-normal ${hasRoomPassword ? "text-amber-300" : "text-slate-500"}`}
+                className={`ml-2 font-normal normal-case tracking-normal ${hasRoomPassword ? "text-amber-300" : "text-ink0"}`}
               >
                 {hasRoomPassword ? "Enabled" : "Disabled"}
               </span>
@@ -169,7 +169,7 @@ export function RoomSettingsPanel({
                   placeholder={
                     hasRoomPassword ? "New password…" : "Set a password…"
                   }
-                  className="w-full h-9 rounded-xl border border-white/10 bg-white/5 px-3 pr-10 text-sm text-slate-100 placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-indigo-500/40"
+                  className="w-full h-9 rounded-[var(--radius-control)] border border-hairline bg-surface px-3 pr-10 text-sm text-ink placeholder:text-ink0 outline-none focus:ring-2 focus:ring-indigo-500/40"
                 />
                 <PasswordToggleButton
                   show={showPassword}
@@ -183,7 +183,7 @@ export function RoomSettingsPanel({
                   onSetRoomPassword(passwordInput.trim());
                   setPasswordInput("");
                 }}
-                className="h-9 px-3 rounded-xl border border-white/10 bg-indigo-500/20 text-indigo-200 text-sm font-medium hover:bg-indigo-500/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                className="h-9 px-3 rounded-[var(--radius-control)] border border-hairline bg-indigo-500/20 text-accent text-sm font-medium hover:bg-indigo-500/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Set
               </button>
@@ -199,20 +199,20 @@ export function RoomSettingsPanel({
             )}
           </section>
 
-          <div className="border-t border-white/10" />
+          <div className="border-t border-hairline" />
 
           {/* Participants */}
           <section>
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+            <h3 className="text-xs font-semibold text-ink-muted uppercase tracking-wider mb-2">
               Participants
-              <span className="ml-2 font-normal normal-case tracking-normal text-slate-500">
+              <span className="ml-2 font-normal normal-case tracking-normal text-ink0">
                 {others.length + 1} in room
               </span>
             </h3>
             <ul className="flex flex-col gap-1">
               {/* Self */}
-              <li className="flex items-center gap-2 h-9 px-3 rounded-xl bg-white/5">
-                <span className="flex-1 text-sm text-slate-200 truncate">
+              <li className="flex items-center gap-2 h-9 px-3 rounded-[var(--radius-control)] bg-surface">
+                <span className="flex-1 text-sm text-ink truncate">
                   {getDisplayName(userId)}
                 </span>
                 <span className="text-xs text-indigo-300 font-medium">
@@ -223,9 +223,9 @@ export function RoomSettingsPanel({
               {others.map((id) => (
                 <li
                   key={id}
-                  className="flex items-center gap-2 h-9 px-3 rounded-xl bg-white/5"
+                  className="flex items-center gap-2 h-9 px-3 rounded-[var(--radius-control)] bg-surface"
                 >
-                  <span className="flex-1 text-sm text-slate-200 truncate">
+                  <span className="flex-1 text-sm text-ink truncate">
                     {getDisplayName(id)}
                     {id === hostId && (
                       <span className="ml-1.5 text-xs text-indigo-300">
@@ -236,7 +236,7 @@ export function RoomSettingsPanel({
 
                   {confirmTransfer === id ? (
                     <div className="flex items-center gap-1 shrink-0">
-                      <span className="text-xs text-slate-400">Transfer?</span>
+                      <span className="text-xs text-ink-muted">Transfer?</span>
                       <button
                         type="button"
                         onClick={() => {
@@ -244,21 +244,21 @@ export function RoomSettingsPanel({
                           setConfirmTransfer(null);
                           onClose();
                         }}
-                        className="text-xs text-indigo-300 hover:text-indigo-200 font-medium"
+                        className="text-xs text-indigo-300 hover:text-accent font-medium"
                       >
                         Yes
                       </button>
                       <button
                         type="button"
                         onClick={() => setConfirmTransfer(null)}
-                        className="text-xs text-slate-500 hover:text-slate-300"
+                        className="text-xs text-ink0 hover:text-ink-muted"
                       >
                         No
                       </button>
                     </div>
                   ) : confirmKick === id ? (
                     <div className="flex items-center gap-1 shrink-0">
-                      <span className="text-xs text-slate-400">Kick?</span>
+                      <span className="text-xs text-ink-muted">Kick?</span>
                       <button
                         type="button"
                         onClick={() => {
@@ -272,7 +272,7 @@ export function RoomSettingsPanel({
                       <button
                         type="button"
                         onClick={() => setConfirmKick(null)}
-                        className="text-xs text-slate-500 hover:text-slate-300"
+                        className="text-xs text-ink0 hover:text-ink-muted"
                       >
                         No
                       </button>
@@ -285,7 +285,7 @@ export function RoomSettingsPanel({
                           setConfirmKick(null);
                           setConfirmTransfer(id);
                         }}
-                        className="h-6 px-2 rounded-md text-xs text-indigo-300 hover:bg-indigo-500/20 transition-colors"
+                        className="h-6 px-2 rounded-md text-xs text-indigo-300 hover:bg-accent-soft transition-colors"
                         title="Make host"
                       >
                         Host
@@ -307,7 +307,7 @@ export function RoomSettingsPanel({
               ))}
 
               {others.length === 0 && (
-                <li className="text-xs text-slate-500 px-3 py-2">
+                <li className="text-xs text-ink0 px-3 py-2">
                   No other participants
                 </li>
               )}

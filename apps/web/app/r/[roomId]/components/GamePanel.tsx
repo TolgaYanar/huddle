@@ -77,7 +77,7 @@ function ImageResultCell({
       type="button"
       onClick={onSelect}
       title={img.title}
-      className={`group relative flex items-center justify-center h-24 rounded-xl overflow-hidden border-2 transition-colors bg-white ${
+      className={`group relative flex items-center justify-center h-24 rounded-[var(--radius-control)] overflow-hidden border-2 transition-colors bg-white ${
         selected
           ? "border-sky-400"
           : "border-transparent hover:border-sky-400/50"
@@ -90,11 +90,11 @@ function ImageResultCell({
         className="max-w-full max-h-full w-auto h-auto object-contain p-2"
         onError={() => setHidden(true)}
       />
-      <div className="absolute bottom-0 inset-x-0 bg-black/70 px-1.5 py-0.5 translate-y-full group-hover:translate-y-0 transition-transform">
-        <p className="text-[10px] text-slate-200 truncate">{img.title}</p>
+      <div className="absolute bottom-0 inset-x-0 bg-sunken px-1.5 py-0.5 translate-y-full group-hover:translate-y-0 transition-transform">
+        <p className="text-[10px] text-ink truncate">{img.title}</p>
       </div>
       {selected && (
-        <div className="absolute top-1 right-1 w-5 h-5 rounded-full bg-sky-500 flex items-center justify-center shadow-md">
+        <div className="absolute top-1 right-1 w-5 h-5 rounded-full bg-accent flex items-center justify-center shadow-md">
           <span className="text-white text-[10px] font-bold">✓</span>
         </div>
       )}
@@ -222,7 +222,7 @@ function ImagePicker({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex gap-1 bg-black/30 p-1 rounded-xl">
+      <div className="flex gap-1 bg-sunken p-1 rounded-[var(--radius-control)]">
         {(["search", "ai", "url"] as const).map((t) => (
           <button
             key={t}
@@ -231,10 +231,10 @@ function ImagePicker({
               setTab(t);
               setError("");
             }}
-            className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+            className={`flex-1 py-1.5 rounded-[var(--radius-control)] text-xs font-medium transition-colors ${
               tab === t
-                ? "bg-white/10 text-slate-100"
-                : "text-slate-500 hover:text-slate-300"
+                ? "bg-raised text-ink"
+                : "text-ink0 hover:text-ink-muted"
             }`}
           >
             {tabLabel[t]}
@@ -252,13 +252,13 @@ function ImagePicker({
               onKeyDown={(e) => e.key === "Enter" && generate()}
               placeholder="Describe the image — e.g. red dragon eating ice cream"
               maxLength={240}
-              className="flex-1 bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-sky-500/25"
+              className="flex-1 bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-sky-500/25"
             />
             <button
               type="button"
               onClick={generate}
               disabled={aiLoading || !aiPrompt.trim()}
-              className="px-4 py-2 rounded-xl bg-sky-600 text-white text-sm font-medium hover:bg-sky-500 transition-colors disabled:opacity-50"
+              className="px-4 py-2 rounded-[var(--radius-control)] bg-sky-600 text-white text-sm font-medium hover:bg-accent transition-colors disabled:opacity-50"
             >
               {aiLoading ? "…" : "Generate"}
             </button>
@@ -266,7 +266,7 @@ function ImagePicker({
           {error && <p className="text-xs text-rose-400">{error}</p>}
           {aiLoading && (
             <div
-              className="flex flex-col items-center justify-center gap-2 w-full h-48 rounded-xl border border-white/10 bg-black/30"
+              className="flex flex-col items-center justify-center gap-2 w-full h-48 rounded-[var(--radius-control)] border border-hairline bg-sunken"
               aria-live="polite"
             >
               <svg
@@ -289,12 +289,10 @@ function ImagePicker({
                   d="M4 12a8 8 0 018-8v3a5 5 0 00-5 5H4z"
                 />
               </svg>
-              <span className="text-sm text-slate-300 font-medium">
+              <span className="text-sm text-ink-muted font-medium">
                 Painting your image…
               </span>
-              <span className="text-xs text-slate-500">
-                Can take 10–30 seconds.
-              </span>
+              <span className="text-xs text-ink0">Can take 10–30 seconds.</span>
             </div>
           )}
           {aiResult && !aiLoading && (
@@ -303,21 +301,21 @@ function ImagePicker({
               <img
                 src={aiResult}
                 alt="Generated"
-                className="w-full max-h-64 object-contain rounded-xl border border-white/10 bg-black/30"
+                className="w-full max-h-64 object-contain rounded-[var(--radius-control)] border border-hairline bg-sunken"
               />
               <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={generate}
                   disabled={aiLoading}
-                  className="flex-1 px-3 py-2 rounded-xl border border-white/10 bg-white/5 text-slate-200 text-sm hover:bg-white/10 transition-colors disabled:opacity-50"
+                  className="flex-1 px-3 py-2 rounded-[var(--radius-control)] border border-hairline bg-surface text-ink text-sm hover:bg-raised transition-colors disabled:opacity-50"
                 >
                   Re-roll
                 </button>
                 <button
                   type="button"
                   onClick={() => onSelect(aiResult)}
-                  className="flex-1 px-3 py-2 rounded-xl bg-sky-600 text-white text-sm font-semibold hover:bg-sky-500 transition-colors"
+                  className="flex-1 px-3 py-2 rounded-[var(--radius-control)] bg-sky-600 text-white text-sm font-semibold hover:bg-accent transition-colors"
                 >
                   Use this image
                 </button>
@@ -325,7 +323,7 @@ function ImagePicker({
             </div>
           )}
           {!aiResult && !aiLoading && !error && (
-            <p className="text-xs text-slate-600 leading-relaxed">
+            <p className="text-xs text-ink-faint leading-relaxed">
               Describe an imaginary scene — &ldquo;red dragon eating ice
               cream&rdquo;. For real-world things (brands, places, people), use
               the 🔍 Search tab — AI doesn&apos;t reliably draw real logos or
@@ -344,13 +342,13 @@ function ImagePicker({
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && search()}
               placeholder="Brand, place, or person — e.g. Hyundai, Eiffel Tower"
-              className="flex-1 bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-sky-500/25"
+              className="flex-1 bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-sky-500/25"
             />
             <button
               type="button"
               onClick={search}
               disabled={loading || !query.trim()}
-              className="px-4 py-2 rounded-xl bg-sky-600 text-white text-sm font-medium hover:bg-sky-500 transition-colors disabled:opacity-50"
+              className="px-4 py-2 rounded-[var(--radius-control)] bg-sky-600 text-white text-sm font-medium hover:bg-accent transition-colors disabled:opacity-50"
             >
               {loading ? "…" : "Search"}
             </button>
@@ -369,7 +367,7 @@ function ImagePicker({
             </div>
           )}
           {results.length === 0 && !loading && !error && (
-            <p className="text-xs text-slate-600 text-center py-4 leading-relaxed">
+            <p className="text-xs text-ink-faint text-center py-4 leading-relaxed">
               Type a brand, place, or person — we&apos;ll find the canonical
               picture from Wikipedia. For made-up things use the ✨ AI tab.
             </p>
@@ -386,31 +384,31 @@ function ImagePicker({
               onChange={(e) => setUrlInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && applyUrl()}
               placeholder="https://example.com/image.jpg"
-              className="flex-1 bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-sky-500/25"
+              className="flex-1 bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-sky-500/25"
             />
             <button
               type="button"
               onClick={applyUrl}
               disabled={!urlInput.trim()}
-              className="px-4 py-2 rounded-xl bg-sky-600 text-white text-sm font-medium hover:bg-sky-500 transition-colors disabled:opacity-50"
+              className="px-4 py-2 rounded-[var(--radius-control)] bg-sky-600 text-white text-sm font-medium hover:bg-accent transition-colors disabled:opacity-50"
             >
               Use
             </button>
           </div>
           {error && <p className="text-xs text-rose-400">{error}</p>}
-          <p className="text-xs text-slate-600">
+          <p className="text-xs text-ink-faint">
             Right-click any image on the web → &ldquo;Copy image address&rdquo;
           </p>
         </>
       )}
 
       {selected && (
-        <div className="flex items-center gap-3 p-2 rounded-xl bg-emerald-600/10 border border-emerald-600/20">
+        <div className="flex items-center gap-3 p-2 rounded-[var(--radius-control)] bg-emerald-600/10 border border-emerald-600/20">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={selected}
             alt="Selected"
-            className="w-12 h-12 rounded-lg object-cover border border-white/10"
+            className="w-12 h-12 rounded-[var(--radius-control)] object-cover border border-hairline"
             onError={(e) => {
               (e.target as HTMLImageElement).src =
                 "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48'%3E%3Crect width='48' height='48' fill='%23334155'/%3E%3C/svg%3E";
@@ -422,7 +420,7 @@ function ImagePicker({
                 ? "Edited image ✓"
                 : "Image selected ✓"}
             </div>
-            <div className="text-xs text-slate-500 truncate">
+            <div className="text-xs text-ink0 truncate">
               {selected.startsWith("data:") ? "Local edit" : selected}
             </div>
           </div>
@@ -430,7 +428,7 @@ function ImagePicker({
             type="button"
             onClick={() => setEditorOpen(true)}
             aria-label="Edit image"
-            className="text-xs text-sky-400 hover:text-sky-300 px-2 py-1 rounded-lg border border-sky-500/30 bg-sky-500/10 hover:bg-sky-500/20 transition-colors"
+            className="text-xs text-sky-400 hover:text-sky-300 px-2 py-1 rounded-[var(--radius-control)] border border-sky-500/30 bg-accent/10 hover:bg-accent/20 transition-colors"
           >
             ✎ Edit
           </button>
@@ -438,7 +436,7 @@ function ImagePicker({
             type="button"
             onClick={() => onSelect("")}
             aria-label="Remove image"
-            className="text-slate-500 hover:text-slate-300 text-lg px-1"
+            className="text-ink0 hover:text-ink-muted text-lg px-1"
           >
             ×
           </button>
@@ -473,16 +471,16 @@ function RoundEditor({
   const [pickerOpen, setPickerOpen] = useState(!round.image);
 
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/3 p-4">
+    <div className="flex flex-col gap-3 rounded-[var(--radius-panel)] border border-hairline bg-white/3 p-4">
       {/* Category + Answer */}
       <div className="grid grid-cols-2 gap-3">
         <div className="flex flex-col gap-1">
-          <label className="text-xs text-slate-500">Category</label>
+          <label className="text-xs text-ink0">Category</label>
           <select
             value={round.category}
             onChange={(e) => onChange({ ...round, category: e.target.value })}
             aria-label="Category"
-            className="bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/25"
+            className="bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-sky-500/25"
           >
             {CATEGORIES.map((c) => (
               <option key={c} value={c}>
@@ -492,8 +490,8 @@ function RoundEditor({
           </select>
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-xs text-slate-500">
-            Answer <span className="text-slate-600">(secret)</span>
+          <label className="text-xs text-ink0">
+            Answer <span className="text-ink-faint">(secret)</span>
           </label>
           <input
             type="text"
@@ -501,7 +499,7 @@ function RoundEditor({
             onChange={(e) => onChange({ ...round, answer: e.target.value })}
             placeholder="e.g. Apple, Picasso…"
             maxLength={100}
-            className="bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-sky-500/25"
+            className="bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-sky-500/25"
           />
         </div>
       </div>
@@ -510,13 +508,13 @@ function RoundEditor({
       {pickerOpen ? (
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
-            <label className="text-xs text-slate-500">
-              Clue image <span className="text-slate-600">(optional)</span>
+            <label className="text-xs text-ink0">
+              Clue image <span className="text-ink-faint">(optional)</span>
             </label>
             <button
               type="button"
               onClick={() => setPickerOpen(false)}
-              className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
+              className="text-xs text-ink0 hover:text-ink-muted transition-colors"
             >
               {round.image ? "Done ✓" : "Skip — text only"}
             </button>
@@ -530,12 +528,12 @@ function RoundEditor({
           />
         </div>
       ) : round.image ? (
-        <div className="flex items-center gap-3 p-2 rounded-xl bg-emerald-600/10 border border-emerald-600/20">
+        <div className="flex items-center gap-3 p-2 rounded-[var(--radius-control)] bg-emerald-600/10 border border-emerald-600/20">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={round.image}
             alt="Clue"
-            className="w-10 h-10 rounded-lg object-cover border border-white/10 shrink-0"
+            className="w-10 h-10 rounded-[var(--radius-control)] object-cover border border-hairline shrink-0"
             onError={(e) => {
               (e.target as HTMLImageElement).src =
                 "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Crect width='40' height='40' fill='%23334155'/%3E%3C/svg%3E";
@@ -547,7 +545,7 @@ function RoundEditor({
           <button
             type="button"
             onClick={() => setPickerOpen(true)}
-            className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
+            className="text-xs text-ink0 hover:text-ink-muted transition-colors"
           >
             Change
           </button>
@@ -556,7 +554,7 @@ function RoundEditor({
             onClick={() => {
               onChange({ ...round, image: "" });
             }}
-            className="text-slate-500 hover:text-rose-400 transition-colors text-lg leading-none px-1"
+            className="text-ink0 hover:text-rose-400 transition-colors text-lg leading-none px-1"
           >
             ×
           </button>
@@ -565,9 +563,9 @@ function RoundEditor({
         <button
           type="button"
           onClick={() => setPickerOpen(true)}
-          className="flex items-center gap-2 text-xs text-slate-600 hover:text-sky-400 transition-colors py-0.5"
+          className="flex items-center gap-2 text-xs text-ink-faint hover:text-sky-400 transition-colors py-0.5"
         >
-          <span className="w-5 h-5 rounded-md border border-dashed border-white/15 flex items-center justify-center hover:border-sky-500/40 text-slate-600">
+          <span className="w-5 h-5 rounded-md border border-dashed border-hairline flex items-center justify-center hover:border-sky-500/40 text-ink-faint">
             +
           </span>
           Add clue image{" "}
@@ -588,14 +586,14 @@ function RoundEditor({
               className="sr-only"
             />
             <div
-              className={`w-7 h-3.5 rounded-full transition-colors ${round.hideBlanks ? "bg-sky-600" : "bg-white/10"}`}
+              className={`w-7 h-3.5 rounded-full transition-colors ${round.hideBlanks ? "bg-sky-600" : "bg-raised"}`}
             >
               <div
                 className={`absolute top-0.5 w-2.5 h-2.5 rounded-full bg-white shadow transition-transform ${round.hideBlanks ? "translate-x-3.5" : "translate-x-0.5"}`}
               />
             </div>
           </div>
-          <span className="text-xs text-slate-500">
+          <span className="text-xs text-ink0">
             Hide letter count until first hint
           </span>
         </label>
@@ -603,7 +601,7 @@ function RoundEditor({
           <button
             type="button"
             onClick={onRemove}
-            className="text-xs text-slate-600 hover:text-rose-400 transition-colors shrink-0"
+            className="text-xs text-ink-faint hover:text-rose-400 transition-colors shrink-0"
           >
             Remove
           </button>
@@ -664,8 +662,8 @@ function RoundSetupForm({
     <div className="flex flex-col gap-4">
       {/* Header always full-width */}
       <div className="flex items-center justify-between">
-        <div className="text-base font-semibold text-slate-100">{title}</div>
-        <div className="text-xs text-slate-500">
+        <div className="text-base font-semibold text-ink">{title}</div>
+        <div className="text-xs text-ink0">
           {validRounds.length}/{rounds.length} ready
         </div>
       </div>
@@ -674,7 +672,7 @@ function RoundSetupForm({
         {/* LEFT — round selector + game settings + actions */}
         <div className="flex flex-col gap-3 lg:sticky lg:top-0 lg:self-start">
           <div>
-            <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-2">
+            <div className="text-[10px] uppercase tracking-wider text-ink0 font-semibold mb-2">
               Rounds ({rounds.length}/10)
             </div>
             <div className="flex items-center gap-2 flex-wrap">
@@ -687,11 +685,11 @@ function RoundSetupForm({
                   className={`w-10 h-10 rounded-full text-sm font-bold transition-all ${
                     i === activeIdx
                       ? isRoundValid(r)
-                        ? "bg-sky-500 text-white ring-2 ring-sky-400/40 ring-offset-1 ring-offset-[#1a1a2e]"
+                        ? "bg-accent text-white ring-2 ring-sky-400/40 ring-offset-1 ring-offset-[#1a1a2e]"
                         : "bg-white/15 text-white ring-2 ring-white/25 ring-offset-1 ring-offset-[#1a1a2e]"
                       : isRoundValid(r)
                         ? "bg-sky-600/30 text-sky-300 hover:bg-sky-600/50"
-                        : "bg-white/8 text-slate-500 hover:bg-white/12 hover:text-slate-300"
+                        : "bg-white/8 text-ink0 hover:bg-white/12 hover:text-ink-muted"
                   }`}
                 >
                   {isRoundValid(r) ? "✓" : i + 1}
@@ -703,7 +701,7 @@ function RoundSetupForm({
                   onClick={addRound}
                   title="Add round"
                   aria-label="Add round"
-                  className="w-10 h-10 rounded-full border border-dashed border-white/20 text-slate-500 text-lg hover:border-sky-500/50 hover:text-sky-400 transition-colors"
+                  className="w-10 h-10 rounded-full border border-dashed border-hairline-strong text-ink0 text-lg hover:border-sky-500/50 hover:text-sky-400 transition-colors"
                 >
                   +
                 </button>
@@ -712,14 +710,14 @@ function RoundSetupForm({
           </div>
 
           {showCreatorOptions && (
-            <div className="flex flex-col gap-2 rounded-2xl border border-white/10 bg-white/3 p-4">
-              <div className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
+            <div className="flex flex-col gap-2 rounded-[var(--radius-panel)] border border-hairline bg-white/3 p-4">
+              <div className="text-xs font-semibold text-ink-muted uppercase tracking-wider">
                 Game settings
               </div>
               <div className="flex items-center gap-3">
                 <label
                   htmlFor="game-turn-timer"
-                  className="text-xs text-slate-400 shrink-0"
+                  className="text-xs text-ink-muted shrink-0"
                 >
                   Turn timer
                 </label>
@@ -731,7 +729,7 @@ function RoundSetupForm({
                       e.target.value === "" ? null : Number(e.target.value),
                     )
                   }
-                  className="flex-1 bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/25"
+                  className="flex-1 bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-sky-500/25"
                 >
                   {TURN_TIMER_OPTIONS.map((o) => (
                     <option key={o.label} value={o.value ?? ""}>
@@ -740,7 +738,7 @@ function RoundSetupForm({
                   ))}
                 </select>
               </div>
-              <p className="text-[11px] text-slate-500 leading-relaxed">
+              <p className="text-[11px] text-ink0 leading-relaxed">
                 When the timer expires the current guesser auto-skips. Hints
                 cost points — full score for guessing without hints, less for
                 each letter revealed.
@@ -752,7 +750,7 @@ function RoundSetupForm({
             <button
               type="button"
               onClick={onCancel}
-              className="flex-1 py-2.5 rounded-xl border border-white/10 bg-white/5 text-slate-300 text-sm hover:bg-white/10 transition-colors"
+              className="flex-1 py-2.5 rounded-[var(--radius-control)] border border-hairline bg-surface text-ink-muted text-sm hover:bg-raised transition-colors"
             >
               Cancel
             </button>
@@ -765,7 +763,7 @@ function RoundSetupForm({
                   showCreatorOptions ? { turnTimerSeconds } : undefined,
                 )
               }
-              className="flex-1 py-2.5 rounded-xl bg-sky-600 text-white text-sm font-semibold hover:bg-sky-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 py-2.5 rounded-[var(--radius-control)] bg-sky-600 text-white text-sm font-semibold hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {submitLabel} ({validRounds.length})
             </button>
@@ -800,7 +798,7 @@ function AnswerBlanks({
   if (hidden || !masked) {
     return (
       <div className="flex items-center justify-center py-4">
-        <span className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-500 text-sm">
+        <span className="px-4 py-2 rounded-[var(--radius-control)] bg-surface border border-hairline text-ink0 text-sm">
           Answer hidden — wait for hints
         </span>
       </div>
@@ -869,17 +867,17 @@ function TurnQueue({
       "px-2.5 py-1 rounded-full text-xs font-medium border whitespace-nowrap shrink-0 transition-colors ";
     let icon = "";
     if (kind === "observer") {
-      cls += "border-white/10 bg-white/5 text-slate-500 italic";
+      cls += "border-hairline bg-surface text-ink0 italic";
       icon = "👁 ";
     } else if (isCurrent) {
       cls +=
-        "border-sky-400/60 bg-sky-500/25 text-sky-100 ring-2 ring-sky-400/30";
+        "border-sky-400/60 bg-accent/25 text-sky-100 ring-2 ring-sky-400/30";
       icon = "🎯 ";
     } else if (won) {
       cls += "border-emerald-500/40 bg-emerald-500/15 text-emerald-300";
       icon = "✓ ";
     } else {
-      cls += "border-white/10 bg-white/5 text-slate-300";
+      cls += "border-hairline bg-surface text-ink-muted";
     }
 
     return (
@@ -892,7 +890,7 @@ function TurnQueue({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">
+      <div className="text-[10px] uppercase tracking-wider text-ink0 font-semibold">
         Turn order
       </div>
       <div className="flex items-center gap-1.5 overflow-x-auto pb-1 -mb-1">
@@ -900,7 +898,7 @@ function TurnQueue({
         {observerList.length > 0 && (
           <>
             {guessers.length > 0 && (
-              <span className="shrink-0 text-slate-600 px-1">·</span>
+              <span className="shrink-0 text-ink-faint px-1">·</span>
             )}
             {observerList.map((id) => renderPill(id, "observer"))}
           </>
@@ -958,7 +956,7 @@ function TurnCountdown({
     ? "border-rose-500/40 bg-rose-500/15 text-rose-200"
     : warning
       ? "border-amber-500/40 bg-amber-500/15 text-amber-200"
-      : "border-white/10 bg-white/5 text-slate-300";
+      : "border-hairline bg-surface text-ink-muted";
 
   return (
     <span
@@ -1024,15 +1022,15 @@ function ActiveRoundView({
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-400">
+            <span className="text-xs font-bold text-ink-muted">
               Round {questioner.currentRoundIndex + 1} of{" "}
               {questioner.totalRounds}
             </span>
-            <span className="text-xs px-2 py-0.5 rounded-lg bg-sky-600/20 text-sky-300 border border-sky-600/30">
+            <span className="text-xs px-2 py-0.5 rounded-[var(--radius-control)] bg-sky-600/20 text-sky-300 border border-sky-600/30">
               {round.category}
             </span>
           </div>
-          <span className="text-xs text-slate-500">
+          <span className="text-xs text-ink0">
             by {questioner.username ?? "Unknown"}
           </span>
         </div>
@@ -1043,14 +1041,14 @@ function ActiveRoundView({
           <img
             src={round.image}
             alt="Clue"
-            className="w-full max-h-64 lg:max-h-80 object-contain rounded-2xl border border-white/10 bg-black/20"
+            className="w-full max-h-64 lg:max-h-80 object-contain rounded-[var(--radius-panel)] border border-hairline bg-sunken"
             onError={(e) => {
               (e.target as HTMLImageElement).style.display = "none";
             }}
           />
         ) : (
-          <div className="flex items-center justify-center h-24 rounded-2xl border border-dashed border-white/10 bg-white/3">
-            <span className="text-sm text-slate-600">
+          <div className="flex items-center justify-center h-24 rounded-[var(--radius-panel)] border border-dashed border-hairline bg-white/3">
+            <span className="text-sm text-ink-faint">
               Text-only round — no image clue
             </span>
           </div>
@@ -1078,12 +1076,12 @@ function ActiveRoundView({
 
         {/* Turn indicator */}
         <div
-          className={`flex items-center justify-center gap-2 font-semibold py-3 px-3 rounded-xl border transition-colors ${
+          className={`flex items-center justify-center gap-2 font-semibold py-3 px-3 rounded-[var(--radius-control)] border transition-colors ${
             isMyTurn
-              ? "bg-sky-500/20 text-sky-200 border-sky-500/50 text-base ring-2 ring-sky-500/30 shadow-lg shadow-sky-500/10"
+              ? "bg-accent/20 text-sky-200 border-sky-500/50 text-base ring-2 ring-sky-500/30 shadow-lg shadow-sky-500/10"
               : iAmWinner
                 ? "bg-emerald-600/20 text-emerald-300 border-emerald-600/30 text-sm"
-                : "bg-white/5 text-slate-400 border-white/5 text-sm"
+                : "bg-surface text-ink-muted border-hairline text-sm"
           }`}
           aria-live="polite"
         >
@@ -1112,12 +1110,12 @@ function ActiveRoundView({
               onChange={(e) => setGuessInput(e.target.value)}
               placeholder="Your answer…"
               autoFocus
-              className="flex-1 bg-black/40 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500/25"
+              className="flex-1 bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2.5 text-sm text-ink placeholder:text-ink0 focus:outline-none focus:ring-2 focus:ring-sky-500/25"
             />
             <button
               type="submit"
               disabled={!guessInput.trim()}
-              className="px-4 py-2 rounded-xl bg-sky-600 text-white text-sm font-semibold hover:bg-sky-500 transition-colors disabled:opacity-50"
+              className="px-4 py-2 rounded-[var(--radius-control)] bg-sky-600 text-white text-sm font-semibold hover:bg-accent transition-colors disabled:opacity-50"
             >
               Guess
             </button>
@@ -1137,7 +1135,7 @@ function ActiveRoundView({
                     type="button"
                     onClick={onRevealHint}
                     disabled={lettersRemaining === 0}
-                    className="py-2.5 rounded-xl border border-amber-500/30 bg-amber-600/10 text-amber-300 text-sm font-medium hover:bg-amber-600/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="py-2.5 rounded-[var(--radius-control)] border border-amber-500/30 bg-amber-600/10 text-amber-300 text-sm font-medium hover:bg-amber-600/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     Reveal a letter
                     {lettersRemaining > 0 && (
@@ -1151,14 +1149,14 @@ function ActiveRoundView({
             <button
               type="button"
               onClick={onSkipTurn}
-              className="py-2.5 rounded-xl border border-white/10 bg-white/5 text-slate-300 text-sm hover:bg-white/10 transition-colors"
+              className="py-2.5 rounded-[var(--radius-control)] border border-hairline bg-surface text-ink-muted text-sm hover:bg-raised transition-colors"
             >
               Skip turn
             </button>
             <button
               type="button"
               onClick={onEndRound}
-              className={`${amActiveQuestioner ? "col-span-2" : "col-span-full"} py-2.5 rounded-xl border border-rose-500/30 bg-rose-600/10 text-rose-300 text-sm font-medium hover:bg-rose-600/20 transition-colors`}
+              className={`${amActiveQuestioner ? "col-span-2" : "col-span-full"} py-2.5 rounded-[var(--radius-control)] border border-rose-500/30 bg-rose-600/10 text-rose-300 text-sm font-medium hover:bg-rose-600/20 transition-colors`}
             >
               End round (reveal answer)
             </button>
@@ -1192,17 +1190,17 @@ function GuessesPanel({
   emptyHint?: string;
 }) {
   return (
-    <aside className="flex flex-col gap-2 rounded-2xl border border-white/10 bg-black/20 p-3 lg:sticky lg:top-0 lg:self-start lg:max-h-[calc(92vh-7rem)] min-h-0">
+    <aside className="flex flex-col gap-2 rounded-[var(--radius-panel)] border border-hairline bg-sunken p-3 lg:sticky lg:top-0 lg:self-start lg:max-h-[calc(92vh-7rem)] min-h-0">
       <div className="flex items-center justify-between">
-        <div className="text-xs text-slate-400 font-medium uppercase tracking-wider">
+        <div className="text-xs text-ink-muted font-medium uppercase tracking-wider">
           Guesses
         </div>
-        <div className="text-[10px] text-slate-600 tabular-nums">
+        <div className="text-[10px] text-ink-faint tabular-nums">
           {guesses.length}
         </div>
       </div>
       {guesses.length === 0 ? (
-        <p className="text-xs text-slate-600 leading-relaxed py-2">
+        <p className="text-xs text-ink-faint leading-relaxed py-2">
           {emptyHint ?? "No guesses yet."}
         </p>
       ) : (
@@ -1210,15 +1208,15 @@ function GuessesPanel({
           {[...guesses].reverse().map((g, i) => (
             <div
               key={i}
-              className={`flex items-center justify-between gap-2 text-sm px-3 py-1.5 rounded-xl ${
+              className={`flex items-center justify-between gap-2 text-sm px-3 py-1.5 rounded-[var(--radius-control)] ${
                 g.correct
                   ? "bg-emerald-600/15 border border-emerald-600/20"
                   : g.nearMiss
                     ? "bg-amber-600/10 border border-amber-600/25"
-                    : "bg-white/5 border border-white/5"
+                    : "bg-surface border border-hairline"
               }`}
             >
-              <span className="text-slate-400 truncate min-w-0">
+              <span className="text-ink-muted truncate min-w-0">
                 {g.username ?? "Unknown"}
               </span>
               <span
@@ -1227,7 +1225,7 @@ function GuessesPanel({
                     ? "text-emerald-300 font-medium"
                     : g.nearMiss
                       ? "text-amber-300"
-                      : "text-slate-300"
+                      : "text-ink-muted"
                 }`}
               >
                 {g.guess}
@@ -1281,12 +1279,12 @@ function RoundResultsView({
     // GuessesPanel — winners and near-misses keep their colour coding).
     <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-4 lg:gap-5">
       <div className="flex flex-col gap-5 min-w-0">
-        <div className="flex items-center justify-between text-xs text-slate-500">
+        <div className="flex items-center justify-between text-xs text-ink0">
           <span>
             Round {questioner.currentRoundIndex + 1} of {questioner.totalRounds}{" "}
             — {questioner.username ?? "Unknown"}
           </span>
-          <span className="px-2 py-0.5 rounded-lg bg-white/5">
+          <span className="px-2 py-0.5 rounded-[var(--radius-control)] bg-surface">
             {round.category}
           </span>
         </div>
@@ -1296,7 +1294,7 @@ function RoundResultsView({
           <img
             src={round.image}
             alt="Clue"
-            className="w-full max-h-52 lg:max-h-72 object-contain rounded-2xl border border-white/10 bg-black/20"
+            className="w-full max-h-52 lg:max-h-72 object-contain rounded-[var(--radius-panel)] border border-hairline bg-sunken"
             onError={(e) => {
               (e.target as HTMLImageElement).style.display = "none";
             }}
@@ -1304,7 +1302,7 @@ function RoundResultsView({
         )}
 
         <div className="text-center">
-          <div className="text-xs text-slate-500 mb-1">Answer</div>
+          <div className="text-xs text-ink0 mb-1">Answer</div>
           <div className="text-2xl font-bold text-sky-300">{round.answer}</div>
         </div>
 
@@ -1328,22 +1326,20 @@ function RoundResultsView({
             ))}
           </div>
         ) : (
-          <div className="text-center text-sm text-slate-500">
-            Nobody guessed it
-          </div>
+          <div className="text-center text-sm text-ink0">Nobody guessed it</div>
         )}
 
         {canAdvance && (
           <button
             type="button"
             onClick={onNextRound}
-            className="w-full py-3 rounded-xl bg-sky-600 text-white text-sm font-semibold hover:bg-sky-500 transition-colors"
+            className="w-full py-3 rounded-[var(--radius-control)] bg-sky-600 text-white text-sm font-semibold hover:bg-accent transition-colors"
           >
             {hasMore ? "Next round →" : "See final scores →"}
           </button>
         )}
         {!canAdvance && (
-          <p className="text-center text-xs text-slate-500">
+          <p className="text-center text-xs text-ink0">
             Waiting for {questioner.username ?? "the questioner"} to continue…
           </p>
         )}
@@ -1390,8 +1386,8 @@ function FinalScoreboard({
     <div className="flex flex-col gap-6 py-2">
       <div className="text-center">
         <div className="text-4xl mb-2">🏆</div>
-        <div className="text-xl font-bold text-slate-100">Game over!</div>
-        <div className="text-sm text-slate-500 mt-1">
+        <div className="text-xl font-bold text-ink">Game over!</div>
+        <div className="text-sm text-ink0 mt-1">
           {totalRounds} round{totalRounds !== 1 ? "s" : ""} across{" "}
           {game.questioners.length} questioner
           {game.questioners.length !== 1 ? "s" : ""}
@@ -1400,7 +1396,7 @@ function FinalScoreboard({
 
       {scores.length > 0 ? (
         <div className="flex flex-col gap-2">
-          <div className="text-xs text-slate-500 font-medium uppercase tracking-wider">
+          <div className="text-xs text-ink0 font-medium uppercase tracking-wider">
             Scoreboard
           </div>
           {scores.map(([socketId, entry], i) => {
@@ -1409,10 +1405,10 @@ function FinalScoreboard({
             return (
               <div
                 key={socketId}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${
+                className={`flex items-center gap-3 px-4 py-3 rounded-[var(--radius-control)] border ${
                   i === 0
                     ? "bg-amber-600/10 border-amber-500/30"
-                    : "bg-white/5 border-white/5"
+                    : "bg-surface border-hairline"
                 }`}
               >
                 <span className="text-lg">
@@ -1424,17 +1420,17 @@ function FinalScoreboard({
                         ? "🥉"
                         : `${i + 1}.`}
                 </span>
-                <span className="flex-1 font-medium text-slate-200">
+                <span className="flex-1 font-medium text-ink">
                   {entry.username ?? "Unknown"}
                 </span>
                 <span
                   className={`text-sm font-bold tabular-nums ${
-                    i === 0 ? "text-amber-300" : "text-slate-400"
+                    i === 0 ? "text-amber-300" : "text-ink-muted"
                   }`}
                 >
                   {fmtScore(pts)} pts
                 </span>
-                <span className="text-xs text-slate-500 tabular-nums shrink-0">
+                <span className="text-xs text-ink0 tabular-nums shrink-0">
                   {entry.wins}/{totalRounds}
                 </span>
               </div>
@@ -1442,16 +1438,14 @@ function FinalScoreboard({
           })}
         </div>
       ) : (
-        <div className="text-center text-slate-500">
-          Nobody scored any points!
-        </div>
+        <div className="text-center text-ink0">Nobody scored any points!</div>
       )}
 
       {canManage && (
         <button
           type="button"
           onClick={onReset}
-          className="w-full py-3 rounded-xl bg-sky-600 text-white text-sm font-semibold hover:bg-sky-500 transition-colors"
+          className="w-full py-3 rounded-[var(--radius-control)] bg-sky-600 text-white text-sm font-semibold hover:bg-accent transition-colors"
         >
           Delete game
         </button>
@@ -1501,40 +1495,38 @@ function StagingView({
   return (
     <div className="flex flex-col gap-5">
       <div className="flex items-center justify-between">
-        <div className="text-base font-semibold text-slate-100">
-          Setting up game
-        </div>
-        <span className="text-xs px-2 py-1 rounded-lg bg-amber-600/20 text-amber-300 border border-amber-600/30">
+        <div className="text-base font-semibold text-ink">Setting up game</div>
+        <span className="text-xs px-2 py-1 rounded-[var(--radius-control)] bg-amber-600/20 text-amber-300 border border-amber-600/30">
           Staging
         </span>
       </div>
 
-      <p className="text-sm text-slate-400">
+      <p className="text-sm text-ink-muted">
         Players can join as questioners by adding their own rounds. The creator
         starts the session when everyone is ready.
       </p>
 
       {/* Questioners list */}
       <div className="flex flex-col gap-2">
-        <div className="text-xs text-slate-500 font-medium">
+        <div className="text-xs text-ink0 font-medium">
           Questioners ({game.questioners.length})
         </div>
         {game.questioners.map((q) => (
           <div
             key={q.socketId}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/5 border border-white/10"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius-control)] bg-surface border border-hairline"
           >
             <div className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
-            <span className="flex-1 text-sm text-slate-200">
+            <span className="flex-1 text-sm text-ink">
               {q.username ?? "Unknown"}
               {q.socketId === game.creatorId && (
-                <span className="ml-2 text-xs text-slate-500">(creator)</span>
+                <span className="ml-2 text-xs text-ink0">(creator)</span>
               )}
               {q.socketId === mySocketId && (
                 <span className="ml-2 text-xs text-sky-400">(you)</span>
               )}
             </span>
-            <span className="text-xs text-slate-500">
+            <span className="text-xs text-ink0">
               {q.totalRounds} round{q.totalRounds !== 1 ? "s" : ""}
             </span>
           </div>
@@ -1546,7 +1538,7 @@ function StagingView({
         <button
           type="button"
           onClick={() => setSetupOpen(true)}
-          className="w-full py-2.5 rounded-xl border border-sky-600/40 bg-sky-600/10 text-sky-300 text-sm font-medium hover:bg-sky-600/20 transition-colors"
+          className="w-full py-2.5 rounded-[var(--radius-control)] border border-sky-600/40 bg-sky-600/10 text-sky-300 text-sm font-medium hover:bg-sky-600/20 transition-colors"
         >
           {amQuestioner ? "Edit my rounds" : "+ Add my rounds"}
         </button>
@@ -1555,7 +1547,7 @@ function StagingView({
           <button
             type="button"
             onClick={onRemoveRounds}
-            className="w-full py-2.5 rounded-xl border border-white/10 bg-white/5 text-slate-400 text-sm hover:bg-white/10 transition-colors"
+            className="w-full py-2.5 rounded-[var(--radius-control)] border border-hairline bg-surface text-ink-muted text-sm hover:bg-raised transition-colors"
           >
             Remove my rounds
           </button>
@@ -1567,7 +1559,7 @@ function StagingView({
               type="button"
               onClick={onStart}
               disabled={game.questioners.length === 0}
-              className="w-full py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full py-2.5 rounded-[var(--radius-control)] bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Start game ({game.questioners.length} questioner
               {game.questioners.length !== 1 ? "s" : ""})
@@ -1575,7 +1567,7 @@ function StagingView({
             <button
               type="button"
               onClick={onDelete}
-              className="w-full py-2.5 rounded-xl border border-white/10 bg-white/5 text-rose-400 text-sm hover:bg-white/10 transition-colors"
+              className="w-full py-2.5 rounded-[var(--radius-control)] border border-hairline bg-surface text-rose-400 text-sm hover:bg-raised transition-colors"
             >
               Delete game
             </button>
@@ -1634,11 +1626,11 @@ function GameView({
       <button
         type="button"
         onClick={onBack}
-        className="text-slate-500 hover:text-slate-300 transition-colors text-sm"
+        className="text-ink0 hover:text-ink-muted transition-colors text-sm"
       >
         ← Back
       </button>
-      <div className="flex-1 text-sm font-medium text-slate-300 truncate">
+      <div className="flex-1 text-sm font-medium text-ink-muted truncate">
         {game.creatorName ?? "Unknown"}&rsquo;s game
       </div>
       {/* Watch-only toggle: hidden during finished sessions and for the
@@ -1653,10 +1645,10 @@ function GameView({
               ? "Re-join the guessing rotation"
               : "Stop being a guesser — keep watching"
           }
-          className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${
+          className={`text-xs px-2.5 py-1 rounded-[var(--radius-control)] border transition-colors ${
             iAmObserver
               ? "border-amber-500/30 bg-amber-600/15 text-amber-200 hover:bg-amber-600/25"
-              : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"
+              : "border-hairline bg-surface text-ink-muted hover:bg-raised"
           }`}
         >
           {iAmObserver ? "👁 Watch only" : "🎮 Playing"}
@@ -1666,7 +1658,7 @@ function GameView({
         <button
           type="button"
           onClick={onEndSession}
-          className="text-xs text-rose-400 hover:text-rose-300 transition-colors px-2 py-1 rounded-lg border border-rose-500/20 hover:border-rose-500/40"
+          className="text-xs text-rose-400 hover:text-rose-300 transition-colors px-2 py-1 rounded-[var(--radius-control)] border border-rose-500/20 hover:border-rose-500/40"
         >
           End game
         </button>
@@ -1712,18 +1704,18 @@ function GameView({
 
       {/* Questioner tabs */}
       {game.questioners.length > 1 && (
-        <div className="flex gap-1 bg-black/30 p-1 rounded-xl mb-4 overflow-x-auto">
+        <div className="flex gap-1 bg-sunken p-1 rounded-[var(--radius-control)] mb-4 overflow-x-auto">
           {game.questioners.map((q) => {
             const progressLabel = `${Math.min(q.currentRoundIndex + (q.isDone ? 0 : 1), q.totalRounds)}/${q.totalRounds}`;
             return (
               <div
                 key={q.socketId}
-                className={`flex-1 min-w-max px-3 py-1.5 rounded-lg text-xs font-medium text-center transition-colors flex items-center justify-center gap-1.5 ${
+                className={`flex-1 min-w-max px-3 py-1.5 rounded-[var(--radius-control)] text-xs font-medium text-center transition-colors flex items-center justify-center gap-1.5 ${
                   q.isActive
                     ? "bg-sky-600 text-white"
                     : q.isDone
-                      ? "text-slate-600 line-through"
-                      : "text-slate-400"
+                      ? "text-ink-faint line-through"
+                      : "text-ink-muted"
                 }`}
               >
                 <span className="truncate">{q.username ?? "Unknown"}</span>
@@ -1732,8 +1724,8 @@ function GameView({
                     q.isActive
                       ? "text-sky-100"
                       : q.isDone
-                        ? "text-slate-600"
-                        : "text-slate-500"
+                        ? "text-ink-faint"
+                        : "text-ink0"
                   }`}
                 >
                   {progressLabel}
@@ -1822,18 +1814,18 @@ function GameLobby({
   const statusBadge = (game: GameData) => {
     if (game.status === "staging")
       return (
-        <span className="text-xs px-2 py-0.5 rounded-lg bg-amber-600/20 text-amber-300 border border-amber-600/30">
+        <span className="text-xs px-2 py-0.5 rounded-[var(--radius-control)] bg-amber-600/20 text-amber-300 border border-amber-600/30">
           Staging
         </span>
       );
     if (game.status === "active")
       return (
-        <span className="text-xs px-2 py-0.5 rounded-lg bg-emerald-600/20 text-emerald-300 border border-emerald-600/30">
+        <span className="text-xs px-2 py-0.5 rounded-[var(--radius-control)] bg-emerald-600/20 text-emerald-300 border border-emerald-600/30">
           Active
         </span>
       );
     return (
-      <span className="text-xs px-2 py-0.5 rounded-lg bg-white/10 text-slate-400">
+      <span className="text-xs px-2 py-0.5 rounded-[var(--radius-control)] bg-raised text-ink-muted">
         Finished
       </span>
     );
@@ -1842,11 +1834,11 @@ function GameLobby({
   return (
     <div className="flex flex-col gap-5">
       <div className="flex items-center justify-between">
-        <div className="text-base font-semibold text-slate-100">Guess It!</div>
+        <div className="text-base font-semibold text-ink">Guess It!</div>
         <button
           type="button"
           onClick={() => setCreatingGame(true)}
-          className="px-4 py-1.5 rounded-xl bg-sky-600 text-white text-xs font-semibold hover:bg-sky-500 transition-colors"
+          className="px-4 py-1.5 rounded-[var(--radius-control)] bg-sky-600 text-white text-xs font-semibold hover:bg-accent transition-colors"
         >
           + New game
         </button>
@@ -1855,34 +1847,32 @@ function GameLobby({
       {games.length === 0 ? (
         <div className="flex flex-col items-center gap-4 py-6">
           <div className="text-5xl">🔍</div>
-          <div className="w-full rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="text-sm font-semibold text-slate-100 mb-2">
+          <div className="w-full rounded-[var(--radius-panel)] border border-hairline bg-surface p-4">
+            <div className="text-sm font-semibold text-ink mb-2">
               How to play
             </div>
-            <ol className="text-xs text-slate-400 leading-relaxed space-y-1.5 list-decimal pl-4">
+            <ol className="text-xs text-ink-muted leading-relaxed space-y-1.5 list-decimal pl-4">
               <li>
-                <span className="text-slate-200 font-medium">Pick rounds.</span>{" "}
-                For each round set a category, the secret answer, and an
-                optional clue image.
+                <span className="text-ink font-medium">Pick rounds.</span> For
+                each round set a category, the secret answer, and an optional
+                clue image.
               </li>
               <li>
-                <span className="text-slate-200 font-medium">
-                  Invite friends.
-                </span>{" "}
+                <span className="text-ink font-medium">Invite friends.</span>{" "}
                 Other players in this room can join as additional questioners
                 with their own rounds.
               </li>
               <li>
-                <span className="text-slate-200 font-medium">Take turns.</span>{" "}
+                <span className="text-ink font-medium">Take turns.</span>{" "}
                 Guessers go one by one. The questioner can reveal letters as
                 hints, skip a stuck guesser, or end the round.
               </li>
               <li>
-                <span className="text-slate-200 font-medium">Win it.</span>{" "}
-                Every correct guess earns a point. Highest score wins.
+                <span className="text-ink font-medium">Win it.</span> Every
+                correct guess earns a point. Highest score wins.
               </li>
             </ol>
-            <div className="mt-3 pt-3 border-t border-white/10 text-[11px] text-slate-500">
+            <div className="mt-3 pt-3 border-t border-hairline text-[11px] text-ink0">
               Typos and punctuation are forgiven — &ldquo;the matrix&rdquo;
               matches &ldquo;Matrix&rdquo;, &ldquo;cafe&rdquo; matches
               &ldquo;café&rdquo;.
@@ -1891,7 +1881,7 @@ function GameLobby({
           <button
             type="button"
             onClick={() => setCreatingGame(true)}
-            className="px-5 py-2.5 rounded-xl bg-sky-600 text-white text-sm font-semibold hover:bg-sky-500 transition-colors"
+            className="px-5 py-2.5 rounded-[var(--radius-control)] bg-sky-600 text-white text-sm font-semibold hover:bg-accent transition-colors"
           >
             Create your first game
           </button>
@@ -1911,13 +1901,13 @@ function GameLobby({
                 <button
                   type="button"
                   onClick={() => onSelectGame(game.gameId)}
-                  className="flex-1 flex items-center gap-3 px-4 py-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors text-left min-w-0"
+                  className="flex-1 flex items-center gap-3 px-4 py-3 rounded-[var(--radius-control)] bg-surface border border-hairline hover:bg-raised transition-colors text-left min-w-0"
                 >
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-slate-200 truncate">
+                    <div className="text-sm font-medium text-ink truncate">
                       {game.creatorName ?? "Unknown"}&rsquo;s game
                     </div>
-                    <div className="text-xs text-slate-500 mt-0.5">
+                    <div className="text-xs text-ink0 mt-0.5">
                       {game.questioners.length} questioner
                       {game.questioners.length !== 1 ? "s" : ""} · {totalRounds}{" "}
                       round{totalRounds !== 1 ? "s" : ""}
@@ -1930,7 +1920,7 @@ function GameLobby({
                     type="button"
                     onClick={() => onDeleteGame(game.gameId)}
                     title="Delete game"
-                    className="shrink-0 h-9 w-9 rounded-xl border border-white/10 bg-white/5 text-rose-400 hover:bg-rose-600/20 hover:border-rose-500/30 transition-colors flex items-center justify-center text-lg"
+                    className="shrink-0 h-9 w-9 rounded-[var(--radius-control)] border border-hairline bg-surface text-rose-400 hover:bg-rose-600/20 hover:border-rose-500/30 transition-colors flex items-center justify-center text-lg"
                   >
                     ×
                   </button>

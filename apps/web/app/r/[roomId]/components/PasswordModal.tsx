@@ -32,7 +32,7 @@ export function PasswordModal({
       closeOnEscape={false}
       labelledBy="room-password-title"
       describedBy="room-password-description"
-      panelClassName="w-full max-w-lg rounded-2xl border border-white/10 bg-black/80 p-6 shadow-xl"
+      panelClassName="w-full max-w-lg rounded-[var(--radius-panel)] border border-hairline bg-black/80 p-6 shadow-xl"
     >
       <form
         onSubmit={(e) => {
@@ -41,15 +41,12 @@ export function PasswordModal({
           submitRoomPassword();
         }}
       >
-        <h2
-          id="room-password-title"
-          className="text-xl font-semibold text-slate-50"
-        >
+        <h2 id="room-password-title" className="text-xl font-semibold text-ink">
           Room password
         </h2>
         <p
           id="room-password-description"
-          className="mt-2 text-sm text-slate-300"
+          className="mt-2 text-sm text-ink-muted"
         >
           {passwordError ?? "This room requires a password."}
         </p>
@@ -66,19 +63,19 @@ export function PasswordModal({
             type="password"
             autoComplete="off"
             autoFocus
-            className="h-12 w-full rounded-xl border border-white/10 bg-white/5 px-4 text-base text-slate-100 placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-white/10"
+            className="h-12 w-full rounded-[var(--radius-control)] border border-hairline bg-surface px-4 text-base text-ink placeholder:text-ink0 outline-none focus:ring-2 focus:ring-white/10"
           />
           <div className="mt-4 flex items-center gap-3">
             <button
               type="submit"
-              className="h-11 px-5 rounded-xl border border-white/10 bg-white/5 text-slate-100 text-sm font-medium hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="h-11 px-5 rounded-[var(--radius-control)] border border-hairline bg-surface text-ink text-sm font-medium hover:bg-raised transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={!canSubmit}
             >
               Join
             </button>
             <Link
               href="/"
-              className="h-11 px-5 inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-100 text-sm font-medium hover:bg-white/10 transition-colors"
+              className="h-11 px-5 inline-flex items-center justify-center rounded-[var(--radius-control)] border border-hairline bg-surface text-ink text-sm font-medium hover:bg-raised transition-colors"
             >
               Go home
             </Link>

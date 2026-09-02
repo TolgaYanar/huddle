@@ -239,7 +239,7 @@ export function WebcamOverlay({
         }
       }}
     >
-      <div className="backdrop-blur-md bg-black/30 border border-white/10 rounded-2xl p-2">
+      <div className="backdrop-blur-md bg-sunken border border-hairline rounded-[var(--radius-panel)] p-2">
         <div className="flex items-center gap-2 overflow-x-auto max-w-[85vw]">
           {hasLocal && (
             <div className="relative shrink-0">
@@ -248,11 +248,11 @@ export function WebcamOverlay({
                 autoPlay
                 playsInline
                 muted
-                className="rounded-xl object-cover border border-white/10 bg-black"
+                className="rounded-[var(--radius-control)] object-cover border border-hairline bg-black"
                 style={{ width: thumbWidth, height: thumbHeight }}
               />
               {localUsername && (
-                <span className="absolute bottom-1 left-1 right-1 text-center text-white text-[10px] font-medium leading-tight bg-black/60 rounded-md px-1 py-0.5 truncate pointer-events-none">
+                <span className="absolute bottom-1 left-1 right-1 text-center text-white text-[10px] font-medium leading-tight bg-sunken rounded-md px-1 py-0.5 truncate pointer-events-none">
                   {localUsername}
                 </span>
               )}
@@ -261,7 +261,7 @@ export function WebcamOverlay({
                   type="button"
                   onClick={onCloseLocal}
                   aria-label="Turn off my camera"
-                  className="absolute top-1 right-1 h-6 w-6 rounded-full bg-black/70 hover:bg-black/90 text-white text-xs inline-flex items-center justify-center border border-white/20"
+                  className="absolute top-1 right-1 h-6 w-6 rounded-full bg-sunken hover:bg-black/90 text-white text-xs inline-flex items-center justify-center border border-hairline-strong"
                   title="Turn off my camera"
                 >
                   ✕
@@ -277,11 +277,11 @@ export function WebcamOverlay({
                 autoPlay
                 playsInline
                 muted
-                className="rounded-xl object-cover border border-white/10 bg-black"
+                className="rounded-[var(--radius-control)] object-cover border border-hairline bg-black"
                 style={{ width: thumbWidth, height: thumbHeight }}
               />
               {r.username && (
-                <span className="absolute bottom-1 left-1 right-1 text-center text-white text-[10px] font-medium leading-tight bg-black/60 rounded-md px-1 py-0.5 truncate pointer-events-none">
+                <span className="absolute bottom-1 left-1 right-1 text-center text-white text-[10px] font-medium leading-tight bg-sunken rounded-md px-1 py-0.5 truncate pointer-events-none">
                   {r.username}
                 </span>
               )}
@@ -292,7 +292,7 @@ export function WebcamOverlay({
         <button
           type="button"
           aria-label="Resize camera thumbnails"
-          className="absolute -bottom-1 -right-1 h-7 w-7 rounded-full border border-white/10 bg-black/50 text-slate-200 text-xs inline-flex items-center justify-center cursor-nwse-resize"
+          className="absolute -bottom-1 -right-1 h-7 w-7 rounded-full border border-hairline bg-sunken text-white text-xs inline-flex items-center justify-center cursor-nwse-resize"
           title="Resize cameras"
           onPointerDown={(e) => {
             if (!active) return;

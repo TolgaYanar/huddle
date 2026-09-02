@@ -29,23 +29,23 @@ export function VideosToAddPreview(props: {
   if (videosToAdd.length === 0) return null;
 
   return (
-    <div className="border-t border-white/10 shrink-0">
-      <div className="flex items-center justify-between p-3 bg-black/20">
-        <div className="text-sm font-medium text-slate-200">
+    <div className="border-t border-hairline shrink-0">
+      <div className="flex items-center justify-between p-3 bg-sunken">
+        <div className="text-sm font-medium text-ink">
           Videos to Add ({selectedCount} / {videosToAdd.length} selected)
         </div>
         <div className="flex gap-2">
           <button
             type="button"
             onClick={selectAll}
-            className="px-2 py-1 text-xs text-slate-400 hover:text-slate-200 transition"
+            className="px-2 py-1 text-xs text-ink-muted hover:text-ink transition"
           >
             Select All
           </button>
           <button
             type="button"
             onClick={deselectAll}
-            className="px-2 py-1 text-xs text-slate-400 hover:text-slate-200 transition"
+            className="px-2 py-1 text-xs text-ink-muted hover:text-ink transition"
           >
             Deselect All
           </button>
@@ -62,10 +62,10 @@ export function VideosToAddPreview(props: {
         {videosToAdd.map((video) => (
           <div
             key={video.id}
-            className={`flex items-center gap-3 p-2 rounded-xl border transition ${
+            className={`flex items-center gap-3 p-2 rounded-[var(--radius-control)] border transition ${
               video.selected
-                ? "border-indigo-500/50 bg-indigo-500/10"
-                : "border-white/10 bg-black/20 opacity-60"
+                ? "border-indigo-500/50 bg-accent-soft"
+                : "border-hairline bg-sunken opacity-60"
             }`}
           >
             <button
@@ -76,7 +76,7 @@ export function VideosToAddPreview(props: {
               className={`shrink-0 w-5 h-5 rounded border flex items-center justify-center transition ${
                 video.selected
                   ? "bg-indigo-600 border-indigo-600 text-white"
-                  : "border-white/20 hover:border-white/40"
+                  : "border-hairline-strong hover:border-white/40"
               }`}
             >
               {video.selected && <CheckIcon />}
@@ -96,7 +96,7 @@ export function VideosToAddPreview(props: {
                 type="text"
                 value={video.title}
                 onChange={(e) => updateVideoTitle(video.id, e.target.value)}
-                className="w-full bg-transparent text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500/30 rounded px-1"
+                className="w-full bg-transparent text-sm text-ink focus:outline-none focus:ring-1 focus:ring-accent rounded px-1"
                 title="Edit title"
               />
               {(() => {
@@ -116,7 +116,7 @@ export function VideosToAddPreview(props: {
               type="button"
               onClick={() => removeVideo(video.id)}
               aria-label="Remove from list"
-              className="shrink-0 p-1 text-slate-400 hover:text-rose-400 transition"
+              className="shrink-0 p-1 text-ink-muted hover:text-rose-400 transition"
               title="Remove from list"
             >
               <TrashIcon />

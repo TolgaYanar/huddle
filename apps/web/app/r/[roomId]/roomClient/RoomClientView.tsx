@@ -101,17 +101,7 @@ export function RoomClientView({
         : "lg:grid-cols-[280px_minmax(0,1fr)_340px]";
 
   return (
-    <div className="relative min-h-screen flex flex-col bg-linear-to-b from-slate-900 via-slate-950 to-black text-slate-200">
-      {/* Ambient background accent — kept behind everything else */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
-      >
-        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[80rem] h-[40rem] rounded-full bg-indigo-500/10 blur-3xl" />
-        <div className="absolute top-1/3 -right-32 w-[28rem] h-[28rem] rounded-full bg-fuchsia-500/10 blur-3xl" />
-        <div className="absolute bottom-0 -left-32 w-[32rem] h-[32rem] rounded-full bg-sky-500/10 blur-3xl" />
-      </div>
-
+    <div className="relative min-h-screen flex flex-col bg-bg text-ink">
       {isReady && headerProps && (
         <RoomHeader roomId={roomId} {...headerProps} />
       )}

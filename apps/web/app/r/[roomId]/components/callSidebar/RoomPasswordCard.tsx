@@ -20,10 +20,10 @@ export function RoomPasswordCard(props: {
   } = props;
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+    <div className="rounded-[var(--radius-panel)] border border-hairline bg-sunken p-3">
       <div className="flex items-center justify-between gap-3">
-        <div className="text-sm text-slate-100 font-medium">Room password</div>
-        <div className="text-xs text-slate-300">
+        <div className="text-sm text-ink font-medium">Room password</div>
+        <div className="text-xs text-ink-muted">
           {hasRoomPassword ? "On" : "Off"}
         </div>
       </div>
@@ -33,7 +33,7 @@ export function RoomPasswordCard(props: {
           <button
             type="button"
             onClick={() => setShowPasswordEditor((v) => !v)}
-            className="h-8 px-3 rounded-lg border border-white/10 bg-white/5 text-slate-200 text-xs font-medium hover:bg-white/10 transition-colors"
+            className="h-8 px-3 rounded-[var(--radius-control)] border border-hairline bg-surface text-ink text-xs font-medium hover:bg-raised transition-colors"
           >
             {showPasswordEditor ? "Close" : hasRoomPassword ? "Change" : "Set"}
           </button>
@@ -44,7 +44,7 @@ export function RoomPasswordCard(props: {
                 onSetRoomPassword("");
                 setPasswordDraft("");
               }}
-              className="h-8 px-3 rounded-lg border border-white/10 bg-white/5 text-slate-200 text-xs font-medium hover:bg-white/10 transition-colors"
+              className="h-8 px-3 rounded-[var(--radius-control)] border border-hairline bg-surface text-ink text-xs font-medium hover:bg-raised transition-colors"
               title="Clear room password"
             >
               Clear
@@ -60,7 +60,7 @@ export function RoomPasswordCard(props: {
             onChange={(e) => setPasswordDraft(e.target.value)}
             placeholder={hasRoomPassword ? "New password" : "Set a password"}
             type="password"
-            className="h-9 flex-1 rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-slate-100 placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-white/10"
+            className="h-9 flex-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-3 text-sm text-ink placeholder:text-ink0 outline-none focus:ring-2 focus:ring-white/10"
           />
           <button
             type="button"
@@ -69,7 +69,7 @@ export function RoomPasswordCard(props: {
               setPasswordDraft("");
               setShowPasswordEditor(false);
             }}
-            className="h-9 px-4 rounded-xl border border-white/10 bg-white/5 text-slate-100 text-sm font-medium hover:bg-white/10 transition-colors"
+            className="h-9 px-4 rounded-[var(--radius-control)] border border-hairline bg-surface text-ink text-sm font-medium hover:bg-raised transition-colors"
             disabled={!passwordDraft.trim()}
           >
             Save

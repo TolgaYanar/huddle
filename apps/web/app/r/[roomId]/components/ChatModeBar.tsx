@@ -27,18 +27,18 @@ export function ChatModeBar({
       // Placed explicitly in the column the player used, rather than left to
       // grid auto-placement, which would drop it into the call sidebar's 280px
       // column and squash it.
-      className="backdrop-blur-md bg-white/5 rounded-2xl border border-white/10 p-4 sm:p-5 flex flex-wrap items-center gap-3 lg:row-start-1 lg:col-start-2 lg:min-w-0 self-start"
+      className="backdrop-blur-md bg-surface rounded-[var(--radius-panel)] border border-hairline p-4 sm:p-5 flex flex-wrap items-center gap-3 lg:row-start-1 lg:col-start-2 lg:min-w-0 self-start"
     >
       <div className="flex items-center gap-3 min-w-0 flex-1">
         <span
           aria-hidden="true"
           className={`h-2.5 w-2.5 rounded-full shrink-0 ${
-            isMuted ? "bg-slate-500" : "bg-emerald-400"
+            isMuted ? "bg-ink-faint" : "bg-emerald-400"
           }`}
         />
         <div className="min-w-0">
-          <div className="font-semibold text-slate-50">Chat only</div>
-          <div className="text-xs text-slate-400 mt-0.5">
+          <div className="font-semibold text-ink">Chat only</div>
+          <div className="text-xs text-ink-muted mt-0.5">
             {isMuted
               ? "The video is hidden and muted for you. Everyone else is unaffected."
               : "The video is hidden but still playing for you, so you can listen while you chat."}
@@ -51,14 +51,14 @@ export function ChatModeBar({
           type="button"
           onClick={onToggleMuted}
           aria-pressed={isMuted}
-          className="h-10 flex-1 sm:flex-none px-3 sm:px-4 rounded-xl border border-white/10 bg-black/20 hover:bg-black/30 text-sm font-medium text-slate-50 transition-colors whitespace-nowrap"
+          className="h-10 flex-1 sm:flex-none px-3 sm:px-4 rounded-[var(--radius-control)] border border-hairline bg-sunken hover:bg-sunken text-sm font-medium text-ink transition-colors whitespace-nowrap"
         >
           {isMuted ? "Turn sound on" : "Turn sound off"}
         </button>
         <button
           type="button"
           onClick={onShowVideo}
-          className="h-10 flex-1 sm:flex-none px-3 sm:px-4 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-sm font-medium text-slate-50 transition-colors whitespace-nowrap"
+          className="h-10 flex-1 sm:flex-none px-3 sm:px-4 rounded-[var(--radius-control)] border border-hairline bg-surface hover:bg-raised text-sm font-medium text-ink transition-colors whitespace-nowrap"
         >
           Show video
         </button>

@@ -80,7 +80,7 @@ export function PlayerViewport({
 }) {
   return (
     <div
-      className={`w-full aspect-video bg-black/40 rounded-2xl relative overflow-hidden border border-white/10 ${
+      className={`w-full aspect-video bg-sunken rounded-[var(--radius-panel)] relative overflow-hidden border border-hairline ${
         isStageDragOver ? "ring-2 ring-indigo-500/30" : ""
       }`}
       ref={playerContainerRef}
@@ -90,7 +90,7 @@ export function PlayerViewport({
           <button
             type="button"
             onClick={() => setFullscreenChatOpen((v) => !v)}
-            className="h-10 px-4 rounded-xl border border-white/20 bg-black/50 text-slate-50 text-sm font-semibold hover:bg-white/10 transition-colors"
+            className="h-10 px-4 rounded-[var(--radius-control)] border border-hairline-strong bg-sunken text-white text-sm font-semibold hover:bg-raised transition-colors"
             title={fullscreenChatOpen ? "Hide chat" : "Show chat"}
           >
             {fullscreenChatOpen ? "Hide chat" : "Chat"}
@@ -100,7 +100,7 @@ export function PlayerViewport({
         <button
           type="button"
           onClick={togglePlayerFullscreen}
-          className="h-10 px-4 rounded-xl border border-white/20 bg-slate-50 text-slate-950 text-sm font-semibold hover:bg-slate-50/90 transition-colors shadow-sm"
+          className="h-10 px-4 rounded-[var(--radius-control)] border border-hairline-strong bg-accent text-accent-ink text-sm font-semibold hover:bg-slate-50/90 transition-colors shadow-sm"
           title="Fullscreen (with webcams)"
         >
           {isPlayerFullscreen ? "Exit" : "Fullscreen"}

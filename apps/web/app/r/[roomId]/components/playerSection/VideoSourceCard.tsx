@@ -109,30 +109,30 @@ export function VideoSourceCard({
   }, [youtubeQuery]);
 
   return (
-    <div className="backdrop-blur-md bg-white/5 rounded-2xl border border-white/10 p-4 sm:p-5">
+    <div className="backdrop-blur-md bg-surface rounded-[var(--radius-panel)] border border-hairline p-4 sm:p-5">
       <div className="flex flex-col gap-3">
         <div className="flex items-baseline justify-between gap-4">
           <div>
-            <div className="font-semibold text-slate-50">Video source</div>
-            <div className="text-xs text-slate-400 mt-1">
+            <div className="font-semibold text-ink">Video source</div>
+            <div className="text-xs text-ink-muted mt-1">
               Paste a link (YouTube/Twitch/Kick/Netflix) or a direct file URL
               (MP4/WebM).
             </div>
           </div>
           <div className="hidden sm:flex items-center gap-2">
-            <span className="px-2 py-1 rounded-full text-[11px] border border-white/10 bg-black/20 text-slate-300">
+            <span className="px-2 py-1 rounded-full text-[11px] border border-hairline bg-sunken text-ink-muted">
               YouTube
             </span>
-            <span className="px-2 py-1 rounded-full text-[11px] border border-white/10 bg-black/20 text-slate-300">
+            <span className="px-2 py-1 rounded-full text-[11px] border border-hairline bg-sunken text-ink-muted">
               Twitch
             </span>
-            <span className="px-2 py-1 rounded-full text-[11px] border border-white/10 bg-black/20 text-slate-300">
+            <span className="px-2 py-1 rounded-full text-[11px] border border-hairline bg-sunken text-ink-muted">
               Kick
             </span>
-            <span className="px-2 py-1 rounded-full text-[11px] border border-white/10 bg-black/20 text-slate-300">
+            <span className="px-2 py-1 rounded-full text-[11px] border border-hairline bg-sunken text-ink-muted">
               Netflix
             </span>
-            <span className="px-2 py-1 rounded-full text-[11px] border border-white/10 bg-black/20 text-slate-300">
+            <span className="px-2 py-1 rounded-full text-[11px] border border-hairline bg-sunken text-ink-muted">
               Prime
             </span>
           </div>
@@ -147,7 +147,7 @@ export function VideoSourceCard({
             value={inputUrl}
             onChange={(e) => setInputUrl(e.target.value)}
             placeholder="e.g. youtube.com/watch?v=..., netflix.com/watch/..."
-            className="w-full sm:w-auto sm:flex-1 min-w-0 bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500/40 transition"
+            className="w-full sm:w-auto sm:flex-1 min-w-0 bg-sunken border border-hairline rounded-[var(--radius-control)] px-4 py-2.5 text-sm text-ink placeholder:text-ink0 focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition"
           />
           <button
             type="button"
@@ -155,7 +155,7 @@ export function VideoSourceCard({
               setYoutubePickerOpen((v) => !v);
               setYoutubeError(null);
             }}
-            className="h-11 flex-1 sm:flex-none px-3 sm:px-4 bg-black/20 hover:bg-black/30 border border-white/10 rounded-xl transition-colors text-sm font-medium text-slate-50 whitespace-nowrap"
+            className="h-11 flex-1 sm:flex-none px-3 sm:px-4 bg-sunken hover:bg-sunken border border-hairline rounded-[var(--radius-control)] transition-colors text-sm font-medium text-ink whitespace-nowrap"
             title="Search YouTube and load into the room"
           >
             Browse YouTube
@@ -169,28 +169,28 @@ export function VideoSourceCard({
                 "noopener,noreferrer",
               );
             }}
-            className="h-11 flex-1 sm:flex-none px-3 sm:px-4 bg-black/20 hover:bg-black/30 border border-white/10 rounded-xl transition-colors text-sm font-medium text-slate-50 whitespace-nowrap"
+            className="h-11 flex-1 sm:flex-none px-3 sm:px-4 bg-sunken hover:bg-sunken border border-hairline rounded-[var(--radius-control)] transition-colors text-sm font-medium text-ink whitespace-nowrap"
             title="Open YouTube in a new tab to pick from your recommendations"
           >
             Open YouTube
           </button>
           <button
             type="submit"
-            className="h-11 flex-1 sm:flex-none px-3 sm:px-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-colors text-sm font-medium text-slate-50 whitespace-nowrap"
+            className="h-11 flex-1 sm:flex-none px-3 sm:px-4 bg-surface hover:bg-raised border border-hairline rounded-[var(--radius-control)] transition-colors text-sm font-medium text-ink whitespace-nowrap"
           >
             Load
           </button>
         </form>
 
         {youtubePickerOpen && (
-          <div className="mt-2 rounded-2xl border border-white/10 bg-black/20 p-3">
+          <div className="mt-2 rounded-[var(--radius-panel)] border border-hairline bg-sunken p-3">
             <div className="flex items-center gap-2">
               <input
                 type="text"
                 value={youtubeQuery}
                 onChange={(e) => setYoutubeQuery(e.target.value)}
                 placeholder="Search YouTube..."
-                className="flex-1 bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500/40 transition"
+                className="flex-1 bg-sunken border border-hairline rounded-[var(--radius-control)] px-4 py-2.5 text-sm text-ink placeholder:text-ink0 focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition"
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
@@ -202,14 +202,14 @@ export function VideoSourceCard({
                 type="button"
                 onClick={() => void runYouTubeSearch()}
                 disabled={youtubeLoading}
-                className="h-11 px-4 bg-white/5 hover:bg-white/10 disabled:opacity-50 disabled:hover:bg-white/5 border border-white/10 rounded-xl transition-colors text-sm font-medium text-slate-50"
+                className="h-11 px-4 bg-surface hover:bg-raised disabled:opacity-50 disabled:hover:bg-surface border border-hairline rounded-[var(--radius-control)] transition-colors text-sm font-medium text-ink"
               >
                 {youtubeLoading ? "Searching..." : "Search"}
               </button>
               <button
                 type="button"
                 onClick={() => setYoutubePickerOpen(false)}
-                className="h-11 px-4 bg-black/20 hover:bg-black/30 border border-white/10 rounded-xl transition-colors text-sm font-medium text-slate-50"
+                className="h-11 px-4 bg-sunken hover:bg-sunken border border-hairline rounded-[var(--radius-control)] transition-colors text-sm font-medium text-ink"
               >
                 Close
               </button>
@@ -231,10 +231,10 @@ export function VideoSourceCard({
                       setInputUrl(next);
                       setYoutubePickerOpen(false);
                     }}
-                    className="text-left rounded-xl border border-white/10 bg-black/20 hover:bg-black/30 transition-colors overflow-hidden"
+                    className="text-left rounded-[var(--radius-control)] border border-hairline bg-sunken hover:bg-sunken transition-colors overflow-hidden"
                     title="Select this video"
                   >
-                    <div className="aspect-video bg-black/30">
+                    <div className="aspect-video bg-sunken">
                       {it.thumbnail ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
@@ -248,11 +248,11 @@ export function VideoSourceCard({
                       )}
                     </div>
                     <div className="p-2">
-                      <div className="text-sm font-semibold text-slate-100 line-clamp-2">
+                      <div className="text-sm font-semibold text-ink line-clamp-2">
                         {it.title}
                       </div>
                       {it.channelTitle && (
-                        <div className="text-xs text-slate-400 mt-1 line-clamp-1">
+                        <div className="text-xs text-ink-muted mt-1 line-clamp-1">
                           {it.channelTitle}
                         </div>
                       )}
@@ -265,7 +265,7 @@ export function VideoSourceCard({
             {youtubeResults.length === 0 &&
               !youtubeLoading &&
               !youtubeError && (
-                <div className="mt-2 text-xs text-slate-400">
+                <div className="mt-2 text-xs text-ink-muted">
                   Search and click a video to open the preview. After you
                   confirm, it becomes the room video.
                 </div>

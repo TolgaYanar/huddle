@@ -105,14 +105,14 @@ export function ProgressBar({
         aria-valuetext={`${formatTime(safeCurrentTime)} of ${formatTime(duration)}`}
         aria-disabled={!seekEnabled}
         tabIndex={seekEnabled ? 0 : -1}
-        className={`relative h-1.5 bg-white/20 rounded-full group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-4 focus-visible:ring-offset-slate-900 ${seekEnabled ? "cursor-pointer" : "cursor-not-allowed opacity-60"}`}
+        className={`relative h-1.5 bg-hairline-strong rounded-full group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-4 focus-visible:ring-offset-slate-900 ${seekEnabled ? "cursor-pointer" : "cursor-not-allowed opacity-60"}`}
         onClick={handleProgressClick}
         onKeyDown={handleProgressKeyDown}
         onMouseMove={handleProgressHover}
         onMouseLeave={() => setHoverTime(null)}
       >
         <div
-          className="absolute h-full bg-linear-to-r from-indigo-500 to-purple-500 rounded-full transition-all"
+          className="absolute h-full bg-accent rounded-full transition-all"
           style={{ width: `${progress}%` }}
         />
         {hoverTime !== null && (
@@ -128,7 +128,7 @@ export function ProgressBar({
           style={{ left: `calc(${progress}% - 6px)` }}
         />
       </div>
-      <div className="flex justify-between mt-1.5 text-xs text-slate-400">
+      <div className="flex justify-between mt-1.5 text-xs text-ink-muted">
         <span>{formatTime(currentTime)}</span>
         <span>{formatTime(duration)}</span>
       </div>

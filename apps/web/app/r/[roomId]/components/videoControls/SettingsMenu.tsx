@@ -41,15 +41,15 @@ export function SettingsMenu({
         aria-haspopup="dialog"
         aria-expanded={open ? "true" : "false"}
         aria-label="Player settings"
-        className="h-9 w-9 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-slate-200 transition-colors"
+        className="h-9 w-9 rounded-[var(--radius-control)] bg-surface hover:bg-raised border border-hairline flex items-center justify-center text-ink transition-colors"
         title="Settings"
       >
         <SettingsIcon />
       </button>
 
       {open && (
-        <div className="absolute bottom-full mb-2 right-0 min-w-50 bg-black/90 backdrop-blur-md rounded-xl border border-white/10 py-2 shadow-xl z-50">
-          <div className="px-3 py-1.5 text-xs text-slate-400 uppercase tracking-wider">
+        <div className="absolute bottom-full mb-2 right-0 min-w-50 bg-black/90 backdrop-blur-md rounded-[var(--radius-control)] border border-hairline py-2 shadow-xl z-50">
+          <div className="px-3 py-1.5 text-xs text-ink-muted uppercase tracking-wider">
             Quick Actions
           </div>
 
@@ -60,7 +60,7 @@ export function SettingsMenu({
               setOpen(false);
             }}
             disabled={!capabilities.canSeek}
-            className="w-full px-3 py-2 text-left text-sm text-slate-200 hover:bg-white/10 transition-colors disabled:opacity-40"
+            className="w-full px-3 py-2 text-left text-sm text-ink hover:bg-raised transition-colors disabled:opacity-40"
           >
             ⏪ Back 5 seconds
           </button>
@@ -71,7 +71,7 @@ export function SettingsMenu({
               setOpen(false);
             }}
             disabled={!capabilities.canSeek}
-            className="w-full px-3 py-2 text-left text-sm text-slate-200 hover:bg-white/10 transition-colors disabled:opacity-40"
+            className="w-full px-3 py-2 text-left text-sm text-ink hover:bg-raised transition-colors disabled:opacity-40"
           >
             ⏩ Forward 5 seconds
           </button>
@@ -82,17 +82,17 @@ export function SettingsMenu({
               setOpen(false);
             }}
             disabled={!capabilities.canSeek}
-            className="w-full px-3 py-2 text-left text-sm text-slate-200 hover:bg-white/10 transition-colors disabled:opacity-40"
+            className="w-full px-3 py-2 text-left text-sm text-ink hover:bg-raised transition-colors disabled:opacity-40"
           >
             ⏮ Restart
           </button>
 
-          <div className="border-t border-white/10 my-2" />
+          <div className="border-t border-hairline my-2" />
 
-          <div className="px-3 py-1.5 text-xs text-slate-400 uppercase tracking-wider">
+          <div className="px-3 py-1.5 text-xs text-ink-muted uppercase tracking-wider">
             Audio
           </div>
-          <label className="px-3 py-2 flex items-center justify-between gap-3 text-sm text-slate-200 select-none">
+          <label className="px-3 py-2 flex items-center justify-between gap-3 text-sm text-ink select-none">
             <span>Sync volume & mute</span>
             <input
               type="checkbox"
@@ -102,17 +102,17 @@ export function SettingsMenu({
             />
           </label>
           {!roomAudioSyncEnabled && (
-            <div className="px-3 pb-2 text-xs text-slate-400">
+            <div className="px-3 pb-2 text-xs text-ink-muted">
               Volume/mute are local. Speed still syncs.
             </div>
           )}
 
-          <div className="border-t border-white/10 my-2" />
+          <div className="border-t border-hairline my-2" />
 
-          <div className="px-3 py-1.5 text-xs text-slate-400 uppercase tracking-wider">
+          <div className="px-3 py-1.5 text-xs text-ink-muted uppercase tracking-wider">
             Platform
           </div>
-          <div className="px-3 py-2 text-sm text-slate-300">
+          <div className="px-3 py-2 text-sm text-ink-muted">
             {platform === "youtube" && "YouTube"}
             {platform === "twitch" && "Twitch (Limited control)"}
             {platform === "kick" && "Kick (Limited control)"}
@@ -123,15 +123,15 @@ export function SettingsMenu({
           </div>
 
           <div className="px-3 py-2">
-            <div className="text-xs text-slate-500">
+            <div className="text-xs text-ink0">
               {capabilities.canPlay
                 ? "✓ Playback control"
                 : "✗ No playback control"}
             </div>
-            <div className="text-xs text-slate-500">
+            <div className="text-xs text-ink0">
               {capabilities.canSeek ? "✓ Seeking" : "✗ No seeking"}
             </div>
-            <div className="text-xs text-slate-500">
+            <div className="text-xs text-ink0">
               {capabilities.canChangeSpeed
                 ? "✓ Speed control"
                 : "✗ No speed control"}

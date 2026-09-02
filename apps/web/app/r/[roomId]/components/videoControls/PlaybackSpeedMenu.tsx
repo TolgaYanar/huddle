@@ -30,7 +30,7 @@ export function PlaybackSpeedMenu({
         aria-haspopup="menu"
         aria-expanded={open ? "true" : "false"}
         aria-label={`Playback speed: ${playbackRate}x`}
-        className="h-9 px-3 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 flex items-center gap-1.5 text-slate-200 text-sm font-medium transition-colors"
+        className="h-9 px-3 rounded-[var(--radius-control)] bg-surface hover:bg-raised border border-hairline flex items-center gap-1.5 text-ink text-sm font-medium transition-colors"
         title="Playback speed"
       >
         <span>{playbackRate}x</span>
@@ -39,9 +39,9 @@ export function PlaybackSpeedMenu({
       {open && (
         <div
           role="menu"
-          className="absolute bottom-full mb-2 right-0 min-w-30 bg-black/90 backdrop-blur-md rounded-xl border border-white/10 py-2 shadow-xl z-50"
+          className="absolute bottom-full mb-2 right-0 min-w-30 bg-black/90 backdrop-blur-md rounded-[var(--radius-control)] border border-hairline py-2 shadow-xl z-50"
         >
-          <div className="px-3 py-1.5 text-xs text-slate-400 uppercase tracking-wider">
+          <div className="px-3 py-1.5 text-xs text-ink-muted uppercase tracking-wider">
             Speed
           </div>
           {speedOptions.map((speed) => (
@@ -54,14 +54,14 @@ export function PlaybackSpeedMenu({
                 onPlaybackRateChange(speed);
                 setOpen(false);
               }}
-              className={`w-full px-3 py-2 text-left text-sm hover:bg-white/10 transition-colors ${
+              className={`w-full px-3 py-2 text-left text-sm hover:bg-raised transition-colors ${
                 playbackRate === speed
                   ? "text-indigo-400 font-medium"
-                  : "text-slate-200"
+                  : "text-ink"
               }`}
             >
               {speed}x{" "}
-              {speed === 1 && <span className="text-slate-500">(Normal)</span>}
+              {speed === 1 && <span className="text-ink0">(Normal)</span>}
             </button>
           ))}
         </div>

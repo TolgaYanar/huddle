@@ -88,7 +88,7 @@ export function VideoControls({
           onClick={isPlaying ? onPause : onPlay}
           disabled={!canControl}
           aria-label={isPlaying ? "Pause" : "Play"}
-          className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 flex items-center justify-center text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="h-10 w-10 rounded-full bg-raised hover:bg-hairline-strong border border-hairline flex items-center justify-center text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           title={effectiveDisabledReason}
         >
           {isBuffering ? (
@@ -105,7 +105,7 @@ export function VideoControls({
 
   return (
     <div
-      className={`backdrop-blur-md bg-black/60 rounded-2xl border border-white/10 p-4 ${className}`}
+      className={`backdrop-blur-md bg-sunken rounded-[var(--radius-panel)] border border-hairline p-4 ${className}`}
     >
       {/* Progress Bar */}
       {capabilities.canGetDuration && capabilities.canSeek && (
@@ -128,7 +128,7 @@ export function VideoControls({
             onClick={() => onSeek(Math.max(0, currentTime - 10))}
             disabled={!canControl || !capabilities.canSeek}
             aria-label="Skip back 10 seconds"
-            className="h-9 w-9 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="h-9 w-9 rounded-[var(--radius-control)] bg-surface hover:bg-raised border border-hairline flex items-center justify-center text-ink disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             title="Back 10s"
           >
             <SkipBackIcon />
@@ -140,7 +140,7 @@ export function VideoControls({
             onClick={isPlaying ? onPause : onPlay}
             disabled={!canControl}
             aria-label={isPlaying ? "Pause" : "Play"}
-            className="h-11 w-11 rounded-xl bg-white text-slate-900 hover:bg-slate-100 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg"
+            className="h-11 w-11 rounded-[var(--radius-control)] bg-accent text-accent-ink hover:brightness-110 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg"
             title={effectiveDisabledReason || (isPlaying ? "Pause" : "Play")}
           >
             {isBuffering ? (
@@ -160,7 +160,7 @@ export function VideoControls({
             }
             disabled={!canControl || !capabilities.canSeek}
             aria-label="Skip forward 10 seconds"
-            className="h-9 w-9 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="h-9 w-9 rounded-[var(--radius-control)] bg-surface hover:bg-raised border border-hairline flex items-center justify-center text-ink disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             title="Forward 10s"
           >
             <SkipForwardIcon />
@@ -202,7 +202,7 @@ export function VideoControls({
               onClick={() => onSeek(Math.max(0, currentTime - 30))}
               disabled={!canControl || !capabilities.canSeek}
               aria-label="Skip back 30 seconds"
-              className="h-8 px-2.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="h-8 px-2.5 rounded-[var(--radius-control)] bg-surface hover:bg-raised border border-hairline text-ink-muted text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               title="Back 30s"
             >
               -30s
@@ -214,7 +214,7 @@ export function VideoControls({
               }
               disabled={!canControl || !capabilities.canSeek}
               aria-label="Skip forward 30 seconds"
-              className="h-8 px-2.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="h-8 px-2.5 rounded-[var(--radius-control)] bg-surface hover:bg-raised border border-hairline text-ink-muted text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               title="Forward 30s"
             >
               +30s
@@ -230,10 +230,10 @@ export function VideoControls({
                 isTheatreMode ? "Exit theatre mode" : "Enter theatre mode"
               }
               aria-pressed={isTheatreMode ? "true" : "false"}
-              className={`hidden lg:flex h-9 w-9 rounded-lg border items-center justify-center transition-colors ${
+              className={`hidden lg:flex h-9 w-9 rounded-[var(--radius-control)] border items-center justify-center transition-colors ${
                 isTheatreMode
-                  ? "bg-indigo-500/20 border-indigo-500/40 text-indigo-200 hover:bg-indigo-500/30"
-                  : "bg-white/5 hover:bg-white/10 border-white/10 text-slate-200"
+                  ? "bg-indigo-500/20 border-accent text-accent hover:bg-indigo-500/30"
+                  : "bg-surface hover:bg-raised border-hairline text-ink"
               }`}
               title={
                 isTheatreMode
@@ -251,7 +251,7 @@ export function VideoControls({
               type="button"
               onClick={onFullscreen}
               aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-              className="h-9 w-9 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-slate-200 transition-colors"
+              className="h-9 w-9 rounded-[var(--radius-control)] bg-surface hover:bg-raised border border-hairline flex items-center justify-center text-ink transition-colors"
               title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
             >
               {isFullscreen ? <ExitFullscreenIcon /> : <FullscreenIcon />}

@@ -230,10 +230,10 @@ export function FullscreenChatOverlay({
       >
         <div
           ref={fullscreenChatPanelRef}
-          className="rounded-2xl border border-white/10 bg-black/50 backdrop-blur-md overflow-hidden h-full flex flex-col"
+          className="rounded-[var(--radius-panel)] border border-hairline bg-sunken backdrop-blur-md overflow-hidden h-full flex flex-col"
         >
           <div
-            className="px-4 py-3 border-b border-white/10 bg-black/20 flex items-center justify-between select-none cursor-move"
+            className="px-4 py-3 border-b border-hairline bg-sunken flex items-center justify-between select-none cursor-move"
             onPointerDown={(e) => {
               const container = playerContainerRef.current;
               const panel = fullscreenChatPanelRef.current;
@@ -253,11 +253,11 @@ export function FullscreenChatOverlay({
               }
             }}
           >
-            <div className="text-sm font-semibold text-slate-50">Chat</div>
+            <div className="text-sm font-semibold text-ink">Chat</div>
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="h-8 px-3 rounded-xl border border-white/10 bg-white/5 text-slate-100 text-xs font-semibold hover:bg-white/10 transition-colors"
+              className="h-8 px-3 rounded-[var(--radius-control)] border border-hairline bg-surface text-ink text-xs font-semibold hover:bg-raised transition-colors"
             >
               Close
             </button>
@@ -271,16 +271,16 @@ export function FullscreenChatOverlay({
             className="p-3 flex-1 min-h-0 overflow-y-auto space-y-2"
           >
             {messages.length === 0 ? (
-              <div className="text-sm text-slate-500">No messages yet.</div>
+              <div className="text-sm text-ink0">No messages yet.</div>
             ) : (
               messages.map((m, idx) => (
                 <div
                   key={`${idx}:${m.time}:${m.user}`}
-                  className="text-sm text-slate-200"
+                  className="text-sm text-ink"
                 >
-                  <span className="text-slate-400 text-xs mr-2">{m.time}</span>
-                  <strong className="text-slate-50">{m.user}</strong>{" "}
-                  <span className="text-slate-200">{m.msg}</span>
+                  <span className="text-ink-muted text-xs mr-2">{m.time}</span>
+                  <strong className="text-ink">{m.user}</strong>{" "}
+                  <span className="text-ink">{m.msg}</span>
                 </div>
               ))
             )}
@@ -291,7 +291,7 @@ export function FullscreenChatOverlay({
               event.preventDefault();
               if (sendChat(chatText)) setChatText("");
             }}
-            className="p-3 border-t border-white/10 bg-black/20 flex gap-2"
+            className="p-3 border-t border-hairline bg-sunken flex gap-2"
           >
             <input
               type="text"
@@ -299,12 +299,12 @@ export function FullscreenChatOverlay({
               onChange={(e) => setChatText(e.target.value)}
               placeholder={isConnected ? "Type a message..." : "Connecting..."}
               disabled={!isConnected}
-              className="flex-1 h-10 bg-black/30 border border-white/10 rounded-xl px-3 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500/25 focus:border-sky-500/30 transition disabled:opacity-60"
+              className="flex-1 h-10 bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 text-sm text-ink placeholder:text-ink0 focus:outline-none focus:ring-2 focus:ring-sky-500/25 focus:border-sky-500/30 transition disabled:opacity-60"
             />
             <button
               type="submit"
               disabled={!isConnected || !chatText.trim()}
-              className="h-10 px-4 rounded-xl border border-white/10 bg-white/5 text-slate-50 text-sm font-semibold hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="h-10 px-4 rounded-[var(--radius-control)] border border-hairline bg-surface text-ink text-sm font-semibold hover:bg-raised transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Send
             </button>
@@ -339,7 +339,7 @@ export function FullscreenChatOverlay({
             }}
             title="Resize"
           >
-            <div className="w-full h-full rounded border border-white/20 bg-white/10" />
+            <div className="w-full h-full rounded border border-hairline-strong bg-raised" />
           </div>
         </div>
       </div>
