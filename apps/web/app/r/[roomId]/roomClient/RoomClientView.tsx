@@ -148,7 +148,16 @@ export function RoomClientView({
           >
             <PlayerSection {...playerSectionProps} />
           </div>
-          {!isTheatreMode && <CallSidebar {...callSidebarProps} />}
+          {/*
+            Chat-only mode wins over theatre mode here. Theatre hides the call
+            to give the video the whole row, but in chat-only mode there is no
+            video on the row — dropping the call would take the user out of a
+            voice call for a reason that no longer exists, and would leave the
+            column it occupies empty.
+          */}
+          {(!isTheatreMode || isChatOnlyMode) && (
+            <CallSidebar {...callSidebarProps} />
+          )}
           <ActivitySidebar
             {...activitySidebarProps}
             isTheatreMode={isTheatreMode && !isChatOnlyMode}

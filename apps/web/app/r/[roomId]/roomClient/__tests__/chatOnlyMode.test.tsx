@@ -123,6 +123,27 @@ describe("chat-only mode", () => {
     render(<RoomClientView {...baseProps} isChatOnlyMode />);
     expect(screen.getByTestId("call-sidebar")).toBeTruthy();
   });
+
+  it("keeps the call sidebar even when chat-only mode is entered from theatre mode", () => {
+    // Theatre mode hides the call to give the video the whole row. In
+    // chat-only mode there is no video on the row, so dropping the call would
+    // end a voice call for a reason that no longer applies — and would leave
+    // the column it occupies empty.
+    const { rerender } = render(
+      <RoomClientView {...baseProps} isTheatreMode isChatOnlyMode={false} />,
+    );
+    expect(screen.queryByTestId("call-sidebar")).toBeNull();
+
+    rerender(<RoomClientView {...baseProps} isTheatreMode isChatOnlyMode />);
+    expect(screen.getByTestId("call-sidebar")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Show video" })).toBeTruthy();
+
+    // Leaving chat-only mode must hand the row back to theatre mode.
+    rerender(
+      <RoomClientView {...baseProps} isTheatreMode isChatOnlyMode={false} />,
+    );
+    expect(screen.queryByTestId("call-sidebar")).toBeNull();
+  });
 });
 
 describe("ChatModeBar", () => {
