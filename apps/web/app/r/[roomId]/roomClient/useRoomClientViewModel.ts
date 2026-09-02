@@ -39,6 +39,14 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
     () => setIsTheatreMode((value) => !value),
     [],
   );
+  // Chat-only mode is a local view preference. It is never broadcast: one
+  // member hiding the video must not change what anyone else sees, and the
+  // room's playback keeps running for them either way.
+  const [isChatOnlyMode, setIsChatOnlyMode] = useState(false);
+  const toggleChatOnlyMode = useCallback(
+    () => setIsChatOnlyMode((value) => !value),
+    [],
+  );
 
   const [echoCancellationEnabled, setEchoCancellationEnabled] = useState(true);
   const [noiseSuppressionEnabled, setNoiseSuppressionEnabled] = useState(true);
@@ -358,6 +366,8 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
           onSetRoomName: roomState.setRoomName,
           onOpenSettings: () => setIsRoomSettingsOpen(true),
           onOpenTimer: () => setIsTimerOpen(true),
+          isChatOnlyMode,
+          onToggleChatOnlyMode: toggleChatOnlyMode,
           timerWidgetProps,
           authUser,
           onAuthUserChange: setAuthUser,
@@ -563,6 +573,15 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
     wheelPickerModalProps,
     isActivityCollapsed,
     isTheatreMode,
+    isChatOnlyMode,
+    chatModeBarProps: {
+      // Reuses the existing per-user mute override rather than adding a second
+      // audio path: it already silences playback locally without telling the
+      // room, which is exactly what "hide the video but keep it quiet" needs.
+      isMuted: playback.video.effectiveMuted,
+      onToggleMuted: playback.video.toggleLocalMute,
+      onShowVideo: toggleChatOnlyMode,
+    },
     playerSectionProps,
     callSidebarProps,
     activitySidebarProps,
