@@ -90,6 +90,10 @@
   --color-negative-soft: var(--c-negative-soft);
   --color-accent-tint: var(--c-accent-tint);
 
+  --font-sans: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-display), ui-serif, Georgia, serif;
+  --font-mono: var(--font-code), ui-monospace, monospace;
+
   /* One small radius. Pills stay pills, but only for real status. */
   --radius-panel: 10px;
   --radius-control: 8px;
