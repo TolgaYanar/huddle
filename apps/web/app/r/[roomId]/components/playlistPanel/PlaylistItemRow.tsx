@@ -62,7 +62,7 @@ export function PlaylistItemRow({
       >
         <span
           aria-hidden="true"
-          className="shrink-0 text-ink0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
+          className="shrink-0 text-ink-faint opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
         >
           <DragHandleIcon />
         </span>
@@ -99,7 +99,7 @@ export function PlaylistItemRow({
               </span>
             ) : (
               <span
-                className={`${isActive ? "text-sky-400" : "text-ink0 group-hover:text-ink-muted"}`}
+                className={`${isActive ? "text-sky-400" : "text-ink-faint group-hover:text-ink-muted"}`}
               >
                 <PlayIcon />
               </span>
@@ -110,7 +110,7 @@ export function PlaylistItemRow({
         <span className="flex-1 min-w-0">
           <span className="block text-sm text-ink truncate">{item.title}</span>
           {item.duration && (
-            <span className="block text-xs text-ink0">
+            <span className="block text-xs text-ink-faint">
               {formatDuration(item.duration)}
             </span>
           )}
@@ -147,7 +147,7 @@ export function PlaylistItemRow({
         <button
           type="button"
           onClick={onRemove}
-          className="opacity-60 group-hover:opacity-100 group-focus-within:opacity-100 focus:opacity-100 p-1.5 text-ink0 hover:text-red-400 focus-visible:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/70 rounded transition"
+          className="opacity-60 group-hover:opacity-100 group-focus-within:opacity-100 focus:opacity-100 p-1.5 text-ink-faint hover:text-red-400 focus-visible:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/70 rounded transition"
           title="Remove from playlist"
           aria-label="Remove from playlist"
         >

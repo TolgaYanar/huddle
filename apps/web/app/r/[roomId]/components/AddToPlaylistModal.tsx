@@ -160,7 +160,7 @@ export function AddToPlaylistModal({
       <div className="p-4 space-y-4">
         {/* Video URL preview */}
         <div className="bg-sunken rounded-[var(--radius-control)] px-3 py-2">
-          <div className="text-xs text-ink0 truncate">{videoUrl}</div>
+          <div className="text-xs text-ink-faint truncate">{videoUrl}</div>
           {(() => {
             const startTime = getYouTubeStartTime(videoUrl);
             if (startTime && startTime > 0) {
@@ -184,7 +184,7 @@ export function AddToPlaylistModal({
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Enter a custom title..."
-            className="w-full bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2 text-sm text-ink placeholder:text-ink0 focus:outline-none focus:ring-2 focus:ring-sky-500/25 focus:border-sky-500/30"
+            className="w-full bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-sky-500/25 focus:border-sky-500/30"
             autoFocus
           />
         </div>
@@ -197,7 +197,7 @@ export function AddToPlaylistModal({
 
           {playlists.length === 0 && !isCreatingPlaylist ? (
             <div className="text-center py-4">
-              <p className="text-sm text-ink0 mb-2">No playlists yet</p>
+              <p className="text-sm text-ink-faint mb-2">No playlists yet</p>
               <button
                 type="button"
                 onClick={() => setIsCreatingPlaylist(true)}
@@ -222,7 +222,7 @@ export function AddToPlaylistModal({
                     disabled={isAdded}
                     className={`w-full flex items-center gap-3 p-3 rounded-[var(--radius-control)] border transition text-left ${
                       isAdded
-                        ? "bg-emerald-500/10 border-emerald-500/30 cursor-default"
+                        ? "bg-positive-soft border-positive cursor-default"
                         : isSelected
                           ? "bg-accent/20 border-sky-500/30"
                           : "bg-sunken border-hairline hover:bg-surface hover:border-hairline-strong"
@@ -230,16 +230,16 @@ export function AddToPlaylistModal({
                   >
                     <div className="flex-1 min-w-0">
                       <div
-                        className={`text-sm font-medium ${isAdded ? "text-emerald-300" : "text-ink"}`}
+                        className={`text-sm font-medium ${isAdded ? "text-positive" : "text-ink"}`}
                       >
                         {playlist.name}
                       </div>
-                      <div className="text-xs text-ink0">
+                      <div className="text-xs text-ink-faint">
                         {playlist.items.length} items
                       </div>
                     </div>
                     {isAdded && (
-                      <span className="text-emerald-400">
+                      <span className="text-positive">
                         <CheckIcon />
                       </span>
                     )}
@@ -257,7 +257,7 @@ export function AddToPlaylistModal({
                 value={newPlaylistName}
                 onChange={(e) => setNewPlaylistName(e.target.value)}
                 placeholder="New playlist name..."
-                className="w-full bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2 text-sm text-ink placeholder:text-ink0 focus:outline-none focus:ring-2 focus:ring-sky-500/25"
+                className="w-full bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-sky-500/25"
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     handleCreatePlaylist();

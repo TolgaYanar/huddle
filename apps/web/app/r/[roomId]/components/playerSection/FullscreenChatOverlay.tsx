@@ -271,7 +271,7 @@ export function FullscreenChatOverlay({
             className="p-3 flex-1 min-h-0 overflow-y-auto space-y-2"
           >
             {messages.length === 0 ? (
-              <div className="text-sm text-ink0">No messages yet.</div>
+              <div className="text-sm text-ink-faint">No messages yet.</div>
             ) : (
               messages.map((m, idx) => (
                 <div
@@ -299,7 +299,7 @@ export function FullscreenChatOverlay({
               onChange={(e) => setChatText(e.target.value)}
               placeholder={isConnected ? "Type a message..." : "Connecting..."}
               disabled={!isConnected}
-              className="flex-1 h-10 bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 text-sm text-ink placeholder:text-ink0 focus:outline-none focus:ring-2 focus:ring-sky-500/25 focus:border-sky-500/30 transition disabled:opacity-60"
+              className="flex-1 h-10 bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-sky-500/25 focus:border-sky-500/30 transition disabled:opacity-60"
             />
             <button
               type="submit"

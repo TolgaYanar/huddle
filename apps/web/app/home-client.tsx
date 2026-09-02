@@ -113,7 +113,7 @@ export function HomeClient() {
 
   return (
     <div className="relative min-h-screen flex flex-col bg-bg text-ink overflow-x-hidden">
-      <header className="relative z-10 h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8 border-b border-hairline bg-bg/85 backdrop-blur-sm sticky top-0">
+      <header className="relative z-10 h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8 border-b border-hairline bg-bg sticky top-0">
         <div className="font-semibold text-lg sm:text-xl flex items-center gap-2 text-ink tracking-tight group">
           <picture>
             <source srcSet="/favicon.svg?v=2" type="image/svg+xml" />
@@ -133,7 +133,7 @@ export function HomeClient() {
           {user ? (
             <>
               <div className="hidden sm:flex items-center gap-1.5 text-xs border border-hairline bg-sunken rounded-full px-3 py-1 text-ink-muted">
-                <span className="text-ink0">@</span>
+                <span className="text-ink-faint">@</span>
                 <span className="text-ink font-medium">{user.username}</span>
               </div>
               <button
@@ -241,7 +241,7 @@ export function HomeClient() {
                                 )}
                               </div>
                               {r.name && (
-                                <div className="text-xs text-ink0 font-mono truncate">
+                                <div className="text-xs text-ink-faint font-mono truncate">
                                   {r.roomId}
                                 </div>
                               )}
@@ -259,7 +259,7 @@ export function HomeClient() {
                                   Saved
                                 </span>
                               )}
-                              <span className="text-xs text-ink0">
+                              <span className="text-xs text-ink-faint">
                                 {timeAgo(r.visitedAt)}
                               </span>
                               <span className="text-ink-faint group-hover/item:text-ink-muted group-hover/item:translate-x-0.5 transition-all">
@@ -365,7 +365,7 @@ export function HomeClient() {
                   </button>
                 </div>
 
-                <div className="text-xs text-ink0">
+                <div className="text-xs text-ink-faint">
                   Tip: share a room by sending its URL (e.g.{" "}
                   <span className="font-mono">/r/neon-penguin-42</span>). No
                   account required.
@@ -460,18 +460,18 @@ export function HomeClient() {
         </div>
       </main>
 
-      <footer className="py-5 px-6 border-t border-white/5 flex items-center justify-center gap-4 text-xs text-ink0">
+      <footer className="py-5 px-6 border-t border-white/5 flex items-center justify-center gap-4 text-xs text-ink-faint">
         <Link
           href="/privacy"
           className="hover:text-ink-muted transition-colors"
         >
           Privacy Policy
         </Link>
-        <span className="text-slate-700">·</span>
+        <span className="text-ink-faint">·</span>
         <Link href="/terms" className="hover:text-ink-muted transition-colors">
           Terms
         </Link>
-        <span className="text-slate-700">·</span>
+        <span className="text-ink-faint">·</span>
         <span>© {CURRENT_YEAR} WeHuddle</span>
       </footer>
     </div>

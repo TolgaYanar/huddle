@@ -19,9 +19,9 @@ function RoomErrorFallback({
     <div className="min-h-screen flex items-center justify-center bg-bg text-ink p-6">
       <div className="w-full max-w-md rounded-[var(--radius-panel)] border border-hairline bg-surface p-6 flex flex-col gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-[var(--radius-control)] bg-rose-500/15 border border-rose-500/30 flex items-center justify-center shrink-0">
+          <div className="w-9 h-9 rounded-[var(--radius-control)] bg-negative-soft border border-negative flex items-center justify-center shrink-0">
             <svg
-              className="w-5 h-5 text-rose-400"
+              className="w-5 h-5 text-negative"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -43,7 +43,7 @@ function RoomErrorFallback({
           </div>
         </div>
         {process.env.NODE_ENV !== "production" && (
-          <pre className="text-xs text-rose-300 bg-rose-500/5 border border-rose-500/15 rounded-[var(--radius-control)] p-3 overflow-auto max-h-40 whitespace-pre-wrap break-all">
+          <pre className="text-xs text-negative bg-negative/5 border border-rose-500/15 rounded-[var(--radius-control)] p-3 overflow-auto max-h-40 whitespace-pre-wrap break-all">
             {error.message}
           </pre>
         )}

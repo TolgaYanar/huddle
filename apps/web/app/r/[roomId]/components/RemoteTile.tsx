@@ -119,7 +119,7 @@ export function RemoteTile({
           {label}
         </span>
         {speaking && (
-          <span className="text-[11px] px-2 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/20 text-emerald-200">
+          <span className="text-[11px] px-2 py-1 rounded-full bg-positive-soft border border-positive text-positive">
             Speaking
           </span>
         )}
@@ -138,7 +138,7 @@ export function RemoteTile({
             e.stopPropagation();
             void toggleFullscreen();
           }}
-          className="h-9 w-9 inline-flex items-center justify-center rounded-[var(--radius-control)] border border-hairline-strong bg-sunken text-white text-sm hover:bg-raised transition-colors"
+          className="h-9 w-9 inline-flex items-center justify-center rounded-[var(--radius-control)] border border-hairline-strong bg-black/65 text-white text-sm hover:bg-raised transition-colors"
           title="Fullscreen"
           aria-label={`Toggle fullscreen for ${label}`}
         >

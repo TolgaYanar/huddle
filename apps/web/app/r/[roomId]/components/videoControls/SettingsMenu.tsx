@@ -123,15 +123,15 @@ export function SettingsMenu({
           </div>
 
           <div className="px-3 py-2">
-            <div className="text-xs text-ink0">
+            <div className="text-xs text-ink-faint">
               {capabilities.canPlay
                 ? "✓ Playback control"
                 : "✗ No playback control"}
             </div>
-            <div className="text-xs text-ink0">
+            <div className="text-xs text-ink-faint">
               {capabilities.canSeek ? "✓ Seeking" : "✗ No seeking"}
             </div>
-            <div className="text-xs text-ink0">
+            <div className="text-xs text-ink-faint">
               {capabilities.canChangeSpeed
                 ? "✓ Speed control"
                 : "✗ No speed control"}

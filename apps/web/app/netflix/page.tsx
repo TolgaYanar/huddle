@@ -20,7 +20,7 @@ const CURRENT_YEAR = new Date().getFullYear();
 
 export default function NetflixPage() {
   return (
-    <div className="relative min-h-screen flex flex-col bg-linear-to-b from-slate-900 via-slate-950 to-black text-slate-200 overflow-x-hidden">
+    <div className="relative min-h-screen flex flex-col bg-bg text-ink overflow-x-hidden">
       <div
         aria-hidden="true"
         className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
@@ -29,10 +29,10 @@ export default function NetflixPage() {
         <div className="absolute top-1/3 -right-32 w-[28rem] h-[28rem] rounded-full bg-rose-700/15 blur-3xl" />
       </div>
 
-      <header className="h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8 border-b border-white/10 backdrop-blur-xl bg-slate-950/60 sticky top-0 z-50">
+      <header className="h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8 border-b border-hairline backdrop-blur-xl bg-bg/60 sticky top-0 z-50">
         <Link
           href="/"
-          className="font-semibold text-lg sm:text-xl flex items-center gap-2 text-slate-50 tracking-tight"
+          className="font-semibold text-lg sm:text-xl flex items-center gap-2 text-ink tracking-tight"
         >
           <picture>
             <source srcSet="/favicon.svg?v=2" type="image/svg+xml" />
@@ -48,7 +48,7 @@ export default function NetflixPage() {
         </Link>
         <Link
           href="/"
-          className="h-8 px-3 rounded-lg border border-white/10 bg-white/5 text-slate-200 text-xs font-medium hover:bg-white/10 transition-colors inline-flex items-center"
+          className="h-8 px-3 rounded-[var(--radius-control)] border border-hairline bg-surface text-ink text-xs font-medium hover:bg-raised transition-colors inline-flex items-center"
         >
           Back home
         </Link>
@@ -57,7 +57,7 @@ export default function NetflixPage() {
       <main className="flex-1 flex flex-col items-center px-4 sm:px-6 py-10 sm:py-16 gap-12">
         {/* Hero */}
         <div className="w-full max-w-3xl flex flex-col items-center text-center gap-3">
-          <span className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1 rounded-full border border-rose-500/40 bg-rose-500/10 text-rose-200">
+          <span className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1 rounded-full border border-rose-500/40 bg-negative-soft text-rose-200">
             <svg
               className="w-3 h-3"
               viewBox="0 0 24 24"
@@ -68,14 +68,14 @@ export default function NetflixPage() {
             </svg>
             Netflix watch-together
           </span>
-          <h1 className="font-semibold text-slate-50 text-3xl sm:text-4xl lg:text-5xl tracking-tight">
+          <h1 className="font-semibold text-ink text-3xl sm:text-4xl lg:text-5xl tracking-tight">
             Watch Netflix together,
             <br />
             <span className="bg-clip-text bg-linear-to-r from-rose-300 via-rose-400 to-amber-300 text-transparent">
               perfectly in sync.
             </span>
           </h1>
-          <p className="text-sm sm:text-base text-slate-400 max-w-xl">
+          <p className="text-sm sm:text-base text-ink-muted max-w-xl">
             Netflix doesn&rsquo;t allow third-party sites to embed its player —
             so we ship a Chrome extension and an Android app that drive Netflix
             on your own device while keeping playback in sync across the room.
@@ -84,11 +84,11 @@ export default function NetflixPage() {
 
         {/* Two cards: Chrome extension + Android app */}
         <div className="w-full max-w-3xl grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="relative bg-white/5 backdrop-blur-md rounded-2xl border border-white/10 p-5 flex flex-col gap-4">
+          <div className="relative bg-surface backdrop-blur-md rounded-[var(--radius-panel)] border border-hairline p-5 flex flex-col gap-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-[var(--radius-control)] bg-accent/15 border border-indigo-500/30 flex items-center justify-center">
                 <svg
-                  className="w-5 h-5 text-indigo-300"
+                  className="w-5 h-5 text-accent"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -101,20 +101,20 @@ export default function NetflixPage() {
                 </svg>
               </div>
               <div className="flex flex-col">
-                <span className="text-sm font-semibold text-slate-100">
+                <span className="text-sm font-semibold text-ink">
                   Chrome extension
                 </span>
-                <span className="text-xs text-slate-400">
+                <span className="text-xs text-ink-muted">
                   Chrome, Edge, Brave, Arc, Opera
                 </span>
               </div>
             </div>
-            <p className="text-xs text-slate-400 leading-relaxed">
+            <p className="text-xs text-ink-muted leading-relaxed">
               Install once. The extension hooks into netflix.com inside your
               regular browser tab and syncs play/pause/seek to your room over
               the same socket the website uses. Works for Netflix only.
             </p>
-            <ol className="text-xs text-slate-400 leading-relaxed flex flex-col gap-1 list-decimal pl-4">
+            <ol className="text-xs text-ink-muted leading-relaxed flex flex-col gap-1 list-decimal pl-4">
               <li>Install Huddle for Netflix from the Chrome Web Store.</li>
               <li>Create or join a room on wehuddle.tv.</li>
               <li>
@@ -126,7 +126,7 @@ export default function NetflixPage() {
               href="https://chromewebstore.google.com/detail/huddle-for-netflix/mmghgnlloogcifdblldihfmjoefabohc"
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-auto h-10 rounded-xl border border-indigo-500/40 bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-100 text-sm font-medium inline-flex items-center justify-center gap-2 transition-colors"
+              className="mt-auto h-10 rounded-[var(--radius-control)] border border-indigo-500/40 bg-accent/15 hover:bg-accent/25 text-indigo-100 text-sm font-medium inline-flex items-center justify-center gap-2 transition-colors"
             >
               Install from Chrome Web Store
               <svg
@@ -143,9 +143,9 @@ export default function NetflixPage() {
             </a>
           </div>
 
-          <div className="relative bg-white/5 backdrop-blur-md rounded-2xl border border-white/10 p-5 flex flex-col gap-4">
+          <div className="relative bg-surface backdrop-blur-md rounded-[var(--radius-panel)] border border-hairline p-5 flex flex-col gap-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-[var(--radius-control)] bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
                 <svg
                   className="w-5 h-5 text-emerald-300"
                   viewBox="0 0 24 24"
@@ -160,20 +160,20 @@ export default function NetflixPage() {
                 </svg>
               </div>
               <div className="flex flex-col">
-                <span className="text-sm font-semibold text-slate-100">
+                <span className="text-sm font-semibold text-ink">
                   Android app
                 </span>
-                <span className="text-xs text-slate-400">
+                <span className="text-xs text-ink-muted">
                   Phone, tablet, Android TV
                 </span>
               </div>
             </div>
-            <p className="text-xs text-slate-400 leading-relaxed">
+            <p className="text-xs text-ink-muted leading-relaxed">
               Loads Netflix inside the Huddle app&rsquo;s embedded WebView with
               hardware Widevine DRM. You sign into your own Netflix once;
               playback stays in sync with the rest of the room.
             </p>
-            <ol className="text-xs text-slate-400 leading-relaxed flex flex-col gap-1 list-decimal pl-4">
+            <ol className="text-xs text-ink-muted leading-relaxed flex flex-col gap-1 list-decimal pl-4">
               <li>Install the Huddle Android app.</li>
               <li>
                 Tap any wehuddle.tv/r/&hellip; link to open the room in-app.
@@ -184,7 +184,7 @@ export default function NetflixPage() {
             </ol>
             <span
               aria-disabled="true"
-              className="mt-auto h-10 rounded-xl border border-white/10 bg-white/5 text-slate-400 text-sm font-medium inline-flex items-center justify-center gap-2 cursor-default select-none"
+              className="mt-auto h-10 rounded-[var(--radius-control)] border border-hairline bg-surface text-ink-muted text-sm font-medium inline-flex items-center justify-center gap-2 cursor-default select-none"
             >
               Android app — coming soon
             </span>
@@ -193,22 +193,20 @@ export default function NetflixPage() {
 
         {/* FAQ */}
         <div className="w-full max-w-2xl flex flex-col gap-4">
-          <h2 className="text-lg font-semibold text-slate-100">
-            Common questions
-          </h2>
+          <h2 className="text-lg font-semibold text-ink">Common questions</h2>
 
-          <details className="group bg-white/5 rounded-xl border border-white/10 p-4 open:bg-white/[0.07] transition-colors">
-            <summary className="text-sm font-medium text-slate-200 cursor-pointer list-none flex items-center justify-between">
+          <details className="group bg-surface rounded-[var(--radius-control)] border border-hairline p-4 open:bg-white/[0.07] transition-colors">
+            <summary className="text-sm font-medium text-ink cursor-pointer list-none flex items-center justify-between">
               <span>
                 Why can&rsquo;t I just paste a Netflix URL into a room?
               </span>
-              <span className="text-slate-500 group-open:rotate-180 transition-transform">
+              <span className="text-ink-faint group-open:rotate-180 transition-transform">
                 ⌄
               </span>
             </summary>
-            <p className="text-xs text-slate-400 leading-relaxed mt-3">
+            <p className="text-xs text-ink-muted leading-relaxed mt-3">
               Netflix sets{" "}
-              <code className="text-slate-300">X-Frame-Options: DENY</code> on
+              <code className="text-ink-muted">X-Frame-Options: DENY</code> on
               every response, and Widevine DRM is bound to the top-level
               browsing context. Together they make it impossible for any website
               to embed Netflix in an iframe — not WeHuddle, not Teleparty, not
@@ -218,28 +216,28 @@ export default function NetflixPage() {
             </p>
           </details>
 
-          <details className="group bg-white/5 rounded-xl border border-white/10 p-4 open:bg-white/[0.07] transition-colors">
-            <summary className="text-sm font-medium text-slate-200 cursor-pointer list-none flex items-center justify-between">
+          <details className="group bg-surface rounded-[var(--radius-control)] border border-hairline p-4 open:bg-white/[0.07] transition-colors">
+            <summary className="text-sm font-medium text-ink cursor-pointer list-none flex items-center justify-between">
               <span>Do I need a Netflix subscription?</span>
-              <span className="text-slate-500 group-open:rotate-180 transition-transform">
+              <span className="text-ink-faint group-open:rotate-180 transition-transform">
                 ⌄
               </span>
             </summary>
-            <p className="text-xs text-slate-400 leading-relaxed mt-3">
+            <p className="text-xs text-ink-muted leading-relaxed mt-3">
               Yes — everyone in the room signs into their own Netflix account.
               WeHuddle never proxies your account or shares it across users; we
               just keep playback aligned across each viewer&rsquo;s own session.
             </p>
           </details>
 
-          <details className="group bg-white/5 rounded-xl border border-white/10 p-4 open:bg-white/[0.07] transition-colors">
-            <summary className="text-sm font-medium text-slate-200 cursor-pointer list-none flex items-center justify-between">
+          <details className="group bg-surface rounded-[var(--radius-control)] border border-hairline p-4 open:bg-white/[0.07] transition-colors">
+            <summary className="text-sm font-medium text-ink cursor-pointer list-none flex items-center justify-between">
               <span>What about Disney+, HBO Max, Hulu, Apple TV+?</span>
-              <span className="text-slate-500 group-open:rotate-180 transition-transform">
+              <span className="text-ink-faint group-open:rotate-180 transition-transform">
                 ⌄
               </span>
             </summary>
-            <p className="text-xs text-slate-400 leading-relaxed mt-3">
+            <p className="text-xs text-ink-muted leading-relaxed mt-3">
               Same DRM constraint as Netflix, but they each need their own
               integration — different player APIs, different anti-bot detection.
               They&rsquo;re on the roadmap; for now WeHuddle&rsquo;s chat,
@@ -248,14 +246,14 @@ export default function NetflixPage() {
             </p>
           </details>
 
-          <details className="group bg-white/5 rounded-xl border border-white/10 p-4 open:bg-white/[0.07] transition-colors">
-            <summary className="text-sm font-medium text-slate-200 cursor-pointer list-none flex items-center justify-between">
+          <details className="group bg-surface rounded-[var(--radius-control)] border border-hairline p-4 open:bg-white/[0.07] transition-colors">
+            <summary className="text-sm font-medium text-ink cursor-pointer list-none flex items-center justify-between">
               <span>iOS support?</span>
-              <span className="text-slate-500 group-open:rotate-180 transition-transform">
+              <span className="text-ink-faint group-open:rotate-180 transition-transform">
                 ⌄
               </span>
             </summary>
-            <p className="text-xs text-slate-400 leading-relaxed mt-3">
+            <p className="text-xs text-ink-muted leading-relaxed mt-3">
               Not yet — Apple App Store guideline 4.3 / 5.2.1 makes the WebView
               pattern risky to ship. The website + extension work fine on Mac
               browsers and the Android app covers mobile.
@@ -264,14 +262,14 @@ export default function NetflixPage() {
         </div>
       </main>
 
-      <footer className="py-5 px-6 border-t border-white/5 flex items-center justify-center gap-4 text-xs text-slate-500">
+      <footer className="py-5 px-6 border-t border-white/5 flex items-center justify-center gap-4 text-xs text-ink-faint">
         <Link
           href="/privacy"
-          className="hover:text-slate-300 transition-colors"
+          className="hover:text-ink-muted transition-colors"
         >
           Privacy Policy
         </Link>
-        <span className="text-slate-700">·</span>
+        <span className="text-ink-faint">·</span>
         <span>© {CURRENT_YEAR} WeHuddle</span>
       </footer>
     </div>

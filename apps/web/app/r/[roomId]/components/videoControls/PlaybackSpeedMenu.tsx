@@ -61,7 +61,7 @@ export function PlaybackSpeedMenu({
               }`}
             >
               {speed}x{" "}
-              {speed === 1 && <span className="text-ink0">(Normal)</span>}
+              {speed === 1 && <span className="text-ink-faint">(Normal)</span>}
             </button>
           ))}
         </div>

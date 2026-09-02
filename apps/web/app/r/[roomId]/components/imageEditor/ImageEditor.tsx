@@ -281,13 +281,13 @@ export function ImageEditor({ src, onClose, onSave }: ImageEditorProps) {
         <button
           type="button"
           onClick={onClose}
-          className="text-ink0 hover:text-ink text-sm"
+          className="text-ink-faint hover:text-ink text-sm"
         >
           Cancel
         </button>
       </div>
 
-      <p className="text-xs text-ink0 mb-3 leading-relaxed">
+      <p className="text-xs text-ink-faint mb-3 leading-relaxed">
         Click and drag to redact parts of the image. Use this to hide brand
         logos, text, or anything that gives away the answer.
       </p>
@@ -343,10 +343,10 @@ export function ImageEditor({ src, onClose, onSave }: ImageEditorProps) {
         className="rounded-[var(--radius-control)] border border-hairline bg-sunken overflow-hidden flex items-center justify-center min-h-48 select-none"
       >
         {imgState === "loading" && (
-          <div className="text-sm text-ink0 py-8">Loading image…</div>
+          <div className="text-sm text-ink-faint py-8">Loading image…</div>
         )}
         {imgState === "error" && (
-          <div className="text-sm text-rose-400 py-8 text-center px-4">
+          <div className="text-sm text-negative py-8 text-center px-4">
             Couldn&apos;t load that image. Try a different one.
           </div>
         )}
@@ -363,7 +363,7 @@ export function ImageEditor({ src, onClose, onSave }: ImageEditorProps) {
       </div>
 
       {tainted && (
-        <p className="text-xs text-amber-400/80 mt-2">
+        <p className="text-xs text-accent/80 mt-2">
           Heads up: this image source blocks in-browser editing. Pick from AI or
           paste a different URL if you need to redact.
         </p>

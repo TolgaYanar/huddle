@@ -252,7 +252,7 @@ export function WebcamOverlay({
                 style={{ width: thumbWidth, height: thumbHeight }}
               />
               {localUsername && (
-                <span className="absolute bottom-1 left-1 right-1 text-center text-white text-[10px] font-medium leading-tight bg-sunken rounded-md px-1 py-0.5 truncate pointer-events-none">
+                <span className="absolute bottom-1 left-1 right-1 text-center text-white text-[10px] font-medium leading-tight bg-black/65 rounded-md px-1 py-0.5 truncate pointer-events-none">
                   {localUsername}
                 </span>
               )}
@@ -261,7 +261,7 @@ export function WebcamOverlay({
                   type="button"
                   onClick={onCloseLocal}
                   aria-label="Turn off my camera"
-                  className="absolute top-1 right-1 h-6 w-6 rounded-full bg-sunken hover:bg-black/90 text-white text-xs inline-flex items-center justify-center border border-hairline-strong"
+                  className="absolute top-1 right-1 h-6 w-6 rounded-full bg-black/65 hover:bg-black/90 text-white text-xs inline-flex items-center justify-center border border-hairline-strong"
                   title="Turn off my camera"
                 >
                   ✕
@@ -281,7 +281,7 @@ export function WebcamOverlay({
                 style={{ width: thumbWidth, height: thumbHeight }}
               />
               {r.username && (
-                <span className="absolute bottom-1 left-1 right-1 text-center text-white text-[10px] font-medium leading-tight bg-sunken rounded-md px-1 py-0.5 truncate pointer-events-none">
+                <span className="absolute bottom-1 left-1 right-1 text-center text-white text-[10px] font-medium leading-tight bg-black/65 rounded-md px-1 py-0.5 truncate pointer-events-none">
                   {r.username}
                 </span>
               )}
@@ -292,7 +292,7 @@ export function WebcamOverlay({
         <button
           type="button"
           aria-label="Resize camera thumbnails"
-          className="absolute -bottom-1 -right-1 h-7 w-7 rounded-full border border-hairline bg-sunken text-white text-xs inline-flex items-center justify-center cursor-nwse-resize"
+          className="absolute -bottom-1 -right-1 h-7 w-7 rounded-full border border-hairline bg-black/65 text-white text-xs inline-flex items-center justify-center cursor-nwse-resize"
           title="Resize cameras"
           onPointerDown={(e) => {
             if (!active) return;

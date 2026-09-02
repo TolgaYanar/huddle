@@ -63,7 +63,7 @@ export function PasswordModal({
             type="password"
             autoComplete="off"
             autoFocus
-            className="h-12 w-full rounded-[var(--radius-control)] border border-hairline bg-surface px-4 text-base text-ink placeholder:text-ink0 outline-none focus:ring-2 focus:ring-white/10"
+            className="h-12 w-full rounded-[var(--radius-control)] border border-hairline bg-surface px-4 text-base text-ink placeholder:text-ink-faint outline-none focus:ring-2 focus:ring-white/10"
           />
           <div className="mt-4 flex items-center gap-3">
             <button

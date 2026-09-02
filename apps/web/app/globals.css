@@ -24,15 +24,18 @@
 
   --c-ink: #1a1713;
   --c-ink-muted: #554e47;
-  --c-ink-faint: #7a7269;
+  --c-ink-faint: #665e56;
 
   /* Darker on light so text on the accent, and the accent on paper, both pass. */
   --c-accent: #8a4f08;
   --c-accent-soft: #f4e3cb;
   --c-accent-ink: #fffdf9;
 
-  --c-positive: #3f6b3a;
-  --c-negative: #a33b28;
+  --c-positive: #2f5a2b;
+  --c-negative: #8f3320;
+  --c-positive-soft: #e2ecdd;
+  --c-negative-soft: #f6e0da;
+  --c-accent-tint: #f2e6d2;
 
   --grain-opacity: 0.035;
   --scanline-opacity: 0.02;
@@ -50,14 +53,17 @@
 
   --c-ink: #f2ede6;
   --c-ink-muted: #a39a90;
-  --c-ink-faint: #6e665e;
+  --c-ink-faint: #8b8279;
 
   --c-accent: #e8a33d;
   --c-accent-soft: #33261408;
   --c-accent-ink: #12100e;
 
-  --c-positive: #6fa86a;
-  --c-negative: #d4715e;
+  --c-positive: #8ec489;
+  --c-negative: #e4907e;
+  --c-positive-soft: #1b2419;
+  --c-negative-soft: #2a1a16;
+  --c-accent-tint: #2a2015;
 
   --grain-opacity: 0.05;
   --scanline-opacity: 0.035;
@@ -80,6 +86,9 @@
   --color-accent-ink: var(--c-accent-ink);
   --color-positive: var(--c-positive);
   --color-negative: var(--c-negative);
+  --color-positive-soft: var(--c-positive-soft);
+  --color-negative-soft: var(--c-negative-soft);
+  --color-accent-tint: var(--c-accent-tint);
 
   /* One small radius. Pills stay pills, but only for real status. */
   --radius-panel: 10px;

@@ -164,7 +164,7 @@ export function PlaylistPanel({
               <div className="text-sm text-ink line-clamp-2 leading-snug">
                 {activePlaylist.items[currentItemIndex].title}
               </div>
-              <div className="text-xs text-ink0 mt-1">
+              <div className="text-xs text-ink-faint mt-1">
                 {activePlaylist.name}
               </div>
             </div>
@@ -274,11 +274,11 @@ export function PlaylistPanel({
                   {selectedPlaylist.name}
                 </h4>
                 {selectedPlaylist.description && (
-                  <p className="text-xs text-ink0">
+                  <p className="text-xs text-ink-faint">
                     {selectedPlaylist.description}
                   </p>
                 )}
-                <p className="text-xs text-ink0">
+                <p className="text-xs text-ink-faint">
                   {selectedPlaylist.items.length} items
                 </p>
               </div>
@@ -330,7 +330,7 @@ export function PlaylistPanel({
             </div>
 
             {selectedPlaylist.items.length === 0 ? (
-              <div className="text-center text-ink0 py-8 text-sm">
+              <div className="text-center text-ink-faint py-8 text-sm">
                 No videos in this playlist yet.
                 <br />
                 <span className="text-xs">
@@ -372,7 +372,7 @@ export function PlaylistPanel({
         )}
 
         {playlists.length === 0 && !isCreating && (
-          <div className="text-center text-ink0 py-8 text-sm">
+          <div className="text-center text-ink-faint py-8 text-sm">
             No playlists yet.
             <br />
             <button

@@ -33,7 +33,7 @@ export function ChatModeBar({
         <span
           aria-hidden="true"
           className={`h-2.5 w-2.5 rounded-full shrink-0 ${
-            isMuted ? "bg-ink-faint" : "bg-emerald-400"
+            isMuted ? "bg-ink-faint" : "bg-positive"
           }`}
         />
         <div className="min-w-0">

@@ -384,7 +384,7 @@ function CupGameHeader({
     if (game.session.status === "playing")
       return {
         text: "In play",
-        color: "bg-emerald-500/20 text-emerald-300 border-emerald-400/30",
+        color: "bg-positive-soft text-positive border-emerald-400/30",
       };
     return {
       text: "Game over",
@@ -418,21 +418,21 @@ function CupGameHeader({
           <button
             type="button"
             onClick={() => setResetArmed(true)}
-            className="h-8 px-3 text-xs rounded-[var(--radius-control)] border border-rose-400/30 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20"
+            className="h-8 px-3 text-xs rounded-[var(--radius-control)] border border-rose-400/30 bg-negative-soft text-negative hover:bg-negative-soft"
           >
             Reset
           </button>
         )}
         {onReset && resetArmed && (
-          <div className="flex items-center gap-1 rounded-[var(--radius-control)] border border-rose-400/40 bg-rose-500/10 px-2 py-1">
-            <span className="text-[11px] text-rose-200">End this game?</span>
+          <div className="flex items-center gap-1 rounded-[var(--radius-control)] border border-negative bg-negative-soft px-2 py-1">
+            <span className="text-[11px] text-negative">End this game?</span>
             <button
               type="button"
               onClick={() => {
                 onReset();
                 setResetArmed(false);
               }}
-              className="h-6 px-2 text-[11px] rounded-md border border-rose-300/50 bg-rose-500/30 text-white hover:bg-rose-500/50 font-semibold"
+              className="h-6 px-2 text-[11px] rounded-md border border-rose-300/50 bg-negative/30 text-white hover:bg-negative/50 font-semibold"
             >
               Yes
             </button>
@@ -499,7 +499,7 @@ function CupGameLobby(props: CupGamePanelProps) {
           <div className="text-[10px] uppercase tracking-wider text-ink-muted font-semibold mb-1">
             Lives per player
           </div>
-          <div className="text-[10px] text-ink0 mb-1.5">
+          <div className="text-[10px] text-ink-faint mb-1.5">
             Also caps how many spiders each player can hide.
           </div>
           <div className="flex items-center gap-1">
@@ -524,7 +524,7 @@ function CupGameLobby(props: CupGamePanelProps) {
           <div className="text-[10px] uppercase tracking-wider text-ink-muted font-semibold mb-1">
             Board size
           </div>
-          <div className="text-[10px] text-ink0 mb-1.5">
+          <div className="text-[10px] text-ink-faint mb-1.5">
             Larger boards = safer flips, longer games.
           </div>
           <div className="flex items-center gap-1">
@@ -555,7 +555,7 @@ function CupGameLobby(props: CupGamePanelProps) {
           <div className="text-[10px] uppercase tracking-wider text-ink-muted font-semibold mb-1">
             Time per turn
           </div>
-          <div className="text-[10px] text-ink0 mb-1.5">
+          <div className="text-[10px] text-ink-faint mb-1.5">
             Auto-skips slow players. Set to none for casual play.
           </div>
           <div className="flex items-center gap-1">
@@ -586,7 +586,7 @@ function CupGameLobby(props: CupGamePanelProps) {
             turnTimerSeconds: timer,
           })
         }
-        className="h-11 px-4 rounded-[var(--radius-control)] border border-emerald-400/30 bg-emerald-500/15 text-emerald-200 text-sm font-semibold hover:bg-emerald-500/25 transition"
+        className="h-11 px-4 rounded-[var(--radius-control)] border border-emerald-400/30 bg-positive-soft text-positive text-sm font-semibold hover:bg-positive/25 transition"
       >
         Open the table
       </button>
@@ -615,7 +615,7 @@ function LobbyView(props: CupGamePanelProps & { game: CupGameData }) {
           type="button"
           disabled={!canStart}
           onClick={() => props.startCupGamePlacement(game.gameId)}
-          className="h-11 rounded-[var(--radius-control)] border border-emerald-400/30 bg-emerald-500/15 text-emerald-200 text-sm font-semibold hover:bg-emerald-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="h-11 rounded-[var(--radius-control)] border border-emerald-400/30 bg-positive-soft text-positive text-sm font-semibold hover:bg-positive/25 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isCreator
             ? eligible.length < 2
@@ -672,7 +672,7 @@ function ConfigEditor({
         <div className="text-[10px] uppercase tracking-wider text-ink-muted font-semibold mb-1">
           Lives per player
         </div>
-        <div className="text-[10px] text-ink0 mb-1.5">
+        <div className="text-[10px] text-ink-faint mb-1.5">
           Also caps how many spiders each player can hide.
         </div>
         <div className="flex gap-1">
@@ -697,7 +697,7 @@ function ConfigEditor({
         <div className="text-[10px] uppercase tracking-wider text-ink-muted font-semibold mb-1">
           Board size
         </div>
-        <div className="text-[10px] text-ink0 mb-1.5">
+        <div className="text-[10px] text-ink-faint mb-1.5">
           Larger boards = safer flips, longer games.
         </div>
         <div className="flex gap-1">
@@ -723,7 +723,7 @@ function ConfigEditor({
         <div className="text-[10px] uppercase tracking-wider text-ink-muted font-semibold mb-1">
           Time per turn
         </div>
-        <div className="text-[10px] text-ink0 mb-1.5">
+        <div className="text-[10px] text-ink-faint mb-1.5">
           Auto-skips slow players. Set to none for casual play.
         </div>
         <div className="flex gap-1">
@@ -806,8 +806,8 @@ function PlacingView(props: CupGamePanelProps & { game: CupGameData }) {
             }
             className={`h-11 rounded-[var(--radius-control)] text-sm font-semibold border transition ${
               me.isPlacementLocked
-                ? "border-amber-400/40 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20"
-                : "border-emerald-400/30 bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/25"
+                ? "border-amber-400/40 bg-amber-500/10 text-accent hover:bg-amber-500/20"
+                : "border-emerald-400/30 bg-positive-soft text-positive hover:bg-positive/25"
             }`}
           >
             {me.isPlacementLocked ? "Change my spiders" : "Done — I'm ready"}
@@ -974,14 +974,14 @@ function PlayingView(
           }
         />
         {peekResult && (
-          <div className="rounded-[var(--radius-control)] border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200 flex items-center justify-between gap-3">
+          <div className="rounded-[var(--radius-control)] border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-sm text-accent flex items-center justify-between gap-3">
             <span>
               <span className="font-semibold">Peek:</span> Cup #
               {peekResult.cupIndex + 1} hides{" "}
               {peekResult.revealedAs === "spider" ? (
-                <span className="font-semibold text-rose-300">a spider 🕷️</span>
+                <span className="font-semibold text-negative">a spider 🕷️</span>
               ) : (
-                <span className="font-semibold text-emerald-300">
+                <span className="font-semibold text-positive">
                   nothing — empty
                 </span>
               )}
@@ -1036,7 +1036,7 @@ function PlayingView(
             <button
               type="button"
               onClick={() => props.cancelCupGameCard(game.gameId)}
-              className="h-9 rounded-[var(--radius-control)] border border-rose-400/30 bg-rose-500/10 text-rose-300 text-xs font-semibold hover:bg-rose-500/20"
+              className="h-9 rounded-[var(--radius-control)] border border-rose-400/30 bg-negative-soft text-negative text-xs font-semibold hover:bg-negative-soft"
             >
               Cancel card
             </button>
@@ -1101,7 +1101,7 @@ function TurnBanner({
       action = "is choosing where to move it";
     return (
       <div
-        className={`rounded-[var(--radius-control)] border px-4 py-3 ${meta.category === "good" ? "border-emerald-400/30 bg-emerald-500/10" : "border-rose-400/30 bg-rose-500/10"}`}
+        className={`rounded-[var(--radius-control)] border px-4 py-3 ${meta.category === "good" ? "border-emerald-400/30 bg-positive-soft" : "border-rose-400/30 bg-negative-soft"}`}
       >
         <div className="flex items-center gap-3">
           {drawnCard && drawnCard.kind === pending.kind && (
@@ -1179,7 +1179,7 @@ function TurnCountdown({
   const seconds = Math.ceil(remainingMs / 1000);
   return (
     <span
-      className={`text-xs font-mono px-2 py-0.5 rounded-full border ${seconds <= 5 ? "border-rose-400/40 bg-rose-500/10 text-rose-300" : "border-hairline bg-surface text-ink-muted"}`}
+      className={`text-xs font-mono px-2 py-0.5 rounded-full border ${seconds <= 5 ? "border-negative bg-negative-soft text-negative" : "border-hairline bg-surface text-ink-muted"}`}
     >
       ⏱ {seconds}s
     </span>
@@ -1226,7 +1226,7 @@ function CupGrid({
               <button
                 type="button"
                 onClick={() => onRowClick(r)}
-                className="h-12 px-2 rounded-[var(--radius-control)] border border-amber-400/40 bg-amber-500/10 text-amber-200 text-xs font-semibold hover:bg-amber-500/20"
+                className="h-12 px-2 rounded-[var(--radius-control)] border border-amber-400/40 bg-amber-500/10 text-accent text-xs font-semibold hover:bg-amber-500/20"
               >
                 Row {r + 1}
               </button>
@@ -1435,24 +1435,24 @@ function FinishedView(props: CupGamePanelProps & { game: CupGameData }) {
           </div>
           {winner ? (
             <>
-              <div className="text-xl font-bold text-amber-100">
+              <div className="text-xl font-bold text-accent">
                 {winner.username || "Player"} wins!
               </div>
-              <div className="text-xs text-amber-200/80 mt-1">
+              <div className="text-xs text-accent/80 mt-1">
                 Last spider standing.
               </div>
             </>
           ) : drawWinners.length > 1 ? (
             <>
-              <div className="text-xl font-bold text-amber-100">
+              <div className="text-xl font-bold text-accent">
                 Tie: {drawWinners.map((p) => p.username || "Player").join(", ")}
               </div>
-              <div className="text-xs text-amber-200/80 mt-1">
+              <div className="text-xs text-accent/80 mt-1">
                 All spiders found — most lives left.
               </div>
             </>
           ) : (
-            <div className="text-lg font-bold text-amber-100">Game over</div>
+            <div className="text-lg font-bold text-accent">Game over</div>
           )}
         </div>
         <div className="rounded-[var(--radius-control)] border border-hairline bg-surface p-4">
@@ -1474,7 +1474,7 @@ function FinishedView(props: CupGamePanelProps & { game: CupGameData }) {
         <button
           type="button"
           onClick={() => props.resetCupGame(game.gameId)}
-          className="h-11 rounded-[var(--radius-control)] border border-emerald-400/30 bg-emerald-500/15 text-emerald-200 text-sm font-semibold hover:bg-emerald-500/25"
+          className="h-11 rounded-[var(--radius-control)] border border-emerald-400/30 bg-positive-soft text-positive text-sm font-semibold hover:bg-positive/25"
         >
           New game
         </button>

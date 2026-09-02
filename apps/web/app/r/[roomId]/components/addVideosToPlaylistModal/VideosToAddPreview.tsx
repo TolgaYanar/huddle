@@ -52,7 +52,7 @@ export function VideosToAddPreview(props: {
           <button
             type="button"
             onClick={clearAll}
-            className="px-2 py-1 text-xs text-rose-400 hover:text-rose-300 transition"
+            className="px-2 py-1 text-xs text-negative hover:text-negative transition"
           >
             Clear All
           </button>
@@ -116,7 +116,7 @@ export function VideosToAddPreview(props: {
               type="button"
               onClick={() => removeVideo(video.id)}
               aria-label="Remove from list"
-              className="shrink-0 p-1 text-ink-muted hover:text-rose-400 transition"
+              className="shrink-0 p-1 text-ink-muted hover:text-negative transition"
               title="Remove from list"
             >
               <TrashIcon />

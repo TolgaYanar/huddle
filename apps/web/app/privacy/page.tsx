@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { ThemeToggle } from "../components/ThemeToggle";
+
 export const metadata: Metadata = {
   title: "Privacy Policy",
   description:
@@ -12,11 +14,11 @@ export const metadata: Metadata = {
 
 export default function PrivacyPolicyPage() {
   return (
-    <div className="min-h-screen flex flex-col bg-linear-to-b from-slate-900 via-slate-950 to-black text-slate-200">
-      <header className="h-16 flex items-center justify-between px-6 lg:px-8 border-b border-white/10 backdrop-blur-md bg-black/30 sticky top-0 z-50">
+    <div className="min-h-screen flex flex-col bg-bg text-ink">
+      <header className="h-16 flex items-center justify-between px-6 lg:px-8 border-b border-hairline backdrop-blur-md bg-sunken sticky top-0 z-50">
         <Link
           href="/"
-          className="font-semibold text-lg sm:text-xl flex items-center gap-2 text-slate-50 tracking-tight"
+          className="font-semibold text-lg sm:text-xl flex items-center gap-2 text-ink tracking-tight"
         >
           <picture>
             <source srcSet="/favicon.svg?v=2" type="image/svg+xml" />
@@ -32,25 +34,26 @@ export default function PrivacyPolicyPage() {
         </Link>
         <Link
           href="/"
-          className="h-8 px-3 rounded-lg border border-white/10 bg-white/5 text-slate-200 text-xs font-medium hover:bg-white/10 transition-colors flex items-center"
+          className="h-8 px-3 rounded-[var(--radius-control)] border border-hairline bg-surface text-ink text-xs font-medium hover:bg-raised transition-colors flex items-center"
         >
           Back to home
         </Link>
+        <ThemeToggle />
       </header>
 
       <main className="flex-1 mx-auto w-full max-w-3xl px-5 py-12">
         <header className="mb-8">
-          <h1 className="text-3xl font-semibold tracking-tight text-slate-50">
+          <h1 className="text-3xl font-semibold tracking-tight text-ink">
             Privacy Policy
           </h1>
-          <p className="mt-2 text-sm text-slate-400">
+          <p className="mt-2 text-sm text-ink-muted">
             Last updated: 2026-09-01
           </p>
         </header>
 
-        <div className="space-y-8 text-slate-200">
+        <div className="space-y-8 text-ink">
           <section className="space-y-3">
-            <h2 className="text-xl font-semibold text-slate-100">
+            <h2 className="text-xl font-semibold text-ink">
               1) What this product does
             </h2>
             <p>
@@ -64,50 +67,44 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-xl font-semibold text-slate-100">
+            <h2 className="text-xl font-semibold text-ink">
               2) Data we collect and process
             </h2>
             <p>When you use the service, we may process:</p>
             <ul className="list-disc space-y-2 pl-6">
               <li>
-                <span className="font-medium text-slate-100">
-                  Room information
-                </span>{" "}
+                <span className="font-medium text-ink">Room information</span>{" "}
                 (e.g., the Room ID you enter).
               </li>
               <li>
-                <span className="font-medium text-slate-100">
+                <span className="font-medium text-ink">
                   Playback sync events
                 </span>{" "}
                 (e.g., play, pause, seek actions and timestamps).
               </li>
               <li>
-                <span className="font-medium text-slate-100">Page URL</span>{" "}
-                (e.g., a Netflix or Prime Video watch URL) to keep participants
+                <span className="font-medium text-ink">Page URL</span> (e.g., a
+                Netflix or Prime Video watch URL) to keep participants
                 synchronized on the same title.
               </li>
               <li>
-                <span className="font-medium text-slate-100">
-                  Chat messages
-                </span>{" "}
-                you send in a room.
+                <span className="font-medium text-ink">Chat messages</span> you
+                send in a room.
               </li>
               <li>
-                <span className="font-medium text-slate-100">
-                  Account details
-                </span>{" "}
-                if you choose to register: a username and password. Accounts are
+                <span className="font-medium text-ink">Account details</span> if
+                you choose to register: a username and password. Accounts are
                 optional — rooms work without one. Passwords are never stored in
                 plaintext; we store only a salted, hashed value (scrypt) used to
                 verify your login.
               </li>
               <li>
-                <span className="font-medium text-slate-100">Saved rooms</span>{" "}
-                that you bookmark while logged in. These are stored on our
-                servers and tied to your account.
+                <span className="font-medium text-ink">Saved rooms</span> that
+                you bookmark while logged in. These are stored on our servers
+                and tied to your account.
               </li>
               <li>
-                <span className="font-medium text-slate-100">
+                <span className="font-medium text-ink">
                   Content fingerprint
                 </span>{" "}
                 on Prime Video only. Prime’s page address can keep pointing at
@@ -122,7 +119,7 @@ export default function PrivacyPolicyPage() {
                 episode, and it is stored with the room’s playback state.
               </li>
               <li>
-                <span className="font-medium text-slate-100">
+                <span className="font-medium text-ink">
                   Sync quality measurements
                 </span>{" "}
                 — counts of events such as how often playback drifted or a
@@ -133,7 +130,7 @@ export default function PrivacyPolicyPage() {
                 account or billing decisions.
               </li>
               <li>
-                <span className="font-medium text-slate-100">
+                <span className="font-medium text-ink">
                   Voice/video and screen-share connection data
                 </span>
                 . Optional calls and screen sharing use peer-to-peer WebRTC. The
@@ -144,14 +141,12 @@ export default function PrivacyPolicyPage() {
                 one another; this is standard WebRTC behavior.
               </li>
               <li>
-                <span className="font-medium text-slate-100">
-                  Technical data
-                </span>{" "}
+                <span className="font-medium text-ink">Technical data</span>{" "}
                 such as IP address and basic connection metadata for security,
                 abuse prevention, and service reliability.
               </li>
               <li>
-                <span className="font-medium text-slate-100">
+                <span className="font-medium text-ink">
                   Aggregate usage and performance analytics
                 </span>{" "}
                 via Vercel Web Analytics and Speed Insights (e.g., page views,
@@ -161,15 +156,14 @@ export default function PrivacyPolicyPage() {
               </li>
             </ul>
             <p>
-              We do <span className="font-medium text-slate-100">not</span>{" "}
-              collect your streaming service credentials (for example your
-              Netflix or Prime Video username and password) or payment
-              information.
+              We do <span className="font-medium text-ink">not</span> collect
+              your streaming service credentials (for example your Netflix or
+              Prime Video username and password) or payment information.
             </p>
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-xl font-semibold text-slate-100">
+            <h2 className="text-xl font-semibold text-ink">
               3) How we use data
             </h2>
             <p>We use data only to:</p>
@@ -199,7 +193,7 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-xl font-semibold text-slate-100">
+            <h2 className="text-xl font-semibold text-ink">
               4) Data storage and retention
             </h2>
             <ul className="list-disc space-y-2 pl-6">
@@ -234,11 +228,11 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-xl font-semibold text-slate-100">5) Cookies</h2>
+            <h2 className="text-xl font-semibold text-ink">5) Cookies</h2>
             <p>
               When you log in, we set a single first-party,{" "}
-              <span className="font-medium text-slate-100">HttpOnly</span>{" "}
-              session cookie so we can keep you signed in. It is not readable by
+              <span className="font-medium text-ink">HttpOnly</span> session
+              cookie so we can keep you signed in. It is not readable by
               client-side JavaScript and is used only for authentication.
             </p>
             <p>
@@ -249,9 +243,7 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-xl font-semibold text-slate-100">
-              6) Data sharing
-            </h2>
+            <h2 className="text-xl font-semibold text-ink">6) Data sharing</h2>
             <p>
               We do not sell user data. We do not share user data with third
               parties except:
@@ -272,9 +264,7 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-xl font-semibold text-slate-100">
-              7) User controls
-            </h2>
+            <h2 className="text-xl font-semibold text-ink">7) User controls</h2>
             <ul className="list-disc space-y-2 pl-6">
               <li>
                 You can stop data processing by disconnecting or uninstalling
@@ -297,9 +287,7 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-xl font-semibold text-slate-100">
-              8) Security
-            </h2>
+            <h2 className="text-xl font-semibold text-ink">8) Security</h2>
             <p>
               We use reasonable technical measures to protect data in transit
               and at rest. No method of transmission or storage is 100% secure.
@@ -307,7 +295,7 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-xl font-semibold text-slate-100">
+            <h2 className="text-xl font-semibold text-ink">
               9) Children’s privacy
             </h2>
             <p>
@@ -318,9 +306,7 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-xl font-semibold text-slate-100">
-              10) Contact
-            </h2>
+            <h2 className="text-xl font-semibold text-ink">10) Contact</h2>
             <p>
               Questions or requests about this Privacy Policy can be sent to:
             </p>
@@ -328,7 +314,7 @@ export default function PrivacyPolicyPage() {
               <li>
                 Website:{" "}
                 <a
-                  className="text-indigo-300 hover:text-indigo-200 underline-offset-2 hover:underline"
+                  className="text-accent hover:text-accent underline-offset-2 hover:underline"
                   href="https://wehuddle.tv/"
                 >
                   https://wehuddle.tv/
@@ -337,7 +323,7 @@ export default function PrivacyPolicyPage() {
               <li>
                 Email:{" "}
                 <a
-                  className="text-indigo-300 hover:text-indigo-200 underline-offset-2 hover:underline"
+                  className="text-accent hover:text-accent underline-offset-2 hover:underline"
                   href="mailto:support@wehuddle.tv"
                 >
                   support@wehuddle.tv
@@ -348,7 +334,7 @@ export default function PrivacyPolicyPage() {
         </div>
       </main>
 
-      <footer className="py-4 px-6 border-t border-white/5 flex items-center justify-center text-xs text-slate-500">
+      <footer className="py-4 px-6 border-t border-white/5 flex items-center justify-center text-xs text-ink-faint">
         © {new Date().getFullYear()} WeHuddle
       </footer>
     </div>
