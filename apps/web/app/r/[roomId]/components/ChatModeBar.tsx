@@ -24,7 +24,10 @@ export function ChatModeBar({
   return (
     <section
       aria-label="Chat-only mode"
-      className="backdrop-blur-md bg-white/5 rounded-2xl border border-white/10 p-4 sm:p-5 flex flex-wrap items-center gap-3"
+      // Placed explicitly in the column the player used, rather than left to
+      // grid auto-placement, which would drop it into the call sidebar's 280px
+      // column and squash it.
+      className="backdrop-blur-md bg-white/5 rounded-2xl border border-white/10 p-4 sm:p-5 flex flex-wrap items-center gap-3 lg:row-start-1 lg:col-start-2 lg:min-w-0 self-start"
     >
       <div className="flex items-center gap-3 min-w-0 flex-1">
         <span
