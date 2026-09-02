@@ -17,7 +17,7 @@ function RoomErrorFallback({
 }) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-bg text-ink p-6">
-      <div className="w-full max-w-md rounded-[var(--radius-panel)] border border-hairline bg-surface p-6 flex flex-col gap-4">
+      <div className="w-full max-w-md panel p-6 flex flex-col gap-4">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-[var(--radius-control)] bg-negative-soft border border-negative flex items-center justify-center shrink-0">
             <svg

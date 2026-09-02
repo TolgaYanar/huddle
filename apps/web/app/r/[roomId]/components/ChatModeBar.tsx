@@ -27,7 +27,7 @@ export function ChatModeBar({
       // Placed explicitly in the column the player used, rather than left to
       // grid auto-placement, which would drop it into the call sidebar's 280px
       // column and squash it.
-      className="backdrop-blur-md bg-surface rounded-[var(--radius-panel)] border border-hairline p-4 sm:p-5 flex flex-wrap items-center gap-3 lg:row-start-1 lg:col-start-2 lg:min-w-0 self-start"
+      className="panel p-4 sm:p-5 flex flex-wrap items-center gap-3 lg:row-start-1 lg:col-start-2 lg:min-w-0 self-start"
     >
       <div className="flex items-center gap-3 min-w-0 flex-1">
         <span

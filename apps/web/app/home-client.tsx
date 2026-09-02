@@ -194,7 +194,7 @@ export function HomeClient() {
         </div>
 
         <div className="w-full max-w-xl">
-          <div className="relative rounded-[var(--radius-panel)] border border-hairline bg-surface p-5 sm:p-6">
+          <div className="relative panel p-5 sm:p-6">
             <div className="relative">
               <h2 className="font-semibold text-ink text-lg">
                 Start a watch party

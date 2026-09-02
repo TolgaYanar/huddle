@@ -269,7 +269,7 @@ export function ImageEditor({ src, onClose, onSave }: ImageEditorProps) {
       open={Boolean(src)}
       onClose={onClose}
       labelledBy="image-editor-title"
-      panelClassName="w-full max-w-2xl rounded-[var(--radius-panel)] border border-hairline bg-surface p-5 shadow-2xl"
+      panelClassName="w-full max-w-2xl panel p-5 shadow-2xl"
     >
       <div className="flex items-center justify-between mb-4">
         <h2

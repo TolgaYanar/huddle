@@ -233,7 +233,7 @@ export function WheelPickerModal(props: {
               onSpin();
             }}
             disabled={!isConnected || entries.length === 0 || isSpinning}
-            className="h-12 w-full rounded-[var(--radius-panel)] border border-hairline bg-surface text-ink text-base font-semibold hover:bg-raised transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="h-12 w-full panel text-ink text-base font-semibold hover:bg-raised transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSpinning ? "Spinning…" : "Spin"}
           </button>
@@ -284,7 +284,7 @@ export function WheelPickerModal(props: {
             <button
               type="submit"
               disabled={!isConnected || isSpinning || !input.trim()}
-              className="h-12 px-5 rounded-[var(--radius-panel)] border border-hairline bg-surface text-ink text-sm font-semibold hover:bg-raised transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="h-12 px-5 panel text-ink text-sm font-semibold hover:bg-raised transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Add
             </button>

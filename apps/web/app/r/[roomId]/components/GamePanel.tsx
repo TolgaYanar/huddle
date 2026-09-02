@@ -1853,7 +1853,7 @@ function GameLobby({
       {games.length === 0 ? (
         <div className="flex flex-col items-center gap-4 py-6">
           <div className="text-5xl">🔍</div>
-          <div className="w-full rounded-[var(--radius-panel)] border border-hairline bg-surface p-4">
+          <div className="w-full panel p-4">
             <div className="text-sm font-semibold text-ink mb-2">
               How to play
             </div>
