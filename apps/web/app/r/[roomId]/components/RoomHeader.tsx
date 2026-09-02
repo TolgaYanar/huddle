@@ -116,7 +116,9 @@ export function RoomHeader({
               className="h-6 w-6 rounded transition-transform group-hover:scale-110"
             />
           </picture>
-          <span className="hidden sm:inline">WeHuddle</span>
+          <span className="hidden sm:inline font-serif font-normal text-[1.35em] leading-none">
+            WeHuddle
+          </span>
         </Link>
         <span className="hidden sm:inline-flex items-center gap-1.5 text-xs border border-hairline bg-sunken rounded-full px-3 py-1 text-ink-muted min-w-0">
           {editingName ? (

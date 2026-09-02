@@ -30,7 +30,9 @@ export default function PrivacyPolicyPage() {
               className="h-6 w-6 rounded"
             />
           </picture>
-          <span>WeHuddle</span>
+          <span className="font-serif font-normal text-[1.35em] leading-none">
+            WeHuddle
+          </span>
         </Link>
         <Link
           href="/"
@@ -43,7 +45,7 @@ export default function PrivacyPolicyPage() {
 
       <main className="flex-1 mx-auto w-full max-w-3xl px-5 py-12">
         <header className="mb-8">
-          <h1 className="text-3xl font-semibold tracking-tight text-ink">
+          <h1 className="font-serif font-normal text-4xl tracking-[-0.02em] text-ink">
             Privacy Policy
           </h1>
           <p className="mt-2 text-sm text-ink-muted">

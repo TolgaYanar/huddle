@@ -44,7 +44,9 @@ export default function NetflixPage() {
               className="h-6 w-6 rounded"
             />
           </picture>
-          <span>WeHuddle</span>
+          <span className="font-serif font-normal text-[1.35em] leading-none">
+            WeHuddle
+          </span>
         </Link>
         <Link
           href="/"
@@ -68,7 +70,7 @@ export default function NetflixPage() {
             </svg>
             Netflix watch-together
           </span>
-          <h1 className="font-semibold text-ink text-3xl sm:text-4xl lg:text-5xl tracking-tight">
+          <h1 className="font-serif font-normal text-ink text-4xl sm:text-5xl lg:text-6xl tracking-[-0.02em] leading-[1.0]">
             Watch Netflix together,
             <br />
             <span className="bg-clip-text bg-linear-to-r from-rose-300 via-rose-400 to-amber-300 text-transparent">

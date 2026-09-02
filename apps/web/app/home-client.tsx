@@ -125,7 +125,9 @@ export function HomeClient() {
               className="h-6 w-6 rounded transition-transform group-hover:scale-110 group-hover:rotate-6"
             />
           </picture>
-          <span>WeHuddle</span>
+          <span className="font-serif font-normal text-[1.35em] leading-none">
+            WeHuddle
+          </span>
         </div>
 
         <div className="flex items-center gap-2">
@@ -180,7 +182,7 @@ export function HomeClient() {
             />
             No install, no account
           </span>
-          <h1 className="font-semibold text-ink text-4xl sm:text-5xl lg:text-6xl tracking-[-0.03em] leading-[1.05] text-balance">
+          <h1 className="font-serif font-normal text-ink text-5xl sm:text-6xl lg:text-7xl tracking-[-0.02em] leading-[0.98] text-balance">
             Watch together,
             <br />
             in sync to the frame.

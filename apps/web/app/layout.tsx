@@ -1,17 +1,46 @@
 import type { Metadata } from "next";
-import localFont from "next/font/local";
+import {
+  IBM_Plex_Mono,
+  Instrument_Sans,
+  Instrument_Serif,
+} from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
-const geistSans = localFont({
-  src: "./fonts/GeistVF.woff",
-  variable: "--font-geist-sans",
+/*
+ * Geist was loaded here and never applied — the body fell through to the
+ * system stack, so the site had no chosen typeface at all while still paying
+ * to download one.
+ *
+ * Instrument Serif carries the headings: high stroke contrast and sharp
+ * terminals, the register of a title card, which is what this product is for.
+ * Instrument Sans is by the same foundry and drawn to sit with it, so the
+ * pairing is a decision rather than two fonts that happen to coexist. The
+ * serif stays on display sizes only; at 12px its contrast would thin out.
+ */
+const displaySerif = Instrument_Serif({
+  subsets: ["latin"],
+  weight: "400",
+  style: ["normal", "italic"],
+  variable: "--font-display",
+  display: "swap",
 });
-const geistMono = localFont({
-  src: "./fonts/GeistMonoVF.woff",
-  variable: "--font-geist-mono",
+
+const bodySans = Instrument_Sans({
+  subsets: ["latin"],
+  variable: "--font-body",
+  display: "swap",
+});
+
+// Room ids and timers only. Mono here means "this is a literal value you may
+// need to copy or compare", not decoration.
+const codeMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  variable: "--font-code",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -118,7 +147,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} bg-bg text-ink antialiased selection:bg-accent selection:text-accent-ink [font-feature-settings:'ss01','cv02','cv11']`}
+        className={`${bodySans.variable} ${displaySerif.variable} ${codeMono.variable} font-sans bg-bg text-ink antialiased selection:bg-accent selection:text-accent-ink`}
         suppressHydrationWarning
       >
         <ErrorBoundary>{children}</ErrorBoundary>
