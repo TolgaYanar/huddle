@@ -129,7 +129,15 @@ export default function RootLayout({
   };
 
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html
+      lang="en"
+      suppressHydrationWarning
+      // The font variables belong on <html>: Tailwind resolves --font-sans at
+      // :root, so a variable defined one level lower is out of scope there and
+      // every font utility silently falls back to the system stack. The dev
+      // server hid this; only the production build showed it.
+      className={`${bodySans.variable} ${displaySerif.variable} ${codeMono.variable}`}
+    >
       <head>
         {/*
           Runs before first paint so a dark-mode user never sees a white flash.
@@ -147,7 +155,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${bodySans.variable} ${displaySerif.variable} ${codeMono.variable} font-sans bg-bg text-ink antialiased selection:bg-accent selection:text-accent-ink`}
+        className={`font-sans bg-bg text-ink antialiased selection:bg-accent selection:text-accent-ink`}
         suppressHydrationWarning
       >
         <ErrorBoundary>{children}</ErrorBoundary>
