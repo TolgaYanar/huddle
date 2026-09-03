@@ -146,7 +146,7 @@ function ImagePicker({
       } else if (data.error && hits.length === 0) {
         setError("Search failed — try a different query or paste a URL");
       } else if (hits.length === 0) {
-        setError("No images found — try a different name or use ✨ AI");
+        setError("No images found — try a different name, or the AI tab.");
       }
     } catch {
       setError("Search failed — try a different query or paste a URL");
@@ -213,8 +213,8 @@ function ImagePicker({
   };
 
   const tabLabel: Record<Tab, string> = {
-    search: "🔍 Search",
-    ai: "✨ AI",
+    search: "Search",
+    ai: "AI",
     url: "Paste URL",
   };
 
@@ -326,7 +326,7 @@ function ImagePicker({
             <p className="text-xs text-ink-faint leading-relaxed">
               Describe an imaginary scene — &ldquo;red dragon eating ice
               cream&rdquo;. For real-world things (brands, places, people), use
-              the 🔍 Search tab — AI doesn&apos;t reliably draw real logos or
+              the Search tab — AI doesn&apos;t reliably draw real logos or
               famous people.
             </p>
           )}
@@ -369,7 +369,7 @@ function ImagePicker({
           {results.length === 0 && !loading && !error && (
             <p className="text-xs text-ink-faint text-center py-4 leading-relaxed">
               Type a brand, place, or person — we&apos;ll find the canonical
-              picture from Wikipedia. For made-up things use the ✨ AI tab.
+              picture from Wikipedia. For made-up things use the AI tab.
             </p>
           )}
         </>
@@ -871,7 +871,7 @@ function TurnQueue({
       icon = "👁 ";
     } else if (isCurrent) {
       cls += "border-accent bg-accent-soft text-accent ring-2 ring-accent";
-      icon = "🎯 ";
+      icon = "";
     } else if (won) {
       cls += "border-positive bg-positive-soft text-positive";
       icon = "✓ ";
@@ -1088,7 +1088,7 @@ function ActiveRoundView({
             {iAmWinner
               ? "✓ You guessed it! Waiting for others…"
               : isMyTurn
-                ? "🎯 Your turn — type your guess"
+                ? "Your turn — type your guess"
                 : amActiveQuestioner
                   ? `Waiting for ${currentGuesserName} to guess…`
                   : `${currentGuesserName}'s turn`}
@@ -1386,7 +1386,6 @@ function FinalScoreboard({
   return (
     <div className="flex flex-col gap-6 py-2">
       <div className="text-center">
-        <div className="text-4xl mb-2">🏆</div>
         <div className="text-xl font-bold text-ink">Game over!</div>
         <div className="text-sm text-ink-faint mt-1">
           {totalRounds} round{totalRounds !== 1 ? "s" : ""} across{" "}
@@ -1654,7 +1653,7 @@ function GameView({
               : "border-hairline bg-surface text-ink-muted hover:bg-raised"
           }`}
         >
-          {iAmObserver ? "👁 Watch only" : "🎮 Playing"}
+          {iAmObserver ? "Watch only" : "Playing"}
         </button>
       )}
       {canManage && game.status === "active" && (
@@ -1849,7 +1848,6 @@ function GameLobby({
 
       {games.length === 0 ? (
         <div className="flex flex-col items-center gap-4 py-6">
-          <div className="text-5xl">🔍</div>
           <div className="w-full panel p-4">
             <div className="text-sm font-semibold text-ink mb-2">
               How to play

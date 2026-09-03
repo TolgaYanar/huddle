@@ -462,9 +462,6 @@ function CupGameLobby(props: CupGamePanelProps) {
     <div className="flex flex-col gap-5">
       <div className="rounded-[var(--radius-control)] border border-hairline bg-surface p-5">
         <div className="flex items-center gap-3 mb-2">
-          <span className="text-3xl" aria-hidden>
-            🥤
-          </span>
           <div>
             <h3 className="text-lg font-bold text-ink">Cup Spider</h3>
             <p className="text-xs text-ink-muted">
@@ -1429,10 +1426,12 @@ function FinishedView(props: CupGamePanelProps & { game: CupGameData }) {
     <div className="relative grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px] gap-4 lg:gap-5">
       {(winner || drawWinners.length > 0) && <Confetti />}
       <div className="flex flex-col gap-4">
-        <div className="relative overflow-hidden rounded-[var(--radius-control)] border border-amber-400/40 bg-gradient-to-br from-amber-500/15 to-orange-500/10 p-6 text-center">
-          <div className="text-5xl mb-2" aria-hidden>
-            🏆
-          </div>
+        {/*
+          The win state is the one place the accent is allowed to fill a whole
+          panel; it stays a flat tint rather than a gradient so it reads as the
+          same accent used everywhere else.
+        */}
+        <div className="relative overflow-hidden rounded-[var(--radius-control)] border border-accent bg-accent-tint p-6 text-center">
           {winner ? (
             <>
               <div className="text-xl font-bold text-accent">
