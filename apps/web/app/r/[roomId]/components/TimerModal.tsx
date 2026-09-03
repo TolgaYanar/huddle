@@ -149,7 +149,7 @@ export function TimerModal({
             type="button"
             onClick={onStart}
             disabled={!isConnected || displayMs <= 0}
-            className="h-9 px-5 rounded-[var(--radius-control)] border border-accent bg-indigo-500/20 text-accent text-sm font-semibold hover:bg-indigo-500/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="h-9 px-5 rounded-[var(--radius-control)] border border-accent bg-accent-soft text-accent text-sm font-semibold hover:bg-accent-tint transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {status === "paused" ? "Resume" : "Start"}
           </button>
@@ -170,7 +170,7 @@ export function TimerModal({
               disabled={!isConnected}
               className={`h-7 px-3 rounded-[var(--radius-control)] text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
                 durationMs === p.ms
-                  ? "border border-indigo-500/50 bg-indigo-500/20 text-accent"
+                  ? "border border-accent bg-accent-soft text-accent"
                   : "border border-hairline bg-surface text-ink-muted hover:bg-raised"
               }`}
             >
@@ -200,7 +200,7 @@ export function TimerModal({
               }
             }}
             placeholder="e.g. 45"
-            className="flex-1 h-9 rounded-[var(--radius-control)] border border-hairline bg-surface px-3 text-sm text-ink placeholder:text-ink-faint outline-none focus:ring-2 focus:ring-indigo-500/40"
+            className="flex-1 h-9 rounded-[var(--radius-control)] border border-hairline bg-surface px-3 text-sm text-ink placeholder:text-ink-faint outline-none focus:ring-2 focus:ring-accent"
             aria-label="Custom duration in minutes"
           />
           <button
@@ -213,7 +213,7 @@ export function TimerModal({
                 setCustomMin("");
               }
             }}
-            className="h-9 px-3 rounded-[var(--radius-control)] border border-hairline bg-indigo-500/20 text-accent text-sm font-medium hover:bg-indigo-500/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="h-9 px-3 rounded-[var(--radius-control)] border border-accent bg-accent-soft text-accent text-sm font-medium hover:bg-accent-tint transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Set
           </button>

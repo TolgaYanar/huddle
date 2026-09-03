@@ -38,34 +38,36 @@ export default async function OpenGraphImage({
         justifyContent: "space-between",
         padding: 64,
         background:
-          "linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #312e81 100%)",
-        color: "#fff",
+          "linear-gradient(145deg, #12100e 0%, #21170f 66%, #8a4f08 145%)",
+        color: "#f2ede6",
         position: "relative",
       }}
     >
-      {/* Decorative circles */}
+      {/* One projector beam, matching the product surface rather than generic blobs. */}
       <div
         style={{
           position: "absolute",
-          top: -100,
-          right: -100,
-          width: 400,
-          height: 400,
-          borderRadius: "50%",
-          background: "rgba(139, 92, 246, 0.15)",
-          filter: "blur(60px)",
+          top: -180,
+          left: 380,
+          width: 440,
+          height: 820,
+          transform: "rotate(-13deg)",
+          background:
+            "linear-gradient(180deg, rgba(232,163,61,0.22), rgba(232,163,61,0))",
+          opacity: 0.7,
         }}
       />
+      {/* Film perforations are the single recurring brand ornament. */}
       <div
         style={{
           position: "absolute",
-          bottom: -50,
-          left: -50,
-          width: 300,
-          height: 300,
-          borderRadius: "50%",
-          background: "rgba(59, 130, 246, 0.15)",
-          filter: "blur(60px)",
+          top: 46,
+          bottom: 46,
+          left: 24,
+          width: 12,
+          background:
+            "repeating-linear-gradient(to bottom, #8f775d 0px, #8f775d 18px, transparent 18px, transparent 38px)",
+          opacity: 0.7,
         }}
       />
 
@@ -102,11 +104,10 @@ export default async function OpenGraphImage({
           flexDirection: "column",
           gap: 16,
           padding: 32,
-          border: "2px solid rgba(255,255,255,0.2)",
-          borderRadius: 24,
-          background: "rgba(255,255,255,0.08)",
-          backdropFilter: "blur(20px)",
-          boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
+          border: "2px solid #3d362f",
+          borderRadius: 12,
+          background: "#1b1815",
+          boxShadow: "0 12px 32px rgba(0,0,0,0.36)",
           zIndex: 1,
         }}
       >
@@ -127,9 +128,7 @@ export default async function OpenGraphImage({
             fontWeight: 900,
             letterSpacing: -1,
             wordBreak: "break-word",
-            background: "linear-gradient(90deg, #fff 0%, #a78bfa 100%)",
-            backgroundClip: "text",
-            color: "transparent",
+            color: "#e8a33d",
           }}
         >
           {displayRoomId}

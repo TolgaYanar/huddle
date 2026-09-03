@@ -55,9 +55,7 @@ export function PlaybackSpeedMenu({
                 setOpen(false);
               }}
               className={`w-full px-3 py-2 text-left text-sm hover:bg-raised transition-colors ${
-                playbackRate === speed
-                  ? "text-indigo-400 font-medium"
-                  : "text-ink"
+                playbackRate === speed ? "text-accent font-medium" : "text-ink"
               }`}
             >
               {speed}x{" "}

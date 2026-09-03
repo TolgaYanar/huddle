@@ -92,7 +92,7 @@ export function GameModal({
               {title}
             </h2>
             {showActiveBadge && (
-              <p className="text-xs text-sky-400 mt-0.5">Game in progress</p>
+              <p className="text-xs text-accent mt-0.5">Game in progress</p>
             )}
           </div>
         </div>

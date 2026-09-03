@@ -49,7 +49,7 @@ export function PlaylistSettingsForm({
         value={name}
         onChange={(e) => setName(e.target.value)}
         placeholder="Playlist name..."
-        className="w-full bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-sky-500/25"
+        className="w-full bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-accent"
       />
 
       <input
@@ -57,7 +57,7 @@ export function PlaylistSettingsForm({
         value={description}
         onChange={(e) => setDescription(e.target.value)}
         placeholder="Description (optional)..."
-        className="w-full bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-sky-500/25"
+        className="w-full bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-accent"
       />
 
       <div className="space-y-2">
@@ -66,7 +66,7 @@ export function PlaylistSettingsForm({
             type="checkbox"
             checked={loop}
             onChange={(e) => setLoop(e.target.checked)}
-            className="w-4 h-4 rounded bg-sunken border-hairline-strong text-sky-500 focus:ring-sky-500/25"
+            className="w-4 h-4 rounded bg-sunken border-hairline-strong text-accent focus:ring-accent"
           />
           <span className="text-sm text-ink-muted">Loop playlist</span>
         </label>
@@ -76,7 +76,7 @@ export function PlaylistSettingsForm({
             type="checkbox"
             checked={shuffle}
             onChange={(e) => setShuffle(e.target.checked)}
-            className="w-4 h-4 rounded bg-sunken border-hairline-strong text-sky-500 focus:ring-sky-500/25"
+            className="w-4 h-4 rounded bg-sunken border-hairline-strong text-accent focus:ring-accent"
           />
           <span className="text-sm text-ink-muted">Shuffle</span>
         </label>
@@ -86,7 +86,7 @@ export function PlaylistSettingsForm({
             type="checkbox"
             checked={autoPlay}
             onChange={(e) => setAutoPlay(e.target.checked)}
-            className="w-4 h-4 rounded bg-sunken border-hairline-strong text-sky-500 focus:ring-sky-500/25"
+            className="w-4 h-4 rounded bg-sunken border-hairline-strong text-accent focus:ring-accent"
           />
           <span className="text-sm text-ink-muted">Auto-play next</span>
         </label>
@@ -103,7 +103,7 @@ export function PlaylistSettingsForm({
         <button
           type="button"
           onClick={handleSave}
-          className="px-3 py-1.5 text-sm bg-sky-600 hover:bg-accent text-white rounded-[var(--radius-control)] transition"
+          className="px-3 py-1.5 text-sm bg-accent text-accent-ink hover:brightness-110 rounded-[var(--radius-control)] transition"
         >
           Save
         </button>

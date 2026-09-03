@@ -81,7 +81,7 @@ export function PlayerViewport({
   return (
     <div
       className={`w-full aspect-video bg-sunken rounded-[var(--radius-panel)] relative overflow-hidden border border-hairline ${
-        isStageDragOver ? "ring-2 ring-indigo-500/30" : ""
+        isStageDragOver ? "ring-2 ring-accent" : ""
       }`}
       ref={playerContainerRef}
     >

@@ -74,7 +74,7 @@ export function VideoPreviewModal({
               return (
                 <span>
                   Starts at:{" "}
-                  <span className="text-indigo-400 font-semibold">
+                  <span className="text-accent font-semibold">
                     {formatStartTime(startTime)}
                   </span>
                 </span>
@@ -92,7 +92,7 @@ export function VideoPreviewModal({
           <button
             type="button"
             onClick={() => onLoadVideo(videoPreview.url)}
-            className="flex-1 h-11 rounded-[var(--radius-control)] font-semibold text-sm transition-colors bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-50 disabled:hover:bg-indigo-600"
+            className="flex-1 h-11 rounded-[var(--radius-control)] font-semibold text-sm transition bg-accent text-accent-ink hover:brightness-110 disabled:opacity-50"
             disabled={isPreviewLoading}
             autoFocus
           >

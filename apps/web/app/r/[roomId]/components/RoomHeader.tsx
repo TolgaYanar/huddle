@@ -107,9 +107,9 @@ export function RoomHeader({
           className="font-semibold text-lg sm:text-xl flex items-center gap-2 text-ink tracking-tight shrink-0 group"
         >
           <picture>
-            <source srcSet="/favicon.svg?v=2" type="image/svg+xml" />
+            <source srcSet="/favicon.svg?v=3" type="image/svg+xml" />
             <img
-              src="/favicon.svg?v=2"
+              src="/favicon.svg?v=3"
               alt="WeHuddle"
               width={24}
               height={24}
@@ -138,7 +138,7 @@ export function RoomHeader({
               <button
                 type="button"
                 onClick={commitName}
-                className="text-indigo-300 hover:text-accent font-medium"
+                className="text-accent hover:brightness-110 font-medium"
               >
                 Save
               </button>
@@ -288,7 +288,7 @@ export function RoomHeader({
           disabled={passwordRequired}
           className={`h-8 inline-flex items-center gap-1.5 px-2.5 sm:px-3 rounded-[var(--radius-control)] border text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
             isPlaylistOpen
-              ? "border-indigo-500/50 bg-indigo-500/20 text-accent shadow-[0_0_0_1px_rgba(99,102,241,0.2)]"
+              ? "border-accent bg-accent-soft text-accent ring-1 ring-accent"
               : "border-hairline bg-surface text-ink hover:bg-raised"
           }`}
           title={

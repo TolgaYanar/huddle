@@ -56,7 +56,7 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       {
-        url: "/favicon.svg?v=2",
+        url: "/favicon.svg?v=3",
         type: "image/svg+xml",
       },
       // PNG fallback for clients that don't render SVG favicons.
@@ -68,7 +68,7 @@ export const metadata: Metadata = {
     ],
     shortcut: [
       {
-        url: "/favicon.svg?v=2",
+        url: "/favicon.svg?v=3",
         type: "image/svg+xml",
       },
       { url: "/icon-192", type: "image/png", sizes: "192x192" },
@@ -114,7 +114,7 @@ export default function RootLayout({
         "@id": "https://wehuddle.tv/#organization",
         name: "WeHuddle",
         url: "https://wehuddle.tv",
-        logo: "https://wehuddle.tv/favicon.svg",
+        logo: "https://wehuddle.tv/favicon.svg?v=3",
       },
       {
         "@type": "WebSite",

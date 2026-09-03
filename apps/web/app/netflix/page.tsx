@@ -35,9 +35,9 @@ export default function NetflixPage() {
           className="font-semibold text-lg sm:text-xl flex items-center gap-2 text-ink tracking-tight"
         >
           <picture>
-            <source srcSet="/favicon.svg?v=2" type="image/svg+xml" />
+            <source srcSet="/favicon.svg?v=3" type="image/svg+xml" />
             <img
-              src="/favicon.svg?v=2"
+              src="/favicon.svg?v=3"
               alt="WeHuddle"
               width={24}
               height={24}
@@ -88,7 +88,7 @@ export default function NetflixPage() {
         <div className="w-full max-w-3xl grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="relative bg-surface backdrop-blur-md rounded-[var(--radius-panel)] border border-hairline p-5 flex flex-col gap-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-[var(--radius-control)] bg-accent/15 border border-indigo-500/30 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-[var(--radius-control)] bg-accent-soft border border-accent flex items-center justify-center">
                 <svg
                   className="w-5 h-5 text-accent"
                   viewBox="0 0 24 24"
@@ -128,7 +128,7 @@ export default function NetflixPage() {
               href="https://chromewebstore.google.com/detail/huddle-for-netflix/mmghgnlloogcifdblldihfmjoefabohc"
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-auto h-10 rounded-[var(--radius-control)] border border-indigo-500/40 bg-accent/15 hover:bg-accent/25 text-indigo-100 text-sm font-medium inline-flex items-center justify-center gap-2 transition-colors"
+              className="mt-auto h-10 rounded-[var(--radius-control)] border border-accent bg-accent-soft hover:bg-accent-tint text-accent text-sm font-medium inline-flex items-center justify-center gap-2 transition-colors"
             >
               Install from Chrome Web Store
               <svg

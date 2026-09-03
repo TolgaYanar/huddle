@@ -98,7 +98,7 @@ export function SettingsMenu({
               type="checkbox"
               checked={roomAudioSyncEnabled}
               onChange={(e) => onAudioSyncEnabledChange?.(e.target.checked)}
-              className="h-4 w-4 accent-indigo-500"
+              className="h-4 w-4 accent-accent"
             />
           </label>
           {!roomAudioSyncEnabled && (

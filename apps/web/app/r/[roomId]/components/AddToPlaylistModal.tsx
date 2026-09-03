@@ -165,7 +165,7 @@ export function AddToPlaylistModal({
             const startTime = getYouTubeStartTime(videoUrl);
             if (startTime && startTime > 0) {
               return (
-                <div className="text-xs text-indigo-400 mt-1">
+                <div className="text-xs text-accent mt-1">
                   ⏱ Starts at {formatStartTime(startTime)}
                 </div>
               );
@@ -184,7 +184,7 @@ export function AddToPlaylistModal({
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Enter a custom title..."
-            className="w-full bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-sky-500/25 focus:border-sky-500/30"
+            className="w-full bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent"
             autoFocus
           />
         </div>
@@ -201,7 +201,7 @@ export function AddToPlaylistModal({
               <button
                 type="button"
                 onClick={() => setIsCreatingPlaylist(true)}
-                className="text-sm text-sky-400 hover:text-sky-300 transition"
+                className="text-sm text-accent hover:brightness-110 transition"
               >
                 Create your first playlist
               </button>
@@ -224,7 +224,7 @@ export function AddToPlaylistModal({
                       isAdded
                         ? "bg-positive-soft border-positive cursor-default"
                         : isSelected
-                          ? "bg-accent/20 border-sky-500/30"
+                          ? "bg-accent-soft border-accent"
                           : "bg-sunken border-hairline hover:bg-surface hover:border-hairline-strong"
                     }`}
                   >
@@ -257,7 +257,7 @@ export function AddToPlaylistModal({
                 value={newPlaylistName}
                 onChange={(e) => setNewPlaylistName(e.target.value)}
                 placeholder="New playlist name..."
-                className="w-full bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-sky-500/25"
+                className="w-full bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-accent"
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     handleCreatePlaylist();
@@ -276,7 +276,7 @@ export function AddToPlaylistModal({
                   type="button"
                   onClick={handleCreatePlaylist}
                   disabled={!newPlaylistName.trim()}
-                  className="px-3 py-1.5 text-sm bg-sky-600 hover:bg-accent text-white rounded-[var(--radius-control)] transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-3 py-1.5 text-sm bg-accent text-accent-ink hover:brightness-110 rounded-[var(--radius-control)] transition disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Create
                 </button>
@@ -314,7 +314,7 @@ export function AddToPlaylistModal({
             !title.trim() ||
             addedToPlaylists.has(selectedPlaylistId || "")
           }
-          className="px-4 py-2 text-sm bg-sky-600 hover:bg-accent text-white rounded-[var(--radius-control)] transition disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-4 py-2 text-sm bg-accent text-accent-ink hover:brightness-110 rounded-[var(--radius-control)] transition disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Add to Playlist
         </button>

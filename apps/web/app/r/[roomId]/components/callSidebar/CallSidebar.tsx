@@ -43,7 +43,7 @@ function GuestNameEditor({
             type="button"
             onClick={commit}
             disabled={!draft.trim()}
-            className="text-xs text-indigo-400 hover:text-indigo-300 font-medium disabled:opacity-40 shrink-0"
+            className="text-xs text-accent hover:brightness-110 font-medium disabled:opacity-40 shrink-0"
           >
             Save
           </button>
@@ -149,15 +149,15 @@ export const CallSidebar = React.memo(function CallSidebar(
         {isCallCollapsed ? (
           <div className="flex items-center gap-2">
             <span
-              className={`w-2 h-2 rounded-full ${micEnabled ? "bg-sky-400" : "bg-slate-600"}`}
+              className={`w-2 h-2 rounded-full ${micEnabled ? "bg-accent" : "bg-ink-faint"}`}
               title={micEnabled ? "Mic on" : "Mic off"}
             />
             <span
-              className={`w-2 h-2 rounded-full ${camEnabled ? "bg-indigo-400" : "bg-slate-600"}`}
+              className={`w-2 h-2 rounded-full ${camEnabled ? "bg-accent" : "bg-ink-faint"}`}
               title={camEnabled ? "Camera on" : "Camera off"}
             />
             <span
-              className={`w-2 h-2 rounded-full ${screenEnabled ? "bg-negative" : "bg-slate-600"}`}
+              className={`w-2 h-2 rounded-full ${screenEnabled ? "bg-negative" : "bg-ink-faint"}`}
               title={screenEnabled ? "Screen sharing" : "Screen off"}
             />
             <span className="text-xs text-ink-faint">

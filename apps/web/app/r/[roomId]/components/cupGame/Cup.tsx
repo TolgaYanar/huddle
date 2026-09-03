@@ -47,13 +47,13 @@ const ROLE_PALETTE: Record<
     shadow: "rgba(255,140,90,0.55)",
     ring: "0 0 0 2px rgba(255,180,140,0.55), 0 0 22px -4px rgba(255,160,110,0.6)",
   },
-  // Your own hidden spider — purple to remember.
+  // Your own hidden spider — projector amber, distinct from the red cup.
   mineSpider: {
-    top: "#e879f9",
-    bottom: "#7c2d92",
-    rim: "#a02db6",
-    shadow: "rgba(232,121,249,0.45)",
-    ring: "0 0 0 2px rgba(232,121,249,0.55)",
+    top: "#e7a747",
+    bottom: "#8a4f08",
+    rim: "#c56d24",
+    shadow: "rgba(231,167,71,0.45)",
+    ring: "0 0 0 2px rgba(231,167,71,0.55)",
   },
   "placement-empty": {
     top: "#ff8a6b",
@@ -62,11 +62,11 @@ const ROLE_PALETTE: Record<
     shadow: "rgba(0,0,0,0.5)",
   },
   "placement-mine": {
-    top: "#e879f9",
-    bottom: "#7c2d92",
-    rim: "#a02db6",
-    shadow: "rgba(232,121,249,0.5)",
-    ring: "0 0 0 2px rgba(232,121,249,0.6)",
+    top: "#e7a747",
+    bottom: "#8a4f08",
+    rim: "#c56d24",
+    shadow: "rgba(231,167,71,0.5)",
+    ring: "0 0 0 2px rgba(231,167,71,0.6)",
   },
   "placement-disabled": {
     top: "#9aa3b2",
@@ -88,11 +88,11 @@ const ROLE_PALETTE: Record<
     shadow: "rgba(252,211,77,0.4)",
   },
   "relocate-src": {
-    top: "#f0abfc",
-    bottom: "#86198f",
-    rim: "#a21caf",
-    shadow: "rgba(240,171,252,0.6)",
-    ring: "0 0 0 3px rgba(240,171,252,0.7)",
+    top: "#f2c06b",
+    bottom: "#8a4f08",
+    rim: "#c56d24",
+    shadow: "rgba(242,192,107,0.6)",
+    ring: "0 0 0 3px rgba(242,192,107,0.7)",
   },
   "relocate-dst-eligible": {
     top: "#86efac",
