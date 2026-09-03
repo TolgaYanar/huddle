@@ -117,12 +117,12 @@ export function RoomSettingsPanel({
                 }}
                 maxLength={40}
                 placeholder="No name set"
-                className="flex-1 h-9 rounded-[var(--radius-control)] border border-hairline bg-surface px-3 text-sm text-ink placeholder:text-ink-faint outline-none focus:ring-2 focus:ring-indigo-500/40"
+                className="flex-1 h-9 rounded-[var(--radius-control)] border border-hairline bg-surface px-3 text-sm text-ink placeholder:text-ink-faint outline-none focus:ring-2 focus:ring-accent"
               />
               <button
                 type="button"
                 onClick={() => onSetRoomName(nameInput.trim())}
-                className="h-9 px-3 rounded-[var(--radius-control)] border border-hairline bg-indigo-500/20 text-accent text-sm font-medium hover:bg-indigo-500/30 transition-colors"
+                className="h-9 px-3 rounded-[var(--radius-control)] border border-accent bg-accent-soft text-accent text-sm font-medium hover:bg-accent-tint transition-colors"
               >
                 Save
               </button>
@@ -169,7 +169,7 @@ export function RoomSettingsPanel({
                   placeholder={
                     hasRoomPassword ? "New password…" : "Set a password…"
                   }
-                  className="w-full h-9 rounded-[var(--radius-control)] border border-hairline bg-surface px-3 pr-10 text-sm text-ink placeholder:text-ink-faint outline-none focus:ring-2 focus:ring-indigo-500/40"
+                  className="w-full h-9 rounded-[var(--radius-control)] border border-hairline bg-surface px-3 pr-10 text-sm text-ink placeholder:text-ink-faint outline-none focus:ring-2 focus:ring-accent"
                 />
                 <PasswordToggleButton
                   show={showPassword}
@@ -183,7 +183,7 @@ export function RoomSettingsPanel({
                   onSetRoomPassword(passwordInput.trim());
                   setPasswordInput("");
                 }}
-                className="h-9 px-3 rounded-[var(--radius-control)] border border-hairline bg-indigo-500/20 text-accent text-sm font-medium hover:bg-indigo-500/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                className="h-9 px-3 rounded-[var(--radius-control)] border border-accent bg-accent-soft text-accent text-sm font-medium hover:bg-accent-tint transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Set
               </button>
@@ -215,7 +215,7 @@ export function RoomSettingsPanel({
                 <span className="flex-1 text-sm text-ink truncate">
                   {getDisplayName(userId)}
                 </span>
-                <span className="text-xs text-indigo-300 font-medium">
+                <span className="text-xs text-accent font-medium">
                   You · Host
                 </span>
               </li>
@@ -228,9 +228,7 @@ export function RoomSettingsPanel({
                   <span className="flex-1 text-sm text-ink truncate">
                     {getDisplayName(id)}
                     {id === hostId && (
-                      <span className="ml-1.5 text-xs text-indigo-300">
-                        Host
-                      </span>
+                      <span className="ml-1.5 text-xs text-accent">Host</span>
                     )}
                   </span>
 
@@ -244,7 +242,7 @@ export function RoomSettingsPanel({
                           setConfirmTransfer(null);
                           onClose();
                         }}
-                        className="text-xs text-indigo-300 hover:text-accent font-medium"
+                        className="text-xs text-accent hover:brightness-110 font-medium"
                       >
                         Yes
                       </button>
@@ -285,7 +283,7 @@ export function RoomSettingsPanel({
                           setConfirmKick(null);
                           setConfirmTransfer(id);
                         }}
-                        className="h-6 px-2 rounded-md text-xs text-indigo-300 hover:bg-accent-soft transition-colors"
+                        className="h-6 px-2 rounded-md text-xs text-accent hover:bg-accent-soft transition-colors"
                         title="Make host"
                       >
                         Host

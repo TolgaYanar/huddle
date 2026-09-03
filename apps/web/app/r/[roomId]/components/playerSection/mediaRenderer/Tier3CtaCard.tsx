@@ -113,7 +113,7 @@ export function Tier3CtaCard({
             href="https://chromewebstore.google.com/detail/huddle-for-netflix/mmghgnlloogcifdblldihfmjoefabohc"
             target="_blank"
             rel="noopener noreferrer"
-            className="h-10 rounded-[var(--radius-control)] border border-accent bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-100 text-sm font-medium inline-flex items-center justify-center gap-2 transition-colors"
+            className="h-10 rounded-[var(--radius-control)] border border-accent bg-accent-soft hover:bg-accent-tint text-accent text-sm font-medium inline-flex items-center justify-center gap-2 transition-colors"
           >
             <svg
               className="w-4 h-4"

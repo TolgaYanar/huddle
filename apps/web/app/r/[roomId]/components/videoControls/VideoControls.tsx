@@ -232,7 +232,7 @@ export function VideoControls({
               aria-pressed={isTheatreMode ? "true" : "false"}
               className={`hidden lg:flex h-9 w-9 rounded-[var(--radius-control)] border items-center justify-center transition-colors ${
                 isTheatreMode
-                  ? "bg-indigo-500/20 border-accent text-accent hover:bg-indigo-500/30"
+                  ? "bg-accent-soft border-accent text-accent hover:bg-accent-tint"
                   : "bg-surface hover:bg-raised border-hairline text-ink"
               }`}
               title={

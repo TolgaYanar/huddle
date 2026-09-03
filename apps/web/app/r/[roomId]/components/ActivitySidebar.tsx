@@ -40,7 +40,7 @@ const VISIBLE_LOG_PAGE_SIZE = 100;
 
 /*
  * One hue per event type was a palette, not a signal: violet, indigo and red
- * meant nothing to a reader, and `text-violet-400` measured 1.28:1 on the dark
+ * meant nothing to a reader, and the old violet measured 1.28:1 on the dark
  * surface. The icon already names the event, so colour is reserved for the
  * three states that actually differ — good, bad, and everything else.
  */
@@ -66,12 +66,12 @@ const EVENT_ICONS: Record<string, string> = {
 
 function userColor(name: string): string {
   const palette = [
-    "bg-sky-600/60 text-sky-100",
-    "bg-violet-600/60 text-violet-100",
-    "bg-emerald-600/60 text-emerald-100",
-    "bg-rose-600/60 text-rose-100",
-    "bg-amber-600/60 text-accent",
-    "bg-indigo-600/60 text-indigo-100",
+    "bg-[#604531] text-[#fff3da]",
+    "bg-[#76572a] text-[#fff3da]",
+    "bg-[#4f5841] text-[#f2ede6]",
+    "bg-[#70443b] text-[#fff3da]",
+    "bg-[#59605a] text-[#f2ede6]",
+    "bg-[#684d45] text-[#fff3da]",
   ];
   let h = 0;
   for (let i = 0; i < name.length; i++)
@@ -104,7 +104,7 @@ const ChatComposer = React.memo(function ChatComposer({
         onChange={(event) => setChatText(event.target.value)}
         placeholder={isConnected ? "Type a message…" : "Connecting…"}
         disabled={!isConnected}
-        className="flex-1 bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-sky-500/25 focus:border-sky-500/30 transition disabled:opacity-60"
+        className="flex-1 bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition disabled:opacity-60"
       />
       <button
         type="submit"
@@ -269,7 +269,7 @@ export const ActivitySidebar = React.memo(function ActivitySidebar(props: {
               >
                 Games
                 {hasActiveGame && activeTab !== "games" && (
-                  <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-sky-400" />
+                  <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-accent" />
                 )}
               </button>
             </div>
@@ -314,7 +314,7 @@ export const ActivitySidebar = React.memo(function ActivitySidebar(props: {
               <button
                 type="button"
                 onClick={showEarlierLogs}
-                className="mx-auto mb-3 rounded-[var(--radius-control)] border border-hairline bg-surface px-3 py-1.5 text-xs font-medium text-ink-muted transition-colors hover:bg-raised hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+                className="mx-auto mb-3 rounded-[var(--radius-control)] border border-hairline bg-surface px-3 py-1.5 text-xs font-medium text-ink-muted transition-colors hover:bg-raised hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
               >
                 Show {Math.min(VISIBLE_LOG_PAGE_SIZE, firstVisibleLogIndex)}
                 {" earlier messages"}
@@ -423,7 +423,7 @@ export const ActivitySidebar = React.memo(function ActivitySidebar(props: {
                             onClick={() => setActiveReactionMsgId(log.id!)}
                             aria-label={`Add reaction to message from ${log.user}`}
                             aria-expanded={activeReactionMsgId === log.id}
-                            className="absolute -top-7 right-0 h-6 min-w-6 rounded-full border border-hairline bg-raised/95 px-1 text-xs text-ink-muted opacity-60 shadow-lg transition hover:opacity-100 focus:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+                            className="absolute -top-7 right-0 h-6 min-w-6 rounded-full border border-hairline bg-raised/95 px-1 text-xs text-ink-muted opacity-60 shadow-lg transition hover:opacity-100 focus:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                           >
                             <span aria-hidden="true">☺+</span>
                           </button>
@@ -445,7 +445,7 @@ export const ActivitySidebar = React.memo(function ActivitySidebar(props: {
                                   closeReactionPicker(log.id!);
                                 }}
                                 aria-label={`React with ${emoji}`}
-                                className="text-sm leading-none hover:scale-125 active:scale-110 transition-transform px-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 rounded"
+                                className="text-sm leading-none hover:scale-125 active:scale-110 transition-transform px-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
                                 title={emoji}
                               >
                                 {emoji}
@@ -471,7 +471,7 @@ export const ActivitySidebar = React.memo(function ActivitySidebar(props: {
                                   aria-label={`React with ${emoji}; ${userIds.length} ${userIds.length === 1 ? "reaction" : "reactions"}`}
                                   className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border transition-colors ${
                                     isMine
-                                      ? "bg-accent/20 border-sky-500/40 text-sky-200 hover:bg-accent/30"
+                                      ? "bg-accent-soft border-accent text-accent hover:bg-accent-tint"
                                       : "bg-surface border-hairline text-ink-muted hover:bg-raised"
                                   }`}
                                 >
@@ -539,16 +539,16 @@ export const ActivitySidebar = React.memo(function ActivitySidebar(props: {
                   <span className="text-3xl">{g.emoji}</span>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-ink group-hover:text-white">
+                      <span className="text-sm font-semibold text-ink group-hover:text-accent">
                         {g.name}
                       </span>
                       {g.id === "guess-it" && hasActiveGame && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-sky-600/30 text-sky-300 border border-sky-600/30">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-accent-soft text-accent border border-accent">
                           Active
                         </span>
                       )}
                       {g.id === "cup-spider" && hasActiveCupGame && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-fuchsia-600/30 text-fuchsia-300 border border-fuchsia-600/30">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-negative-soft text-negative border border-negative">
                           Active
                         </span>
                       )}

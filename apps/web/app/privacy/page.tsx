@@ -21,9 +21,9 @@ export default function PrivacyPolicyPage() {
           className="font-semibold text-lg sm:text-xl flex items-center gap-2 text-ink tracking-tight"
         >
           <picture>
-            <source srcSet="/favicon.svg?v=2" type="image/svg+xml" />
+            <source srcSet="/favicon.svg?v=3" type="image/svg+xml" />
             <img
-              src="/favicon.svg?v=2"
+              src="/favicon.svg?v=3"
               alt="WeHuddle"
               width={24}
               height={24}

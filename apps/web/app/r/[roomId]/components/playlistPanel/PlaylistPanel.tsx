@@ -142,7 +142,7 @@ export function PlaylistPanel({
       </div>
 
       {activePlaylist && activePlaylist.items[currentItemIndex] && (
-        <div className="p-3 bg-linear-to-r from-sky-500/10 to-purple-500/10 border-b border-hairline">
+        <div className="p-3 bg-accent-tint border-b border-hairline">
           <div className="text-xs text-ink-muted uppercase tracking-wider mb-2">
             Now Playing
           </div>
@@ -191,13 +191,13 @@ export function PlaylistPanel({
             </button>
             <div className="flex-1" />
             <span
-              className={`p-1 rounded ${activePlaylist.settings.loop ? "text-sky-400" : "text-ink-faint"}`}
+              className={`p-1 rounded ${activePlaylist.settings.loop ? "text-accent" : "text-ink-faint"}`}
               title="Loop"
             >
               <LoopIcon />
             </span>
             <span
-              className={`p-1 rounded ${activePlaylist.settings.shuffle ? "text-sky-400" : "text-ink-faint"}`}
+              className={`p-1 rounded ${activePlaylist.settings.shuffle ? "text-accent" : "text-ink-faint"}`}
               title="Shuffle"
             >
               <ShuffleIcon />
@@ -215,13 +215,13 @@ export function PlaylistPanel({
             aria-pressed={selectedPlaylistId === playlist.id ? "true" : "false"}
             className={`px-3 py-1.5 text-sm rounded-[var(--radius-control)] whitespace-nowrap transition ${
               selectedPlaylistId === playlist.id
-                ? "bg-accent/20 text-sky-300 border border-sky-500/30"
+                ? "bg-accent-soft text-accent border border-accent"
                 : "text-ink-muted hover:text-ink hover:bg-surface"
             }`}
           >
             {playlist.name}
             {playlist.id === activePlaylistId && (
-              <span className="ml-1 text-xs text-sky-400" aria-label="Active">
+              <span className="ml-1 text-xs text-accent" aria-label="Active">
                 ●
               </span>
             )}
@@ -288,7 +288,7 @@ export function PlaylistPanel({
                     <button
                       type="button"
                       onClick={() => onSetActive(selectedPlaylistId)}
-                      className="px-2 py-1 text-xs bg-sky-600 hover:bg-accent text-white rounded-[var(--radius-control)] transition"
+                      className="px-2 py-1 text-xs bg-accent text-accent-ink hover:brightness-110 rounded-[var(--radius-control)] transition"
                     >
                       Set Active
                     </button>
@@ -310,7 +310,7 @@ export function PlaylistPanel({
                 <button
                   type="button"
                   onClick={onOpenAddVideos}
-                  className="flex-1 p-2 text-sm text-ink bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 hover:border-indigo-500/50 rounded-[var(--radius-control)] transition flex items-center justify-center gap-2"
+                  className="flex-1 p-2 text-sm text-accent bg-accent-soft hover:bg-accent-tint border border-accent rounded-[var(--radius-control)] transition flex items-center justify-center gap-2"
                 >
                   <PlusIcon />
                   Add Videos
@@ -378,7 +378,7 @@ export function PlaylistPanel({
             <button
               type="button"
               onClick={() => setIsCreating(true)}
-              className="text-sky-400 hover:text-sky-300 mt-2 transition"
+              className="text-accent hover:brightness-110 mt-2 transition"
             >
               Create your first playlist
             </button>

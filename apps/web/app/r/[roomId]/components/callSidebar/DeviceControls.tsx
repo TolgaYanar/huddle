@@ -138,7 +138,7 @@ export function DeviceControls(props: {
           aria-label={micEnabled ? "Turn off microphone" : "Turn on microphone"}
           className={`flex flex-col items-center justify-center gap-1 py-2.5 rounded-[var(--radius-control)] border text-xs font-medium transition-colors ${
             micEnabled
-              ? "bg-accent/15 border-sky-500/30 text-sky-300"
+              ? "bg-accent-soft border-accent text-accent"
               : "bg-sunken border-hairline text-ink-muted hover:bg-surface hover:text-ink"
           }`}
           title={micEnabled ? "Turn off microphone" : "Turn on microphone"}
@@ -158,7 +158,7 @@ export function DeviceControls(props: {
           aria-label={camEnabled ? "Turn off camera" : "Turn on camera"}
           className={`flex flex-col items-center justify-center gap-1 py-2.5 rounded-[var(--radius-control)] border text-xs font-medium transition-colors ${
             camEnabled
-              ? "bg-indigo-500/15 border-indigo-500/30 text-indigo-300"
+              ? "bg-accent-soft border-accent text-accent"
               : "bg-sunken border-hairline text-ink-muted hover:bg-surface hover:text-ink"
           }`}
           title={camEnabled ? "Turn off camera" : "Turn on camera"}

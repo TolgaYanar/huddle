@@ -105,7 +105,7 @@ export function ProgressBar({
         aria-valuetext={`${formatTime(safeCurrentTime)} of ${formatTime(duration)}`}
         aria-disabled={!seekEnabled}
         tabIndex={seekEnabled ? 0 : -1}
-        className={`relative h-1.5 bg-hairline-strong rounded-full group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-4 focus-visible:ring-offset-slate-900 ${seekEnabled ? "cursor-pointer" : "cursor-not-allowed opacity-60"}`}
+        className={`relative h-1.5 bg-hairline-strong rounded-full group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-4 focus-visible:ring-offset-sunken ${seekEnabled ? "cursor-pointer" : "cursor-not-allowed opacity-60"}`}
         onClick={handleProgressClick}
         onKeyDown={handleProgressKeyDown}
         onMouseMove={handleProgressHover}

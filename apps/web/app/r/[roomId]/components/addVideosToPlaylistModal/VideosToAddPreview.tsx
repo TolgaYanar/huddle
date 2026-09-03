@@ -64,7 +64,7 @@ export function VideosToAddPreview(props: {
             key={video.id}
             className={`flex items-center gap-3 p-2 rounded-[var(--radius-control)] border transition ${
               video.selected
-                ? "border-indigo-500/50 bg-accent-soft"
+                ? "border-accent bg-accent-soft"
                 : "border-hairline bg-sunken opacity-60"
             }`}
           >
@@ -75,7 +75,7 @@ export function VideosToAddPreview(props: {
               aria-pressed={video.selected ? "true" : "false"}
               className={`shrink-0 w-5 h-5 rounded border flex items-center justify-center transition ${
                 video.selected
-                  ? "bg-indigo-600 border-indigo-600 text-white"
+                  ? "bg-accent border-accent text-accent-ink"
                   : "border-hairline-strong hover:border-white/40"
               }`}
             >
@@ -103,7 +103,7 @@ export function VideosToAddPreview(props: {
                 const startTime = getYouTubeStartTime(video.url);
                 if (startTime && startTime > 0) {
                   return (
-                    <span className="text-[10px] text-indigo-400 px-1">
+                    <span className="text-[10px] text-accent px-1">
                       ⏱ {formatStartTime(startTime)}
                     </span>
                   );

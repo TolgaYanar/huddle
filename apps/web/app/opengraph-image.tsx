@@ -19,7 +19,8 @@ export default function OpenGraphImage() {
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)",
+        background:
+          "linear-gradient(145deg, #12100e 0%, #21170f 62%, #8a4f08 140%)",
       }}
     >
       <div style={{ display: "flex", marginBottom: 20 }}>
@@ -29,7 +30,8 @@ export default function OpenGraphImage() {
         style={{
           fontSize: 72,
           fontWeight: "bold",
-          color: "white",
+          color: "#f2ede6",
+          letterSpacing: -2,
         }}
       >
         WeHuddle

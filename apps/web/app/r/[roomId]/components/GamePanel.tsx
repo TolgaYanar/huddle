@@ -78,9 +78,7 @@ function ImageResultCell({
       onClick={onSelect}
       title={img.title}
       className={`group relative flex items-center justify-center h-24 rounded-[var(--radius-control)] overflow-hidden border-2 transition-colors bg-white ${
-        selected
-          ? "border-sky-400"
-          : "border-transparent hover:border-sky-400/50"
+        selected ? "border-accent" : "border-transparent hover:border-accent"
       }`}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -252,13 +250,13 @@ function ImagePicker({
               onKeyDown={(e) => e.key === "Enter" && generate()}
               placeholder="Describe the image — e.g. red dragon eating ice cream"
               maxLength={240}
-              className="flex-1 bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-sky-500/25"
+              className="flex-1 bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-accent"
             />
             <button
               type="button"
               onClick={generate}
               disabled={aiLoading || !aiPrompt.trim()}
-              className="px-4 py-2 rounded-[var(--radius-control)] bg-sky-600 text-white text-sm font-medium hover:bg-accent transition-colors disabled:opacity-50"
+              className="px-4 py-2 rounded-[var(--radius-control)] bg-accent text-accent-ink text-sm font-medium hover:brightness-110 transition disabled:opacity-50"
             >
               {aiLoading ? "…" : "Generate"}
             </button>
@@ -270,7 +268,7 @@ function ImagePicker({
               aria-live="polite"
             >
               <svg
-                className="w-7 h-7 animate-spin text-sky-400"
+                className="w-7 h-7 animate-spin text-accent"
                 viewBox="0 0 24 24"
                 aria-hidden
               >
@@ -317,7 +315,7 @@ function ImagePicker({
                 <button
                   type="button"
                   onClick={() => onSelect(aiResult)}
-                  className="flex-1 px-3 py-2 rounded-[var(--radius-control)] bg-sky-600 text-white text-sm font-semibold hover:bg-accent transition-colors"
+                  className="flex-1 px-3 py-2 rounded-[var(--radius-control)] bg-accent text-accent-ink text-sm font-semibold hover:brightness-110 transition"
                 >
                   Use this image
                 </button>
@@ -344,13 +342,13 @@ function ImagePicker({
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && search()}
               placeholder="Brand, place, or person — e.g. Hyundai, Eiffel Tower"
-              className="flex-1 bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-sky-500/25"
+              className="flex-1 bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-accent"
             />
             <button
               type="button"
               onClick={search}
               disabled={loading || !query.trim()}
-              className="px-4 py-2 rounded-[var(--radius-control)] bg-sky-600 text-white text-sm font-medium hover:bg-accent transition-colors disabled:opacity-50"
+              className="px-4 py-2 rounded-[var(--radius-control)] bg-accent text-accent-ink text-sm font-medium hover:brightness-110 transition disabled:opacity-50"
             >
               {loading ? "…" : "Search"}
             </button>
@@ -386,13 +384,13 @@ function ImagePicker({
               onChange={(e) => setUrlInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && applyUrl()}
               placeholder="https://example.com/image.jpg"
-              className="flex-1 bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-sky-500/25"
+              className="flex-1 bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-accent"
             />
             <button
               type="button"
               onClick={applyUrl}
               disabled={!urlInput.trim()}
-              className="px-4 py-2 rounded-[var(--radius-control)] bg-sky-600 text-white text-sm font-medium hover:bg-accent transition-colors disabled:opacity-50"
+              className="px-4 py-2 rounded-[var(--radius-control)] bg-accent text-accent-ink text-sm font-medium hover:brightness-110 transition disabled:opacity-50"
             >
               Use
             </button>
@@ -430,7 +428,7 @@ function ImagePicker({
             type="button"
             onClick={() => setEditorOpen(true)}
             aria-label="Edit image"
-            className="text-xs text-sky-400 hover:text-sky-300 px-2 py-1 rounded-[var(--radius-control)] border border-sky-500/30 bg-accent/10 hover:bg-accent/20 transition-colors"
+            className="text-xs text-accent px-2 py-1 rounded-[var(--radius-control)] border border-accent bg-accent-soft hover:bg-accent-tint transition-colors"
           >
             ✎ Edit
           </button>
@@ -482,7 +480,7 @@ function RoundEditor({
             value={round.category}
             onChange={(e) => onChange({ ...round, category: e.target.value })}
             aria-label="Category"
-            className="bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-sky-500/25"
+            className="bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-accent"
           >
             {CATEGORIES.map((c) => (
               <option key={c} value={c}>
@@ -501,7 +499,7 @@ function RoundEditor({
             onChange={(e) => onChange({ ...round, answer: e.target.value })}
             placeholder="e.g. Apple, Picasso…"
             maxLength={100}
-            className="bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-sky-500/25"
+            className="bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-accent"
           />
         </div>
       </div>
@@ -565,9 +563,9 @@ function RoundEditor({
         <button
           type="button"
           onClick={() => setPickerOpen(true)}
-          className="flex items-center gap-2 text-xs text-ink-faint hover:text-sky-400 transition-colors py-0.5"
+          className="flex items-center gap-2 text-xs text-ink-faint hover:text-accent transition-colors py-0.5"
         >
-          <span className="w-5 h-5 rounded-md border border-dashed border-hairline flex items-center justify-center hover:border-sky-500/40 text-ink-faint">
+          <span className="w-5 h-5 rounded-md border border-dashed border-hairline flex items-center justify-center hover:border-accent text-ink-faint">
             +
           </span>
           Add clue image{" "}
@@ -588,7 +586,7 @@ function RoundEditor({
               className="sr-only"
             />
             <div
-              className={`w-7 h-3.5 rounded-full transition-colors ${round.hideBlanks ? "bg-sky-600" : "bg-raised"}`}
+              className={`w-7 h-3.5 rounded-full transition-colors ${round.hideBlanks ? "bg-accent" : "bg-raised"}`}
             >
               <div
                 className={`absolute top-0.5 w-2.5 h-2.5 rounded-full bg-white shadow transition-transform ${round.hideBlanks ? "translate-x-3.5" : "translate-x-0.5"}`}
@@ -687,10 +685,10 @@ function RoundSetupForm({
                   className={`w-10 h-10 rounded-full text-sm font-bold transition-all ${
                     i === activeIdx
                       ? isRoundValid(r)
-                        ? "bg-accent text-white ring-2 ring-sky-400/40 ring-offset-1 ring-offset-[#1a1a2e]"
+                        ? "bg-accent text-accent-ink ring-2 ring-accent ring-offset-1 ring-offset-sunken"
                         : "bg-white/15 text-white ring-2 ring-white/25 ring-offset-1 ring-offset-[#1a1a2e]"
                       : isRoundValid(r)
-                        ? "bg-sky-600/30 text-sky-300 hover:bg-sky-600/50"
+                        ? "bg-accent-soft text-accent hover:bg-accent-tint"
                         : "bg-white/8 text-ink-faint hover:bg-white/12 hover:text-ink-muted"
                   }`}
                 >
@@ -703,7 +701,7 @@ function RoundSetupForm({
                   onClick={addRound}
                   title="Add round"
                   aria-label="Add round"
-                  className="w-10 h-10 rounded-full border border-dashed border-hairline-strong text-ink-faint text-lg hover:border-sky-500/50 hover:text-sky-400 transition-colors"
+                  className="w-10 h-10 rounded-full border border-dashed border-hairline-strong text-ink-faint text-lg hover:border-accent hover:text-accent transition-colors"
                 >
                   +
                 </button>
@@ -731,7 +729,7 @@ function RoundSetupForm({
                       e.target.value === "" ? null : Number(e.target.value),
                     )
                   }
-                  className="flex-1 bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-sky-500/25"
+                  className="flex-1 bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-accent"
                 >
                   {TURN_TIMER_OPTIONS.map((o) => (
                     <option key={o.label} value={o.value ?? ""}>
@@ -765,7 +763,7 @@ function RoundSetupForm({
                   showCreatorOptions ? { turnTimerSeconds } : undefined,
                 )
               }
-              className="flex-1 py-2.5 rounded-[var(--radius-control)] bg-sky-600 text-white text-sm font-semibold hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 py-2.5 rounded-[var(--radius-control)] bg-accent text-accent-ink text-sm font-semibold hover:brightness-110 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {submitLabel} ({validRounds.length})
             </button>
@@ -817,7 +815,7 @@ function AnswerBlanks({
             className={`inline-flex items-center justify-center w-9 h-11 border-b-2 text-xl font-bold ${
               ch === "_"
                 ? "border-slate-600 text-transparent select-none"
-                : "border-sky-400 text-sky-200"
+                : "border-accent text-accent"
             }`}
           >
             {ch === "_" ? "_" : ch.toUpperCase()}
@@ -872,8 +870,7 @@ function TurnQueue({
       cls += "border-hairline bg-surface text-ink-faint italic";
       icon = "👁 ";
     } else if (isCurrent) {
-      cls +=
-        "border-sky-400/60 bg-accent/25 text-sky-100 ring-2 ring-sky-400/30";
+      cls += "border-accent bg-accent-soft text-accent ring-2 ring-accent";
       icon = "🎯 ";
     } else if (won) {
       cls += "border-positive bg-positive-soft text-positive";
@@ -1028,7 +1025,7 @@ function ActiveRoundView({
               Round {questioner.currentRoundIndex + 1} of{" "}
               {questioner.totalRounds}
             </span>
-            <span className="text-xs px-2 py-0.5 rounded-[var(--radius-control)] bg-sky-600/20 text-sky-300 border border-sky-600/30">
+            <span className="text-xs px-2 py-0.5 rounded-[var(--radius-control)] bg-accent-soft text-accent border border-accent">
               {round.category}
             </span>
           </div>
@@ -1080,7 +1077,7 @@ function ActiveRoundView({
         <div
           className={`flex items-center justify-center gap-2 font-semibold py-3 px-3 rounded-[var(--radius-control)] border transition-colors ${
             isMyTurn
-              ? "bg-accent/20 text-sky-200 border-sky-500/50 text-base ring-2 ring-sky-500/30 shadow-lg shadow-sky-500/10"
+              ? "bg-accent-soft text-accent border-accent text-base ring-2 ring-accent"
               : iAmWinner
                 ? "bg-emerald-600/20 text-positive border-emerald-600/30 text-sm"
                 : "bg-surface text-ink-muted border-hairline text-sm"
@@ -1112,12 +1109,12 @@ function ActiveRoundView({
               onChange={(e) => setGuessInput(e.target.value)}
               placeholder="Your answer…"
               autoFocus
-              className="flex-1 bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2.5 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-sky-500/25"
+              className="flex-1 bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2.5 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-accent"
             />
             <button
               type="submit"
               disabled={!guessInput.trim()}
-              className="px-4 py-2 rounded-[var(--radius-control)] bg-sky-600 text-white text-sm font-semibold hover:bg-accent transition-colors disabled:opacity-50"
+              className="px-4 py-2 rounded-[var(--radius-control)] bg-accent text-accent-ink text-sm font-semibold hover:brightness-110 transition disabled:opacity-50"
             >
               Guess
             </button>
@@ -1226,7 +1223,7 @@ function GuessesPanel({
                   g.correct
                     ? "text-positive font-medium"
                     : g.nearMiss
-                      ? "text-accent"
+                      ? "text-accent-ink"
                       : "text-ink-muted"
                 }`}
               >
@@ -1305,7 +1302,7 @@ function RoundResultsView({
 
         <div className="text-center">
           <div className="text-xs text-ink-faint mb-1">Answer</div>
-          <div className="text-2xl font-bold text-sky-300">{round.answer}</div>
+          <div className="text-2xl font-bold text-accent">{round.answer}</div>
         </div>
 
         {round.winnerUsernames.length > 0 ? (
@@ -1337,7 +1334,7 @@ function RoundResultsView({
           <button
             type="button"
             onClick={onNextRound}
-            className="w-full py-3 rounded-[var(--radius-control)] bg-sky-600 text-white text-sm font-semibold hover:bg-accent transition-colors"
+            className="w-full py-3 rounded-[var(--radius-control)] bg-accent text-accent-ink text-sm font-semibold hover:brightness-110 transition"
           >
             {hasMore ? "Next round →" : "See final scores →"}
           </button>
@@ -1451,7 +1448,7 @@ function FinalScoreboard({
         <button
           type="button"
           onClick={onReset}
-          className="w-full py-3 rounded-[var(--radius-control)] bg-sky-600 text-white text-sm font-semibold hover:bg-accent transition-colors"
+          className="w-full py-3 rounded-[var(--radius-control)] bg-accent text-accent-ink text-sm font-semibold hover:brightness-110 transition"
         >
           Delete game
         </button>
@@ -1529,7 +1526,7 @@ function StagingView({
                 <span className="ml-2 text-xs text-ink-faint">(creator)</span>
               )}
               {q.socketId === mySocketId && (
-                <span className="ml-2 text-xs text-sky-400">(you)</span>
+                <span className="ml-2 text-xs text-accent">(you)</span>
               )}
             </span>
             <span className="text-xs text-ink-faint">
@@ -1544,7 +1541,7 @@ function StagingView({
         <button
           type="button"
           onClick={() => setSetupOpen(true)}
-          className="w-full py-2.5 rounded-[var(--radius-control)] border border-sky-600/40 bg-sky-600/10 text-sky-300 text-sm font-medium hover:bg-sky-600/20 transition-colors"
+          className="w-full py-2.5 rounded-[var(--radius-control)] border border-accent bg-accent-soft text-accent text-sm font-medium hover:bg-accent-tint transition-colors"
         >
           {amQuestioner ? "Edit my rounds" : "+ Add my rounds"}
         </button>
@@ -1718,7 +1715,7 @@ function GameView({
                 key={q.socketId}
                 className={`flex-1 min-w-max px-3 py-1.5 rounded-[var(--radius-control)] text-xs font-medium text-center transition-colors flex items-center justify-center gap-1.5 ${
                   q.isActive
-                    ? "bg-sky-600 text-white"
+                    ? "bg-accent text-accent-ink"
                     : q.isDone
                       ? "text-ink-faint line-through"
                       : "text-ink-muted"
@@ -1728,7 +1725,7 @@ function GameView({
                 <span
                   className={`shrink-0 text-[10px] ${
                     q.isActive
-                      ? "text-sky-100"
+                      ? "text-accent"
                       : q.isDone
                         ? "text-ink-faint"
                         : "text-ink-faint"
@@ -1737,7 +1734,7 @@ function GameView({
                   {progressLabel}
                 </span>
                 {q.isActive && (
-                  <span className="text-sky-200" aria-hidden>
+                  <span className="text-accent-ink" aria-hidden>
                     ●
                   </span>
                 )}
@@ -1844,7 +1841,7 @@ function GameLobby({
         <button
           type="button"
           onClick={() => setCreatingGame(true)}
-          className="px-4 py-1.5 rounded-[var(--radius-control)] bg-sky-600 text-white text-xs font-semibold hover:bg-accent transition-colors"
+          className="px-4 py-1.5 rounded-[var(--radius-control)] bg-accent text-accent-ink text-xs font-semibold hover:brightness-110 transition"
         >
           + New game
         </button>
@@ -1887,7 +1884,7 @@ function GameLobby({
           <button
             type="button"
             onClick={() => setCreatingGame(true)}
-            className="px-5 py-2.5 rounded-[var(--radius-control)] bg-sky-600 text-white text-sm font-semibold hover:bg-accent transition-colors"
+            className="px-5 py-2.5 rounded-[var(--radius-control)] bg-accent text-accent-ink text-sm font-semibold hover:brightness-110 transition"
           >
             Create your first game
           </button>

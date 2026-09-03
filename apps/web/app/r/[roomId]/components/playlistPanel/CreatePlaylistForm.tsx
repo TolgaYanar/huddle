@@ -27,7 +27,7 @@ export function CreatePlaylistForm({
         value={name}
         onChange={(e) => setName(e.target.value)}
         placeholder="Playlist name..."
-        className="w-full bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-sky-500/25"
+        className="w-full bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-accent"
         autoFocus
       />
       <input
@@ -35,7 +35,7 @@ export function CreatePlaylistForm({
         value={description}
         onChange={(e) => setDescription(e.target.value)}
         placeholder="Description (optional)..."
-        className="w-full bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-sky-500/25"
+        className="w-full bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-accent"
       />
       <div className="flex gap-2 justify-end">
         <button
@@ -48,7 +48,7 @@ export function CreatePlaylistForm({
         <button
           type="submit"
           disabled={!name.trim()}
-          className="px-3 py-1.5 text-sm bg-sky-600 hover:bg-accent text-white rounded-[var(--radius-control)] transition disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-3 py-1.5 text-sm bg-accent text-accent-ink hover:brightness-110 rounded-[var(--radius-control)] transition disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Create
         </button>

@@ -57,7 +57,7 @@ export function ReconnectBanner({
             <button
               type="button"
               onClick={onManualReconnect}
-              className="px-3 py-1 rounded-[var(--radius-control)] bg-sky-600 text-white text-xs font-semibold hover:bg-accent transition-colors"
+              className="px-3 py-1 rounded-[var(--radius-control)] bg-accent text-accent-ink text-xs font-semibold hover:brightness-110 transition"
             >
               Try again
             </button>

@@ -299,7 +299,7 @@ export function FullscreenChatOverlay({
               onChange={(e) => setChatText(e.target.value)}
               placeholder={isConnected ? "Type a message..." : "Connecting..."}
               disabled={!isConnected}
-              className="flex-1 h-10 bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-sky-500/25 focus:border-sky-500/30 transition disabled:opacity-60"
+              className="flex-1 h-10 bg-sunken border border-hairline rounded-[var(--radius-control)] px-3 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition disabled:opacity-60"
             />
             <button
               type="submit"

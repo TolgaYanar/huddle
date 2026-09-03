@@ -279,7 +279,7 @@ export function WheelPickerModal(props: {
               onChange={(e) => setInput(e.target.value)}
               placeholder={isConnected ? "Add entry…" : "Connecting…"}
               disabled={!isConnected || isSpinning}
-              className="flex-1 h-12 bg-sunken border border-hairline rounded-[var(--radius-panel)] px-4 text-base text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-sky-500/25 focus:border-sky-500/30 transition disabled:opacity-60"
+              className="flex-1 h-12 bg-sunken border border-hairline rounded-[var(--radius-panel)] px-4 text-base text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition disabled:opacity-60"
             />
             <button
               type="submit"

@@ -47,9 +47,9 @@ export function PlaylistItemRow({
         isDragging
           ? "opacity-50 bg-raised border border-dashed border-white/30"
           : isDragOver
-            ? "bg-indigo-500/20 border border-indigo-500/50"
+            ? "bg-accent-tint border border-accent"
             : isActive
-              ? "bg-accent/20 border border-sky-500/30"
+              ? "bg-accent-soft border border-accent"
               : "hover:bg-surface border border-transparent"
       }`}
     >
@@ -58,7 +58,7 @@ export function PlaylistItemRow({
         onClick={onPlay}
         aria-label={`Play ${item.title}`}
         aria-current={isActive ? "true" : undefined}
-        className="flex flex-1 min-w-0 items-center gap-2 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/80"
+        className="flex flex-1 min-w-0 items-center gap-2 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
       >
         <span
           aria-hidden="true"
@@ -78,14 +78,14 @@ export function PlaylistItemRow({
             />
             {isPlaying && (
               <span className="absolute inset-0 bg-sunken flex items-center justify-center">
-                <span className="text-sky-400">
+                <span className="text-accent">
                   <PauseIcon />
                 </span>
               </span>
             )}
             {!isPlaying && isActive && (
               <span className="absolute inset-0 bg-sunken flex items-center justify-center">
-                <span className="text-sky-400 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
+                <span className="text-accent opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
                   <PlayIcon />
                 </span>
               </span>
@@ -94,12 +94,12 @@ export function PlaylistItemRow({
         ) : (
           <span className="w-10 h-10 shrink-0 flex items-center justify-center">
             {isPlaying ? (
-              <span className="text-sky-400">
+              <span className="text-accent">
                 <PauseIcon />
               </span>
             ) : (
               <span
-                className={`${isActive ? "text-sky-400" : "text-ink-faint group-hover:text-ink-muted"}`}
+                className={`${isActive ? "text-accent" : "text-ink-faint group-hover:text-ink-muted"}`}
               >
                 <PlayIcon />
               </span>
@@ -127,7 +127,7 @@ export function PlaylistItemRow({
             type="button"
             onClick={onMoveUp}
             disabled={!canMoveUp}
-            className="h-7 min-w-7 rounded text-ink-muted opacity-70 transition hover:bg-raised hover:text-ink focus:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 disabled:cursor-not-allowed disabled:opacity-25"
+            className="h-7 min-w-7 rounded text-ink-muted opacity-70 transition hover:bg-raised hover:text-ink focus:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-25"
             title="Move up"
             aria-label={`Move ${item.title} up`}
           >
@@ -137,7 +137,7 @@ export function PlaylistItemRow({
             type="button"
             onClick={onMoveDown}
             disabled={!canMoveDown}
-            className="h-7 min-w-7 rounded text-ink-muted opacity-70 transition hover:bg-raised hover:text-ink focus:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 disabled:cursor-not-allowed disabled:opacity-25"
+            className="h-7 min-w-7 rounded text-ink-muted opacity-70 transition hover:bg-raised hover:text-ink focus:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-25"
             title="Move down"
             aria-label={`Move ${item.title} down`}
           >

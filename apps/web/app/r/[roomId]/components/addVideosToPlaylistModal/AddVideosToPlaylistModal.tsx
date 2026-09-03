@@ -69,7 +69,7 @@ export function AddVideosToPlaylistModal(props: AddVideosToPlaylistModalProps) {
             onClick={() => state.setActiveTab("url")}
             className={`flex-1 px-4 py-3 text-sm font-medium transition ${
               state.activeTab === "url"
-                ? "text-indigo-400 border-b-2 border-indigo-400"
+                ? "text-accent border-b-2 border-accent"
                 : "text-ink-muted hover:text-ink"
             }`}
           >
@@ -80,7 +80,7 @@ export function AddVideosToPlaylistModal(props: AddVideosToPlaylistModalProps) {
             onClick={() => state.setActiveTab("search")}
             className={`flex-1 px-4 py-3 text-sm font-medium transition ${
               state.activeTab === "search"
-                ? "text-indigo-400 border-b-2 border-indigo-400"
+                ? "text-accent border-b-2 border-accent"
                 : "text-ink-muted hover:text-ink"
             }`}
           >
@@ -115,7 +115,7 @@ export function AddVideosToPlaylistModal(props: AddVideosToPlaylistModalProps) {
                     type="button"
                     onClick={state.handleAddFromUrl}
                     disabled={state.isLoadingUrl || !state.urlInput.trim()}
-                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:hover:bg-indigo-600 rounded-[var(--radius-control)] text-sm font-medium text-white transition flex items-center gap-2"
+                    className="px-4 py-2 bg-accent hover:brightness-110 disabled:opacity-50 rounded-[var(--radius-control)] text-sm font-medium text-accent-ink transition flex items-center gap-2"
                   >
                     {state.isLoadingUrl ? (
                       "Loading..."
@@ -151,7 +151,7 @@ export function AddVideosToPlaylistModal(props: AddVideosToPlaylistModalProps) {
                   type="button"
                   onClick={state.runYouTubeSearch}
                   disabled={state.isSearching}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:hover:bg-indigo-600 rounded-[var(--radius-control)] text-sm font-medium text-white transition flex items-center gap-2"
+                  className="px-4 py-2 bg-accent hover:brightness-110 disabled:opacity-50 rounded-[var(--radius-control)] text-sm font-medium text-accent-ink transition flex items-center gap-2"
                 >
                   {state.isSearching ? (
                     "Searching..."
@@ -189,7 +189,7 @@ export function AddVideosToPlaylistModal(props: AddVideosToPlaylistModalProps) {
                           />
                         )}
                         <div className="absolute inset-0 bg-sunken opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          <div className="bg-indigo-600 rounded-full p-2">
+                          <div className="bg-accent rounded-full p-2 text-accent-ink">
                             <PlusIcon />
                           </div>
                         </div>
@@ -249,7 +249,7 @@ export function AddVideosToPlaylistModal(props: AddVideosToPlaylistModalProps) {
             state.selectedCount === 0 ||
             state.isAddingVideos
           }
-          className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:hover:bg-indigo-600 rounded-[var(--radius-control)] text-sm font-medium text-white transition"
+          className="px-6 py-2 bg-accent hover:brightness-110 disabled:opacity-50 rounded-[var(--radius-control)] text-sm font-medium text-accent-ink transition"
         >
           {state.isAddingVideos
             ? "Adding..."

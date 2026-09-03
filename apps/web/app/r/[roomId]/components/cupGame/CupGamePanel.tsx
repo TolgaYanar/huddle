@@ -374,12 +374,12 @@ function CupGameHeader({
     if (game.session.status === "lobby")
       return {
         text: "Setting up",
-        color: "bg-accent/20 text-sky-300 border-sky-400/30",
+        color: "bg-accent-soft text-accent border-accent",
       };
     if (game.session.status === "placing")
       return {
         text: "Hiding spiders",
-        color: "bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-400/30",
+        color: "bg-negative-soft text-negative border-negative",
       };
     if (game.session.status === "playing")
       return {
@@ -510,7 +510,7 @@ function CupGameLobby(props: CupGamePanelProps) {
                 onClick={() => setLives(n)}
                 className={`flex-1 h-8 rounded-[var(--radius-control)] text-sm border transition-colors ${
                   lives === n
-                    ? "border-sky-400/60 bg-accent/20 text-sky-200"
+                    ? "border-accent bg-accent-soft text-accent"
                     : "border-hairline bg-surface text-ink-muted hover:bg-raised"
                 }`}
                 aria-pressed={lives === n ? "true" : "false"}
@@ -541,7 +541,7 @@ function CupGameLobby(props: CupGamePanelProps) {
                 onClick={() => setGridSize(g.value)}
                 className={`flex-1 h-8 rounded-[var(--radius-control)] text-xs border transition-colors ${
                   gridSize === g.value
-                    ? "border-sky-400/60 bg-accent/20 text-sky-200"
+                    ? "border-accent bg-accent-soft text-accent"
                     : "border-hairline bg-surface text-ink-muted hover:bg-raised"
                 }`}
                 aria-pressed={gridSize === g.value ? "true" : "false"}
@@ -566,7 +566,7 @@ function CupGameLobby(props: CupGamePanelProps) {
                 onClick={() => setTimer(t as 20 | 30 | 60 | null)}
                 className={`flex-1 h-8 rounded-[var(--radius-control)] text-xs border transition-colors ${
                   timer === t
-                    ? "border-sky-400/60 bg-accent/20 text-sky-200"
+                    ? "border-accent bg-accent-soft text-accent"
                     : "border-hairline bg-surface text-ink-muted hover:bg-raised"
                 }`}
                 aria-pressed={timer === t ? "true" : "false"}
@@ -683,7 +683,7 @@ function ConfigEditor({
               onClick={() => onChange({ startingLives: n })}
               className={`flex-1 h-8 rounded-[var(--radius-control)] text-sm border ${
                 game.config.startingLives === n
-                  ? "border-sky-400/60 bg-accent/20 text-sky-200"
+                  ? "border-accent bg-accent-soft text-accent"
                   : "border-hairline bg-surface text-ink-muted hover:bg-raised"
               }`}
               aria-pressed={game.config.startingLives === n ? "true" : "false"}
@@ -736,7 +736,7 @@ function ConfigEditor({
               }
               className={`flex-1 h-8 rounded-[var(--radius-control)] text-xs border ${
                 game.config.turnTimerSeconds === t
-                  ? "border-sky-400/60 bg-accent/20 text-sky-200"
+                  ? "border-accent bg-accent-soft text-accent"
                   : "border-hairline bg-surface text-ink-muted hover:bg-raised"
               }`}
               aria-pressed={
@@ -773,7 +773,7 @@ function PlacingView(props: CupGamePanelProps & { game: CupGameData }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px] gap-4 lg:gap-5">
       <div className="flex flex-col gap-3">
-        <div className="rounded-[var(--radius-control)] border border-fuchsia-400/20 bg-fuchsia-500/10 px-4 py-3 text-sm text-fuchsia-200">
+        <div className="rounded-[var(--radius-control)] border border-negative bg-negative-soft px-4 py-3 text-sm text-negative">
           <strong>Hide your spiders.</strong> Tap up to{" "}
           <span className="font-semibold">{me?.spiderBudget ?? 0}</span> cups to
           put a spider under each. So far:{" "}
@@ -1131,11 +1131,11 @@ function TurnBanner({
   if (game.session.status !== "playing") return null;
   return (
     <div
-      className={`rounded-[var(--radius-control)] border px-4 py-3 flex items-center justify-between ${myTurn ? "border-sky-400/40 bg-accent/10" : "border-hairline bg-surface"}`}
+      className={`rounded-[var(--radius-control)] border px-4 py-3 flex items-center justify-between ${myTurn ? "border-accent bg-accent-soft" : "border-hairline bg-surface"}`}
     >
       <div className="flex items-center gap-2 text-sm">
         <span
-          className={`inline-block w-2 h-2 rounded-full ${myTurn ? "bg-sky-300 animate-pulse" : "bg-slate-400"}`}
+          className={`inline-block w-2 h-2 rounded-full ${myTurn ? "bg-accent animate-pulse" : "bg-ink-faint"}`}
         />
         <span className="font-semibold text-ink">
           {myTurn ? "Your turn" : `${turnPlayer?.username || "Someone"}'s turn`}
@@ -1147,7 +1147,7 @@ function TurnBanner({
           </span>
         )}
         {me?.hasMirror && myTurn && (
-          <span className="text-xs px-2 py-0.5 rounded-full bg-accent/20 text-sky-200 border border-sky-400/30">
+          <span className="text-xs px-2 py-0.5 rounded-full bg-accent-soft text-accent border border-accent">
             🪞 Mirror up
           </span>
         )}
@@ -1316,17 +1316,17 @@ function PlayerList({
               } ${p.eliminated ? "opacity-50" : ""}`}
             >
               <span
-                className={`inline-block w-2 h-2 rounded-full ${isTurn ? "bg-sky-300 animate-pulse" : "bg-ink-faint"}`}
+                className={`inline-block w-2 h-2 rounded-full ${isTurn ? "bg-accent animate-pulse" : "bg-ink-faint"}`}
               />
               <span
-                className={`text-sm font-medium truncate ${isMe ? "text-sky-200" : "text-ink"}`}
+                className={`text-sm font-medium truncate ${isMe ? "text-accent" : "text-ink"}`}
               >
                 {p.username || "Player"}
                 {isMe && " (you)"}
               </span>
               <span className="ml-auto flex items-center gap-1.5">
                 {placingPhase && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-fuchsia-500/15 text-fuchsia-300 border border-fuchsia-400/20">
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-negative-soft text-negative border border-negative">
                     {p.spidersPlaced}/{p.spiderBudget} 🕷
                     {p.isPlacementLocked && " ✓"}
                   </span>

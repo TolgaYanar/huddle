@@ -116,9 +116,9 @@ export function HomeClient() {
       <header className="relative z-10 h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8 border-b border-hairline bg-bg sticky top-0">
         <div className="font-semibold text-lg sm:text-xl flex items-center gap-2 text-ink tracking-tight group">
           <picture>
-            <source srcSet="/favicon.svg?v=2" type="image/svg+xml" />
+            <source srcSet="/favicon.svg?v=3" type="image/svg+xml" />
             <img
-              src="/favicon.svg?v=2"
+              src="/favicon.svg?v=3"
               alt="WeHuddle"
               width={24}
               height={24}
@@ -343,7 +343,7 @@ export function HomeClient() {
                     type="button"
                     className={`h-11 px-5 rounded-[var(--radius-control)] border text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5 ${
                       normalizedJoin
-                        ? "border-indigo-500/50 bg-indigo-500/20 text-indigo-100 hover:bg-indigo-500/30"
+                        ? "border-accent bg-accent-soft text-accent hover:bg-accent-tint"
                         : "border-hairline bg-surface text-ink-muted hover:bg-raised"
                     }`}
                     disabled={!normalizedJoin}

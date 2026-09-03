@@ -300,7 +300,7 @@ export function ImageEditor({ src, onClose, onSave }: ImageEditorProps) {
           aria-pressed={tool === "black" ? "true" : "false"}
           className={`px-3 py-1.5 rounded-[var(--radius-control)] text-xs font-medium border transition-colors ${
             tool === "black"
-              ? "border-sky-500/50 bg-accent/15 text-sky-200"
+              ? "border-accent bg-accent-soft text-accent"
               : "border-hairline bg-surface text-ink-muted hover:bg-raised"
           }`}
         >
@@ -312,7 +312,7 @@ export function ImageEditor({ src, onClose, onSave }: ImageEditorProps) {
           aria-pressed={tool === "pixelate" ? "true" : "false"}
           className={`px-3 py-1.5 rounded-[var(--radius-control)] text-xs font-medium border transition-colors ${
             tool === "pixelate"
-              ? "border-sky-500/50 bg-accent/15 text-sky-200"
+              ? "border-accent bg-accent-soft text-accent"
               : "border-hairline bg-surface text-ink-muted hover:bg-raised"
           }`}
         >
@@ -382,7 +382,7 @@ export function ImageEditor({ src, onClose, onSave }: ImageEditorProps) {
           type="button"
           onClick={handleSave}
           disabled={imgState !== "ready"}
-          className="flex-1 py-2.5 rounded-[var(--radius-control)] bg-sky-600 text-white text-sm font-semibold hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex-1 py-2.5 rounded-[var(--radius-control)] bg-accent text-accent-ink text-sm font-semibold hover:brightness-110 transition disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {rects.length === 0
             ? "Use as-is"

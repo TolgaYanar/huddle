@@ -71,6 +71,25 @@ describe("theme tokens", () => {
         "so they render as no colour at all",
     ).toEqual([]);
   });
+
+  it("does not reintroduce the retired blue-purple brand palette", () => {
+    const retired =
+      /(?:text|bg|border|ring|fill|stroke|from|to|via|shadow|accent)-(?:sky|blue|cyan|indigo|violet|purple|fuchsia)-[0-9]/g;
+    const offenders: string[] = [];
+
+    for (const file of sourceFiles(APP)) {
+      const source = readFileSync(file, "utf8");
+      for (const match of source.matchAll(retired)) {
+        offenders.push(`${file.replace(APP, "app")}: ${match[0]}`);
+      }
+    }
+
+    expect(
+      offenders,
+      "Cold Tailwind hues were the old brand language. Use the warm theme " +
+        "tokens (accent, ink, positive, negative) so light and dark stay coherent.",
+    ).toEqual([]);
+  });
 });
 
 /**
