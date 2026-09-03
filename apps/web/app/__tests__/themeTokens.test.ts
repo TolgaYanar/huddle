@@ -138,3 +138,24 @@ describe("component classes", () => {
     ).toEqual([]);
   });
 });
+
+/**
+ * Every colour token in this system is an opaque hex. An eight-digit value
+ * silently carries an alpha channel, so `--c-accent-soft: #33261408` was a 3%
+ * wash: the chips that use it simply had no fill in dark mode, and nothing
+ * looked broken enough to notice. Six digits, or say why not.
+ */
+describe("colour tokens", () => {
+  it("are opaque six-digit hex values", () => {
+    const css = readFileSync(join(APP, "globals.css"), "utf8");
+    const offenders = [...css.matchAll(/(--c-[a-z-]+):\s*(#[0-9a-fA-F]+)/g)]
+      .filter(([, , value]) => value!.length !== 7)
+      .map(([, name, value]) => `${name}: ${value}`);
+
+    expect(
+      offenders,
+      "A token with an alpha channel renders as almost nothing over a dark " +
+        "surface; use an opaque tint instead",
+    ).toEqual([]);
+  });
+});
