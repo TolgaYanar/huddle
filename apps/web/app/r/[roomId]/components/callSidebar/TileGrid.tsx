@@ -119,10 +119,22 @@ export function TileGrid(props: {
         />
         {!camEnabled && !screenEnabled && (
           <div className="absolute inset-0 flex items-center justify-center text-ink-muted text-sm">
-            Camera/screen off
+            Your camera is off
           </div>
         )}
       </div>
+
+      {/*
+        Without this the column simply stopped: one dark rectangle and then a
+        tall run of nothing, which reads as something failing to load rather
+        than as an empty call. Say what the space is for instead.
+      */}
+      {remoteStreams.length === 0 && (
+        <p className="px-1 py-3 text-center text-xs text-ink-faint text-balance">
+          Everyone who joins the call shows up here. Watching together works
+          without it.
+        </p>
+      )}
 
       {remoteStreams.map(({ id, stream }) => {
         const speaking = !!remoteSpeaking[id];
