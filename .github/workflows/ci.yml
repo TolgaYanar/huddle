@@ -18,6 +18,22 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The attribution check reads the complete PR commit range.
+          fetch-depth: 0
+
+      # The guard's own failure mode is silent, so it is exercised on every run
+      # rather than trusted.
+      - name: Self-test the attribution guard
+        run: bash scripts/check-ai-coauthors.sh --self-test
+
+      - name: Reject unapproved AI co-author trailers
+        if: github.event_name == 'pull_request'
+        env:
+          AI_COAUTHOR_APPROVED: ${{ contains(github.event.pull_request.labels.*.name, 'allow-ai-coauthor') }}
+        run: >-
+          bash scripts/check-ai-coauthors.sh --range
+          "${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
 
       - uses: actions/setup-node@v4
         with:

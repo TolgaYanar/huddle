@@ -281,6 +281,9 @@ version — the source tree can already be ahead of what is published.
 ## Conventions
 
 - Prettier for formatting; ESLint with `--max-warnings 0` on web.
+- AI `Co-authored-by` trailers are opt-in: never add one unless the user
+  explicitly requests it in the current conversation, and never bypass the
+  commit hook or apply the `allow-ai-coauthor` PR label without that request.
 - React 19 / `react-dom` 19.2.3 are pinned via root `overrides` — do not bump one
   workspace independently.
 - `shared-logic` is consumed as raw TypeScript through Next's
