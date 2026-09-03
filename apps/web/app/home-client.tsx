@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { ThemeToggle } from "./components/ThemeToggle";
+import { RoomPreview } from "./_components/RoomPreview";
 
 import {
   apiAuthMe,
@@ -172,9 +173,9 @@ export function HomeClient() {
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 py-10 sm:py-16 gap-12">
+      <main className="flex-1 flex flex-col items-center px-4 sm:px-6 py-12 sm:py-20 gap-10">
         {/* Hero */}
-        <div className="w-full max-w-2xl flex flex-col items-center text-center gap-3">
+        <div className="w-full max-w-2xl flex flex-col items-center text-center gap-4">
           <span className="inline-flex items-center gap-2 text-xs font-medium text-ink-muted">
             <span
               aria-hidden="true"
@@ -191,6 +192,10 @@ export function HomeClient() {
             Create a private room, share the link, hit play. Voice and video
             chat, reactions and games come with it.
           </p>
+        </div>
+
+        <div className="w-full max-w-2xl">
+          <RoomPreview />
         </div>
 
         <div className="w-full max-w-xl">
