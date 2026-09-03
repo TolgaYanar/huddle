@@ -278,6 +278,16 @@ sync logic against the Netflix player. Manifest version and `package.json` versi
 must stay in step. Before bumping the version, check the live Chrome Web Store
 version — the source tree can already be ahead of what is published.
 
+The store listing text is reviewed against Google's metadata policy, and a
+listing that reads naturally can still fail it. Version 1.3.0 was rejected for
+"keyword spam" over one line in the description that named the browsers the
+extension runs on — `Chrome, Edge, Brave, Arc, Opera, Vivaldi`. Naming a
+compatible browser is fine on our own site; a list of brand names in the store
+description is not. Say the requirement once, generically ("a Chromium-based
+desktop browser"), and keep the listing to what the extension actually does.
+Service names the extension really supports (Netflix, Prime Video) are
+functional, not keywords, and are fine.
+
 ## Conventions
 
 - Prettier for formatting; ESLint with `--max-warnings 0` on web.
