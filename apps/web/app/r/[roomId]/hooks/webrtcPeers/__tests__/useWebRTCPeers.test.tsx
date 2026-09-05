@@ -96,6 +96,8 @@ const iceResponse = (
 
 type RenderPeersProps = { iceAccessToken: string | null };
 
+const MEMBERSHIP_TOKEN = "private-membership-token";
+
 function renderPeers(initialIceAccessToken: string | null = null) {
   let roomUsers: RoomUsersListener | undefined;
   let userJoined: PresenceListener | undefined;
@@ -203,7 +205,7 @@ describe("useWebRTCPeers ICE servers", () => {
       ),
     );
 
-    const harness = renderPeers();
+    const harness = renderPeers(MEMBERSHIP_TOKEN);
     expect(harness.getRoomUsers()).toBeDefined();
 
     // Presence arrives before the lookup settles — the common case, since the
@@ -237,7 +239,7 @@ describe("useWebRTCPeers ICE servers", () => {
       ),
     );
 
-    const harness = renderPeers();
+    const harness = renderPeers(MEMBERSHIP_TOKEN);
     const pendingSnapshot = harness.getRoomUsers()?.({
       roomId: "room",
       users: ["zzz-self", "aaa-peer"],
@@ -265,7 +267,7 @@ describe("useWebRTCPeers ICE servers", () => {
       }),
     );
 
-    const harness = renderPeers();
+    const harness = renderPeers(MEMBERSHIP_TOKEN);
     await announcePeer(harness);
 
     expect(FakePeerConnection.configs).toHaveLength(1);
@@ -275,10 +277,7 @@ describe("useWebRTCPeers ICE servers", () => {
   });
 
   it("upgrades existing peers when the private room token arrives after presence", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce({ ok: false, status: 403 } as Response)
-      .mockResolvedValueOnce(iceResponse([TURN], 600));
+    const fetchMock = vi.fn().mockResolvedValue(iceResponse([TURN], 600));
     vi.stubGlobal("fetch", fetchMock);
 
     const harness = renderPeers();
@@ -290,18 +289,21 @@ describe("useWebRTCPeers ICE servers", () => {
     expect(peer.config.iceServers?.[0]?.urls).toEqual([
       "stun:stun.l.google.com:19302",
     ]);
+    // The relay endpoint refuses a caller that cannot prove room membership,
+    // so asking before the capability arrives only spends rate-limit budget.
+    expect(fetchMock).not.toHaveBeenCalled();
 
     await act(async () => {
-      harness.rerender({ iceAccessToken: "private-membership-token" });
+      harness.rerender({ iceAccessToken: MEMBERSHIP_TOKEN });
     });
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
-    expect(fetchMock.mock.calls[1]?.[0]).toContain(
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(fetchMock.mock.calls[0]?.[0]).toContain(
       "/api/webrtc/ice?roomId=room&socketId=zzz-self",
     );
-    expect(fetchMock.mock.calls[1]?.[1]).toEqual(
+    expect(fetchMock.mock.calls[0]?.[1]).toEqual(
       expect.objectContaining({
-        headers: { "X-Huddle-Room-Token": "private-membership-token" },
+        headers: { "X-Huddle-Room-Token": MEMBERSHIP_TOKEN },
       }),
     );
     expect(peer.setConfiguration).toHaveBeenCalledWith({ iceServers: [TURN] });
@@ -321,7 +323,7 @@ describe("useWebRTCPeers ICE servers", () => {
       .mockResolvedValueOnce(iceResponse([TURN], 600));
     vi.stubGlobal("fetch", fetchMock);
 
-    const harness = renderPeers();
+    const harness = renderPeers(MEMBERSHIP_TOKEN);
     const peer = await announcePeer(harness);
     await setConnectionState(peer, "connected");
     expect(peer.config.iceServers?.[0]?.urls).toEqual([
@@ -354,7 +356,7 @@ describe("useWebRTCPeers ICE servers", () => {
       .mockResolvedValueOnce(iceResponse([TURN], 600));
     vi.stubGlobal("fetch", fetchMock);
 
-    const harness = renderPeers();
+    const harness = renderPeers(MEMBERSHIP_TOKEN);
     const peer = await announcePeer(harness);
     await setConnectionState(peer, "connected");
     peer.setConfiguration.mockImplementationOnce(() => {
@@ -388,7 +390,7 @@ describe("useWebRTCPeers ICE servers", () => {
       .mockResolvedValueOnce(iceResponse([rotatedTurn], 60));
     vi.stubGlobal("fetch", fetchMock);
 
-    const harness = renderPeers();
+    const harness = renderPeers(MEMBERSHIP_TOKEN);
     const peer = await announcePeer(harness);
     await setConnectionState(peer, "connected");
 
