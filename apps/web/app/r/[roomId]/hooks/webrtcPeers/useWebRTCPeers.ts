@@ -21,6 +21,10 @@ import { useWebRTCPeerSubscriptions } from "./useWebRTCPeerSubscriptions";
 
 export const PEER_DISCONNECTED_GRACE_MS = 5_000;
 export const PEER_CONNECTION_TIMEOUT_MS = 15_000;
+// How long after a peer connects to confirm its audio encoder actually
+// started, and how many times to try reviving it.
+export const SENDER_STALL_CHECK_MS = 3_000;
+export const SENDER_STALL_ATTEMPTS = 2;
 export const PEER_RECOVERY_DELAYS_MS = [0, 500, 1_500] as const;
 
 export function useWebRTCPeers<MediaState>(
@@ -68,6 +72,9 @@ export function useWebRTCPeers<MediaState>(
   const disconnectedTimersRef = useRef<
     Map<string, ReturnType<typeof setTimeout>>
   >(new Map());
+  const senderCheckTimersRef = useRef<
+    Map<string, ReturnType<typeof setTimeout>>
+  >(new Map());
   const connectionTimersRef = useRef<
     Map<string, ReturnType<typeof setTimeout>>
   >(new Map());
@@ -78,6 +85,9 @@ export function useWebRTCPeers<MediaState>(
   const schedulePeerRecoveryRef = useRef<
     (peerId: string, pc: RTCPeerConnection, force?: boolean) => void
   >(() => {});
+  const reviveStalledSenderRef = useRef<
+    (peerId: string, pc: RTCPeerConnection, attempt: number) => Promise<void>
+  >(async () => {});
   const configureExistingPeersRef = useRef<
     (iceServers: RTCIceServer[], restartIce: boolean) => void
   >(() => {});
@@ -298,6 +308,7 @@ export function useWebRTCPeers<MediaState>(
           // ignore
         }
       }
+      clearPeerTimer(senderCheckTimersRef.current, peerId);
       peersRef.current.delete(peerId);
       negotiatorsRef.current.delete(peerId);
       remoteStreamsRef.current.delete(peerId);
@@ -321,6 +332,7 @@ export function useWebRTCPeers<MediaState>(
       return true;
     },
     [
+      clearPeerTimer,
       peersRef,
       remoteStreamsRef,
       setRemoteMedia,
@@ -554,12 +566,77 @@ export function useWebRTCPeers<MediaState>(
   );
   schedulePeerRecoveryRef.current = schedulePeerRecovery;
 
+  // A sender can come out of a renegotiation holding a live, enabled track on
+  // a sendrecv transceiver, with both descriptions agreeing, while its encoder
+  // was never started. Nothing in the connection reports a problem:
+  // outbound-rtp exists and says active, and only packetsSent gives it away by
+  // staying at zero forever, so the peer simply never hears this side.
+  // Measured on production it hit one side of roughly half of all calls, and
+  // the track itself was fine — an independent AudioContext read the same
+  // audio from it that the healthy side was sending. Detaching and
+  // re-attaching the track rebuilds the encoder without touching the
+  // description or ICE, so a call that is already working cannot be disturbed.
+  const reviveStalledSender = useCallback(
+    async (peerId: string, pc: RTCPeerConnection, attempt: number) => {
+      senderCheckTimersRef.current.delete(peerId);
+      if (peersRef.current.get(peerId) !== pc) return;
+      if (pc.connectionState !== "connected") return;
+
+      const sender = pc.getSenders().find((s) => s.track?.kind === "audio");
+      const track = sender?.track;
+      if (!sender || !track) return;
+      if (track.readyState !== "live" || !track.enabled) return;
+
+      let stalled = false;
+      try {
+        const report = await pc.getStats(track);
+        report.forEach((entry) => {
+          const stat = entry as {
+            type?: string;
+            kind?: string;
+            packetsSent?: number;
+          };
+          if (stat.type === "outbound-rtp" && stat.kind === "audio") {
+            stalled = (stat.packetsSent ?? 0) === 0;
+          }
+        });
+      } catch {
+        return;
+      }
+
+      if (peersRef.current.get(peerId) !== pc) return;
+      if (!stalled) return;
+
+      try {
+        await sender.replaceTrack(null);
+        await sender.replaceTrack(track);
+      } catch {
+        // An engine that refuses the swap keeps the stalled sender; the next
+        // attempt, or ordinary recovery, is the remaining path.
+      }
+
+      if (attempt + 1 >= SENDER_STALL_ATTEMPTS) return;
+      if (peersRef.current.get(peerId) !== pc) return;
+      const timer = setTimeout(() => {
+        void reviveStalledSenderRef.current(peerId, pc, attempt + 1);
+      }, SENDER_STALL_CHECK_MS);
+      senderCheckTimersRef.current.set(peerId, timer);
+    },
+    [peersRef],
+  );
+  reviveStalledSenderRef.current = reviveStalledSender;
+
   handleConnectionStateRef.current = (peerId, pc) => {
     if (peersRef.current.get(peerId) !== pc) return;
     const state = pc.connectionState;
     if (state === "connected") {
       cancelPeerRecovery(peerId);
       setPeerConnectionStatus(peerId, "connected");
+      clearPeerTimer(senderCheckTimersRef.current, peerId);
+      const senderCheck = setTimeout(() => {
+        void reviveStalledSenderRef.current(peerId, pc, 0);
+      }, SENDER_STALL_CHECK_MS);
+      senderCheckTimersRef.current.set(peerId, senderCheck);
       return;
     }
 
@@ -686,6 +763,7 @@ export function useWebRTCPeers<MediaState>(
     const recoveryTimers = recoveryTimersRef.current;
     const disconnectedTimers = disconnectedTimersRef.current;
     const connectionTimers = connectionTimersRef.current;
+    const senderChecks = senderCheckTimersRef.current;
     const recoveryAttempts = recoveryAttemptsRef.current;
     const activePeerIds = activePeerIdsRef.current;
     return () => {
@@ -698,6 +776,10 @@ export function useWebRTCPeers<MediaState>(
       for (const timer of connectionTimers.values()) {
         clearTimeout(timer);
       }
+      for (const timer of senderChecks.values()) {
+        clearTimeout(timer);
+      }
+      senderChecks.clear();
       recoveryTimers.clear();
       disconnectedTimers.clear();
       connectionTimers.clear();
