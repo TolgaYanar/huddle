@@ -36,6 +36,7 @@ const { createSessionCleanup } = require("./src/auth/sessionCleanup");
 const { createTelemetryCleanup } = require("./src/telemetry/telemetryCleanup");
 
 const { registerRoutes } = require("./src/routes");
+const { readIceConfig } = require("./src/webrtc/iceConfig");
 const { createIo } = require("./src/socket/createIo");
 const { registerSocket } = require("./src/socket/register");
 
@@ -112,10 +113,17 @@ const telemetryCleanup = createTelemetryCleanup({
 });
 telemetryCleanup.start();
 
+// Relay configuration is read once so a typo shows up in the boot log rather
+// than as calls that "sometimes" fail for users behind strict NAT.
+const iceConfig = readIceConfig(process.env);
+for (const warning of iceConfig.warnings) console.warn(`[ice] ${warning}`);
+console.log(`[ice] TURN relay mode: ${iceConfig.mode}`);
+
 let io;
 
 const deps = {
   vLog,
+  iceConfig,
 
   // prisma
   getPrisma,

@@ -59,6 +59,8 @@ export function useWebRTCPeerSubscriptions<MediaState>(args: {
 
     const cleanupRoomUsers = _onRoomUsers?.(
       async (data: RoomUsersPayload<MediaState>) => {
+        if (data.roomId !== latestRef.current.roomId) return;
+        await latestRef.current.iceReady;
         const { roomId: currentRoomId, userId: currentUserId } =
           latestRef.current;
         if (data.roomId !== currentRoomId) return;
@@ -95,8 +97,10 @@ export function useWebRTCPeerSubscriptions<MediaState>(args: {
 
     const cleanupJoined = _onUserJoined?.(async (peer) => {
       const peerId = toSocketId(peer);
+      if (!peerId || peerId === latestRef.current.userId) return;
+      await latestRef.current.iceReady;
       const { userId: currentUserId } = latestRef.current;
-      if (!peerId || peerId === currentUserId) return;
+      if (peerId === currentUserId) return;
       if (currentUserId < peerId) {
         try {
           await latestRef.current.sendOfferToPeer(peerId);
@@ -116,6 +120,10 @@ export function useWebRTCPeerSubscriptions<MediaState>(args: {
     });
 
     const cleanupOffer = _onWebRTCOffer?.(async (data: WebRTCOfferPayload) => {
+      if (data.roomId !== latestRef.current.roomId) return;
+      // Candidates that arrive while this waits are buffered by the ICE
+      // handler below and flushed once the peer exists.
+      await latestRef.current.iceReady;
       const { roomId: currentRoomId, userId: currentUserId } =
         latestRef.current;
       if (data.roomId !== currentRoomId) return;

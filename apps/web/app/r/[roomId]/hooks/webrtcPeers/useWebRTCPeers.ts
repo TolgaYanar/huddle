@@ -1,8 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
-import { parseIceServers } from "./iceServers";
+import {
+  ICE_RETRY_MS,
+  fetchIceConfig,
+  parseIceServers,
+  refreshDelayMs,
+} from "./iceServers";
 import { PeerNegotiator } from "./negotiation";
 import { syncTracksToPeer as syncTracksToPeerImpl } from "./syncTracks";
 import type { UseWebRTCPeersArgs, WebRTCPeersLatest } from "./types";
@@ -41,6 +46,14 @@ export function useWebRTCPeers<MediaState>(
   } = args;
 
   const negotiatorsRef = useRef<Map<string, PeerNegotiator>>(new Map());
+
+  // ICE servers for every new RTCPeerConnection. Starts from the static
+  // fallback and is replaced by whatever the server issues; a connection
+  // already negotiated keeps the servers it was created with.
+  const iceServersRef = useRef<RTCIceServer[]>(
+    parseIceServers(process.env.NEXT_PUBLIC_ICE_SERVERS),
+  );
+  const iceGateRef = useRef(createIceGate());
   const identityRef = useRef(userId);
   const signalingRef = useRef({ sendWebRTCOffer, sendWebRTCAnswer });
   identityRef.current = userId;
@@ -49,6 +62,7 @@ export function useWebRTCPeers<MediaState>(
   const latestRef = useRef<WebRTCPeersLatest<MediaState>>({
     roomId,
     userId,
+    iceReady: iceGateRef.current.promise,
     createPeerConnection: null as unknown as (
       peerId: string,
     ) => RTCPeerConnection,
@@ -89,12 +103,32 @@ export function useWebRTCPeers<MediaState>(
     onWebRTCSpeaking,
   });
 
-  const rtcConfig = useMemo<RTCConfiguration>(
-    () => ({
-      iceServers: parseIceServers(process.env.NEXT_PUBLIC_ICE_SERVERS),
-    }),
-    [],
-  );
+  useEffect(() => {
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const load = async () => {
+      const config = await fetchIceConfig();
+      if (cancelled) return;
+      if (config) {
+        iceServersRef.current = config.iceServers;
+        if (config.ttlSeconds !== null) {
+          timer = setTimeout(load, refreshDelayMs(config.ttlSeconds));
+        }
+      } else {
+        timer = setTimeout(load, ICE_RETRY_MS);
+      }
+      // Open the gate on the first settled attempt either way: a room with
+      // STUN only is degraded, a room that never creates peers is broken.
+      iceGateRef.current.open();
+    };
+
+    void load();
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, []);
 
   const updateRemoteStreamsState = useCallback(() => {
     setRemoteStreams(
@@ -158,7 +192,7 @@ export function useWebRTCPeers<MediaState>(
       const existing = peersRef.current.get(peerId);
       if (existing) return existing;
 
-      const pc = new RTCPeerConnection(rtcConfig);
+      const pc = new RTCPeerConnection({ iceServers: iceServersRef.current });
       peersRef.current.set(peerId, pc);
 
       const negotiator = new PeerNegotiator({
@@ -222,7 +256,6 @@ export function useWebRTCPeers<MediaState>(
       closePeer,
       peersRef,
       remoteStreamsRef,
-      rtcConfig,
       sendWebRTCIce,
       syncTracksToPeer,
       updateRemoteStreamsState,
@@ -350,4 +383,12 @@ export function useWebRTCPeers<MediaState>(
     closeAllPeers,
     renegotiateAllPeers,
   };
+}
+
+function createIceGate() {
+  let open: () => void = () => {};
+  const promise = new Promise<void>((resolve) => {
+    open = resolve;
+  });
+  return { promise, open };
 }

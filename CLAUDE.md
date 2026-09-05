@@ -114,7 +114,9 @@ return "YouTube browsing is not configured". `apps/web/.gitignore` ignores
 must contain only a version or SHA token, never a secret.
 
 The server reads exactly: `DATABASE_URL`, `PORT`, `CORS_ORIGINS`, `NODE_ENV`,
-`ALLOW_EXTENSION_ORIGINS`, `COOKIE_DOMAIN`, `VERBOSE_LOGS`. Anything else in
+`ALLOW_EXTENSION_ORIGINS`, `COOKIE_DOMAIN`, `VERBOSE_LOGS`, `SENTRY_DSN`, and
+the TURN relay set `TURN_URLS`, `TURN_SECRET`, `TURN_USERNAME`,
+`TURN_CREDENTIAL`, `TURN_TTL_SECONDS`, `STUN_URLS`. Anything else in
 `apps/server/.env` is dead configuration.
 
 Prisma is on **v7**. Two things moved in that upgrade and both are easy to
@@ -179,8 +181,8 @@ shares a parent domain with the web app and `COOKIE_DOMAIN` is set to it.
 cookie never reaches the handshake, and the socket connects unauthenticated.
 
 **Next.js rewrites.** `apps/web/next.config.js` (`beforeFiles`) proxies only
-`/health`, `/socket.io*`, `/api/auth/*`, `/api/telemetry/*` and
-`/api/saved-rooms*` to
+`/health`, `/socket.io*`, `/api/auth/*`, `/api/telemetry/*`, `/api/webrtc/*`
+and `/api/saved-rooms*` to
 `API_PROXY_TARGET`. Everything else under `/api` is a real Next route handler in
 `apps/web/app/api/` (url-preview, video-info, youtube-search, image-search,
 image-generate, ...) — do not add a blanket `/api/:path*` rewrite or those break.
@@ -262,10 +264,24 @@ The sink also owns the autoplay gate: a listener who has not interacted with
 the page gets `NotAllowedError` from `play()`, which the old code swallowed.
 The sink shows an "Enable audio" control and retries on the next gesture.
 
-ICE servers come from `NEXT_PUBLIC_ICE_SERVERS` (JSON, parsed by
-`hooks/webrtcPeers/iceServers.ts`, STUN-only fallback). STUN alone cannot
-connect two peers who are both behind symmetric NAT; that needs a TURN relay
-configured there, and no client code change can substitute for it.
+ICE servers are issued by the server: `GET /api/webrtc/ice`
+(`src/routes/ice.js`, pure logic in `src/webrtc/iceConfig.js`) returns STUN
+plus, when `TURN_URLS` is configured, a TURN entry. With `TURN_SECRET` the
+credential is a TURN-REST-API HMAC (`<expiry>:<random>` / base64 HMAC-SHA1)
+that expires after `TURN_TTL_SECONDS`; with `TURN_USERNAME`/`TURN_CREDENTIAL`
+it is the fixed pair. Relay credentials must never move into the web bundle:
+`NEXT_PUBLIC_ICE_SERVERS` is only the static fallback parsed by
+`hooks/webrtcPeers/iceServers.ts`. `useWebRTCPeers` fetches the config on
+mount, refreshes at 80% of the TTL, retries a failed lookup every minute, and
+exposes `latestRef.current.iceReady`; the `room_users`, `user_joined` and
+offer handlers in `useWebRTCPeerSubscriptions` await it so the first peer of a
+session is built with relay credentials instead of racing the fetch. The gate
+is bounded by the fetch timeout (3 s) and always opens — a failed lookup
+means STUN only, never no peers. The TTL must outlast a call: a TURN server
+re-checks expiry on every allocation refresh, so a credential expiring
+mid-call drops the relayed connection. STUN alone cannot connect two peers
+who are both behind symmetric NAT; that needs a relay, and no client code
+change can substitute for it.
 
 **Auth.** Session cookie based (`apps/server/src/auth/`): `session.js` (SHA-256
 hashed tokens, HttpOnly cookie), `password.js`, `validators.js`, `middleware.js`,

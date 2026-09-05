@@ -4,7 +4,7 @@ export type AuthUser = {
   createdAt: string;
 };
 
-function getApiBaseUrl(): string {
+export function getApiBaseUrl(): string {
   // For API calls, we want to use same-origin requests in production
   // so Vercel can proxy them to Railway. This avoids CORS issues.
   //
