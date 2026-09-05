@@ -37,6 +37,7 @@ const { createTelemetryCleanup } = require("./src/telemetry/telemetryCleanup");
 
 const { registerRoutes } = require("./src/routes");
 const { assertIceReadiness, readIceConfig } = require("./src/webrtc/iceConfig");
+const { createCloudflareTurnProvider } = require("./src/webrtc/cloudflareTurn");
 const { createIo } = require("./src/socket/createIo");
 const { registerSocket } = require("./src/socket/register");
 
@@ -113,6 +114,18 @@ if (
   );
 }
 
+// One provider for the whole process, so /health and the ICE route read the
+// same cached credential instead of minting twice.
+const cloudflareTurnProvider =
+  iceConfig.mode === "cloudflare"
+    ? createCloudflareTurnProvider({
+        keyId: iceConfig.cloudflareKeyId,
+        apiToken: iceConfig.cloudflareApiToken,
+        ttlSeconds: iceConfig.ttlSeconds,
+        onError: (message) => console.warn(`[ice] cloudflare: ${message}`),
+      })
+    : null;
+
 const prismaState = initPrisma({ vLog });
 const getPrisma = () => prismaState.prisma;
 const isDbConnected = () => prismaState.dbConnected;
@@ -134,6 +147,7 @@ let io;
 const deps = {
   vLog,
   iceConfig,
+  cloudflareTurnProvider,
 
   // prisma
   getPrisma,
@@ -198,22 +212,56 @@ function getLanIPv4() {
   return null;
 }
 
-server.listen(PORT, "0.0.0.0", () => {
-  const lanIp = getLanIPv4();
-  console.log(`✓ Server running on port ${PORT}`);
-  console.log(`✓ Server accessible at http://localhost:${PORT}`);
-  if (lanIp) {
-    console.log(`✓ Server accessible on LAN at http://${lanIp}:${PORT}`);
-  }
-  // The pg pool connects lazily, so the startup probe is still in flight here.
-  // Reporting isDbConnected() synchronously printed "memory-only mode" even
-  // against a healthy database. Wait for the probe, then report the truth.
-  void prismaState.ready.then((connected) => {
-    console.log(
-      `✓ Database status: ${connected ? "Connected" : "Disconnected (running in memory-only mode)"}`,
-    );
+function listen() {
+  server.listen(PORT, "0.0.0.0", () => {
+    const lanIp = getLanIPv4();
+    console.log(`✓ Server running on port ${PORT}`);
+    console.log(`✓ Server accessible at http://localhost:${PORT}`);
+    if (lanIp) {
+      console.log(`✓ Server accessible on LAN at http://${lanIp}:${PORT}`);
+    }
+    // The pg pool connects lazily, so the startup probe is still in flight
+    // here. Reporting isDbConnected() synchronously printed "memory-only mode"
+    // even against a healthy database. Wait for the probe, then report.
+    void prismaState.ready.then((connected) => {
+      console.log(
+        `✓ Database status: ${connected ? "Connected" : "Disconnected (running in memory-only mode)"}`,
+      );
+    });
   });
-});
+}
+
+// Cloudflare hands out relay credentials over an API, so a revoked or mistyped
+// key is indistinguishable from a working one until it is used. Mint once at
+// startup: REQUIRE_TURN promises a startup failure rather than a silent
+// downgrade, and that promise can only be kept by actually asking. Without the
+// flag the check still runs, but in the background, so a Cloudflare blip never
+// delays a boot that is allowed to degrade to STUN.
+async function verifyCloudflareCredentials() {
+  if (!cloudflareTurnProvider) return true;
+  const issued = await cloudflareTurnProvider.getIceServers();
+  if (issued) {
+    console.log("[ice] cloudflare: relay credential verified");
+    return true;
+  }
+  console.error(
+    "[ice] cloudflare: no relay credential could be issued; check CLOUDFLARE_TURN_KEY_ID and CLOUDFLARE_TURN_API_TOKEN",
+  );
+  return false;
+}
+
+if (cloudflareTurnProvider && iceConfig.requireTurn) {
+  void verifyCloudflareCredentials().then((ok) => {
+    if (ok) return listen();
+    console.error(
+      "[ice] REQUIRE_TURN is enabled and the relay cannot issue credentials; refusing to start",
+    );
+    process.exit(1);
+  });
+} else {
+  listen();
+  void verifyCloudflareCredentials();
+}
 
 let shuttingDown = false;
 async function shutdown() {

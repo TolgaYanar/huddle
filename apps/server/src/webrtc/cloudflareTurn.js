@@ -29,6 +29,13 @@ const MAX_TTL_SECONDS = 48 * 60 * 60;
 const REFRESH_FRACTION = 0.8;
 // A mint that hangs would hold the first room join of a cold server open.
 const REQUEST_TIMEOUT_MS = 5000;
+// Below this much remaining life a cached credential is not worth handing out.
+// The client refreshes at 80% of whatever TTL it is told but never sooner than
+// 30 s, so anything under ~38 s expires on a live peer before the client asks
+// for another. On a server that sat idle through the whole refresh window, the
+// first joiner would otherwise receive a credential with seconds left and lose
+// the relay immediately — the exact symptom the relay exists to remove.
+const MIN_REMAINING_SECONDS = 120;
 
 function normaliseIceServers(body) {
   const servers = body?.iceServers;
@@ -65,6 +72,10 @@ function createCloudflareTurnProvider(options) {
 
   let cached = null; // { iceServers, issuedAtMs, expiresAtMs, refreshAtMs }
   let inFlight = null;
+  let lastMintFailed = false;
+
+  const remainingSeconds = (entry, nowMs) =>
+    Math.floor((entry.expiresAtMs - nowMs) / 1000);
 
   async function mint() {
     const controller = new AbortController();
@@ -80,6 +91,7 @@ function createCloudflareTurnProvider(options) {
         signal: controller.signal,
       });
       if (!res.ok) {
+        lastMintFailed = true;
         // 401/403 means the token is wrong or revoked — worth seeing in the
         // log, because the symptom otherwise is only "calls are STUN again".
         onError(`credential request failed with HTTP ${res.status}`);
@@ -87,10 +99,12 @@ function createCloudflareTurnProvider(options) {
       }
       const iceServers = normaliseIceServers(await res.json());
       if (!iceServers) {
+        lastMintFailed = true;
         onError("credential response had no usable iceServers");
         return null;
       }
       const issuedAtMs = now();
+      lastMintFailed = false;
       cached = {
         iceServers,
         issuedAtMs,
@@ -99,6 +113,7 @@ function createCloudflareTurnProvider(options) {
       };
       return cached;
     } catch (err) {
+      lastMintFailed = true;
       onError(
         err?.name === "AbortError"
           ? `credential request timed out after ${timeoutMs} ms`
@@ -128,21 +143,37 @@ function createCloudflareTurnProvider(options) {
       return toResult(cached, nowMs);
     }
 
-    if (cached && nowMs < cached.expiresAtMs) {
-      // Still valid, just stale. Serve it now and replace it in the
-      // background so no room join waits on Cloudflare.
+    if (cached && remainingSeconds(cached, nowMs) >= MIN_REMAINING_SECONDS) {
+      // Past the refresh point but still worth handing out. Serve it now and
+      // replace it in the background so no room join waits on Cloudflare.
       void mintOnce();
       return toResult(cached, nowMs);
     }
 
-    // Nothing usable is cached: either the first request since boot, or the
-    // previous credential outlived its expiry. Both must wait for a real one.
+    // Nothing usable is cached, or too little of it is left to survive the
+    // client's own refresh interval. Either way this caller waits for a real
+    // one rather than being handed a credential that dies under it.
     const minted = await mintOnce();
     if (minted) return toResult(minted, now());
-    // Do not serve an expired credential — a TURN server rejects it, which
-    // is worse than STUN because the client would stop looking for a path.
+
+    // The mint failed. A short credential is still better than no relay at
+    // all as long as it has not actually expired: the client refreshes on its
+    // own, and the retry may succeed by then. An expired one is not — a TURN
+    // server rejects it, and the client would stop looking for another path.
+    const afterMs = now();
+    if (cached && afterMs < cached.expiresAtMs)
+      return toResult(cached, afterMs);
     cached = null;
     return null;
+  }
+
+  /**
+   * What the last attempt actually achieved, for /health. Configuration alone
+   * cannot tell a live key from a revoked one.
+   */
+  function getCredentialStatus() {
+    if (cached && now() < cached.expiresAtMs) return "ready";
+    return lastMintFailed ? "failing" : "unknown";
   }
 
   function toResult(entry, nowMs) {
@@ -154,12 +185,13 @@ function createCloudflareTurnProvider(options) {
     };
   }
 
-  return { getIceServers };
+  return { getIceServers, getCredentialStatus };
 }
 
 module.exports = {
   CREDENTIALS_URL,
   MAX_TTL_SECONDS,
+  MIN_REMAINING_SECONDS,
   REFRESH_FRACTION,
   REQUEST_TIMEOUT_MS,
   createCloudflareTurnProvider,

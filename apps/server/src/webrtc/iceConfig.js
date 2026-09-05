@@ -281,14 +281,22 @@ function readIceConfig(env = process.env) {
  * Operational state exposed by /health. This intentionally reports only
  * whether a relay can be issued, never relay URLs, usernames, or credentials.
  */
-function getIceReadiness(config) {
+function getIceReadiness(config, credentialStatus = null) {
   const relayConfigured =
     config?.mode === "hmac" ||
     config?.mode === "static" ||
     config?.mode === "cloudflare";
+  // hmac and static credentials are computed here, so configuration is proof.
+  // Cloudflare issues them over an API, where a revoked key looks identical to
+  // a live one until it is used. Report what the last attempt achieved instead
+  // of claiming a relay that cannot actually mint.
+  const credential =
+    config?.mode === "cloudflare" ? (credentialStatus ?? "unknown") : "n/a";
+  const usable = relayConfigured && credential !== "failing";
   return {
-    status: relayConfigured ? "ready" : "degraded",
+    status: usable ? "ready" : "degraded",
     relay: relayConfigured ? "configured" : "missing",
+    credential,
     required: config?.requireTurn === true,
   };
 }

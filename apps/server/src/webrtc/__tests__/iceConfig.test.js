@@ -31,6 +31,7 @@ test("TURN readiness reports degraded safely, or fails fast when required", () =
   assert.deepEqual(getIceReadiness(optional), {
     status: "degraded",
     relay: "missing",
+    credential: "n/a",
     required: false,
   });
   assert.doesNotThrow(() => assertIceReadiness(optional));
@@ -40,6 +41,7 @@ test("TURN readiness reports degraded safely, or fails fast when required", () =
   assert.deepEqual(getIceReadiness(required), {
     status: "degraded",
     relay: "missing",
+    credential: "n/a",
     required: true,
   });
   assert.throws(() => assertIceReadiness(required), /no usable TURN relay/);
@@ -52,6 +54,7 @@ test("TURN readiness reports degraded safely, or fails fast when required", () =
   assert.deepEqual(assertIceReadiness(ready), {
     status: "ready",
     relay: "configured",
+    credential: "n/a",
     required: true,
   });
 });
@@ -339,8 +342,35 @@ test("readIceConfig: Cloudflare counts as a configured relay for readiness", () 
   assert.deepEqual(getIceReadiness(config), {
     status: "ready",
     relay: "configured",
+    credential: "unknown",
     required: true,
   });
   // Production must be allowed to boot on Cloudflare alone.
   assert.doesNotThrow(() => assertIceReadiness(config));
+});
+
+test("readIceConfig: a Cloudflare key that cannot mint is reported as degraded", () => {
+  const config = readIceConfig({
+    CLOUDFLARE_TURN_KEY_ID: "key-1",
+    CLOUDFLARE_TURN_API_TOKEN: "revoked",
+  });
+  // Configuration alone cannot tell a live key from a revoked one, so /health
+  // must not claim a working relay merely because two variables are set.
+  assert.deepEqual(getIceReadiness(config, "failing"), {
+    status: "degraded",
+    relay: "configured",
+    credential: "failing",
+    required: false,
+  });
+  assert.equal(getIceReadiness(config, "ready").status, "ready");
+});
+
+test("readIceConfig: the credential field is meaningless outside Cloudflare", () => {
+  const hmac = readIceConfig({
+    TURN_URLS: "turn:relay.example.com:3478",
+    TURN_SECRET: "s",
+  });
+  // hmac credentials are computed locally, so there is nothing to report.
+  assert.equal(getIceReadiness(hmac, "failing").credential, "n/a");
+  assert.equal(getIceReadiness(hmac, "failing").status, "ready");
 });
