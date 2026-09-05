@@ -297,13 +297,21 @@ returns different TURN servers, `configureExistingPeers` calls
 
 Relay credentials must never move into the web bundle:
 `NEXT_PUBLIC_ICE_SERVERS` is only the static fallback parsed by
-`hooks/webrtcPeers/iceServers.ts`. `useWebRTCPeers` fetches the config on
-mount, refreshes at 80% of the TTL, retries a failed lookup every minute, and
-exposes `latestRef.current.iceReady`; the `room_users`, `user_joined` and
-offer handlers in `useWebRTCPeerSubscriptions` await it so the first peer of a
-session is built with relay credentials instead of racing the fetch. The gate
-is bounded by the fetch timeout (3 s) and always opens — a failed lookup
-means STUN only, never no peers. STUN alone cannot connect two peers who are
+`hooks/webrtcPeers/iceServers.ts`. `useWebRTCPeers` refreshes at 80% of the
+TTL, retries a failed lookup every minute, and exposes
+`latestRef.current.iceReady`; the `room_users`, `user_joined` and offer
+handlers in `useWebRTCPeerSubscriptions` await it rather than racing the
+fetch. The gate is bounded by the fetch timeout (3 s) and always opens — a
+failed lookup means STUN only, never no peers.
+
+It does **not** request before `iceAccessToken` exists. That capability
+arrives with the first `room_users` payload, so an earlier request could only
+be refused; it would spend rate-limit budget and put a 403 in every user's
+console. The gate opens immediately in that window instead of holding, because
+an offer can arrive before our own presence and a peer that is never built is
+worse than one that starts on STUN. The first peer of a session is therefore
+often STUN-only, and `configureExistingPeers` upgrades it in place with
+`setConfiguration` plus `restartIce` when the credentials land. STUN alone cannot connect two peers who are
 both behind symmetric NAT; that needs a relay, and no client code change can
 substitute for it.
 

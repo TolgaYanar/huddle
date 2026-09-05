@@ -214,13 +214,13 @@ export function useWebRTCPeers<MediaState>(
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
 
+    const iceAccess =
+      iceAccessToken && userId
+        ? { roomId, socketId: userId, token: iceAccessToken }
+        : undefined;
+
     const load = async () => {
-      const config = await fetchIceConfig({
-        iceAccess:
-          iceAccessToken && userId
-            ? { roomId, socketId: userId, token: iceAccessToken }
-            : undefined,
-      });
+      const config = await fetchIceConfig({ iceAccess });
       if (cancelled) return;
       if (config) {
         const previousIceServers = iceServersRef.current;
@@ -248,7 +248,20 @@ export function useWebRTCPeers<MediaState>(
       iceGateRef.current.open();
     };
 
-    void load();
+    if (iceAccess) {
+      void load();
+    } else {
+      // The relay endpoint answers only a caller that proved room membership,
+      // and that capability arrives with the first `room_users` payload. A
+      // request before then can only be refused, so it buys nothing and spends
+      // the caller's rate-limit budget. Do not hold the gate waiting for the
+      // capability either: an offer can arrive before our own presence, and a
+      // peer that is never built is worse than one that starts on STUN. The
+      // effect re-runs when the token lands, and configureExistingPeers then
+      // upgrades live peers to the relay with an ICE restart.
+      iceGateRef.current.open();
+    }
+
     return () => {
       cancelled = true;
       if (timer) clearTimeout(timer);
