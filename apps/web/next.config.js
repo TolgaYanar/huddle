@@ -87,6 +87,10 @@ const nextConfig = {
           source: "/api/telemetry/:path*",
           destination: `${target}/api/telemetry/:path*`,
         },
+        {
+          source: "/api/webrtc/:path*",
+          destination: `${target}/api/webrtc/:path*`,
+        },
         // Saved rooms endpoints
         {
           source: "/api/saved-rooms/:path*",

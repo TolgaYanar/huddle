@@ -11,7 +11,7 @@ import { useWebRTCPeerSubscriptions } from "../useWebRTCPeerSubscriptions";
 type OfferListener = (data: WebRTCOfferPayload) => void | Promise<void>;
 type IceListener = (data: WebRTCIcePayload) => void | Promise<void>;
 
-function createHarness() {
+function createHarness(options: { holdIceGate?: boolean } = {}) {
   let offerListener: OfferListener | undefined;
   let answerListener: OfferListener | undefined;
   let iceListener: IceListener | undefined;
@@ -29,10 +29,17 @@ function createHarness() {
   );
   const getExistingNegotiator = vi.fn(() => undefined);
 
+  let openIceGate: () => void = () => {};
+  const iceReady = new Promise<void>((resolve) => {
+    openIceGate = resolve;
+  });
+  if (!options.holdIceGate) openIceGate();
+
   const latestRef = {
     current: {
       roomId: "room",
       userId: "self",
+      iceReady,
       createPeerConnection,
       getPeerIds: vi.fn(() => []),
       getExistingPeer,
@@ -81,6 +88,7 @@ function createHarness() {
     getOfferListener: () => offerListener,
     getAnswerListener: () => answerListener,
     getIceListener: () => iceListener,
+    openIceGate: () => openIceGate(),
   };
 }
 
@@ -128,5 +136,43 @@ describe("useWebRTCPeerSubscriptions signaling races", () => {
     expect(harness.createPeerConnection).not.toHaveBeenCalled();
     expect(harness.negotiator.receiveDescription).not.toHaveBeenCalled();
     harness.unmount();
+  });
+});
+
+describe("useWebRTCPeerSubscriptions ICE server gate", () => {
+  it("creates the first peer only after the ICE lookup settles, keeping its candidates", async () => {
+    const harness = createHarness({ holdIceGate: true });
+    const offer = harness.getOfferListener();
+    const ice = harness.getIceListener();
+    expect(offer).toBeDefined();
+    expect(ice).toBeDefined();
+
+    const offerHandled = act(async () => {
+      await offer?.({
+        roomId: "room",
+        from: "peer",
+        sdp: { type: "offer", sdp: "v=0" },
+      });
+    });
+    await act(async () => {
+      await ice?.({
+        roomId: "room",
+        from: "peer",
+        candidate: { candidate: "c" },
+      });
+    });
+
+    // Neither the offer nor the candidate may touch a connection that does
+    // not have its relay credentials yet.
+    expect(harness.createPeerConnection).not.toHaveBeenCalled();
+    expect(harness.addIceCandidate).not.toHaveBeenCalled();
+
+    harness.openIceGate();
+    await offerHandled;
+
+    expect(harness.createPeerConnection).toHaveBeenCalledWith("peer");
+    expect(harness.negotiator.receiveDescription).toHaveBeenCalledTimes(1);
+    // The buffered candidate is flushed once the description is applied.
+    expect(harness.addIceCandidate).toHaveBeenCalledWith({ candidate: "c" });
   });
 });

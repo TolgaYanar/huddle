@@ -96,6 +96,11 @@ export type WebRTCPeersLatest<MediaState> = {
   roomId: string;
   userId: string;
 
+  // Resolves once the first ICE server lookup has settled (success, failure
+  // or timeout). Peer creation waits on it so the first connection of a
+  // session gets the relay credentials instead of racing the fetch.
+  iceReady: Promise<void>;
+
   createPeerConnection: (peerId: string) => RTCPeerConnection;
   getPeerIds: () => string[];
   getExistingPeer: (peerId: string) => RTCPeerConnection | undefined;

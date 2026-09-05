@@ -61,8 +61,8 @@ npm run build      # Generate Prisma client
 API_PROXY_TARGET=http://localhost:4000
 YOUTUBE_API_KEY=<your-youtube-data-api-v3-key>
 # Optional outside Vercel: NEXT_PUBLIC_APP_RELEASE=<git-sha-or-version>
-# Optional TURN relay for calls across restrictive NATs (JSON RTCIceServer array):
-# NEXT_PUBLIC_ICE_SERVERS='[{"urls":["turn:relay.example.com:3478"],"username":"u","credential":"p"}]'
+# Optional static ICE fallback; the TURN relay itself is configured on the server (TURN_URLS)
+# NEXT_PUBLIC_ICE_SERVERS='[{"urls":["stun:stun.l.google.com:19302"]}]'
 ```
 
 `YOUTUBE_API_KEY` is read by the Next.js route handlers in `apps/web/app/api/`
@@ -103,6 +103,9 @@ Web is deployed on Vercel, the backend on Railway.
 ```env
 DATABASE_URL=<railway-postgres-url>
 CORS_ORIGINS=https://yourdomain.com
+# TURN relay so calls work across symmetric NAT (see apps/server/.env.example)
+TURN_URLS=turn:turn.yourdomain.com:3478?transport=udp,turn:turn.yourdomain.com:3478?transport=tcp,turns:turn.yourdomain.com:5349?transport=tcp
+TURN_SECRET=<the relay's shared secret>
 NODE_ENV=production
 ```
 
