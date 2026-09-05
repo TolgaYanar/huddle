@@ -7,6 +7,7 @@ import {
   PEER_CONNECTION_TIMEOUT_MS,
   PEER_DISCONNECTED_GRACE_MS,
   PEER_RECOVERY_DELAYS_MS,
+  SENDER_STALL_CHECK_MS,
   useWebRTCPeers,
 } from "../useWebRTCPeers";
 
@@ -65,8 +66,34 @@ class FakePeerConnection {
     FakePeerConnection.instances.push(this);
   }
 
+  // Optional audio sender, for the stalled-encoder watchdog. Left unset the
+  // fake behaves exactly as before for every other test.
+  audioSender: {
+    track: { kind: string; enabled: boolean; readyState: string } | null;
+    replaceTrack: ReturnType<typeof vi.fn>;
+  } | null = null;
+  packetsSent = 0;
+
+  attachAudioSender() {
+    const track = { kind: "audio", enabled: true, readyState: "live" };
+    this.audioSender = {
+      track,
+      replaceTrack: vi.fn(async (next: typeof track | null) => {
+        this.audioSender!.track = next;
+      }),
+    };
+    return this.audioSender;
+  }
+
+  getStats = vi.fn(async () => {
+    const rows = this.audioSender
+      ? [{ type: "outbound-rtp", kind: "audio", packetsSent: this.packetsSent }]
+      : [];
+    return { forEach: (fn: (row: unknown) => void) => rows.forEach(fn) };
+  });
+
   getSenders() {
-    return [];
+    return this.audioSender ? [this.audioSender] : [];
   }
 
   getTransceivers() {
@@ -594,6 +621,60 @@ describe("useWebRTCPeers connection recovery", () => {
     expect(harness.result.current.peerConnectionStates["aaa-peer"]).toBe(
       "recovering",
     );
+    harness.unmount();
+  });
+});
+
+describe("useWebRTCPeers stalled audio encoder", () => {
+  beforeEach(() => {
+    FakePeerConnection.configs = [];
+    FakePeerConnection.instances = [];
+    vi.stubGlobal("RTCPeerConnection", FakePeerConnection);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("re-attaches a live track whose encoder never sent a packet", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(iceResponse([TURN], 600)));
+
+    const harness = renderPeers(MEMBERSHIP_TOKEN);
+    const peer = await announcePeer(harness);
+    const sender = peer.attachAudioSender();
+    const track = sender.track;
+    peer.packetsSent = 0;
+
+    await setConnectionState(peer, "connected", SENDER_STALL_CHECK_MS);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    // Detach then re-attach: this rebuilds the encoder without touching the
+    // description or ICE, which is what a working call depends on.
+    expect(sender.replaceTrack).toHaveBeenCalledTimes(2);
+    expect(sender.replaceTrack).toHaveBeenNthCalledWith(1, null);
+    expect(sender.replaceTrack).toHaveBeenNthCalledWith(2, track);
+    harness.unmount();
+  });
+
+  it("leaves a sender that is actually sending alone", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(iceResponse([TURN], 600)));
+
+    const harness = renderPeers(MEMBERSHIP_TOKEN);
+    const peer = await announcePeer(harness);
+    const sender = peer.attachAudioSender();
+    peer.packetsSent = 42;
+
+    await setConnectionState(peer, "connected", SENDER_STALL_CHECK_MS * 3);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(sender.replaceTrack).not.toHaveBeenCalled();
     harness.unmount();
   });
 });

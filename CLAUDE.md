@@ -260,7 +260,23 @@ read `sendrecv` and their sender held a live track while `outbound-rtp` stayed
 at zero packets, so about half of all calls were audible in one direction
 only. A remote track being `live` does not mean media is flowing — verify with
 `getStats()` (`outbound-rtp.packetsSent`, `inbound-rtp.packetsReceived` and
-`totalAudioEnergy`), never with `track.readyState`. Treat each
+`totalAudioEnergy`), never with `track.readyState`.
+
+A sender can also finish a renegotiation holding a live, enabled track on a
+`sendrecv` transceiver, with both descriptions agreeing, while its encoder was
+never started. Nothing reports a fault: `outbound-rtp` exists and says
+`active`, and only `packetsSent` gives it away by staying at zero, so that side
+is simply never heard. Measured on production it hit one side of roughly half
+of all calls, and the capture was innocent — an independent `AudioContext` read
+the same audio from the very track being sent that the working side was
+transmitting, while `media-source.totalAudioEnergy` for it read 0. So
+`useWebRTCPeers` re-checks `packetsSent` `SENDER_STALL_CHECK_MS` after a peer
+connects and, if it is still zero, detaches and re-attaches the track
+(`replaceTrack(null)` then `replaceTrack(track)`) to rebuild the encoder. That
+touches neither the description nor ICE, so a call that is already working
+cannot be disturbed, and the check is bounded to `SENDER_STALL_ATTEMPTS`.
+
+Treat each
 `room_users` payload as authoritative: peers absent from its `users` list must
 be closed even if a preceding `user_left` event was missed during reconnect.
 Media permission promises cannot be cancelled by the browser, so
