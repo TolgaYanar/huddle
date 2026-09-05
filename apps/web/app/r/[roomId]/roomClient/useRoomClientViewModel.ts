@@ -574,6 +574,7 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
     isActivityCollapsed,
     isTheatreMode,
     isChatOnlyMode,
+    remoteAudioSinkProps: { streams: rtc.remoteStreams },
     chatModeBarProps: {
       // Reuses the existing per-user mute override rather than adding a second
       // audio path: it already silences playback locally without telling the

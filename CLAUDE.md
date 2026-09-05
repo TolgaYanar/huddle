@@ -252,6 +252,21 @@ Media permission promises cannot be cancelled by the browser, so
 and stops tracks from stale results. Keep the local preview on the callback ref:
 the video element is conditionally remounted by several room UI states.
 
+Remote voice is played only by `components/RemoteAudioSink.tsx`, mounted at the
+room root in `RoomClientView`. It used to live in each participant's tile,
+and the tiles unmount when the call panel is collapsed or theatre mode is
+entered — every peer connection stayed healthy and the room went silent, with
+nothing logged. Never put an `<audio>` for a remote stream back into a tile:
+it would stop with the tile and, while both exist, play every voice twice.
+The sink also owns the autoplay gate: a listener who has not interacted with
+the page gets `NotAllowedError` from `play()`, which the old code swallowed.
+The sink shows an "Enable audio" control and retries on the next gesture.
+
+ICE servers come from `NEXT_PUBLIC_ICE_SERVERS` (JSON, parsed by
+`hooks/webrtcPeers/iceServers.ts`, STUN-only fallback). STUN alone cannot
+connect two peers who are both behind symmetric NAT; that needs a TURN relay
+configured there, and no client code change can substitute for it.
+
 **Auth.** Session cookie based (`apps/server/src/auth/`): `session.js` (SHA-256
 hashed tokens, HttpOnly cookie), `password.js`, `validators.js`, `middleware.js`,
 `rateLimiter.js`. Password hashing and verification are asynchronous scrypt;

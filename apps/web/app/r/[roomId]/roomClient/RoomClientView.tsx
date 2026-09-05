@@ -4,6 +4,7 @@ import { CallSidebar } from "../components/CallSidebar";
 import { ActivitySidebar } from "../components/ActivitySidebar";
 import { PlayerSection } from "../components/PlayerSection";
 import { ChatModeBar } from "../components/ChatModeBar";
+import { RemoteAudioSink } from "../components/RemoteAudioSink";
 import { WheelPickerModal } from "../components/WheelPickerModal";
 import { PasswordModal } from "../components/PasswordModal";
 import { VideoPreviewModal } from "../components/VideoPreviewModal";
@@ -34,6 +35,7 @@ export type RoomClientViewProps = {
   isTheatreMode: boolean;
   isChatOnlyMode: boolean;
   chatModeBarProps: React.ComponentProps<typeof ChatModeBar>;
+  remoteAudioSinkProps: React.ComponentProps<typeof RemoteAudioSink>;
   playerSectionProps: React.ComponentProps<typeof PlayerSection>;
   callSidebarProps: React.ComponentProps<typeof CallSidebar>;
   activitySidebarProps: React.ComponentProps<typeof ActivitySidebar>;
@@ -66,6 +68,7 @@ export function RoomClientView({
   isTheatreMode,
   isChatOnlyMode,
   chatModeBarProps,
+  remoteAudioSinkProps,
   playerSectionProps,
   callSidebarProps,
   activitySidebarProps,
@@ -109,6 +112,13 @@ export function RoomClientView({
       <PasswordModal {...passwordModalProps} />
 
       <WheelPickerModal {...wheelPickerModalProps} />
+
+      {/*
+        Outside the layout grid on purpose: remote voice must keep playing
+        through theatre mode, a collapsed call panel and chat-only mode, none of
+        which keep the participant tiles mounted.
+      */}
+      {isReady && <RemoteAudioSink {...remoteAudioSinkProps} />}
 
       {isReady && (
         <main

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
+import { parseIceServers } from "./iceServers";
 import { PeerNegotiator } from "./negotiation";
 import { syncTracksToPeer as syncTracksToPeerImpl } from "./syncTracks";
 import type { UseWebRTCPeersArgs, WebRTCPeersLatest } from "./types";
@@ -88,9 +89,9 @@ export function useWebRTCPeers<MediaState>(
     onWebRTCSpeaking,
   });
 
-  const rtcConfig = useMemo(
+  const rtcConfig = useMemo<RTCConfiguration>(
     () => ({
-      iceServers: [{ urls: ["stun:stun.l.google.com:19302"] }],
+      iceServers: parseIceServers(process.env.NEXT_PUBLIC_ICE_SERVERS),
     }),
     [],
   );
