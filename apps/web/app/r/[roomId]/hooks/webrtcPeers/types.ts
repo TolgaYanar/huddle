@@ -14,6 +14,11 @@ export type RoomUsersPayload<MediaState> = {
   roomId: string;
   users: string[];
   mediaStates?: Record<string, MediaState>;
+  // The per-room capability the ICE endpoint requires. It arrives on this
+  // payload, which is also what creates the first peer, so reading it here
+  // rather than waiting for React state is what lets that peer be built with
+  // relay credentials instead of upgraded afterwards.
+  iceAccessToken?: string | null;
 };
 
 export type WebRTCFromPayload = {
@@ -113,6 +118,10 @@ export type WebRTCPeersLatest<MediaState> = {
   // or timeout). Peer creation waits on it so the first connection of a
   // session gets the relay credentials instead of racing the fetch.
   iceReady: Promise<void>;
+
+  // Start the relay-credential lookup from a capability we have in hand.
+  // Safe to call repeatedly: only the first use of a given token requests.
+  primeIceAccess: (token: string | null | undefined) => void;
 
   createPeerConnection: (peerId: string) => RTCPeerConnection;
   getPeerIds: () => string[];

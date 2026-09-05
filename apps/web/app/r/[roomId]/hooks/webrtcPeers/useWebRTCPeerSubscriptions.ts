@@ -102,6 +102,14 @@ export function useWebRTCPeerSubscriptions<MediaState>(args: {
     const cleanupRoomUsers = _onRoomUsers?.(
       async (data: RoomUsersPayload<MediaState>) => {
         if (data.roomId !== latestRef.current.roomId) return;
+        // This payload both carries the ICE capability and creates the first
+        // peers of the session. Starting the lookup from it, rather than
+        // waiting for the token to travel through React state, is what lets
+        // that peer be built with relay credentials. The upgrade that ran
+        // otherwise — setConfiguration plus restartIce on a peer that was
+        // still connecting — collided with the other side's media
+        // renegotiation and left one direction permanently silent.
+        latestRef.current.primeIceAccess(data.iceAccessToken);
         const currentUserId = latestRef.current.userId;
 
         // Presence is authoritative and must be recorded before waiting for
