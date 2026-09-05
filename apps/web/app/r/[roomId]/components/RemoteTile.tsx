@@ -24,12 +24,10 @@ export function RemoteTile({
   extraActions?: React.ReactNode;
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   // Track which stream is currently wired so we don't reassign srcObject
   // (and re-initialize the element) on every parent re-render when the
   // underlying MediaStream hasn't actually changed.
   const wiredVideoStreamRef = useRef<MediaStream | null>(null);
-  const wiredAudioStreamRef = useRef<MediaStream | null>(null);
 
   const toggleFullscreen = async () => {
     try {
@@ -68,24 +66,13 @@ export function RemoteTile({
     });
   }, [stream]);
 
-  useEffect(() => {
-    if (!audioRef.current) return;
-    if (wiredAudioStreamRef.current === stream) return;
-    audioRef.current.srcObject = stream;
-    wiredAudioStreamRef.current = stream;
-    // Audio autoplay may be blocked until user interaction.
-    audioRef.current.play().catch(() => {
-      // ignore
-    });
-  }, [stream]);
-
   const hasVideo = stream.getVideoTracks().length > 0;
   const hasAudio = stream.getAudioTracks().length > 0;
 
   return (
     <div
       className={`rounded-[var(--radius-panel)] border border-hairline bg-sunken overflow-hidden relative ${
-        speaking ? "ring-2 ring-emerald-500/20" : ""
+        speaking ? "ring-2 ring-positive" : ""
       }`}
       draggable={Boolean(draggablePayload)}
       onDragStart={(e) => {
@@ -159,7 +146,12 @@ export function RemoteTile({
         className="w-full aspect-video object-cover"
       />
 
-      <audio ref={audioRef} autoPlay className="hidden" />
+      {/*
+        No <audio> here on purpose. This tile unmounts when the call panel is
+        collapsed or theatre mode is entered; voice is played by RemoteAudioSink
+        at the room root, which does not. A second element on the same stream
+        would also play every participant twice.
+      */}
 
       {!hasVideo && (
         <div className="absolute inset-0 flex items-center justify-center text-ink-muted text-sm">

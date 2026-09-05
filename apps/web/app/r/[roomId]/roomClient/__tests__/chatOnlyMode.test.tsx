@@ -72,6 +72,7 @@ const baseProps = {
     onToggleMuted: vi.fn(),
     onShowVideo: vi.fn(),
   },
+  remoteAudioSinkProps: { streams: [] },
   playerSectionProps: {},
   callSidebarProps: {},
   activitySidebarProps: {},
