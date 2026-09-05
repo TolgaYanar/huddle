@@ -20,6 +20,13 @@ vi.mock("../../components/CallSidebar", async () => {
       React.createElement("div", { "data-testid": "call-sidebar" }),
   };
 });
+vi.mock("../../components/callSidebar/ConnectionStatusNotice", async () => {
+  const React = await import("react");
+  return {
+    ConnectionStatusNotice: () =>
+      React.createElement("div", { "data-testid": "theatre-call-status" }),
+  };
+});
 vi.mock("../../components/ActivitySidebar", () => ({
   ActivitySidebar: () => null,
 }));
@@ -134,9 +141,11 @@ describe("chat-only mode", () => {
       <RoomClientView {...baseProps} isTheatreMode isChatOnlyMode={false} />,
     );
     expect(screen.queryByTestId("call-sidebar")).toBeNull();
+    expect(screen.getByTestId("theatre-call-status")).toBeTruthy();
 
     rerender(<RoomClientView {...baseProps} isTheatreMode isChatOnlyMode />);
     expect(screen.getByTestId("call-sidebar")).toBeTruthy();
+    expect(screen.queryByTestId("theatre-call-status")).toBeNull();
     expect(screen.getByRole("button", { name: "Show video" })).toBeTruthy();
 
     // Leaving chat-only mode must hand the row back to theatre mode.

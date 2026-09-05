@@ -104,8 +104,11 @@ Web is deployed on Vercel, the backend on Railway.
 DATABASE_URL=<railway-postgres-url>
 CORS_ORIGINS=https://yourdomain.com
 # TURN relay so calls work across symmetric NAT (see apps/server/.env.example)
-TURN_URLS=turn:turn.yourdomain.com:3478?transport=udp,turn:turn.yourdomain.com:3478?transport=tcp,turns:turn.yourdomain.com:5349?transport=tcp
-TURN_SECRET=<the relay's shared secret>
+CLOUDFLARE_TURN_KEY_ID=<turn key id>
+CLOUDFLARE_TURN_API_TOKEN=<turn key api token>
+REQUIRE_TURN=1
+# Refuse to start rather than silently ship calls that fail on strict NAT.
+REQUIRE_TURN=1
 NODE_ENV=production
 ```
 

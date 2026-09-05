@@ -56,6 +56,7 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
   const guestUsernameRef = useRef("");
   const hasInitialSyncRef = useRef<boolean>(false);
   const mountTimeRef = useRef<number>(Date.now());
+  const pushToTalkDownRef = useRef(false);
 
   useEffect(() => {
     setIsClient(true);
@@ -129,19 +130,6 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
     }
   }, [room.isConnected, room.socket?.id]);
 
-  const {
-    bindingLabel: pushToTalkBindingLabel,
-    isRebinding: isRebindingPushToTalkKey,
-    setIsRebinding: setIsRebindingPushToTalkKey,
-    isDown: pushToTalkDown,
-    isDownRef: pushToTalkDownRef,
-    stopTransmit: stopPushToTalkTransmit,
-  } = usePushToTalkBinding({
-    isClient,
-    enabled: pushToTalkEnabled,
-    micEnabled: true,
-  });
-
   const roomState = useRoomState({
     roomId,
     userId,
@@ -181,12 +169,29 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
     pushToTalkDownRef,
   });
 
+  const {
+    bindingLabel: pushToTalkBindingLabel,
+    isRebinding: isRebindingPushToTalkKey,
+    setIsRebinding: setIsRebindingPushToTalkKey,
+    isDown: pushToTalkDown,
+    stopTransmit: stopPushToTalkTransmit,
+  } = usePushToTalkBinding({
+    isClient,
+    enabled: pushToTalkEnabled,
+    micEnabled: rtc.mediaTracks.micEnabled,
+    downRef: pushToTalkDownRef,
+    onTransmitChange: rtc.mediaTracks.applyPushToTalkGate,
+  });
+
   const fullscreen = useFullscreen({ isClient });
 
   const stagePinning = useStagePinning({
     userId,
     ensureLocalStream: rtc.mediaTracks.ensureLocalStream,
+    localVideoActive:
+      rtc.mediaTracks.camEnabled || rtc.mediaTracks.screenEnabled,
     remoteStreams: rtc.remoteStreams,
+    remoteMedia: rtc.remoteMedia,
   });
 
   const inviteLink = useInviteLink(roomId, isClient);
@@ -300,11 +305,28 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
     setCamEnabled: rtc.mediaTracks.setCamEnabled,
     screenEnabled: rtc.mediaTracks.screenEnabled,
     setScreenEnabled: rtc.mediaTracks.setScreenEnabled,
+    mediaErrors: rtc.mediaTracks.mediaErrors,
+    mediaPending: rtc.mediaTracks.mediaPending,
+    clearMediaError: rtc.mediaTracks.clearMediaError,
+    audioInputs: rtc.mediaDevices.audioInputs,
+    videoInputs: rtc.mediaDevices.videoInputs,
+    audioOutputs: rtc.mediaDevices.audioOutputs,
+    audioInputId: rtc.mediaDevices.audioInputId,
+    setAudioInputId: rtc.mediaDevices.setAudioInputId,
+    videoInputId: rtc.mediaDevices.videoInputId,
+    setVideoInputId: rtc.mediaDevices.setVideoInputId,
+    audioOutputId: rtc.mediaDevices.audioOutputId,
+    setAudioOutputId: rtc.mediaDevices.setAudioOutputId,
+    outputSelectionSupported: rtc.mediaDevices.outputSelectionSupported,
+    devicesRefreshing: rtc.mediaDevices.isRefreshing,
+    deviceInventoryError: rtc.mediaDevices.inventoryError,
+    refreshDevices: rtc.mediaDevices.refresh,
     pushToTalkEnabled,
     setPushToTalkEnabled,
     pushToTalkDown,
     pushToTalkBindingLabel,
     stopPushToTalkTransmit,
+    closePushToTalkGate: rtc.mediaTracks.closePushToTalkGate,
     isRebindingPushToTalkKey,
     setIsRebindingPushToTalkKey,
     echoCancellationEnabled,
@@ -318,6 +340,8 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
     remoteStreams: rtc.remoteStreams,
     remoteSpeaking: rtc.remoteSpeaking,
     remoteMedia: rtc.remoteMedia,
+    peerConnectionStates: rtc.peerConnectionStates,
+    retryFailedPeers: rtc.retryFailedPeers,
     setIsDraggingTile: stagePinning.setIsDraggingTile,
     setIsStageDragOver: stagePinning.setIsStageDragOver,
     onPinTile: stagePinning.setPinnedStage,
@@ -574,7 +598,10 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
     isActivityCollapsed,
     isTheatreMode,
     isChatOnlyMode,
-    remoteAudioSinkProps: { streams: rtc.remoteStreams },
+    remoteAudioSinkProps: {
+      streams: rtc.remoteStreams,
+      outputDeviceId: rtc.mediaDevices.audioOutputId,
+    },
     chatModeBarProps: {
       // Reuses the existing per-user mute override rather than adding a second
       // audio path: it already silences playback locally without telling the

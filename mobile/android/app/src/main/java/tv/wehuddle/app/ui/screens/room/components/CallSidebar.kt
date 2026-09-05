@@ -62,7 +62,7 @@ fun CallSidebar(
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    text = "Screen share, webcam, and mic between users.",
+                    text = "Webcam and mic between users.",
                     style = TextStyle(
                         color = Slate400,
                         fontSize = 12.sp
@@ -220,17 +220,18 @@ fun CallSidebar(
                 
                 HuddleSmallButton(
                     onClick = onToggleScreen,
-                    isActive = localMediaState.screen,
+                    enabled = false,
+                    isActive = false,
                     modifier = Modifier.weight(1f)
                 ) {
                     Icon(
-                        imageVector = if (localMediaState.screen) Icons.Default.ScreenShare else Icons.Default.StopScreenShare,
-                        contentDescription = "Screen",
+                        imageVector = Icons.Default.ScreenShare,
+                        contentDescription = "Screen sharing unavailable",
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(Modifier.width(4.dp))
                     Text(
-                        text = if (localMediaState.screen) "Screen On" else "Screen Off",
+                        text = "Unavailable",
                         style = TextStyle(fontSize = 12.sp)
                     )
                 }

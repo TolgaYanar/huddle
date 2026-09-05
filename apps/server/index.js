@@ -36,7 +36,7 @@ const { createSessionCleanup } = require("./src/auth/sessionCleanup");
 const { createTelemetryCleanup } = require("./src/telemetry/telemetryCleanup");
 
 const { registerRoutes } = require("./src/routes");
-const { readIceConfig } = require("./src/webrtc/iceConfig");
+const { assertIceReadiness, readIceConfig } = require("./src/webrtc/iceConfig");
 const { createIo } = require("./src/socket/createIo");
 const { registerSocket } = require("./src/socket/register");
 
@@ -97,6 +97,22 @@ if (process.env.NODE_ENV === "production" && allowedOrigins.length === 0) {
   );
 }
 
+// Relay configuration is read before database clients or cleanup timers start.
+// A deployment that opts into REQUIRE_TURN therefore fails without opening
+// other resources when its relay settings are missing or malformed.
+const iceConfig = readIceConfig(process.env);
+for (const warning of iceConfig.warnings) console.warn(`[ice] ${warning}`);
+const iceReadiness = assertIceReadiness(iceConfig);
+console.log(`[ice] TURN relay mode: ${iceConfig.mode}`);
+if (
+  process.env.NODE_ENV === "production" &&
+  iceReadiness.status === "degraded"
+) {
+  console.warn(
+    "[ice] WebRTC voice is degraded: no TURN relay is configured; strict NAT pairs may be unable to connect",
+  );
+}
+
 const prismaState = initPrisma({ vLog });
 const getPrisma = () => prismaState.prisma;
 const isDbConnected = () => prismaState.dbConnected;
@@ -112,12 +128,6 @@ const telemetryCleanup = createTelemetryCleanup({
   vLog,
 });
 telemetryCleanup.start();
-
-// Relay configuration is read once so a typo shows up in the boot log rather
-// than as calls that "sometimes" fail for users behind strict NAT.
-const iceConfig = readIceConfig(process.env);
-for (const warning of iceConfig.warnings) console.warn(`[ice] ${warning}`);
-console.log(`[ice] TURN relay mode: ${iceConfig.mode}`);
 
 let io;
 

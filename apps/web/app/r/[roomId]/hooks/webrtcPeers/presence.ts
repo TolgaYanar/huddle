@@ -36,11 +36,13 @@ export function reconcileRoomUsers<MediaState>(args: {
     return next;
   });
 
-  args.setRemoteSpeaking((previous) => {
+  args.setRemoteSpeaking(() => {
     const next: Record<string, boolean> = {};
     for (const peerId of activePeerIds) {
-      const speaking = previous[peerId];
-      if (speaking !== undefined) next[peerId] = speaking;
+      // A snapshot begins a new presence epoch. `speaking:false` may have
+      // disappeared with the previous socket, so positive state must never be
+      // carried across reconnect.
+      next[peerId] = false;
     }
     return next;
   });

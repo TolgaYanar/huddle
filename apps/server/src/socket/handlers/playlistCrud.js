@@ -10,7 +10,9 @@ function attachPlaylistCrudHandlers(io, state, socket, deps) {
     const { roomId } = data || {};
     if (!roomId || typeof roomId !== "string") return;
     if (!isRoomMember(socket, roomId)) return;
-    await emitPlaylistStateTo(deps, state, socket, roomId);
+    await emitPlaylistStateTo(deps, state, socket, roomId, () =>
+      isRoomMember(socket, roomId),
+    );
   });
 
   socket.on("playlist_create", async (data) => {

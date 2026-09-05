@@ -28,6 +28,6 @@ describe("reconcileRoomUsers", () => {
     expect(closePeer).toHaveBeenCalledWith("ghost");
     expect(clearPendingIce).toHaveBeenCalledWith("ghost");
     expect(media).toEqual({ active: "fresh" });
-    expect(speaking).toEqual({ active: true });
+    expect(speaking).toEqual({ active: false });
   });
 });

@@ -1,8 +1,17 @@
 package tv.wehuddle.app.ui.screens.room
 
+import android.Manifest
+import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.ContextWrapper
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -23,6 +32,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,6 +48,11 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.IntOffset
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.core.content.ContextCompat
+import androidx.core.app.ActivityCompat
+import kotlinx.coroutines.launch
 import tv.wehuddle.app.data.model.*
 import tv.wehuddle.app.ui.components.*
 import tv.wehuddle.app.data.model.PlaylistStateData
@@ -46,14 +61,22 @@ import tv.wehuddle.app.ui.theme.*
 import tv.wehuddle.app.util.isTV
 import tv.wehuddle.app.util.onDpadKeyEvent
 import tv.wehuddle.app.util.rememberScreenSize
+import tv.wehuddle.app.data.webrtc.VersionedValue
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import org.webrtc.EglBase
 import org.webrtc.MediaStream
 import android.util.Log
 
 private const val TAG = "RoomScreen"
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
 
 @Composable
 fun RoomScreen(
@@ -67,6 +90,26 @@ fun RoomScreen(
     val isTV = isTV()
     val screenSize = rememberScreenSize()
     val focusManager = LocalFocusManager.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
+    var askedForMicrophonePermission by rememberSaveable { mutableStateOf(false) }
+    var askedForCameraPermission by rememberSaveable { mutableStateOf(false) }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, viewModel) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (roomCallLifecycleAction(event)) {
+                RoomCallLifecycleAction.SUSPEND -> viewModel.suspendCall()
+                RoomCallLifecycleAction.RESUME -> viewModel.resumeCall()
+                RoomCallLifecycleAction.NONE -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            viewModel.suspendCall()
+        }
+    }
     
     val roomState by viewModel.roomState.collectAsStateWithLifecycle()
     val connectionState by viewModel.connectionState.collectAsStateWithLifecycle()
@@ -79,12 +122,155 @@ fun RoomScreen(
     val authUser by viewModel.authUser.collectAsStateWithLifecycle()
     val isRoomSaved by viewModel.isRoomSaved.collectAsStateWithLifecycle()
     val saveBusy by viewModel.saveBusy.collectAsStateWithLifecycle()
+    val callError by viewModel.callError.collectAsStateWithLifecycle()
     
     // WebRTC state
     val localStream by viewModel.localStream.collectAsStateWithLifecycle()
     val remoteStreams by viewModel.remoteStreams.collectAsStateWithLifecycle()
     // Collect EGL context as state to ensure recomposition when it becomes available
     val eglContext by viewModel.eglContext.collectAsStateWithLifecycle()
+
+    val microphonePermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            viewModel.toggleMic()
+        } else {
+            coroutineScope.launch {
+                val canAskAgain = context.findActivity()?.let { activity ->
+                    ActivityCompat.shouldShowRequestPermissionRationale(
+                        activity,
+                        Manifest.permission.RECORD_AUDIO,
+                    )
+                } == true
+                val result = snackbarHostState.showSnackbar(
+                    message = if (canAskAgain) {
+                        "Microphone access is needed so others can hear you."
+                    } else {
+                        "Microphone access is blocked. Enable it in system settings."
+                    },
+                    actionLabel = if (canAskAgain) null else "Settings",
+                    withDismissAction = true,
+                )
+                if (!canAskAgain && result == SnackbarResult.ActionPerformed) {
+                    context.startActivity(
+                        Intent(
+                            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            Uri.fromParts("package", context.packageName, null),
+                        )
+                    )
+                }
+            }
+        }
+    }
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            viewModel.toggleCam()
+        } else {
+            coroutineScope.launch {
+                val canAskAgain = context.findActivity()?.let { activity ->
+                    ActivityCompat.shouldShowRequestPermissionRationale(
+                        activity,
+                        Manifest.permission.CAMERA,
+                    )
+                } == true
+                val result = snackbarHostState.showSnackbar(
+                    message = if (canAskAgain) {
+                        "Camera access is needed to share your video."
+                    } else {
+                        "Camera access is blocked. Enable it in system settings."
+                    },
+                    actionLabel = if (canAskAgain) null else "Settings",
+                    withDismissAction = true,
+                )
+                if (!canAskAgain && result == SnackbarResult.ActionPerformed) {
+                    context.startActivity(
+                        Intent(
+                            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            Uri.fromParts("package", context.packageName, null),
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    val onToggleMic: () -> Unit = {
+        if (
+            roomState.localMediaState.mic ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            viewModel.toggleMic()
+        } else {
+            val shouldExplain = askedForMicrophonePermission &&
+                context.findActivity()?.let { activity ->
+                    ActivityCompat.shouldShowRequestPermissionRationale(
+                        activity,
+                        Manifest.permission.RECORD_AUDIO,
+                    )
+                } == true
+            askedForMicrophonePermission = true
+            if (shouldExplain) {
+                coroutineScope.launch {
+                    val result = snackbarHostState.showSnackbar(
+                        message = "Voice chat needs microphone access.",
+                        actionLabel = "Continue",
+                        withDismissAction = true,
+                    )
+                    if (result == SnackbarResult.ActionPerformed) {
+                        microphonePermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                    }
+                }
+            } else {
+                microphonePermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            }
+        }
+    }
+    val onToggleCam: () -> Unit = {
+        if (
+            roomState.localMediaState.cam ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            viewModel.toggleCam()
+        } else {
+            val shouldExplain = askedForCameraPermission &&
+                context.findActivity()?.let { activity ->
+                    ActivityCompat.shouldShowRequestPermissionRationale(
+                        activity,
+                        Manifest.permission.CAMERA,
+                    )
+                } == true
+            askedForCameraPermission = true
+            if (shouldExplain) {
+                coroutineScope.launch {
+                    val result = snackbarHostState.showSnackbar(
+                        message = "Video chat needs camera access.",
+                        actionLabel = "Continue",
+                        withDismissAction = true,
+                    )
+                    if (result == SnackbarResult.ActionPerformed) {
+                        cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                    }
+                }
+            } else {
+                cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+            }
+        }
+    }
+
+    LaunchedEffect(callError) {
+        callError?.let { message ->
+            snackbarHostState.showSnackbar(
+                message = message,
+                withDismissAction = true,
+            )
+            viewModel.clearCallError()
+        }
+    }
     
     // Wheel picker state
     val showWheelPicker by viewModel.showWheelPicker.collectAsStateWithLifecycle()
@@ -116,13 +302,6 @@ fun RoomScreen(
     val playButtonFocusRequester = remember { FocusRequester() }
     val tabFocusRequesters = remember { List(tabs.size) { FocusRequester() } }
     
-    // Request initial focus on TV
-    LaunchedEffect(isTV) {
-        if (isTV) {
-            playButtonFocusRequester.requestFocus()
-        }
-    }
-
     // Define colors locally if not in theme
     val Slate950 = Color(0xFF020617)
     val Slate900 = Color(0xFF0F172A)
@@ -133,6 +312,22 @@ fun RoomScreen(
     // Password state from room
     val passwordRequired = roomState.passwordRequired
     val passwordInput by viewModel.passwordInput.collectAsStateWithLifecycle()
+    val accessSurface = roomAccessSurface(
+        passwordRequired = passwordRequired,
+        connectionState = connectionState,
+        userId = roomState.userId,
+        error = roomState.error,
+    )
+
+    // The requester is attached only inside the authorized wide-TV layout.
+    // Wait for that composition before moving focus; every room begins behind
+    // the membership gate and requesting sooner throws on TV.
+    LaunchedEffect(isTV, screenSize.isWide, accessSurface) {
+        if (shouldRequestInitialTvFocus(isTV, screenSize.isWide, accessSurface)) {
+            withFrameNanos { }
+            playButtonFocusRequester.requestFocus()
+        }
+    }
     
     // Build remote streams info for fullscreen
     // Use participants list as the source (has mediaState), and join with remoteStreams for actual video
@@ -142,7 +337,7 @@ fun RoomScreen(
         participants
             .filter { it.id != roomState.userId } // Exclude self
             .map { participant ->
-                val stream = remoteStreams[participant.id]
+                val stream = remoteStreams[participant.id]?.value
                 RemoteStreamInfo(
                     peerId = participant.id,
                     stream = stream,
@@ -158,10 +353,24 @@ fun RoomScreen(
     
     // Root Box to contain layouts and fullscreen overlay
     Box(modifier = Modifier.fillMaxSize()) {
-        // Determine layout based on device type
-        if (isTV && screenSize.isWide) {
-            // TV Wide Layout - Side by side
-            TvWideRoomLayout(
+        when (accessSurface) {
+            RoomAccessSurface.PASSWORD -> PasswordModal(
+                passwordInput = passwordInput,
+                onPasswordChange = viewModel::updatePasswordInput,
+                onSubmit = viewModel::submitPassword,
+                error = roomState.passwordError,
+            )
+            RoomAccessSurface.JOINING -> RoomMembershipGate(
+                error = null,
+                onNavigateBack = onNavigateBack,
+            )
+            RoomAccessSurface.DENIED -> RoomMembershipGate(
+                error = roomState.error,
+                onNavigateBack = onNavigateBack,
+            )
+            RoomAccessSurface.ROOM -> if (isTV && screenSize.isWide) {
+                // TV Wide Layout - Side by side
+                TvWideRoomLayout(
                 roomId = roomId,
                 roomState = roomState,
                 connectionState = connectionState,
@@ -185,15 +394,20 @@ fun RoomScreen(
                 onNavigateToRegister = onNavigateToRegister,
                 context = context,
                 playButtonFocusRequester = playButtonFocusRequester,
+                eglContext = eglContext,
+                localStream = localStream,
+                remoteStreams = remoteStreams,
+                onToggleMic = onToggleMic,
+                onToggleCam = onToggleCam,
                 onEnterFullscreen = { 
                     Log.d(TAG, "TvWideRoomLayout: onEnterFullscreen called")
                     isFullscreen = true 
                 },
                 isFullscreen = isFullscreen
-            )
-        } else {
-            // Mobile/Compact TV Layout - Tabbed
-            MobileRoomLayout(
+                )
+            } else {
+                // Mobile/Compact TV Layout - Tabbed
+                MobileRoomLayout(
                 roomId = roomId,
                 roomState = roomState,
                 connectionState = connectionState,
@@ -220,15 +434,20 @@ fun RoomScreen(
                 onNavigateToRegister = onNavigateToRegister,
                 context = context,
                 isTV = isTV,
+                isHeightCompact = screenSize.heightDp < 480.dp,
                 onEnterFullscreen = { isFullscreen = true },
                 isFullscreen = isFullscreen,
-                passwordRequired = passwordRequired,
-                passwordInput = passwordInput
-            )
+                eglContext = eglContext,
+                localStream = localStream,
+                remoteStreams = remoteStreams,
+                onToggleMic = onToggleMic,
+                onToggleCam = onToggleCam,
+                )
+            }
         }
         
         // Fullscreen player overlay - placed LAST so it appears on top
-        FullscreenPlayerOverlay(
+        if (accessSurface == RoomAccessSurface.ROOM) FullscreenPlayerOverlay(
             isFullscreen = isFullscreen,
             onExitFullscreen = { isFullscreen = false },
             videoUrl = roomState.videoState.url,
@@ -256,8 +475,8 @@ fun RoomScreen(
             localMediaState = roomState.localMediaState,
             remoteStreams = remoteStreamInfoList,
             localUsername = authUser?.username ?: roomState.userId.take(8),
-            onToggleMic = viewModel::toggleMic,
-            onToggleCam = viewModel::toggleCam,
+            onToggleMic = onToggleMic,
+            onToggleCam = onToggleCam,
             chatMessages = chatMessages,
             chatInput = chatInput,
             currentUserId = roomState.userId,
@@ -272,6 +491,67 @@ fun RoomScreen(
             onShowWebcamsChange = { fullscreenShowWebcams = it },
             onShowChatChange = { fullscreenShowChat = it }
         )
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
+    }
+}
+
+@Composable
+private fun RoomMembershipGate(
+    error: String?,
+    onNavigateBack: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            if (error == null) {
+                CircularProgressIndicator(modifier = Modifier.size(32.dp))
+                Spacer(Modifier.height(20.dp))
+                Text(
+                    text = "Joining room…",
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "Checking access before enabling your microphone and camera.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Default.Lock,
+                    contentDescription = null,
+                    modifier = Modifier.size(36.dp),
+                    tint = MaterialTheme.colorScheme.error,
+                )
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    text = "Unable to join room",
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = error,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Spacer(Modifier.height(20.dp))
+                Button(onClick = onNavigateBack) {
+                    Text("Go back")
+                }
+            }
+        }
     }
 }
 
@@ -300,6 +580,11 @@ private fun TvWideRoomLayout(
     onNavigateToRegister: (String) -> Unit,
     context: Context,
     playButtonFocusRequester: FocusRequester,
+    eglContext: EglBase.Context?,
+    localStream: MediaStream?,
+    remoteStreams: Map<String, VersionedValue<MediaStream>>,
+    onToggleMic: () -> Unit,
+    onToggleCam: () -> Unit,
     onEnterFullscreen: () -> Unit,
     isFullscreen: Boolean = false
 ) {
@@ -344,6 +629,23 @@ private fun TvWideRoomLayout(
                 isConnected = connectionState == ConnectionState.CONNECTED,
                 participantCount = participants.size,
                 onBack = onNavigateBack
+            )
+
+            RoomCallStrip(
+                eglContext = eglContext,
+                localUserId = roomState.userId,
+                localUsername = authUser?.username ?: roomState.userId.take(8),
+                localStream = localStream,
+                localMediaState = roomState.localMediaState,
+                localIsSpeaking = roomState.isSpeaking,
+                participants = participants,
+                remoteStreams = remoteStreams,
+                onToggleMic = onToggleMic,
+                onToggleCamera = onToggleCam,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 8.dp),
+                isTv = true,
             )
             
             // Video Player - Takes most of the screen
@@ -517,6 +819,10 @@ private fun TvWideRoomLayout(
                     onEnterFullscreen()
                 },
                 playButtonFocusRequester = playButtonFocusRequester,
+                isMicEnabled = roomState.localMediaState.mic,
+                isCamEnabled = roomState.localMediaState.cam,
+                onToggleMic = onToggleMic,
+                onToggleCam = onToggleCam,
                 showChatButton = true,
                 onChatToggle = { showChatPanel = !showChatPanel },
                 chatUnread = chatMessages.isNotEmpty()
@@ -658,6 +964,10 @@ private fun TvPlaybackControls(
     onSync: () -> Unit,
     onFullscreen: () -> Unit,
     playButtonFocusRequester: FocusRequester,
+    isMicEnabled: Boolean,
+    isCamEnabled: Boolean,
+    onToggleMic: () -> Unit,
+    onToggleCam: () -> Unit,
     showChatButton: Boolean = false,
     onChatToggle: () -> Unit = {},
     chatUnread: Boolean = false
@@ -767,15 +1077,29 @@ private fun TvPlaybackControls(
                 )
             }
             
-            // Right - Chat button and hints
+            // Right - Personal call controls and chat
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text(
-                    "◀▶ Seek • ENTER Play/Pause",
-                    color = Color(0xFF64748B),
-                    fontSize = 14.sp
+                TvCallControl(
+                    enabled = isMicEnabled,
+                    deviceName = "microphone",
+                    enabledIcon = Icons.Default.Mic,
+                    disabledIcon = Icons.Default.MicOff,
+                    enabledLabel = "Mic on",
+                    disabledLabel = "Mic off",
+                    onClick = onToggleMic,
+                )
+
+                TvCallControl(
+                    enabled = isCamEnabled,
+                    deviceName = "camera",
+                    enabledIcon = Icons.Default.Videocam,
+                    disabledIcon = Icons.Default.VideocamOff,
+                    enabledLabel = "Camera on",
+                    disabledLabel = "Camera off",
+                    onClick = onToggleCam,
                 )
                 
                 if (showChatButton) {
@@ -806,6 +1130,39 @@ private fun TvPlaybackControls(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun TvCallControl(
+    enabled: Boolean,
+    deviceName: String,
+    enabledIcon: androidx.compose.ui.graphics.vector.ImageVector,
+    disabledIcon: androidx.compose.ui.graphics.vector.ImageVector,
+    enabledLabel: String,
+    disabledLabel: String,
+    onClick: () -> Unit,
+) {
+    val label = if (enabled) enabledLabel else disabledLabel
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        TvIconButton(
+            onClick = onClick,
+            icon = if (enabled) enabledIcon else disabledIcon,
+            contentDescription = "Turn $deviceName ${if (enabled) "off" else "on"}",
+            isActive = enabled,
+            size = 44.dp,
+            iconSize = 22.dp,
+        )
+        Text(
+            text = label,
+            color = if (enabled) Color(0xFFA7F3D0) else Color(0xFFCBD5E1),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+        )
     }
 }
 
@@ -964,10 +1321,14 @@ private fun MobileRoomLayout(
     onNavigateToRegister: (String) -> Unit,
     context: Context,
     isTV: Boolean,
+    isHeightCompact: Boolean,
     onEnterFullscreen: () -> Unit,
     isFullscreen: Boolean = false,
-    passwordRequired: Boolean = false,
-    passwordInput: String = ""
+    eglContext: EglBase.Context?,
+    localStream: MediaStream?,
+    remoteStreams: Map<String, VersionedValue<MediaStream>>,
+    onToggleMic: () -> Unit,
+    onToggleCam: () -> Unit,
 ) {
     val Slate950 = Color(0xFF020617)
     val Slate900 = Color(0xFF0F172A)
@@ -994,8 +1355,6 @@ private fun MobileRoomLayout(
             .statusBarsPadding()
             .imePadding()
     ) {
-        // Only show room content when password is not required
-        if (!passwordRequired) {
         // 1. Header (Always Visible)
         RoomHeader(
             roomId = roomId,
@@ -1020,14 +1379,38 @@ private fun MobileRoomLayout(
             onBack = onNavigateBack
         )
 
-        // 2. Tabs (hidden in theatre mode)
+        if (!isTheatreMode) {
+            RoomCallStrip(
+                eglContext = eglContext,
+                localUserId = roomState.userId,
+                localUsername = authUser?.username ?: roomState.userId.take(8),
+                localStream = localStream,
+                localMediaState = roomState.localMediaState,
+                localIsSpeaking = roomState.isSpeaking,
+                participants = participants,
+                remoteStreams = remoteStreams,
+                onToggleMic = onToggleMic,
+                onToggleCamera = onToggleCam,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = if (isTV) 16.dp else 10.dp, vertical = 8.dp),
+                isTv = isTV,
+                isHeightCompact = isHeightCompact,
+            )
+        }
+
+        // 2. Tabs (hidden only in theatre mode). Compact landscape keeps a
+        // shorter switcher so rotation can never strand another tab.
         if (!isTheatreMode) {
         if (isTV) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(Slate900)
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(
+                        horizontal = if (isHeightCompact) 8.dp else 16.dp,
+                        vertical = if (isHeightCompact) 4.dp else 8.dp,
+                    ),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 tabs.forEachIndexed { index, title ->
@@ -1056,12 +1439,12 @@ private fun MobileRoomLayout(
                     Tab(
                         selected = selectedTab == index,
                         onClick = { onTabSelected(index) },
-                        modifier = Modifier.height(48.dp),
+                        modifier = Modifier.height(if (isHeightCompact) 36.dp else 48.dp),
                         text = {
                             Text(
                                 text = title,
                                 style = TextStyle(
-                                    fontSize = 14.sp,
+                                    fontSize = if (isHeightCompact) 12.sp else 14.sp,
                                     fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Medium,
                                     color = if (selectedTab == index) Slate50 else Slate400
                                 )
@@ -1102,7 +1485,9 @@ private fun MobileRoomLayout(
                     roomState = roomState,
                     isHost = viewModel.isHost(),
                     modifier = Modifier.verticalScroll(rememberScrollState()),
-                    isTV = isTV
+                    isTV = isTV,
+                    onToggleMic = onToggleMic,
+                    onToggleCam = onToggleCam,
                 )
                 2 -> ActivityTabContent(
                     activityLog = activityLog,
@@ -1121,25 +1506,16 @@ private fun MobileRoomLayout(
             BottomMediaBar(
                 micEnabled = roomState.localMediaState.mic,
                 camEnabled = roomState.localMediaState.cam,
-                participants = participants
+                participants = participants,
+                onToggleMic = onToggleMic,
+                onToggleCam = onToggleCam,
             )
         }
-        } // End of !passwordRequired condition
     }
     } // End of ambient-background Box
 
-    // Password Modal - Show when password is required
-    if (passwordRequired) {
-        PasswordModal(
-            passwordInput = passwordInput,
-            onPasswordChange = viewModel::updatePasswordInput,
-            onSubmit = viewModel::submitPassword,
-            error = roomState.passwordError
-        )
-    }
-
     // Animated Wheel Picker Modal
-    if (!passwordRequired && showWheelPicker) {
+    if (showWheelPicker) {
         AnimatedWheelPickerModal(
             entries = wheelState.entries,
             entryInput = wheelEntryInput,
@@ -1164,8 +1540,6 @@ private fun MobileRoomLayout(
         )
     }
     
-    // Playlist Panel - Only show when password is not required
-    if (!passwordRequired) {
     PlaylistPanel(
         playlists = playlistState.playlists,
         activePlaylistId = playlistState.activePlaylistId,
@@ -1187,7 +1561,6 @@ private fun MobileRoomLayout(
         onPlayNext = { viewModel.playNextInPlaylist() },
         onPlayPrevious = { viewModel.playPreviousInPlaylist() }
     )
-    } // End of playlist panel conditional
 }
 
 // --- TAB CONTENTS ---
@@ -1618,7 +1991,9 @@ private fun ControlsTabContent(
     roomState: RoomUiState,
     isHost: Boolean,
     modifier: Modifier = Modifier,
-    isTV: Boolean = false
+    isTV: Boolean = false,
+    onToggleMic: () -> Unit,
+    onToggleCam: () -> Unit,
 ) {
     val padding = if (isTV) 24.dp else 16.dp
     val spacing = if (isTV) 20.dp else 16.dp
@@ -1636,7 +2011,7 @@ private fun ControlsTabContent(
                 icon = if (roomState.localMediaState.mic) Icons.Default.Mic else Icons.Default.MicOff,
                 label = "Mic",
                 isActive = roomState.localMediaState.mic,
-                onClick = viewModel::toggleMic,
+                onClick = onToggleMic,
                 modifier = Modifier.weight(1f),
                 isTV = isTV
             )
@@ -1645,7 +2020,7 @@ private fun ControlsTabContent(
                 icon = if (roomState.localMediaState.cam) Icons.Default.Videocam else Icons.Default.VideocamOff,
                 label = "Camera",
                 isActive = roomState.localMediaState.cam,
-                onClick = viewModel::toggleCam,
+                onClick = onToggleCam,
                 modifier = Modifier.weight(1f),
                 isTV = isTV
             )
@@ -1853,7 +2228,9 @@ private fun ActivityLogItem(entry: ActivityLogEntry) {
 private fun BottomMediaBar(
     micEnabled: Boolean,
     camEnabled: Boolean,
-    participants: List<Participant>
+    participants: List<Participant>,
+    onToggleMic: () -> Unit,
+    onToggleCam: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -1878,13 +2255,15 @@ private fun BottomMediaBar(
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 MediaStatusChip(
                     icon = if (micEnabled) Icons.Default.Mic else Icons.Default.MicOff,
-                    label = "Mic",
-                    isActive = micEnabled
+                    label = if (micEnabled) "Mic on" else "Mic off",
+                    isActive = micEnabled,
+                    onClick = onToggleMic,
                 )
                 MediaStatusChip(
                     icon = if (camEnabled) Icons.Default.Videocam else Icons.Default.VideocamOff,
-                    label = "Cam",
-                    isActive = camEnabled
+                    label = if (camEnabled) "Cam on" else "Cam off",
+                    isActive = camEnabled,
+                    onClick = onToggleCam,
                 )
             }
 
@@ -1916,9 +2295,11 @@ private fun BottomMediaBar(
 private fun MediaStatusChip(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
-    isActive: Boolean
+    isActive: Boolean,
+    onClick: () -> Unit,
 ) {
     Surface(
+        onClick = onClick,
         color = if (isActive) Color(0xFF1E293B) else Color(0xFF0F172A),
         shape = RoundedCornerShape(50), // Fully rounded pill
         border = BorderStroke(

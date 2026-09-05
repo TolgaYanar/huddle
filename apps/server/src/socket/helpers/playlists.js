@@ -43,8 +43,18 @@ async function getPlaylistsForRoom({ isDbConnected, getPrisma }, roomId) {
   }
 }
 
-async function emitPlaylistStateTo(deps, state, socket, roomId) {
+async function emitPlaylistStateTo(
+  deps,
+  state,
+  socket,
+  roomId,
+  shouldEmit = () => true,
+) {
   const playlists = await getPlaylistsForRoom(deps, roomId);
+  // Membership can be revoked while the DB query is in flight (explicit
+  // leave, kick, or disconnect). Check at the last possible moment so private
+  // playlist data is never emitted to a socket whose join was cancelled.
+  if (!shouldEmit()) return;
   const activeState = state.roomPlaylistActive.get(roomId) || {
     activePlaylistId: null,
     currentItemIndex: 0,

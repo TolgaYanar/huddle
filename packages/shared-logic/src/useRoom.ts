@@ -26,12 +26,21 @@ import { useUsersApi } from "./useRoom/users";
 import { useWebRtcApi } from "./useRoom/webrtc";
 import { useWheelApi } from "./useRoom/wheel";
 import { useTimerApi } from "./useRoom/timer";
+import { createBufferedEventChannel } from "./useRoom/bufferedEvent";
+import type {
+  WebRTCIceData,
+  WebRTCMediaStateData,
+  WebRTCOfferData,
+  WebRTCSpeakingData,
+  WebRtcEventChannels,
+} from "./useRoom/webrtc";
 
 export const useRoom = (roomId: string, userId: string) => {
   const [isConnected, setIsConnected] = useState(false);
   // 0 = not reconnecting, 1-N = current attempt number
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
   const [reconnectFailed, setReconnectFailed] = useState(false);
+  const [iceAccessToken, setIceAccessToken] = useState<string | null>(null);
   const socketRef = useRef<Socket | null>(null);
 
   const latestRoomStateRef = useRef<RoomStateData | null>(null);
@@ -52,6 +61,17 @@ export const useRoom = (roomId: string, userId: string) => {
   const latestTimerStateRef = useRef<TimerStateData | null>(null);
 
   const pendingSyncEventsRef = useRef<PendingSyncEvent[]>([]);
+  const webRtcEventChannelsRef = useRef<WebRtcEventChannels | null>(null);
+  if (!webRtcEventChannelsRef.current) {
+    webRtcEventChannelsRef.current = {
+      offer: createBufferedEventChannel<WebRTCOfferData>(),
+      answer: createBufferedEventChannel<WebRTCOfferData>(),
+      ice: createBufferedEventChannel<WebRTCIceData>(),
+      mediaState: createBufferedEventChannel<WebRTCMediaStateData>(),
+      speaking: createBufferedEventChannel<WebRTCSpeakingData>(),
+    };
+  }
+  const webRtcEventChannels = webRtcEventChannelsRef.current;
 
   useEffect(() => {
     const isSameOrigin =
@@ -87,6 +107,7 @@ export const useRoom = (roomId: string, userId: string) => {
       latestGameStateRef.current = null;
       latestCupGameStateRef.current = null;
       latestTimerStateRef.current = null;
+      setIceAccessToken(null);
     };
 
     const handleRoomState = (data: RoomStateData) => {
@@ -102,7 +123,18 @@ export const useRoom = (roomId: string, userId: string) => {
     };
 
     const handleRoomUsers = (data: RoomUsersData) => {
-      latestRoomUsersRef.current = data;
+      const previousToken = latestRoomUsersRef.current?.iceAccessToken;
+      const token =
+        typeof data.iceAccessToken === "string" && data.iceAccessToken
+          ? data.iceAccessToken
+          : previousToken;
+      // The server follows the private snapshot with a room-wide snapshot
+      // that intentionally omits the capability. Preserve the private token
+      // rather than erasing it on that next event.
+      latestRoomUsersRef.current = token
+        ? { ...data, iceAccessToken: token }
+        : data;
+      if (token) setIceAccessToken(token);
       // If we received room users, join succeeded; any previous password-required is obsolete.
       latestRoomPasswordRequiredRef.current = null;
     };
@@ -141,6 +173,26 @@ export const useRoom = (roomId: string, userId: string) => {
       latestTimerStateRef.current = data;
     };
 
+    const handleWebRTCOffer = (data: WebRTCOfferData) => {
+      webRtcEventChannels.offer.publish(data);
+    };
+
+    const handleWebRTCAnswer = (data: WebRTCOfferData) => {
+      webRtcEventChannels.answer.publish(data);
+    };
+
+    const handleWebRTCIce = (data: WebRTCIceData) => {
+      webRtcEventChannels.ice.publish(data);
+    };
+
+    const handleWebRTCMediaState = (data: WebRTCMediaStateData) => {
+      webRtcEventChannels.mediaState.publish(data);
+    };
+
+    const handleWebRTCSpeaking = (data: WebRTCSpeakingData) => {
+      webRtcEventChannels.speaking.publish(data);
+    };
+
     // Always listen for room state so we don't miss the first push during join.
     socket.on("room_state", handleRoomState);
     socket.on("chat_history", handleChatHistory);
@@ -154,6 +206,14 @@ export const useRoom = (roomId: string, userId: string) => {
     socket.on("game_state", handleGameState);
     socket.on("cup_game_state", handleCupGameState);
     socket.on("timer_state", handleTimerState);
+    // Signaling listeners must exist before connect/join. React attaches the
+    // peer consumers one or two renders later, so these bounded channels keep
+    // the first offer and its ICE candidates from falling into that gap.
+    socket.on("webrtc_offer", handleWebRTCOffer);
+    socket.on("webrtc_answer", handleWebRTCAnswer);
+    socket.on("webrtc_ice", handleWebRTCIce);
+    socket.on("webrtc_media_state", handleWebRTCMediaState);
+    socket.on("webrtc_speaking", handleWebRTCSpeaking);
 
     socket.on("connect_error", (err) => {
       console.error("Socket connect_error:", err?.message || err);
@@ -185,6 +245,14 @@ export const useRoom = (roomId: string, userId: string) => {
       setReconnectFailed(false);
       // Avoid stale cached room/users/password data showing up while disconnected or on the next reconnect.
       clearCachedRoomData();
+      // Detach the previous socket-id consumers synchronously. Waiting for a
+      // React cleanup leaves another small reconnect window where fresh
+      // signaling is delivered to callbacks that still carry the old id.
+      webRtcEventChannels.offer.reset();
+      webRtcEventChannels.answer.reset();
+      webRtcEventChannels.ice.reset();
+      webRtcEventChannels.mediaState.reset();
+      webRtcEventChannels.speaking.reset();
     });
 
     const flushPendingSyncEvents = () => {
@@ -263,6 +331,11 @@ export const useRoom = (roomId: string, userId: string) => {
       socket.off("game_state", handleGameState);
       socket.off("cup_game_state", handleCupGameState);
       socket.off("timer_state", handleTimerState);
+      socket.off("webrtc_offer", handleWebRTCOffer);
+      socket.off("webrtc_answer", handleWebRTCAnswer);
+      socket.off("webrtc_ice", handleWebRTCIce);
+      socket.off("webrtc_media_state", handleWebRTCMediaState);
+      socket.off("webrtc_speaking", handleWebRTCSpeaking);
 
       // Best-effort: tell server we left the room so others update immediately.
       try {
@@ -273,7 +346,7 @@ export const useRoom = (roomId: string, userId: string) => {
 
       socket.disconnect();
     };
-  }, [roomId]);
+  }, [roomId, webRtcEventChannels]);
 
   const usersApi = useUsersApi({
     roomId,
@@ -309,7 +382,11 @@ export const useRoom = (roomId: string, userId: string) => {
     latestActivityHistoryRef,
   });
 
-  const webrtcApi = useWebRtcApi({ roomId, socketRef });
+  const webrtcApi = useWebRtcApi({
+    roomId,
+    socketRef,
+    eventChannels: webRtcEventChannels,
+  });
 
   const playlistsApi = usePlaylistsApi({
     roomId,
@@ -347,6 +424,7 @@ export const useRoom = (roomId: string, userId: string) => {
 
   return {
     isConnected,
+    iceAccessToken,
     reconnectAttempt,
     reconnectFailed,
     manualReconnect,

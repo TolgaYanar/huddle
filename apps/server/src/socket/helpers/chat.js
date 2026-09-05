@@ -14,7 +14,13 @@ function pushRoomChatMessage(state, roomId, msg) {
   state.roomChatHistory.set(roomId, list);
 }
 
-async function emitChatHistoryToSocket(deps, state, socket, roomId) {
+async function emitChatHistoryToSocket(
+  deps,
+  state,
+  socket,
+  roomId,
+  shouldEmit = () => true,
+) {
   try {
     if (deps.isDbConnected() && deps.getPrisma()) {
       const recent = await deps.getPrisma().roomMessage.findMany({
@@ -23,6 +29,7 @@ async function emitChatHistoryToSocket(deps, state, socket, roomId) {
         take: state.CHAT_HISTORY_LIMIT,
       });
 
+      if (!shouldEmit()) return;
       socket.emit("chat_history", {
         roomId,
         messages: recent.reverse().map((m) => ({
@@ -37,6 +44,7 @@ async function emitChatHistoryToSocket(deps, state, socket, roomId) {
       return;
     }
 
+    if (!shouldEmit()) return;
     socket.emit("chat_history", {
       roomId,
       messages: (state.roomChatHistory.get(roomId) || []).slice(
@@ -45,6 +53,7 @@ async function emitChatHistoryToSocket(deps, state, socket, roomId) {
     });
   } catch (err) {
     console.error("Failed to load chat history:", err.message);
+    if (!shouldEmit()) return;
     socket.emit("chat_history", {
       roomId,
       messages: (state.roomChatHistory.get(roomId) || []).slice(

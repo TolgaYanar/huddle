@@ -50,3 +50,16 @@ data class SaveRoomResponse(
 data class OkResponse(
     val ok: Boolean
 )
+
+@Serializable
+data class IceServerDto(
+    val urls: List<String>,
+    val username: String? = null,
+    val credential: String? = null
+)
+
+@Serializable
+data class IceConfigResponse(
+    val iceServers: List<IceServerDto>,
+    val ttlSeconds: Long? = null
+)

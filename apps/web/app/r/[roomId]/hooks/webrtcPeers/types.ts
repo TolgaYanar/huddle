@@ -4,6 +4,12 @@ import type { PeerNegotiator } from "./negotiation";
 
 export type RemoteStreamsState = Array<{ id: string; stream: MediaStream }>;
 
+export type PeerConnectionStatus =
+  | "connecting"
+  | "connected"
+  | "recovering"
+  | "failed";
+
 export type RoomUsersPayload<MediaState> = {
   roomId: string;
   users: string[];
@@ -35,6 +41,7 @@ export type UseWebRTCPeersArgs<MediaState> = {
   isConnected: boolean;
   userId: string;
   roomId: string;
+  iceAccessToken?: string | null;
 
   ensureLocalStream: () => MediaStream | null;
 
@@ -48,9 +55,15 @@ export type UseWebRTCPeersArgs<MediaState> = {
     React.SetStateAction<Record<string, boolean>>
   >;
 
-  sendWebRTCIce: (to: string, candidate: RTCIceCandidate) => void;
-  sendWebRTCOffer: (to: string, sdp: RTCSessionDescriptionInit | null) => void;
-  sendWebRTCAnswer: (to: string, sdp: RTCSessionDescriptionInit | null) => void;
+  sendWebRTCIce: (to: string, candidate: RTCIceCandidateInit) => boolean | void;
+  sendWebRTCOffer: (
+    to: string,
+    sdp: RTCSessionDescriptionInit | null,
+  ) => boolean | void;
+  sendWebRTCAnswer: (
+    to: string,
+    sdp: RTCSessionDescriptionInit | null,
+  ) => boolean | void;
 
   onRoomUsers:
     | ((
@@ -107,10 +120,18 @@ export type WebRTCPeersLatest<MediaState> = {
   getExistingNegotiator: (peerId: string) => PeerNegotiator | undefined;
   getPeerNegotiator: (peerId: string) => PeerNegotiator;
   sendOfferToPeer: (peerId: string) => Promise<void>;
+  recoverPeer: (peerId: string, pc: RTCPeerConnection) => void;
   closePeer: (peerId: string) => void;
-  syncTracksToPeer: (peerId: string, pc: RTCPeerConnection) => void;
+  syncTracksToPeer: (peerId: string, pc: RTCPeerConnection) => Promise<void>;
+  replaceActivePeerIds: (peerIds: Iterable<string>) => void;
+  markPeerActive: (peerId: string) => void;
+  markPeerInactive: (peerId: string) => void;
+  isPeerActive: (peerId: string) => boolean;
 
-  sendWebRTCAnswer: (to: string, sdp: RTCSessionDescriptionInit | null) => void;
+  sendWebRTCAnswer: (
+    to: string,
+    sdp: RTCSessionDescriptionInit | null,
+  ) => boolean | void;
   setRemoteMedia: React.Dispatch<
     React.SetStateAction<Record<string, MediaState>>
   >;

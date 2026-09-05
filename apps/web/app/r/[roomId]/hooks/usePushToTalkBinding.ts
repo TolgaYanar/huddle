@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MutableRefObject,
+} from "react";
 
 export type PushToTalkBinding =
   | {
@@ -27,11 +34,25 @@ export const DEFAULT_PUSH_TO_TALK_BINDING: PushToTalkBinding = {
   meta: false,
 };
 
-const isTypingTarget = (t: EventTarget | null) => {
+const isInteractiveTarget = (t: EventTarget | null) => {
   const el = t as HTMLElement | null;
   if (!el) return false;
   const tag = (el.tagName || "").toLowerCase();
-  if (tag === "input" || tag === "textarea" || tag === "select") return true;
+  if (
+    tag === "input" ||
+    tag === "textarea" ||
+    tag === "select" ||
+    tag === "button" ||
+    tag === "a" ||
+    tag === "summary"
+  )
+    return true;
+  if (
+    el.closest?.(
+      'input, textarea, select, button, a, summary, [role="button"], [role="switch"], [role="menuitem"]',
+    )
+  )
+    return true;
   if (el.isContentEditable) return true;
   return false;
 };
@@ -72,8 +93,10 @@ export function usePushToTalkBinding(params: {
   isClient: boolean;
   enabled: boolean;
   micEnabled: boolean;
+  downRef?: MutableRefObject<boolean>;
+  onTransmitChange?: (isDown: boolean) => void;
 }) {
-  const { isClient, enabled, micEnabled } = params;
+  const { isClient, enabled, micEnabled, onTransmitChange } = params;
 
   const [binding, setBinding] = useState<PushToTalkBinding>(
     DEFAULT_PUSH_TO_TALK_BINDING,
@@ -86,12 +109,25 @@ export function usePushToTalkBinding(params: {
   const [isRebinding, setIsRebinding] = useState(false);
 
   const [isDown, setIsDown] = useState(false);
-  const isDownRef = useRef(false);
+  const internalDownRef = useRef(false);
+  const isDownRef = params.downRef ?? internalDownRef;
+
+  const setTransmitDown = useCallback(
+    (next: boolean) => {
+      isDownRef.current = next;
+      setIsDown(next);
+      onTransmitChange?.(next);
+    },
+    [isDownRef, onTransmitChange],
+  );
 
   const stopTransmit = useCallback(() => {
-    isDownRef.current = false;
-    setIsDown(false);
-  }, []);
+    setTransmitDown(false);
+  }, [setTransmitDown]);
+
+  useEffect(() => {
+    if (!micEnabled) stopTransmit();
+  }, [micEnabled, stopTransmit]);
 
   // Load/save binding.
   useEffect(() => {
@@ -229,38 +265,43 @@ export function usePushToTalkBinding(params: {
 
     const keyDown = (e: KeyboardEvent) => {
       if (!micEnabled) return;
-      if (isTypingTarget(e.target)) return;
+      if (isInteractiveTarget(e.target)) return;
       if (!matchesKeyboardDown(e)) return;
       if (e.repeat) return;
-      isDownRef.current = true;
-      setIsDown(true);
+      setTransmitDown(true);
       e.preventDefault();
     };
 
     const keyUp = (e: KeyboardEvent) => {
       if (!matchesKeyboardUp(e)) return;
-      isDownRef.current = false;
-      setIsDown(false);
+      // A keydown on a focused button/input is deliberately ignored. Do not
+      // consume its matching keyup either: native Space activation happens on
+      // keyup in several browsers.
+      if (!isDownRef.current) return;
+      setTransmitDown(false);
       e.preventDefault();
     };
 
     const mouseDown = (e: MouseEvent) => {
       if (!micEnabled) return;
+      if (isInteractiveTarget(e.target)) return;
       if (!matchesMouseDown(e)) return;
-      isDownRef.current = true;
-      setIsDown(true);
+      setTransmitDown(true);
       e.preventDefault();
     };
 
     const mouseUp = (e: MouseEvent) => {
       if (!matchesMouseUp(e)) return;
-      isDownRef.current = false;
-      setIsDown(false);
+      if (!isDownRef.current) return;
+      setTransmitDown(false);
       e.preventDefault();
     };
 
     const blur = () => {
       stopTransmit();
+    };
+    const visibilityChange = () => {
+      if (document.visibilityState !== "visible") stopTransmit();
     };
 
     window.addEventListener("keydown", keyDown, true);
@@ -268,14 +309,25 @@ export function usePushToTalkBinding(params: {
     window.addEventListener("mousedown", mouseDown, true);
     window.addEventListener("mouseup", mouseUp, true);
     window.addEventListener("blur", blur);
+    document.addEventListener("visibilitychange", visibilityChange);
     return () => {
       window.removeEventListener("keydown", keyDown, true);
       window.removeEventListener("keyup", keyUp, true);
       window.removeEventListener("mousedown", mouseDown, true);
       window.removeEventListener("mouseup", mouseUp, true);
       window.removeEventListener("blur", blur);
+      document.removeEventListener("visibilitychange", visibilityChange);
     };
-  }, [isClient, enabled, micEnabled, binding, isRebinding, stopTransmit]);
+  }, [
+    isClient,
+    enabled,
+    micEnabled,
+    binding,
+    isRebinding,
+    isDownRef,
+    stopTransmit,
+    setTransmitDown,
+  ]);
 
   return {
     binding,

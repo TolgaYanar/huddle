@@ -59,6 +59,10 @@ export function useKeyboardShortcuts({
     if (!enabled) return;
 
     function onKeyDown(e: KeyboardEvent) {
+      // A capture-phase feature such as push-to-talk may already own this
+      // gesture. Respect that ownership so the default Space PTT binding does
+      // not also play/pause the room video.
+      if (e.defaultPrevented) return;
       if (isTyping()) return;
       if (isModalOpen()) return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;

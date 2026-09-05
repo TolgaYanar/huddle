@@ -9,6 +9,7 @@ import io.socket.emitter.Emitter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -16,6 +17,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.json.JSONArray
@@ -43,13 +45,22 @@ sealed class SocketEvent {
     data class ActivityHistoryReceived(val data: ActivityHistory) : SocketEvent()
     data class PasswordStatus(val data: RoomPasswordStatus) : SocketEvent()
     data class PasswordRequired(val data: RoomPasswordRequired) : SocketEvent()
+    data class RoomBanned(val roomId: String) : SocketEvent()
     data class WheelStateReceived(val data: WheelState) : SocketEvent()
     data class WheelSpun(val data: WheelSpunData) : SocketEvent()
     data class WebRTCOfferReceived(val data: WebRTCOffer) : SocketEvent()
     data class WebRTCAnswerReceived(val data: WebRTCAnswer) : SocketEvent()
     data class WebRTCIceReceived(val data: WebRTCIceCandidate) : SocketEvent()
-    data class MediaStateReceived(val userId: String, val state: WebRTCMediaState) : SocketEvent()
-    data class SpeakingStateReceived(val userId: String, val speaking: Boolean) : SocketEvent()
+    data class MediaStateReceived(
+        val roomId: String,
+        val userId: String,
+        val state: WebRTCMediaState,
+    ) : SocketEvent()
+    data class SpeakingStateReceived(
+        val roomId: String,
+        val userId: String,
+        val speaking: Boolean,
+    ) : SocketEvent()
     // Playlist events
     data class PlaylistStateReceived(val data: PlaylistStateData) : SocketEvent()
     data class PlaylistItemPlayed(val data: PlaylistItemPlayedData) : SocketEvent()
@@ -108,13 +119,26 @@ class SocketClient @Inject constructor(
     // No replay cache - prevents stale events when rejoining rooms
     private val _events = MutableSharedFlow<SocketEvent>(replay = 0, extraBufferCapacity = 64)
     val events: SharedFlow<SocketEvent> = _events.asSharedFlow()
+
+    // A single writer preserves Socket.IO wire order even when a collector is
+    // briefly slower than the 64-event SharedFlow buffer. Launching one
+    // fallback coroutine per event can otherwise let ICE overtake its offer.
+    private val eventQueue = Channel<SocketEvent>(Channel.UNLIMITED)
     
     private val _socketId = MutableStateFlow<String?>(null)
     val socketId: StateFlow<String?> = _socketId.asStateFlow()
     
-    private var currentRoomId: String? = null
+    private val activeRoomSession = ActiveRoomSession()
 
     private var authToken: String? = null
+
+    init {
+        scope.launch {
+            for (event in eventQueue) {
+                _events.emit(event)
+            }
+        }
+    }
 
     /**
      * Provide a Bearer token for authenticating the socket handshake.
@@ -127,11 +151,9 @@ class SocketClient @Inject constructor(
 
         if (changed && socket?.connected() == true) {
             // Reconnect to apply updated auth.
-            val priorRoom = currentRoomId
-            disconnect()
-            currentRoomId = priorRoom
+            disconnectSocket(clearActiveRoom = false)
             connect()
-            // Rejoin will happen on connect via currentRoomId.
+            // Rejoin will happen on connect from the in-memory room session.
         }
     }
 
@@ -196,22 +218,35 @@ class SocketClient @Inject constructor(
      * Disconnect from the socket server
      */
     fun disconnect() {
+        disconnectSocket(clearActiveRoom = true)
+    }
+
+    private fun disconnectSocket(clearActiveRoom: Boolean) {
+        val shouldNotifyMembershipLoss =
+            socket != null || _connectionState.value != ConnectionState.DISCONNECTED
         socket?.disconnect()
         socket?.off()
         socket = null
         _connectionState.value = ConnectionState.DISCONNECTED
         _socketId.value = null
-        currentRoomId = null
+        if (clearActiveRoom) activeRoomSession.clear()
+        // Socket.disconnect() dispatches its close event asynchronously. Since
+        // listeners are removed immediately above, explicitly publish the
+        // membership loss so auth-token reconnects cannot retain hidden media.
+        if (shouldNotifyMembershipLoss) emitEvent(SocketEvent.Disconnected)
     }
     
     /**
      * Join a room
      */
     fun joinRoom(roomId: String, password: String? = null) {
-        currentRoomId = roomId
+        emitJoinRoom(activeRoomSession.remember(roomId, password))
+    }
+
+    private fun emitJoinRoom(request: RoomJoinRequest) {
         val data = JSONObject().apply {
-            put("roomId", roomId)
-            password?.let { put("password", it) }
+            put("roomId", request.roomId)
+            request.password?.let { put("password", it) }
         }
         socket?.emit("join_room", data)
     }
@@ -219,11 +254,12 @@ class SocketClient @Inject constructor(
     /**
      * Leave current room
      */
-    fun leaveRoom() {
-        currentRoomId?.let { roomId ->
-            socket?.emit("leave_room", JSONObject().put("roomId", roomId))
-        }
-        currentRoomId = null
+    fun leaveRoom(roomId: String) {
+        socket?.emit("leave_room", JSONObject().put("roomId", roomId))
+        // A previous room's ViewModel can be cleared after navigation has
+        // already joined the next room. It must not erase the new reconnect
+        // target.
+        activeRoomSession.leave(roomId)
     }
     
     /**
@@ -441,7 +477,7 @@ class SocketClient @Inject constructor(
     }
     
     // WebRTC signaling methods
-    fun sendWebRTCOffer(roomId: String, toId: String, sdp: String) {
+    fun sendWebRTCOffer(roomId: String, toId: String, sdp: String, generation: String?) {
         // Server expects: { roomId, to, sdp } where sdp is { type, sdp }
         val data = JSONObject().apply {
             put("roomId", roomId)
@@ -449,13 +485,14 @@ class SocketClient @Inject constructor(
             put("sdp", JSONObject().apply {
                 put("type", "offer")
                 put("sdp", sdp)
+                generation?.let { put("generation", it) }
             })
         }
         Log.d("SocketClient", "Sending webrtc_offer to=$toId, sdp length=${sdp.length}")
         socket?.emit("webrtc_offer", data)
     }
     
-    fun sendWebRTCAnswer(roomId: String, toId: String, sdp: String) {
+    fun sendWebRTCAnswer(roomId: String, toId: String, sdp: String, generation: String?) {
         // Server expects: { roomId, to, sdp } where sdp is { type, sdp }
         val data = JSONObject().apply {
             put("roomId", roomId)
@@ -463,13 +500,21 @@ class SocketClient @Inject constructor(
             put("sdp", JSONObject().apply {
                 put("type", "answer")
                 put("sdp", sdp)
+                generation?.let { put("generation", it) }
             })
         }
         Log.d("SocketClient", "Sending webrtc_answer to=$toId, sdp length=${sdp.length}")
         socket?.emit("webrtc_answer", data)
     }
     
-    fun sendWebRTCIce(roomId: String, toId: String, candidate: String, sdpMid: String?, sdpMLineIndex: Int?) {
+    fun sendWebRTCIce(
+        roomId: String,
+        toId: String,
+        candidate: String,
+        sdpMid: String?,
+        sdpMLineIndex: Int?,
+        generation: String?,
+    ) {
         // Server expects: { roomId, to, candidate }
         val data = JSONObject().apply {
             put("roomId", roomId)
@@ -478,6 +523,7 @@ class SocketClient @Inject constructor(
                 put("candidate", candidate)
                 sdpMid?.let { put("sdpMid", it) }
                 sdpMLineIndex?.let { put("sdpMLineIndex", it) }
+                generation?.let { put("generation", it) }
             })
         }
         Log.d("SocketClient", "Sending webrtc_ice to=$toId")
@@ -485,12 +531,9 @@ class SocketClient @Inject constructor(
     }
     
     fun sendMediaState(roomId: String, state: WebRTCMediaState) {
-        val data = JSONObject().apply {
-            put("roomId", roomId)
-            put("mic", state.mic)
-            put("cam", state.cam)
-            put("screen", state.screen)
-        }
+        val data = JSONObject(
+            json.encodeToString(WebRTCMediaStateRequest(roomId, state))
+        )
         socket?.emit("webrtc_media_state", data)
     }
     
@@ -518,12 +561,13 @@ class SocketClient @Inject constructor(
             emitEvent(SocketEvent.Connected)
             
             // Rejoin room if we were in one
-            currentRoomId?.let { joinRoom(it) }
+            activeRoomSession.reconnectRequest()?.let(::emitJoinRoom)
         }
         
         on(Socket.EVENT_DISCONNECT) {
             android.util.Log.w("SocketClient", "Disconnected from server")
             _connectionState.value = ConnectionState.DISCONNECTED
+            _socketId.value = null
             emitEvent(SocketEvent.Disconnected)
         }
         
@@ -592,7 +636,10 @@ class SocketClient @Inject constructor(
                     users = users,
                     usernames = usernamesMap.ifEmpty { null },
                     mediaStates = mediaStates,
-                    hostId = obj.optString("hostId").takeIf { it.isNotEmpty() }
+                    hostId = obj.optString("hostId").takeIf { it.isNotEmpty() },
+                    iceAccessToken = obj.optString("iceAccessToken")
+                        .trim()
+                        .takeIf { it.length in 1..512 },
                 )
                 emitEvent(SocketEvent.RoomUsers(data))
             }
@@ -629,7 +676,7 @@ class SocketClient @Inject constructor(
                 val hasAudioSyncEnabled = obj.has("audioSyncEnabled")
 
                 val data = SyncData(
-                    roomId = currentRoomId ?: obj.optString("roomId"),
+                    roomId = activeRoomSession.activeRoomId() ?: obj.optString("roomId"),
                     action = parseSyncAction(obj.optString("action", "play"), SyncAction.play),
                     timestamp = obj.optDouble("timestamp", 0.0),
                     videoUrl = obj.optString("videoUrl").takeIf { it.isNotEmpty() },
@@ -778,6 +825,18 @@ class SocketClient @Inject constructor(
                 emitEvent(SocketEvent.PasswordRequired(data))
             }
         }
+
+        on("room_banned") { args ->
+            parseJsonObject(args) { obj ->
+                val roomId = obj.optString("roomId").trim()
+                if (roomId.isEmpty()) return@parseJsonObject
+
+                // A banned room must never be rejoined automatically after a
+                // transport reconnect. Forget only the matching active room.
+                activeRoomSession.leave(roomId)
+                emitEvent(SocketEvent.RoomBanned(roomId))
+            }
+        }
         
         on("wheel_state") { args ->
             Log.d("WheelPicker", "wheel_state received: ${args.firstOrNull()}")
@@ -874,19 +933,23 @@ class SocketClient @Inject constructor(
         on("webrtc_offer") { args ->
             parseJsonObject(args) { obj ->
                 // Server sends: { roomId, from, sdp } where sdp is an object { type, sdp }
+                val roomId = obj.optString("roomId")
                 val fromId = obj.optString("from")
                 val sdpObj = obj.opt("sdp")
+                val generation = (sdpObj as? JSONObject)?.let(::parseSignalingGeneration)
                 val sdpString: String = when (sdpObj) {
                     is JSONObject -> sdpObj.optString("sdp")
                     is String -> sdpObj as String
                     else -> ""
                 }
                 Log.d("SocketClient", "Parsed webrtc_offer: from=$fromId, sdp length=${sdpString.length}")
-                if (fromId.isNotEmpty() && sdpString.isNotEmpty()) {
+                if (roomId.isNotEmpty() && fromId.isNotEmpty() && sdpString.isNotEmpty()) {
                     val data = WebRTCOffer(
+                        roomId = roomId,
                         fromId = fromId,
                         toId = socketId.value ?: "",
-                        sdp = sdpString
+                        sdp = sdpString,
+                        generation = generation,
                     )
                     emitEvent(SocketEvent.WebRTCOfferReceived(data))
                 }
@@ -896,19 +959,23 @@ class SocketClient @Inject constructor(
         on("webrtc_answer") { args ->
             parseJsonObject(args) { obj ->
                 // Server sends: { roomId, from, sdp } where sdp is an object { type, sdp }
+                val roomId = obj.optString("roomId")
                 val fromId = obj.optString("from")
                 val sdpObj = obj.opt("sdp")
+                val generation = (sdpObj as? JSONObject)?.let(::parseSignalingGeneration)
                 val sdpString: String = when (sdpObj) {
                     is JSONObject -> sdpObj.optString("sdp")
                     is String -> sdpObj as String
                     else -> ""
                 }
                 Log.d("SocketClient", "Parsed webrtc_answer: from=$fromId, sdp length=${sdpString.length}")
-                if (fromId.isNotEmpty() && sdpString.isNotEmpty()) {
+                if (roomId.isNotEmpty() && fromId.isNotEmpty() && sdpString.isNotEmpty()) {
                     val data = WebRTCAnswer(
+                        roomId = roomId,
                         fromId = fromId,
                         toId = socketId.value ?: "",
-                        sdp = sdpString
+                        sdp = sdpString,
+                        generation = generation,
                     )
                     emitEvent(SocketEvent.WebRTCAnswerReceived(data))
                 }
@@ -918,20 +985,24 @@ class SocketClient @Inject constructor(
         on("webrtc_ice") { args ->
             parseJsonObject(args) { obj ->
                 // Server sends: { roomId, from, candidate } where candidate is an object
+                val roomId = obj.optString("roomId")
                 val fromId = obj.optString("from")
                 val candidateObj = obj.optJSONObject("candidate")
+                val generation = candidateObj?.let(::parseSignalingGeneration)
                 val candidate: String = candidateObj?.optString("candidate") ?: obj.optString("candidate")
                 val sdpMid: String = candidateObj?.optString("sdpMid") ?: obj.optString("sdpMid")
                 val sdpMLineIndex: Int = candidateObj?.optInt("sdpMLineIndex", -1) ?: obj.optInt("sdpMLineIndex", -1)
                 
                 Log.d("SocketClient", "Parsed webrtc_ice: from=$fromId, candidate=${candidate.take(50)}...")
-                if (fromId.isNotEmpty() && candidate.isNotEmpty()) {
+                if (roomId.isNotEmpty() && fromId.isNotEmpty() && candidate.isNotEmpty()) {
                     val data = WebRTCIceCandidate(
+                        roomId = roomId,
                         fromId = fromId,
                         toId = socketId.value ?: "",
                         candidate = candidate,
                         sdpMid = sdpMid.takeIf { it.isNotEmpty() },
-                        sdpMLineIndex = sdpMLineIndex.takeIf { it >= 0 }
+                        sdpMLineIndex = sdpMLineIndex.takeIf { it >= 0 },
+                        generation = generation,
                     )
                     emitEvent(SocketEvent.WebRTCIceReceived(data))
                 }
@@ -940,23 +1011,38 @@ class SocketClient @Inject constructor(
         
         on("webrtc_media_state") { args ->
             parseJsonObject(args) { obj ->
-                val userId = obj.optString("senderId")
-                val state = WebRTCMediaState(
-                    mic = obj.optBoolean("mic", false),
-                    cam = obj.optBoolean("cam", false),
-                    screen = obj.optBoolean("screen", false)
-                )
-                emitEvent(SocketEvent.MediaStateReceived(userId, state))
+                runCatching {
+                    json.decodeFromString<WebRTCMediaStateEvent>(obj.toString())
+                }.getOrNull()?.let { event ->
+                    if (event.fromId.isNotBlank()) {
+                        emitEvent(
+                            SocketEvent.MediaStateReceived(
+                                roomId = event.roomId,
+                                userId = event.fromId,
+                                state = event.state,
+                            )
+                        )
+                    }
+                }
             }
         }
         
         on("webrtc_speaking") { args ->
             parseJsonObject(args) { obj ->
-                val userId = obj.optString("senderId")
+                val roomId = obj.optString("roomId")
+                val userId = obj.optString("from")
                 val speaking = obj.optBoolean("speaking", false)
-                emitEvent(SocketEvent.SpeakingStateReceived(userId, speaking))
+                if (roomId.isNotBlank() && userId.isNotBlank()) {
+                    emitEvent(SocketEvent.SpeakingStateReceived(roomId, userId, speaking))
+                }
             }
         }
+    }
+
+    private fun parseSignalingGeneration(obj: JSONObject): String? {
+        return obj.optString("generation")
+            .trim()
+            .takeIf { it.length in 1..64 }
     }
     
     private fun parsePlaylist(obj: JSONObject): Playlist {
@@ -1012,8 +1098,8 @@ class SocketClient @Inject constructor(
     }
     
     private fun emitEvent(event: SocketEvent) {
-        scope.launch {
-            _events.emit(event)
+        if (eventQueue.trySend(event).isFailure) {
+            Log.e("SocketClient", "Socket event queue is unavailable")
         }
     }
 }

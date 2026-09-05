@@ -81,6 +81,7 @@ import { DeviceControls } from "./DeviceControls";
 import { AudioProcessingControls } from "./AudioProcessingControls";
 import { TileGrid } from "./TileGrid";
 import { ParticipantsWithoutStream } from "./ParticipantsWithoutStream";
+import { ConnectionStatusNotice } from "./ConnectionStatusNotice";
 
 export const CallSidebar = React.memo(function CallSidebar(
   props: CallSidebarProps,
@@ -102,11 +103,28 @@ export const CallSidebar = React.memo(function CallSidebar(
     setCamEnabled,
     screenEnabled,
     setScreenEnabled,
+    mediaErrors,
+    mediaPending,
+    clearMediaError,
+    audioInputs,
+    videoInputs,
+    audioOutputs,
+    audioInputId,
+    setAudioInputId,
+    videoInputId,
+    setVideoInputId,
+    audioOutputId,
+    setAudioOutputId,
+    outputSelectionSupported,
+    devicesRefreshing,
+    deviceInventoryError,
+    refreshDevices,
     pushToTalkEnabled,
     setPushToTalkEnabled,
     pushToTalkDown,
     pushToTalkBindingLabel,
     stopPushToTalkTransmit,
+    closePushToTalkGate,
     isRebindingPushToTalkKey,
     setIsRebindingPushToTalkKey,
     echoCancellationEnabled,
@@ -120,12 +138,15 @@ export const CallSidebar = React.memo(function CallSidebar(
     remoteStreams,
     remoteSpeaking,
     remoteMedia,
+    peerConnectionStates,
+    retryFailedPeers,
     setIsDraggingTile,
     setIsStageDragOver,
     onPinTile,
   } = props;
 
   const isHost = Boolean(userId && hostId && userId === hostId);
+  const localMediaExpected = micEnabled || camEnabled || screenEnabled;
 
   const remoteStreamIds = new Set(remoteStreams.map((s) => s.id));
   const participantsWithoutStream = participants.filter(
@@ -142,8 +163,19 @@ export const CallSidebar = React.memo(function CallSidebar(
       <div className="flex flex-col gap-3">
         <CallHeader
           localSpeaking={localSpeaking}
+          micEnabled={micEnabled}
           isCallCollapsed={isCallCollapsed}
           setIsCallCollapsed={setIsCallCollapsed}
+        />
+
+        <ConnectionStatusNotice
+          userId={userId}
+          participants={participants}
+          peerConnectionStates={peerConnectionStates}
+          localMediaExpected={localMediaExpected}
+          remoteMedia={remoteMedia}
+          getDisplayName={getDisplayName}
+          retryFailedPeers={retryFailedPeers}
         />
 
         {isCallCollapsed ? (
@@ -186,11 +218,28 @@ export const CallSidebar = React.memo(function CallSidebar(
               setCamEnabled={setCamEnabled}
               screenEnabled={screenEnabled}
               setScreenEnabled={setScreenEnabled}
+              mediaErrors={mediaErrors}
+              mediaPending={mediaPending}
+              clearMediaError={clearMediaError}
+              audioInputs={audioInputs}
+              videoInputs={videoInputs}
+              audioOutputs={audioOutputs}
+              audioInputId={audioInputId}
+              setAudioInputId={setAudioInputId}
+              videoInputId={videoInputId}
+              setVideoInputId={setVideoInputId}
+              audioOutputId={audioOutputId}
+              setAudioOutputId={setAudioOutputId}
+              outputSelectionSupported={outputSelectionSupported}
+              devicesRefreshing={devicesRefreshing}
+              deviceInventoryError={deviceInventoryError}
+              refreshDevices={refreshDevices}
               pushToTalkEnabled={pushToTalkEnabled}
               setPushToTalkEnabled={setPushToTalkEnabled}
               pushToTalkDown={pushToTalkDown}
               pushToTalkBindingLabel={pushToTalkBindingLabel}
               stopPushToTalkTransmit={stopPushToTalkTransmit}
+              closePushToTalkGate={closePushToTalkGate}
               isRebindingPushToTalkKey={isRebindingPushToTalkKey}
               setIsRebindingPushToTalkKey={setIsRebindingPushToTalkKey}
             />
@@ -226,6 +275,8 @@ export const CallSidebar = React.memo(function CallSidebar(
             <ParticipantsWithoutStream
               participantsWithoutStream={participantsWithoutStream}
               remoteMedia={remoteMedia}
+              peerConnectionStates={peerConnectionStates}
+              localMediaExpected={localMediaExpected}
               hostId={hostId}
               isHost={isHost}
               getDisplayName={getDisplayName}

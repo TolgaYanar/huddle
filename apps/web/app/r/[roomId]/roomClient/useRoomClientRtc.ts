@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 import type { useRoom as useRoomFn, WebRTCMediaState } from "shared-logic";
 
-import { useMediaTracks, useWebRTCPeers } from "../hooks";
+import { useMediaDevices, useMediaTracks, useWebRTCPeers } from "../hooks";
 
 import type { RemoteStreamEntry } from "../types";
 
@@ -53,11 +53,21 @@ export function useRoomClientRtc(args: {
 
   const ensureLocalStreamRef = useRef<EnsureLocalStream | null>(null);
   const renegotiateAllPeersRef = useRef<RenegotiateAllPeers | null>(null);
+  const mediaStateBroadcastRef = useRef<(() => void) | null>(null);
+  const speakingStateBroadcastRef = useRef<(() => void) | null>(null);
+  const mediaDevices = useMediaDevices({ isClient });
+  const onRoomUsers = room.onRoomUsers;
 
-  const { closeAllPeers, renegotiateAllPeers } = useWebRTCPeers<MediaState>({
+  const {
+    closeAllPeers,
+    renegotiateAllPeers,
+    peerConnectionStates,
+    retryFailedPeers,
+  } = useWebRTCPeers<MediaState>({
     isConnected: room.isConnected,
     userId,
     roomId,
+    iceAccessToken: room.iceAccessToken,
     ensureLocalStream: () => ensureLocalStreamRef.current?.() ?? null,
     peersRef,
     remoteStreamsRef,
@@ -88,17 +98,39 @@ export function useRoomClientRtc(args: {
     echoCancellationEnabled,
     noiseSuppressionEnabled,
     autoGainControlEnabled,
+    audioInputId: mediaDevices.audioInputId,
+    videoInputId: mediaDevices.videoInputId,
     pushToTalkEnabled,
     pushToTalkDownRef,
     sendWebRTCMediaState: room.sendWebRTCMediaState,
     sendWebRTCSpeaking: room.sendWebRTCSpeaking,
     renegotiateAllPeers: () =>
       renegotiateAllPeersRef.current?.() ?? Promise.resolve(),
+    onDeviceAccess: mediaDevices.refreshAfterAccess,
   });
 
   useEffect(() => {
     ensureLocalStreamRef.current = mediaTracks.ensureLocalStream;
-  }, [mediaTracks.ensureLocalStream]);
+    mediaStateBroadcastRef.current = mediaTracks.broadcastCurrentMediaState;
+    speakingStateBroadcastRef.current =
+      mediaTracks.broadcastCurrentSpeakingState;
+  }, [
+    mediaTracks.ensureLocalStream,
+    mediaTracks.broadcastCurrentMediaState,
+    mediaTracks.broadcastCurrentSpeakingState,
+  ]);
+
+  useEffect(() => {
+    const cleanup = onRoomUsers?.((data) => {
+      if (data.roomId !== roomId) return;
+      // Socket transport becomes connected before join_room is accepted. The
+      // authoritative snapshot is our membership acknowledgement, so repeat
+      // any state the server may have correctly rejected before this point.
+      mediaStateBroadcastRef.current?.();
+      speakingStateBroadcastRef.current?.();
+    });
+    return () => cleanup?.();
+  }, [onRoomUsers, roomId]);
 
   useEffect(() => {
     return () => {
@@ -111,15 +143,23 @@ export function useRoomClientRtc(args: {
   }, [closeAllPeers]);
 
   useEffect(() => {
-    if (!room.isConnected) return;
+    if (!room.isConnected) {
+      // Reconnect starts a new signaling epoch. Keeping a stranded
+      // have-local-offer connection can queue every later negotiation forever.
+      closeAllPeers();
+      return;
+    }
     renegotiateAllPeers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [room.isConnected]);
 
   return {
     mediaTracks,
+    mediaDevices,
     remoteStreams,
     remoteSpeaking,
     remoteMedia,
+    peerConnectionStates,
+    retryFailedPeers,
   };
 }

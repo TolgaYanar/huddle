@@ -2,6 +2,7 @@ const { emitRoomUsersToRoom } = require("../helpers/users");
 const { anchorRoomStateOnEmpty, persistRoomState } = require("../helpers/sync");
 const { scheduleRoomCleanup } = require("../state");
 const { isRoomMember } = require("../helpers/membership");
+const { cancelPendingRoomJoin } = require("../helpers/pendingJoin");
 
 function attachLeaveRoomHandler(io, state, socket, joinedRooms, deps) {
   socket.on("leave_room", async (payload) => {
@@ -13,6 +14,9 @@ function attachLeaveRoomHandler(io, state, socket, joinedRooms, deps) {
           : undefined;
 
     if (!roomId || typeof roomId !== "string") return;
+    // A leave can race the DB/password await before socket.join(). Cancel that
+    // in-flight intent even though the socket is not an adapter member yet.
+    cancelPendingRoomJoin(socket, roomId);
     if (!isRoomMember(socket, roomId)) return;
 
     try {
@@ -21,6 +25,7 @@ function attachLeaveRoomHandler(io, state, socket, joinedRooms, deps) {
       // ignore
     }
     joinedRooms.delete(roomId);
+    socket.data?.iceAccessByRoom?.delete?.(roomId);
 
     // Clean up in-memory media state.
     const map = state.roomMediaState.get(roomId);

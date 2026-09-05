@@ -87,6 +87,10 @@ export interface WebRTCMediaState {
 export interface RoomUsersData {
   roomId: string;
   users: string[];
+  // Private room-membership capability sent only to this socket. It permits
+  // the API to issue short-lived TURN credentials without requiring guests
+  // to create an account.
+  iceAccessToken?: string;
   // Optional map of socketId -> username (if available)
   usernames?: Record<string, string | null>;
   mediaStates?: Record<string, WebRTCMediaState>;

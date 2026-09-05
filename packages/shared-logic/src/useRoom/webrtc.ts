@@ -3,20 +3,55 @@ import type { MutableRefObject } from "react";
 import type { Socket } from "socket.io-client";
 
 import type { WebRTCMediaState } from "../types";
+import type { BufferedEventChannel } from "./bufferedEvent";
+
+export type WebRTCOfferData = {
+  roomId: string;
+  from: string;
+  sdp: unknown;
+};
+
+export type WebRTCIceData = {
+  roomId: string;
+  from: string;
+  candidate: unknown;
+};
+
+export type WebRTCMediaStateData = {
+  roomId: string;
+  from: string;
+  state: WebRTCMediaState;
+};
+
+export type WebRTCSpeakingData = {
+  roomId: string;
+  from: string;
+  speaking: boolean;
+};
+
+export type WebRtcEventChannels = {
+  offer: BufferedEventChannel<WebRTCOfferData>;
+  answer: BufferedEventChannel<WebRTCOfferData>;
+  ice: BufferedEventChannel<WebRTCIceData>;
+  mediaState: BufferedEventChannel<WebRTCMediaStateData>;
+  speaking: BufferedEventChannel<WebRTCSpeakingData>;
+};
 
 export function useWebRtcApi({
   roomId,
   socketRef,
+  eventChannels,
 }: {
   roomId: string;
   socketRef: MutableRefObject<Socket | null>;
+  eventChannels: WebRtcEventChannels;
 }) {
   const sendWebRTCOffer = useCallback(
     (to: string, sdp: unknown) => {
       const socket = socketRef.current;
-      if (!socket) return;
-      if (!socket.connected) return;
+      if (!socket?.connected) return false;
       socket.emit("webrtc_offer", { roomId, to, sdp });
+      return true;
     },
     [roomId, socketRef],
   );
@@ -24,9 +59,9 @@ export function useWebRtcApi({
   const sendWebRTCAnswer = useCallback(
     (to: string, sdp: unknown) => {
       const socket = socketRef.current;
-      if (!socket) return;
-      if (!socket.connected) return;
+      if (!socket?.connected) return false;
       socket.emit("webrtc_answer", { roomId, to, sdp });
+      return true;
     },
     [roomId, socketRef],
   );
@@ -34,63 +69,29 @@ export function useWebRtcApi({
   const sendWebRTCIce = useCallback(
     (to: string, candidate: unknown) => {
       const socket = socketRef.current;
-      if (!socket) return;
-      if (!socket.connected) return;
+      if (!socket?.connected) return false;
       socket.emit("webrtc_ice", { roomId, to, candidate });
+      return true;
     },
     [roomId, socketRef],
   );
 
   const onWebRTCOffer = useCallback(
-    (
-      callback: (data: { roomId: string; from: string; sdp: unknown }) => void,
-    ) => {
-      if (socketRef.current) {
-        socketRef.current.on("webrtc_offer", callback);
-      }
-      return () => {
-        if (socketRef.current) {
-          socketRef.current.off("webrtc_offer", callback);
-        }
-      };
-    },
-    [socketRef],
+    (callback: (data: WebRTCOfferData) => void | Promise<void>) =>
+      eventChannels.offer.subscribe(callback),
+    [eventChannels],
   );
 
   const onWebRTCAnswer = useCallback(
-    (
-      callback: (data: { roomId: string; from: string; sdp: unknown }) => void,
-    ) => {
-      if (socketRef.current) {
-        socketRef.current.on("webrtc_answer", callback);
-      }
-      return () => {
-        if (socketRef.current) {
-          socketRef.current.off("webrtc_answer", callback);
-        }
-      };
-    },
-    [socketRef],
+    (callback: (data: WebRTCOfferData) => void | Promise<void>) =>
+      eventChannels.answer.subscribe(callback),
+    [eventChannels],
   );
 
   const onWebRTCIce = useCallback(
-    (
-      callback: (data: {
-        roomId: string;
-        from: string;
-        candidate: unknown;
-      }) => void,
-    ) => {
-      if (socketRef.current) {
-        socketRef.current.on("webrtc_ice", callback);
-      }
-      return () => {
-        if (socketRef.current) {
-          socketRef.current.off("webrtc_ice", callback);
-        }
-      };
-    },
-    [socketRef],
+    (callback: (data: WebRTCIceData) => void | Promise<void>) =>
+      eventChannels.ice.subscribe(callback),
+    [eventChannels],
   );
 
   const sendWebRTCMediaState = useCallback(
@@ -104,23 +105,9 @@ export function useWebRtcApi({
   );
 
   const onWebRTCMediaState = useCallback(
-    (
-      callback: (data: {
-        roomId: string;
-        from: string;
-        state: WebRTCMediaState;
-      }) => void,
-    ) => {
-      if (socketRef.current) {
-        socketRef.current.on("webrtc_media_state", callback);
-      }
-      return () => {
-        if (socketRef.current) {
-          socketRef.current.off("webrtc_media_state", callback);
-        }
-      };
-    },
-    [socketRef],
+    (callback: (data: WebRTCMediaStateData) => void) =>
+      eventChannels.mediaState.subscribe(callback),
+    [eventChannels],
   );
 
   const sendWebRTCSpeaking = useCallback(
@@ -134,23 +121,9 @@ export function useWebRtcApi({
   );
 
   const onWebRTCSpeaking = useCallback(
-    (
-      callback: (data: {
-        roomId: string;
-        from: string;
-        speaking: boolean;
-      }) => void,
-    ) => {
-      if (socketRef.current) {
-        socketRef.current.on("webrtc_speaking", callback);
-      }
-      return () => {
-        if (socketRef.current) {
-          socketRef.current.off("webrtc_speaking", callback);
-        }
-      };
-    },
-    [socketRef],
+    (callback: (data: WebRTCSpeakingData) => void) =>
+      eventChannels.speaking.subscribe(callback),
+    [eventChannels],
   );
 
   return {

@@ -1,5 +1,6 @@
 export { useRoomState } from "./useRoomState";
 export { useMediaTracks } from "./useMediaTracks";
+export { useMediaDevices } from "./useMediaDevices";
 export { useActivityLog } from "./useActivityLog";
 export { useWheelPicker } from "./useWheelPicker";
 export { useVideoPlayer } from "./useVideoPlayer";
@@ -7,4 +8,5 @@ export { useFullscreen } from "./useFullscreen";
 export { useStagePinning } from "./useStagePinning";
 export { usePushToTalkBinding } from "./usePushToTalkBinding";
 export { useWebRTCPeers } from "./useWebRTCPeers";
+export type { PeerConnectionStatus } from "./useWebRTCPeers";
 export { usePlaylist } from "./usePlaylist";

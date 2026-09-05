@@ -228,13 +228,22 @@ async function persistRoomState(deps, state, roomId) {
 }
 
 // Restore room state from DB into in-memory if missing (handles server restarts).
-async function restoreRoomStateFromDB(deps, state, roomId) {
+async function restoreRoomStateFromDB(
+  deps,
+  state,
+  roomId,
+  shouldApply = () => true,
+) {
   if (!deps.isDbConnected || !deps.isDbConnected()) return;
   const prisma = deps.getPrisma?.();
   if (!prisma) return;
   try {
     const saved = await prisma.roomState.findUnique({ where: { roomId } });
     if (!saved) return;
+    // A leave/disconnect can cancel a join while this lookup is in flight.
+    // Applying the row after that cancellation would still leak per-room
+    // state into memory even if the socket itself never joined the adapter.
+    if (!shouldApply()) return;
     if (saved.name && !state.roomName.has(roomId)) {
       state.roomName.set(roomId, saved.name);
     }

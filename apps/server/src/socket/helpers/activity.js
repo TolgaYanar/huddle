@@ -1,7 +1,14 @@
-async function emitActivityHistory(deps, state, socket, roomId) {
+async function emitActivityHistory(
+  deps,
+  state,
+  socket,
+  roomId,
+  shouldEmit = () => true,
+) {
   try {
     // Skip if database is not connected
     if (!deps.isDbConnected() || !deps.getPrisma()) {
+      if (!shouldEmit()) return;
       socket.emit("activity_history", { roomId, events: [] });
       return;
     }
@@ -12,6 +19,7 @@ async function emitActivityHistory(deps, state, socket, roomId) {
       take: state.ACTIVITY_HISTORY_LIMIT,
     });
 
+    if (!shouldEmit()) return;
     socket.emit("activity_history", {
       roomId,
       events: recent.reverse().map((e) => ({
@@ -28,6 +36,7 @@ async function emitActivityHistory(deps, state, socket, roomId) {
     });
   } catch (err) {
     console.error("Failed to load activity history:", err.message);
+    if (!shouldEmit()) return;
     socket.emit("activity_history", { roomId, events: [] });
   }
 }

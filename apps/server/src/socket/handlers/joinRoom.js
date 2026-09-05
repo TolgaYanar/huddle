@@ -17,10 +17,20 @@ const {
   emitCupGameStateTo,
   ensurePlayer: ensureCupGamePlayer,
 } = require("../helpers/cupGame");
-const { getBanIdentity, cancelRoomCleanup } = require("../state");
+const {
+  getBanIdentity,
+  cancelRoomCleanup,
+  beginRoomJoinLease,
+  finishRoomJoinLease,
+} = require("../state");
 const { isRoomMember } = require("../helpers/membership");
 const { createSocketRateLimiter } = require("../helpers/socketRateLimit");
 const { validateRoomId } = require("../../auth/validators");
+const {
+  beginPendingRoomJoin,
+  isPendingRoomJoinCurrent,
+  finishPendingRoomJoin,
+} = require("../helpers/pendingJoin");
 
 // A socket has no legitimate reason to sit in many rooms at once; the web
 // client joins exactly one. Bounding it stops a single connection from
@@ -33,9 +43,12 @@ function attachJoinRoomHandler(io, state, socket, joinedRooms, deps) {
   // restores state from the DB and, for a password-protected room, runs
   // scrypt. Bound it before either can be reached.
   const joinLimiter = createSocketRateLimiter({ windowMs: 10000, max: 10 });
-  async function handleJoin(roomId, password) {
+  async function handleJoin(roomId, password, joinToken) {
+    const isCurrent = () => isPendingRoomJoinCurrent(socket, roomId, joinToken);
+
     // Restore persisted state if in-memory is cold (server restart recovery).
-    await restoreRoomStateFromDB(deps, state, roomId);
+    await restoreRoomStateFromDB(deps, state, roomId, isCurrent);
+    if (!isCurrent()) return;
 
     // Ban check by STABLE identity (user:<id> for authed, socket:<id> for
     // guests) — see getBanIdentity. Authenticated bans survive reconnects;
@@ -56,6 +69,7 @@ function attachJoinRoomHandler(io, state, socket, joinedRooms, deps) {
     const storedHash = state.roomPasswordHash.get(roomId);
     if (storedHash) {
       const ok = await deps.verifyPassword(password, storedHash);
+      if (!isCurrent()) return;
       if (!ok) {
         socket.emit("room_requires_password", {
           roomId,
@@ -91,7 +105,8 @@ function attachJoinRoomHandler(io, state, socket, joinedRooms, deps) {
 
         emitWheelStateTo(state, socket, roomId);
         emitTimerStateTo(state, socket, roomId);
-        await emitPlaylistStateTo(deps, state, socket, roomId);
+        await emitPlaylistStateTo(deps, state, socket, roomId, isCurrent);
+        if (!isCurrent()) return;
 
         // Always re-send room state so reconnecting clients can re-sync.
         emitRoomStateToSocket(state, socket, roomId);
@@ -169,8 +184,10 @@ function attachJoinRoomHandler(io, state, socket, joinedRooms, deps) {
 
       emitWheelStateTo(state, socket, roomId);
       emitTimerStateTo(state, socket, roomId);
-      await emitPlaylistStateTo(deps, state, socket, roomId);
+      await emitPlaylistStateTo(deps, state, socket, roomId, isCurrent);
+      if (!isCurrent()) return;
     } catch (err) {
+      if (!isCurrent()) return;
       console.error("Failed to emit room_users", err);
       socket.emit("room_users", {
         roomId,
@@ -188,7 +205,8 @@ function attachJoinRoomHandler(io, state, socket, joinedRooms, deps) {
       });
 
       emitWheelStateTo(state, socket, roomId);
-      await emitPlaylistStateTo(deps, state, socket, roomId);
+      await emitPlaylistStateTo(deps, state, socket, roomId, isCurrent);
+      if (!isCurrent()) return;
     }
 
     // Persist join as an activity event.
@@ -207,6 +225,8 @@ function attachJoinRoomHandler(io, state, socket, joinedRooms, deps) {
           },
         });
 
+        if (!isCurrent()) return;
+
         socket.to(roomId).emit("activity_event", {
           id: evt.id,
           roomId: evt.roomId,
@@ -220,6 +240,7 @@ function attachJoinRoomHandler(io, state, socket, joinedRooms, deps) {
         });
       }
     } catch (err) {
+      if (!isCurrent()) return;
       console.error("Failed to persist join activity:", err.message);
     }
 
@@ -258,9 +279,10 @@ function attachJoinRoomHandler(io, state, socket, joinedRooms, deps) {
     emitCupGameStateTo(state, socket, roomId);
 
     // Send recent chat history for this room.
-    await emitChatHistoryToSocket(deps, state, socket, roomId);
+    await emitChatHistoryToSocket(deps, state, socket, roomId, isCurrent);
+    if (!isCurrent()) return;
 
-    await emitActivityHistory(deps, state, socket, roomId);
+    await emitActivityHistory(deps, state, socket, roomId, isCurrent);
   }
 
   socket.on("join_room", (payload) => {
@@ -294,20 +316,35 @@ function attachJoinRoomHandler(io, state, socket, joinedRooms, deps) {
     // and reconnect retries both hit this.
     if (bag.pendingJoins.has(roomId)) return;
 
+    // Reserve capacity as soon as a join starts. Counting only joinedRooms
+    // lets many different room ids pass this check in the same tick while all
+    // of them are still waiting on the initial DB lookup.
+    const reservedRoomIds = new Set(joinedRooms);
+    for (const pendingRoomId of bag.pendingJoins.keys()) {
+      reservedRoomIds.add(pendingRoomId);
+    }
     if (
-      !joinedRooms.has(roomId) &&
-      joinedRooms.size >= MAX_JOINED_ROOMS_PER_SOCKET
+      !reservedRoomIds.has(roomId) &&
+      reservedRoomIds.size >= MAX_JOINED_ROOMS_PER_SOCKET
     ) {
       return;
     }
 
-    const p = handleJoin(roomId, password);
+    const joinToken = beginPendingRoomJoin(socket, roomId);
+    beginRoomJoinLease(state, roomId);
+    // Store the finalized promise, not the raw handleJoin promise. Consumers
+    // use pendingJoins as the full join lifecycle boundary and must not resume
+    // one microtask before the lease/token bookkeeping is complete.
+    const p = handleJoin(roomId, password, joinToken)
+      .catch((err) => {
+        console.error("Failed to handle join_room", err);
+      })
+      .finally(() => {
+        if (bag.pendingJoins.get(roomId) === p) bag.pendingJoins.delete(roomId);
+        finishPendingRoomJoin(socket, roomId, joinToken);
+        finishRoomJoinLease(io, state, roomId);
+      });
     bag.pendingJoins.set(roomId, p);
-    p.catch((err) => {
-      console.error("Failed to handle join_room", err);
-    }).finally(() => {
-      if (bag.pendingJoins.get(roomId) === p) bag.pendingJoins.delete(roomId);
-    });
   });
 }
 

@@ -97,6 +97,50 @@ describe("RemoteAudioSink", () => {
     expect(screen.queryByRole("button", { name: "Enable audio" })).toBeNull();
   });
 
+  it("surfaces a non-autoplay playback failure and lets the listener retry", async () => {
+    const unsupported = new Error("No supported source was found");
+    unsupported.name = "NotSupportedError";
+    play.mockRejectedValueOnce(unsupported);
+    render(<RemoteAudioSink streams={[{ id: "a", stream: fakeStream() }]} />);
+
+    const button = await screen.findByRole("button", { name: "Retry audio" });
+    expect(
+      screen.getByText(/sound permission and output device/i),
+    ).toBeTruthy();
+
+    await userEvent.click(button);
+    await act(async () => {});
+    expect(screen.queryByRole("button", { name: "Retry audio" })).toBeNull();
+  });
+
+  it("clears a playback warning when the affected participant leaves", async () => {
+    const unsupported = new Error("Output device disappeared");
+    unsupported.name = "NotReadableError";
+    play.mockRejectedValueOnce(unsupported);
+    const { rerender } = render(
+      <RemoteAudioSink streams={[{ id: "a", stream: fakeStream() }]} />,
+    );
+
+    await screen.findByRole("button", { name: "Retry audio" });
+    rerender(<RemoteAudioSink streams={[]} />);
+    await act(async () => {});
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("clears a warning when a failed stream is replaced at the same list size", async () => {
+    const unsupported = new Error("Output device disappeared");
+    unsupported.name = "NotReadableError";
+    play.mockRejectedValueOnce(unsupported);
+    const { rerender } = render(
+      <RemoteAudioSink streams={[{ id: "a", stream: fakeStream() }]} />,
+    );
+
+    await screen.findByRole("button", { name: "Retry audio" });
+    rerender(<RemoteAudioSink streams={[{ id: "b", stream: fakeStream() }]} />);
+    await act(async () => {});
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
   it("asks the element to play again when the stream gains a track later", async () => {
     const stream = fakeStream(0);
     render(<RemoteAudioSink streams={[{ id: "a", stream }]} />);
@@ -114,6 +158,183 @@ describe("RemoteAudioSink", () => {
     const { container } = render(<RemoteAudioSink streams={[]} />);
     expect(container.querySelectorAll("audio")).toHaveLength(0);
     expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("routes every remote voice to the selected speaker before playback", async () => {
+    const previous = Object.getOwnPropertyDescriptor(
+      HTMLMediaElement.prototype,
+      "setSinkId",
+    );
+    const setSinkId = vi.fn(() => Promise.resolve());
+    Object.defineProperty(HTMLMediaElement.prototype, "setSinkId", {
+      configurable: true,
+      value: setSinkId,
+    });
+
+    try {
+      const stream = fakeStream();
+      const { rerender } = render(
+        <RemoteAudioSink
+          streams={[{ id: "a", stream }]}
+          outputDeviceId="speaker-2"
+        />,
+      );
+      await act(async () => {});
+      expect(setSinkId).toHaveBeenCalledWith("speaker-2");
+      expect(setSinkId.mock.invocationCallOrder[0]!).toBeLessThan(
+        play.mock.invocationCallOrder[0]!,
+      );
+
+      rerender(
+        <RemoteAudioSink
+          streams={[{ id: "a", stream }]}
+          outputDeviceId="speaker-3"
+        />,
+      );
+      await act(async () => {});
+      expect(setSinkId).toHaveBeenLastCalledWith("speaker-3");
+    } finally {
+      if (previous) {
+        Object.defineProperty(
+          HTMLMediaElement.prototype,
+          "setSinkId",
+          previous,
+        );
+      } else {
+        Reflect.deleteProperty(HTMLMediaElement.prototype, "setSinkId");
+      }
+    }
+  });
+
+  it("re-applies the newest speaker when setSinkId resolves out of order", async () => {
+    const previous = Object.getOwnPropertyDescriptor(
+      HTMLMediaElement.prototype,
+      "setSinkId",
+    );
+    let physicalSink = "";
+    const requests: Array<{
+      id: string;
+      settle: () => void;
+      promise: Promise<void>;
+    }> = [];
+    const setSinkId = vi.fn((id: string) => {
+      let resolve!: () => void;
+      const promise = new Promise<void>((done) => {
+        resolve = done;
+      });
+      requests.push({
+        id,
+        promise,
+        settle: () => {
+          physicalSink = id;
+          resolve();
+        },
+      });
+      return promise;
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, "setSinkId", {
+      configurable: true,
+      value: setSinkId,
+    });
+
+    try {
+      const stream = fakeStream();
+      const { rerender } = render(
+        <RemoteAudioSink
+          streams={[{ id: "a", stream }]}
+          outputDeviceId="speaker-a"
+        />,
+      );
+      expect(requests.map(({ id }) => id)).toEqual(["speaker-a"]);
+
+      rerender(
+        <RemoteAudioSink
+          streams={[{ id: "a", stream }]}
+          outputDeviceId="speaker-b"
+        />,
+      );
+      expect(requests.map(({ id }) => id)).toEqual(["speaker-a", "speaker-b"]);
+
+      // The newer request wins first, then the older request finishes late
+      // and physically routes the element back to A.
+      await act(async () => {
+        requests[1]!.settle();
+        await requests[1]!.promise;
+      });
+      expect(physicalSink).toBe("speaker-b");
+      await act(async () => {
+        requests[0]!.settle();
+        await requests[0]!.promise;
+      });
+      expect(physicalSink).toBe("speaker-a");
+
+      // The sink must notice the stale completion and enforce the current UI
+      // selection again instead of silently leaving audio on speaker A.
+      expect(requests.map(({ id }) => id)).toEqual([
+        "speaker-a",
+        "speaker-b",
+        "speaker-b",
+      ]);
+      await act(async () => {
+        requests[2]!.settle();
+        await requests[2]!.promise;
+      });
+      expect(physicalSink).toBe("speaker-b");
+      expect(setSinkId).toHaveBeenLastCalledWith("speaker-b");
+    } finally {
+      if (previous) {
+        Object.defineProperty(
+          HTMLMediaElement.prototype,
+          "setSinkId",
+          previous,
+        );
+      } else {
+        Reflect.deleteProperty(HTMLMediaElement.prototype, "setSinkId");
+      }
+    }
+  });
+
+  it("reports when switching back to the system speaker fails", async () => {
+    const previous = Object.getOwnPropertyDescriptor(
+      HTMLMediaElement.prototype,
+      "setSinkId",
+    );
+    const setSinkId = vi
+      .fn()
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error("default output unavailable"));
+    Object.defineProperty(HTMLMediaElement.prototype, "setSinkId", {
+      configurable: true,
+      value: setSinkId,
+    });
+
+    try {
+      const stream = fakeStream();
+      const { rerender } = render(
+        <RemoteAudioSink
+          streams={[{ id: "a", stream }]}
+          outputDeviceId="speaker-2"
+        />,
+      );
+      await act(async () => {});
+
+      rerender(<RemoteAudioSink streams={[{ id: "a", stream }]} />);
+      await screen.findByRole("button", { name: "Retry audio" });
+      expect(
+        screen.getByText(/switch back to the system default/i),
+      ).toBeTruthy();
+      expect(setSinkId).toHaveBeenLastCalledWith("");
+    } finally {
+      if (previous) {
+        Object.defineProperty(
+          HTMLMediaElement.prototype,
+          "setSinkId",
+          previous,
+        );
+      } else {
+        Reflect.deleteProperty(HTMLMediaElement.prototype, "setSinkId");
+      }
+    }
   });
 });
 

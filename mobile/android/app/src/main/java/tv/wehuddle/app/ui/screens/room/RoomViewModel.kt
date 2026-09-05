@@ -5,6 +5,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import tv.wehuddle.app.data.model.*
@@ -68,10 +69,16 @@ class RoomViewModel @Inject constructor(
     
     private val _copied = MutableStateFlow(false)
     val copied: StateFlow<Boolean> = _copied.asStateFlow()
+
+    private val _callError = MutableStateFlow<String?>(null)
+    val callError: StateFlow<String?> = _callError.asStateFlow()
     
     init {
-        connectToRoom()
+        // WebRTC listeners must exist before the socket joins. Otherwise an
+        // offer emitted immediately after room_users can be lost because the
+        // SocketClient signaling flow intentionally has no replay cache.
         initializeWebRTC()
+        connectToRoom()
 
         viewModelScope.launch {
             authRepository.user.collect { user ->
@@ -119,8 +126,12 @@ class RoomViewModel @Inject constructor(
     }
     
     private fun connectToRoom() {
+        // Warm the short-lived ICE credential in parallel. Signaling handlers
+        // await the same repository gate before creating the first peer, while
+        // chat and room state do not pay the network timeout.
+        viewModelScope.launch { webRTCManager.prepareIceServers() }
         roomRepository.connect()
-        
+
         viewModelScope.launch {
             // Wait for connection then join room
             roomRepository.connectionState
@@ -146,21 +157,58 @@ class RoomViewModel @Inject constructor(
     }
     
     private fun initializeWebRTC() {
-        viewModelScope.launch {
-            webRTCManager.initialize()
-            
+        viewModelScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            // StateFlow changes synchronously even when Socket.IO's close
+            // callback is removed during auth-token reconnect. Any transport
+            // state outside CONNECTED is therefore an immediate capture gate.
+            roomRepository.connectionState
+                .distinctUntilChanged()
+                .collect { state ->
+                    if (state != ConnectionState.CONNECTED) {
+                        stopCallForMembershipLoss()
+                    }
+                }
+        }
+
+        viewModelScope.launch(start = CoroutineStart.UNDISPATCHED) {
             // Observe WebRTC signaling events from socket (incoming)
             roomRepository.socketEvents.collect { event ->
                 when (event) {
+                    is SocketEvent.RoomUsers -> {
+                        if (event.data.roomId != roomId) return@collect
+                        val socketId = roomRepository.socketId.value
+                            ?.takeIf(String::isNotBlank)
+                            ?: return@collect
+                        // Only the private post-join snapshot carries this
+                        // token. Later room-wide snapshots intentionally omit
+                        // it, so retain the last valid token until disconnect.
+                        event.data.iceAccessToken?.let { token ->
+                            webRTCManager.updateIceAccess(roomId, socketId, token)
+                        }
+                    }
+                    is SocketEvent.Disconnected -> {
+                        stopCallForMembershipLoss()
+                    }
+                    is SocketEvent.PasswordRequired -> {
+                        if (event.data.roomId != roomId) return@collect
+                        stopCallForMembershipLoss()
+                    }
+                    is SocketEvent.RoomBanned -> {
+                        if (event.roomId != roomId) return@collect
+                        stopCallForMembershipLoss()
+                    }
                     is SocketEvent.WebRTCOfferReceived -> {
+                        if (event.data.roomId != roomId) return@collect
                         Log.d("RoomViewModel", "Received WebRTC offer from ${event.data.fromId}")
                         webRTCManager.handleOffer(event.data.fromId, event.data)
                     }
                     is SocketEvent.WebRTCAnswerReceived -> {
+                        if (event.data.roomId != roomId) return@collect
                         Log.d("RoomViewModel", "Received WebRTC answer from ${event.data.fromId}")
                         webRTCManager.handleAnswer(event.data.fromId, event.data)
                     }
                     is SocketEvent.WebRTCIceReceived -> {
+                        if (event.data.roomId != roomId) return@collect
                         Log.d("RoomViewModel", "Received ICE candidate from ${event.data.fromId}")
                         webRTCManager.handleIceCandidate(
                             event.data.fromId,
@@ -173,24 +221,36 @@ class RoomViewModel @Inject constructor(
         }
         
         // Observe WebRTC events from manager (outgoing) and send to server
-        viewModelScope.launch {
+        viewModelScope.launch(start = CoroutineStart.UNDISPATCHED) {
             webRTCManager.events.collect { event ->
                 when (event) {
                     is tv.wehuddle.app.data.webrtc.WebRTCEvent.AnswerCreated -> {
                         Log.d("RoomViewModel", "Sending WebRTC answer to ${event.peerId}")
-                        roomRepository.sendWebRTCAnswer(event.peerId, event.sdp.description)
+                        roomRepository.sendWebRTCAnswer(
+                            roomId,
+                            event.peerId,
+                            event.sdp.description,
+                            event.generation,
+                        )
                     }
                     is tv.wehuddle.app.data.webrtc.WebRTCEvent.OfferCreated -> {
                         Log.d("RoomViewModel", "Sending WebRTC offer to ${event.peerId}")
-                        roomRepository.sendWebRTCOffer(event.peerId, event.sdp.description)
+                        roomRepository.sendWebRTCOffer(
+                            roomId,
+                            event.peerId,
+                            event.sdp.description,
+                            event.generation,
+                        )
                     }
                     is tv.wehuddle.app.data.webrtc.WebRTCEvent.IceCandidateGenerated -> {
                         Log.d("RoomViewModel", "Sending ICE candidate to ${event.peerId}")
                         roomRepository.sendWebRTCIce(
+                            roomId,
                             event.peerId,
                             event.candidate.sdp,
                             event.candidate.sdpMid,
-                            event.candidate.sdpMLineIndex
+                            event.candidate.sdpMLineIndex,
+                            event.generation,
                         )
                     }
                     is tv.wehuddle.app.data.webrtc.WebRTCEvent.RemoteStreamAdded -> {
@@ -202,18 +262,60 @@ class RoomViewModel @Inject constructor(
                     is tv.wehuddle.app.data.webrtc.WebRTCEvent.ConnectionStateChanged -> {
                         Log.d("RoomViewModel", "Connection state changed for ${event.peerId}: ${event.state}")
                     }
+                    is tv.wehuddle.app.data.webrtc.WebRTCEvent.LocalSpeakingChanged -> {
+                        roomRepository.sendSpeakingState(roomId, event.speaking)
+                    }
                     is tv.wehuddle.app.data.webrtc.WebRTCEvent.Error -> {
                         Log.e("RoomViewModel", "WebRTC error: ${event.message}")
+                        // Runtime camera/microphone failures can happen after a
+                        // successful toggle. Publish the manager's real state,
+                        // never the last optimistic button state.
+                        roomRepository.sendMediaState(roomId, webRTCManager.localMediaState.value)
+                        _callError.value = event.message
                     }
                     else -> {}
                 }
             }
         }
+
+        // RoomRepository subscribes to socket events eagerly and exposes the
+        // latest participant snapshot as StateFlow. Reconciling from that
+        // snapshot both survives an early room_users event and closes peers
+        // that leave. The lexical rule is shared with the web client, so one
+        // side always creates the initial offer regardless of socket-id order.
+        viewModelScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            combine(
+                roomRepository.participants,
+                roomRepository.socketId,
+                roomRepository.roomState,
+            ) { participants, socketId, state ->
+                Triple(socketId, state.roomId, participants.map(Participant::id).sorted())
+            }
+                .distinctUntilChanged()
+                .collectLatest { (socketId, activeRoomId, participantIds) ->
+                    if (socketId.isNullOrBlank() || activeRoomId != roomId) {
+                        webRTCManager.closeAllPeerConnections()
+                    } else {
+                        if (socketId in participantIds) {
+                            // The server forgets per-socket call state on a
+                            // disconnect. Re-advertise capture and speaking
+                            // state after every successful join/rejoin.
+                            roomRepository.sendMediaState(roomId, webRTCManager.localMediaState.value)
+                            roomRepository.sendSpeakingState(roomId, webRTCManager.localSpeaking.value)
+                        }
+                        webRTCManager.reconcilePeers(socketId, participantIds)
+                    }
+                }
+        }
+
+        // Initialize only after both signaling directions are subscribed, so
+        // even an immediate native initialization error reaches the UI.
+        webRTCManager.initialize()
     }
     
     override fun onCleared() {
         super.onCleared()
-        roomRepository.leaveRoom()
+        roomRepository.leaveRoom(roomId)
         webRTCManager.release()
     }
     
@@ -407,6 +509,34 @@ class RoomViewModel @Inject constructor(
     fun clearError() {
         roomRepository.clearError()
     }
+
+    fun clearCallError() {
+        _callError.value = null
+    }
+
+    /** Stop both capture and playout while the room screen is not visible. */
+    fun suspendCall() {
+        val canPublish = hasActiveRoomMembership()
+        webRTCManager.closeAllPeerConnections()
+        webRTCManager.stopCamera()
+        webRTCManager.stopMicrophone()
+        if (canPublish) {
+            roomRepository.sendMediaState(roomId, webRTCManager.localMediaState.value)
+            roomRepository.sendSpeakingState(roomId, false)
+        } else {
+            roomRepository.clearLocalCallState()
+        }
+    }
+
+    /** Restore remote playout on return; local capture stays opt-in and off. */
+    fun resumeCall() {
+        if (!hasActiveRoomMembership()) return
+        val socketId = roomRepository.socketId.value ?: return
+        val participantIds = roomRepository.participants.value.map(Participant::id)
+        viewModelScope.launch {
+            webRTCManager.reconcilePeers(socketId, participantIds)
+        }
+    }
     
     // Re-sync: request current room state without broadcasting changes
     fun requestResync() {
@@ -415,39 +545,33 @@ class RoomViewModel @Inject constructor(
     
     // Media state
     fun toggleMic() {
-        val currentState = roomState.value.localMediaState
-        val newMicState = !currentState.mic
-        val newState = currentState.copy(mic = newMicState)
-        
-        // Toggle microphone in WebRTC manager
+        if (!hasActiveRoomMembership()) {
+            _callError.value = "Join the room before turning on your microphone"
+            return
+        }
+        // Publish the state that native capture actually reached. Previously
+        // a permission/capture failure still told everyone that the mic was on.
+        _callError.value = null
         webRTCManager.toggleMicrophone()
-        
-        roomRepository.sendMediaState(newState)
+        roomRepository.sendMediaState(roomId, webRTCManager.localMediaState.value)
     }
     
     fun toggleCam() {
-        val currentState = roomState.value.localMediaState
-        val newCamState = !currentState.cam
-        val newState = currentState.copy(cam = newCamState)
-        
-        viewModelScope.launch {
-            if (newCamState) {
-                // Start camera
-                webRTCManager.startCamera()
-            } else {
-                // Stop camera
-                webRTCManager.stopCamera()
-            }
+        if (!hasActiveRoomMembership()) {
+            _callError.value = "Join the room before turning on your camera"
+            return
         }
-        
-        roomRepository.sendMediaState(newState)
+        _callError.value = null
+        viewModelScope.launch {
+            webRTCManager.toggleCamera()
+            roomRepository.sendMediaState(roomId, webRTCManager.localMediaState.value)
+        }
     }
     
     fun toggleScreen() {
-        val currentState = roomState.value.localMediaState
-        val newState = currentState.copy(screen = !currentState.screen)
-        roomRepository.sendMediaState(newState)
-        // Screen share requires different handling - placeholder for now
+        // Android screen capture needs a MediaProjection permission flow and
+        // a foreground service. Do not advertise a stream that does not exist.
+        Log.w("RoomViewModel", "Screen sharing is not available on Android yet")
     }
     
     // Host actions
@@ -458,5 +582,24 @@ class RoomViewModel @Inject constructor(
     fun isHost(): Boolean {
         val state = roomState.value
         return state.userId.isNotEmpty() && state.hostId == state.userId
+    }
+
+    private fun hasActiveRoomMembership(): Boolean {
+        val state = roomState.value
+        val socketId = roomRepository.socketId.value
+        return connectionState.value == ConnectionState.CONNECTED &&
+            state.roomId == roomId &&
+            state.userId.isNotBlank() &&
+            state.userId == socketId
+    }
+
+    private fun stopCallForMembershipLoss() {
+        // A protected, banned, or disconnected client must never keep hidden
+        // capture alive while it is outside the room membership boundary.
+        webRTCManager.closeAllPeerConnections()
+        webRTCManager.stopCamera()
+        webRTCManager.stopMicrophone()
+        webRTCManager.clearIceAccess()
+        roomRepository.clearLocalCallState()
     }
 }

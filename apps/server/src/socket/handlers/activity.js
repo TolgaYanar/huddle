@@ -12,7 +12,9 @@ function attachActivityHandlers(state, socket, deps) {
     const pending = socket.data?.pendingJoins?.get(roomId);
     if (pending) await pending.catch(() => {});
     if (!isRoomMember(socket, roomId)) return;
-    await emitActivityHistory(deps, state, socket, roomId);
+    await emitActivityHistory(deps, state, socket, roomId, () =>
+      isRoomMember(socket, roomId),
+    );
   });
 }
 

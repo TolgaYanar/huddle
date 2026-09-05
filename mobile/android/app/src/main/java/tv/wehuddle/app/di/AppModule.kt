@@ -19,7 +19,6 @@ import tv.wehuddle.app.data.network.AuthInterceptor
 import tv.wehuddle.app.data.network.HuddleApiService
 import tv.wehuddle.app.data.network.SocketClient
 import tv.wehuddle.app.data.repository.RoomRepository
-import tv.wehuddle.app.data.webrtc.WebRTCManager
 import javax.inject.Singleton
 
 @Module
@@ -98,11 +97,4 @@ object AppModule {
         return RoomRepository(socketClient, preferencesManager)
     }
     
-    @Provides
-    @Singleton
-    fun provideWebRTCManager(
-        @ApplicationContext context: Context
-    ): WebRTCManager {
-        return WebRTCManager(context)
-    }
 }
