@@ -247,7 +247,20 @@ in `apps/web/app/r/[roomId]/hooks/webrtcPeers/`. `Permissions-Policy` in
 `next.config.js` must keep `camera=(self), microphone=(self)`. Offer/answer
 collisions are resolved by `PeerNegotiator` with a deterministic polite role;
 never restore a direct `signalingState !== "stable"` early-return because media
-renegotiation requested during an active exchange must remain queued. Treat each
+renegotiation requested during an active exchange must remain queued.
+
+When the polite peer accepts a colliding offer, `setRemoteDescription`
+implicitly rolls back the offer it had already sent, and everything that offer
+carried goes with it — an ICE restart requested when relay credentials
+arrived, and any track added since the last exchange. `receiveDescription`
+therefore re-arms `offerPending` on every collision it accepts, so the flush at
+the end of that exchange puts the proposal back on the wire. Without it the
+second person to join a room could not send audio at all: their transceiver
+read `sendrecv` and their sender held a live track while `outbound-rtp` stayed
+at zero packets, so about half of all calls were audible in one direction
+only. A remote track being `live` does not mean media is flowing — verify with
+`getStats()` (`outbound-rtp.packetsSent`, `inbound-rtp.packetsReceived` and
+`totalAudioEnergy`), never with `track.readyState`. Treat each
 `room_users` payload as authoritative: peers absent from its `users` list must
 be closed even if a preceding `user_left` event was missed during reconnect.
 Media permission promises cannot be cancelled by the browser, so

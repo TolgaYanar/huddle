@@ -140,6 +140,17 @@ export class PeerNegotiator {
     this.ignoreOffer = !this.isPolite() && offerCollision;
     if (this.ignoreOffer) return false;
 
+    // A polite peer accepts a colliding offer, and setRemoteDescription below
+    // implicitly rolls back the offer this peer had already put on the wire.
+    // Everything that offer carried goes with it — an ICE restart requested
+    // when relay credentials arrived, and any track added since the last
+    // exchange — and nothing else re-issues it, because requestOffer() cleared
+    // offerPending when it sent. That left the polite side of a glare unable
+    // to send media at all: its transceiver read sendrecv while its encoder
+    // never started. Re-arm the request so the flush at the end of this
+    // exchange puts our own proposal back on the wire.
+    if (offerCollision) this.offerPending = true;
+
     if (description.type === "offer") {
       // The answer and every ICE candidate generated from it belong to the
       // offerer's transaction. Legacy peers omit the field and remain
