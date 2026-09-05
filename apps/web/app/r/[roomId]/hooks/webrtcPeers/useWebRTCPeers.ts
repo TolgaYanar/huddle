@@ -156,20 +156,14 @@ export function useWebRTCPeers<MediaState>(
   );
   const iceGateRef = useRef(createIceGate());
   const identityRef = useRef(userId);
-  const roomRef = useRef(roomId);
-  const primeIceAccessRef = useRef<(token: string | null | undefined) => void>(
-    () => {},
-  );
   const signalingRef = useRef({ sendWebRTCOffer, sendWebRTCAnswer });
   identityRef.current = userId;
-  roomRef.current = roomId;
   signalingRef.current = { sendWebRTCOffer, sendWebRTCAnswer };
 
   const latestRef = useRef<WebRTCPeersLatest<MediaState>>({
     roomId,
     userId,
     iceReady: iceGateRef.current.promise,
-    primeIceAccess: (token) => primeIceAccessRef.current(token),
     createPeerConnection: null as unknown as (
       peerId: string,
     ) => RTCPeerConnection,
@@ -216,14 +210,18 @@ export function useWebRTCPeers<MediaState>(
     onWebRTCSpeaking,
   });
 
-  const iceLoadedTokenRef = useRef<string | null>(null);
-  const iceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const iceCancelledRef = useRef(false);
+  useEffect(() => {
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
 
-  const loadIceConfig = useCallback(
-    async (iceAccess: { roomId: string; socketId: string; token: string }) => {
+    const iceAccess =
+      iceAccessToken && userId
+        ? { roomId, socketId: userId, token: iceAccessToken }
+        : undefined;
+
+    const load = async () => {
       const config = await fetchIceConfig({ iceAccess });
-      if (iceCancelledRef.current) return;
+      if (cancelled) return;
       if (config) {
         const previousIceServers = iceServersRef.current;
         const iceConfigurationChanged = !iceServerConfigurationsMatch(
@@ -240,55 +238,35 @@ export function useWebRTCPeers<MediaState>(
           );
         }
         if (config.ttlSeconds !== null) {
-          iceTimerRef.current = setTimeout(
-            () => void loadIceConfig(iceAccess),
-            refreshDelayMs(config.ttlSeconds),
-          );
+          timer = setTimeout(load, refreshDelayMs(config.ttlSeconds));
         }
       } else {
-        iceTimerRef.current = setTimeout(
-          () => void loadIceConfig(iceAccess),
-          ICE_RETRY_MS,
-        );
+        timer = setTimeout(load, ICE_RETRY_MS);
       }
       // Open the gate on the first settled attempt either way: a room with
       // STUN only is degraded, a room that never creates peers is broken.
       iceGateRef.current.open();
-    },
-    [],
-  );
+    };
 
-  const primeIceAccess = useCallback(
-    (token: string | null | undefined) => {
+    if (iceAccess) {
+      void load();
+    } else {
       // The relay endpoint answers only a caller that proved room membership,
-      // so there is nothing to ask for until the capability exists.
-      if (!token || !identityRef.current) return;
-      if (iceLoadedTokenRef.current === token) return;
-      iceLoadedTokenRef.current = token;
-      if (iceTimerRef.current) clearTimeout(iceTimerRef.current);
-      void loadIceConfig({
-        roomId: roomRef.current,
-        socketId: identityRef.current,
-        token,
-      });
-    },
-    [loadIceConfig],
-  );
-  primeIceAccessRef.current = primeIceAccess;
-
-  useEffect(() => {
-    iceCancelledRef.current = false;
-    if (iceAccessToken) primeIceAccess(iceAccessToken);
-    // Without a capability there is nothing to fetch, and the gate must not
-    // hold: an offer can arrive before our own presence, and a peer that is
-    // never built is worse than one that starts on STUN.
-    else iceGateRef.current.open();
+      // and that capability arrives with the first `room_users` payload. A
+      // request before then can only be refused, so it buys nothing and spends
+      // the caller's rate-limit budget. Do not hold the gate waiting for the
+      // capability either: an offer can arrive before our own presence, and a
+      // peer that is never built is worse than one that starts on STUN. The
+      // effect re-runs when the token lands, and configureExistingPeers then
+      // upgrades live peers to the relay with an ICE restart.
+      iceGateRef.current.open();
+    }
 
     return () => {
-      iceCancelledRef.current = true;
-      if (iceTimerRef.current) clearTimeout(iceTimerRef.current);
+      cancelled = true;
+      if (timer) clearTimeout(timer);
     };
-  }, [iceAccessToken, primeIceAccess]);
+  }, [iceAccessToken, roomId, userId]);
 
   const updateRemoteStreamsState = useCallback(() => {
     setRemoteStreams(

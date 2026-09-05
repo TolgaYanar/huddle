@@ -64,7 +64,6 @@ function createHarness(
       roomId: "room",
       userId: "self",
       iceReady,
-      primeIceAccess: vi.fn(),
       createPeerConnection,
       getPeerIds: vi.fn(() => []),
       getExistingPeer,
