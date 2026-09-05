@@ -162,7 +162,6 @@ class RoomViewModel @Inject constructor(
             // callback is removed during auth-token reconnect. Any transport
             // state outside CONNECTED is therefore an immediate capture gate.
             roomRepository.connectionState
-                .distinctUntilChanged()
                 .collect { state ->
                     if (state != ConnectionState.CONNECTED) {
                         stopCallForMembershipLoss()
