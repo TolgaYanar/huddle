@@ -4,6 +4,7 @@ const assert = require("node:assert/strict");
 const {
   CREDENTIALS_URL,
   MAX_TTL_SECONDS,
+  MIN_REMAINING_SECONDS,
   REFRESH_FRACTION,
   createCloudflareTurnProvider,
 } = require("../cloudflareTurn");
@@ -206,4 +207,65 @@ test("a hung request aborts instead of holding the first room join open", async 
 
 test("Cloudflare's documented ceiling is 48 hours", () => {
   assert.equal(MAX_TTL_SECONDS, 48 * 60 * 60);
+});
+
+test("never serves a credential too short to survive the client's refresh", async () => {
+  // The client refreshes at 80% of the TTL it is told but never sooner than
+  // 30 s, so a credential with seconds left dies on a live peer before another
+  // is requested. A server that sat idle through the refresh window used to
+  // hand exactly that to its next joiner.
+  const { provider, calls, advance } = makeProvider();
+  const first = await provider.getIceServers();
+  assert.equal(first.ttlSeconds, 3600);
+
+  advance((3600 - 1) * 1000);
+  const late = await provider.getIceServers();
+
+  assert.equal(
+    calls.length,
+    2,
+    "the stale credential must be replaced, not served",
+  );
+  assert.equal(late.ttlSeconds, 3600);
+  assert.ok(late.ttlSeconds >= MIN_REMAINING_SECONDS);
+});
+
+test("still serves a short credential when a fresh mint fails", async () => {
+  let attempt = 0;
+  const { provider, advance } = makeProvider({
+    fetchImpl: async () => {
+      attempt += 1;
+      if (attempt === 1) return jsonResponse(ISSUED);
+      return jsonResponse({ error: "upstream" }, 503);
+    },
+  });
+  await provider.getIceServers();
+
+  advance((3600 - 60) * 1000);
+  const degraded = await provider.getIceServers();
+
+  // 60 seconds of relay beats none: the client refreshes on its own and the
+  // retry may succeed by then.
+  assert.ok(degraded);
+  assert.equal(degraded.ttlSeconds, 60);
+  assert.equal(provider.getCredentialStatus(), "ready");
+});
+
+test("reports what the last mint achieved, for /health", async () => {
+  const { provider, advance } = makeProvider();
+  assert.equal(provider.getCredentialStatus(), "unknown");
+  await provider.getIceServers();
+  assert.equal(provider.getCredentialStatus(), "ready");
+  advance(3600 * 1000 + 1000);
+  assert.equal(
+    provider.getCredentialStatus(),
+    "unknown",
+    "expired is not ready",
+  );
+
+  const { provider: broken } = makeProvider({
+    fetchImpl: async () => jsonResponse({ error: "revoked" }, 401),
+  });
+  assert.equal(await broken.getIceServers(), null);
+  assert.equal(broken.getCredentialStatus(), "failing");
 });

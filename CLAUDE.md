@@ -273,16 +273,32 @@ returns STUN, and a TURN entry in one of three modes:
   Cloudflare deliberately refuses a locally computed shared-secret credential,
   so `src/webrtc/cloudflareTurn.js` exchanges the key for one over their API.
   That is a network call, so it is cached and refreshed at 80% of the TTL,
-  concurrent cold-start joins collapse onto one request, and an expired
-  credential is dropped rather than served. Nothing there throws: a failed
-  mint degrades the response to STUN.
+  and concurrent cold-start joins collapse onto one request. Past the refresh
+  point the cached credential is only served while at least
+  `MIN_REMAINING_SECONDS` (120 s) of it is left: the client's own refresh floor
+  is 30 s, so a shorter one dies on a live peer before another is requested,
+  and a server that sat idle through the whole window used to hand its next
+  joiner a credential with one second on it. Below that floor the caller waits
+  for a fresh mint; if that mint fails, a still-valid short credential beats no
+  relay and is served anyway, while an expired one never is. Nothing there
+  throws: a failed mint degrades the response to STUN.
 - `hmac` — `TURN_URLS` + `TURN_SECRET`, a TURN-REST-API credential
   (`<expiry>:<random>` / base64 HMAC-SHA1) computed locally.
 - `static` — `TURN_URLS` + `TURN_USERNAME`/`TURN_CREDENTIAL`, refused under
   `NODE_ENV=production` because it cannot expire.
 
-Cloudflare wins when set, and says so in a `[ice]` boot warning. `REQUIRE_TURN`
-makes a missing relay a startup failure instead of a silent downgrade.
+Cloudflare wins when set, and says so in a `[ice]` boot warning.
+
+`REQUIRE_TURN` makes a missing relay a startup failure instead of a silent
+downgrade. For `cloudflare` that promise cannot be kept from configuration
+alone — a revoked key is indistinguishable from a live one until it is used —
+so `index.js` mints once before it listens when the flag is set, and exits 1 if
+Cloudflare refuses. Without the flag the same check runs in the background so a
+Cloudflare blip never delays a boot that is allowed to degrade. For the same
+reason `/health` reports a `credential` field (`ready` / `failing` / `unknown`,
+or `n/a` outside Cloudflare) and marks `status: degraded` when the relay is
+configured but cannot actually mint; `relay: "configured"` on its own never
+meant a working relay.
 
 STUN is public configuration, but a TURN credential spends relay quota, so the
 route hands one out only to a caller that proves live room membership with the
