@@ -95,13 +95,17 @@ describe("PeerNegotiator", () => {
   it("lets the polite peer accept and answer a colliding offer", async () => {
     const pc = new FakePeerConnection();
     pc.signalingState = "have-local-offer";
-    const { negotiator, sendAnswer } = createNegotiator(pc, true);
+    const { negotiator, sendAnswer, sendOffer } = createNegotiator(pc, true);
 
     await expect(
       negotiator.receiveDescription({ type: "offer", sdp: "remote-offer" }),
     ).resolves.toBe(true);
     expect(sendAnswer).toHaveBeenCalledTimes(1);
-    expect(pc.signalingState).toBe("stable");
+    // Accepting the collision rolls back the offer this peer had outstanding,
+    // so it re-offers immediately; the exchange ends mid-flight by design
+    // rather than back at stable with our proposal discarded.
+    expect(sendOffer).toHaveBeenCalledTimes(1);
+    expect(pc.signalingState).toBe("have-local-offer");
   });
 
   it("handles glare while the polite peer is still creating its offer", async () => {
@@ -280,5 +284,44 @@ describe("PeerNegotiator.flushPendingOffer", () => {
     await negotiator.flushPendingOffer();
 
     expect(sendOffer).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("PeerNegotiator rolled-back offers", () => {
+  it("re-issues a polite peer's offer that a colliding offer rolled back", async () => {
+    // Reproduces the production defect: relay credentials arrive, the peer
+    // calls restartIce() and offers, the remote offer lands first, and the
+    // polite rollback discarded our offer for good. Roughly half of all calls
+    // ended up with audio flowing in one direction only.
+    const pc = new FakePeerConnection();
+    const { negotiator, sendOffer, sendAnswer } = createNegotiator(pc, true);
+
+    await negotiator.requestOffer();
+    expect(sendOffer).toHaveBeenCalledTimes(1);
+    expect(pc.signalingState).toBe("have-local-offer");
+
+    // The remote offer arrives while ours is still outstanding.
+    await negotiator.receiveDescription({ type: "offer", sdp: "remote-offer" });
+
+    expect(sendAnswer).toHaveBeenCalledTimes(1);
+    // Our proposal must go back on the wire rather than being silently lost.
+    expect(sendOffer).toHaveBeenCalledTimes(2);
+    expect(negotiator.hasPendingOffer()).toBe(false);
+  });
+
+  it("leaves an impolite peer's ignored collision alone", async () => {
+    const pc = new FakePeerConnection();
+    const { negotiator, sendOffer, sendAnswer } = createNegotiator(pc, false);
+
+    await negotiator.requestOffer();
+    const accepted = await negotiator.receiveDescription({
+      type: "offer",
+      sdp: "remote-offer",
+    });
+
+    // The impolite peer keeps its own offer, so there is nothing to re-issue.
+    expect(accepted).toBe(false);
+    expect(sendAnswer).not.toHaveBeenCalled();
+    expect(sendOffer).toHaveBeenCalledTimes(1);
   });
 });
