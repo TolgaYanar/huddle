@@ -1,6 +1,7 @@
 import React from "react";
 
 import { CallSidebar } from "../components/CallSidebar";
+import { ConnectionStatusNotice } from "../components/callSidebar/ConnectionStatusNotice";
 import { ActivitySidebar } from "../components/ActivitySidebar";
 import { PlayerSection } from "../components/PlayerSection";
 import { ChatModeBar } from "../components/ChatModeBar";
@@ -119,6 +120,26 @@ export function RoomClientView({
         which keep the participant tiles mounted.
       */}
       {isReady && <RemoteAudioSink {...remoteAudioSinkProps} />}
+
+      {isReady && isTheatreMode && !isChatOnlyMode && (
+        <div className="fixed left-1/2 top-20 z-50 w-[min(32rem,calc(100vw-2rem))] -translate-x-1/2">
+          <ConnectionStatusNotice
+            userId={callSidebarProps.userId}
+            participants={callSidebarProps.participants}
+            peerConnectionStates={callSidebarProps.peerConnectionStates}
+            localMediaExpected={Boolean(
+              callSidebarProps.micEnabled ||
+              callSidebarProps.camEnabled ||
+              callSidebarProps.screenEnabled,
+            )}
+            remoteMedia={callSidebarProps.remoteMedia}
+            getDisplayName={(id) =>
+              callSidebarProps.usernamesById?.[id] ?? id.slice(0, 6)
+            }
+            retryFailedPeers={callSidebarProps.retryFailedPeers}
+          />
+        </div>
+      )}
 
       {isReady && (
         <main

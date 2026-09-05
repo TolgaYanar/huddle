@@ -115,8 +115,9 @@ must contain only a version or SHA token, never a secret.
 
 The server reads exactly: `DATABASE_URL`, `PORT`, `CORS_ORIGINS`, `NODE_ENV`,
 `ALLOW_EXTENSION_ORIGINS`, `COOKIE_DOMAIN`, `VERBOSE_LOGS`, `SENTRY_DSN`, and
-the TURN relay set `TURN_URLS`, `TURN_SECRET`, `TURN_USERNAME`,
-`TURN_CREDENTIAL`, `TURN_TTL_SECONDS`, `STUN_URLS`. Anything else in
+the TURN relay set `CLOUDFLARE_TURN_KEY_ID`, `CLOUDFLARE_TURN_API_TOKEN`,
+`TURN_URLS`, `TURN_SECRET`, `TURN_USERNAME`, `TURN_CREDENTIAL`,
+`TURN_TTL_SECONDS`, `STUN_URLS`, `REQUIRE_TURN`. Anything else in
 `apps/server/.env` is dead configuration.
 
 Prisma is on **v7**. Two things moved in that upgrade and both are easy to
@@ -265,11 +266,36 @@ the page gets `NotAllowedError` from `play()`, which the old code swallowed.
 The sink shows an "Enable audio" control and retries on the next gesture.
 
 ICE servers are issued by the server: `GET /api/webrtc/ice`
-(`src/routes/ice.js`, pure logic in `src/webrtc/iceConfig.js`) returns STUN
-plus, when `TURN_URLS` is configured, a TURN entry. With `TURN_SECRET` the
-credential is a TURN-REST-API HMAC (`<expiry>:<random>` / base64 HMAC-SHA1)
-that expires after `TURN_TTL_SECONDS`; with `TURN_USERNAME`/`TURN_CREDENTIAL`
-it is the fixed pair. Relay credentials must never move into the web bundle:
+(`src/routes/ice.js`, pure logic in `src/webrtc/iceConfig.js`). It always
+returns STUN, and a TURN entry in one of three modes:
+
+- `cloudflare` — `CLOUDFLARE_TURN_KEY_ID` + `CLOUDFLARE_TURN_API_TOKEN`.
+  Cloudflare deliberately refuses a locally computed shared-secret credential,
+  so `src/webrtc/cloudflareTurn.js` exchanges the key for one over their API.
+  That is a network call, so it is cached and refreshed at 80% of the TTL,
+  concurrent cold-start joins collapse onto one request, and an expired
+  credential is dropped rather than served. Nothing there throws: a failed
+  mint degrades the response to STUN.
+- `hmac` — `TURN_URLS` + `TURN_SECRET`, a TURN-REST-API credential
+  (`<expiry>:<random>` / base64 HMAC-SHA1) computed locally.
+- `static` — `TURN_URLS` + `TURN_USERNAME`/`TURN_CREDENTIAL`, refused under
+  `NODE_ENV=production` because it cannot expire.
+
+Cloudflare wins when set, and says so in a `[ice]` boot warning. `REQUIRE_TURN`
+makes a missing relay a startup failure instead of a silent downgrade.
+
+STUN is public configuration, but a TURN credential spends relay quota, so the
+route hands one out only to a caller that proves live room membership with the
+capability issued at socket join (`x-huddle-room-token`); everything else gets 403. The route's last handler is async — Express 4 does not catch a rejected
+async handler, so it must keep its own try/catch or a failure hangs the
+request instead of degrading.
+
+The TTL does **not** need to outlast a call. A shorter window limits what a
+leaked credential is worth, and the client handles rotation: when the server
+returns different TURN servers, `configureExistingPeers` calls
+`setConfiguration` plus `restartIce` on live peers rather than dropping them.
+
+Relay credentials must never move into the web bundle:
 `NEXT_PUBLIC_ICE_SERVERS` is only the static fallback parsed by
 `hooks/webrtcPeers/iceServers.ts`. `useWebRTCPeers` fetches the config on
 mount, refreshes at 80% of the TTL, retries a failed lookup every minute, and
@@ -277,11 +303,9 @@ exposes `latestRef.current.iceReady`; the `room_users`, `user_joined` and
 offer handlers in `useWebRTCPeerSubscriptions` await it so the first peer of a
 session is built with relay credentials instead of racing the fetch. The gate
 is bounded by the fetch timeout (3 s) and always opens — a failed lookup
-means STUN only, never no peers. The TTL must outlast a call: a TURN server
-re-checks expiry on every allocation refresh, so a credential expiring
-mid-call drops the relayed connection. STUN alone cannot connect two peers
-who are both behind symmetric NAT; that needs a relay, and no client code
-change can substitute for it.
+means STUN only, never no peers. STUN alone cannot connect two peers who are
+both behind symmetric NAT; that needs a relay, and no client code change can
+substitute for it.
 
 **Auth.** Session cookie based (`apps/server/src/auth/`): `session.js` (SHA-256
 hashed tokens, HttpOnly cookie), `password.js`, `validators.js`, `middleware.js`,

@@ -2,10 +2,12 @@ import React from "react";
 
 export function CallHeader(props: {
   localSpeaking: boolean;
+  micEnabled: boolean;
   isCallCollapsed: boolean;
   setIsCallCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
 }) {
-  const { localSpeaking, isCallCollapsed, setIsCallCollapsed } = props;
+  const { localSpeaking, micEnabled, isCallCollapsed, setIsCallCollapsed } =
+    props;
 
   return (
     <div className="flex items-center justify-between gap-2">
@@ -21,7 +23,7 @@ export function CallHeader(props: {
           <span
             className={`w-1.5 h-1.5 rounded-full ${localSpeaking ? "bg-positive" : "bg-ink-faint"}`}
           />
-          {localSpeaking ? "Speaking" : "Muted"}
+          {localSpeaking ? "Speaking" : micEnabled ? "Ready" : "Mic off"}
         </span>
       </div>
 

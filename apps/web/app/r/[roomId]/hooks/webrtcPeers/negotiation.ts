@@ -1,21 +1,47 @@
+export type CorrelatedDescription = RTCSessionDescriptionInit & {
+  generation?: string;
+};
+
 type SignalDescription = (
-  description: RTCSessionDescriptionInit | null,
-) => void;
+  description: CorrelatedDescription | null,
+) => boolean | void;
 
 type PeerNegotiatorOptions = {
   pc: RTCPeerConnection;
   isPolite: () => boolean;
-  syncTracks: () => void;
+  syncTracks: () => void | Promise<void>;
   sendOffer: SignalDescription;
   sendAnswer: SignalDescription;
 };
 
-function parseDescription(value: unknown): RTCSessionDescriptionInit | null {
+function parseDescription(value: unknown): {
+  description: RTCSessionDescriptionInit;
+  generation: string | null;
+} | null {
   if (!value || typeof value !== "object") return null;
-  const candidate = value as { type?: unknown; sdp?: unknown };
+  const candidate = value as {
+    type?: unknown;
+    sdp?: unknown;
+    generation?: unknown;
+  };
   if (candidate.type !== "offer" && candidate.type !== "answer") return null;
   if (typeof candidate.sdp !== "string" || !candidate.sdp) return null;
-  return { type: candidate.type, sdp: candidate.sdp };
+  const generation =
+    typeof candidate.generation === "string" &&
+    candidate.generation.length > 0 &&
+    candidate.generation.length <= 64
+      ? candidate.generation
+      : null;
+  return {
+    description: { type: candidate.type, sdp: candidate.sdp },
+    generation,
+  };
+}
+
+let nextGeneration = 0;
+function createGeneration() {
+  nextGeneration += 1;
+  return `rtc-${Date.now().toString(36)}-${nextGeneration.toString(36)}`;
 }
 
 /**
@@ -29,7 +55,7 @@ function parseDescription(value: unknown): RTCSessionDescriptionInit | null {
 export class PeerNegotiator {
   private readonly pc: RTCPeerConnection;
   private readonly isPolite: () => boolean;
-  private readonly syncTracks: () => void;
+  private readonly syncTracks: () => void | Promise<void>;
   private readonly sendOffer: SignalDescription;
   private readonly sendAnswer: SignalDescription;
 
@@ -37,6 +63,8 @@ export class PeerNegotiator {
   private settingRemoteAnswer = false;
   private offerPending = false;
   private ignoreOffer = false;
+  private activeGeneration: string | null = null;
+  private readonly localIceGenerations = new Map<string, string | null>();
 
   constructor(options: PeerNegotiatorOptions) {
     this.pc = options.pc;
@@ -59,8 +87,9 @@ export class PeerNegotiator {
     this.offerPending = false;
     this.makingOffer = true;
     try {
-      this.syncTracks();
+      await this.syncTracks();
       const offer = await this.pc.createOffer();
+      const generation = createGeneration();
 
       // An incoming polite-side offer may have changed signalingState while
       // createOffer() was pending. Preserve our intent and let that exchange
@@ -70,8 +99,20 @@ export class PeerNegotiator {
         return "queued";
       }
 
+      this.activeGeneration = generation;
       await this.pc.setLocalDescription(offer);
-      this.sendOffer(this.pc.localDescription);
+      const local = this.pc.localDescription ?? offer;
+      this.rememberLocalIceGeneration(local, generation);
+      const sent = this.sendOffer({
+        type: local.type,
+        sdp: local.sdp,
+        generation,
+      });
+      if (sent === false) {
+        throw new Error(
+          "WebRTC offer could not be sent while signaling was offline",
+        );
+      }
       return "sent";
     } finally {
       this.makingOffer = false;
@@ -79,8 +120,17 @@ export class PeerNegotiator {
   }
 
   async receiveDescription(value: unknown): Promise<boolean> {
-    const description = parseDescription(value);
-    if (!description) return false;
+    const parsed = parseDescription(value);
+    if (!parsed) return false;
+    const { description, generation } = parsed;
+
+    if (
+      description.type === "answer" &&
+      generation &&
+      generation !== this.activeGeneration
+    ) {
+      return false;
+    }
 
     const readyForOffer =
       !this.makingOffer &&
@@ -89,6 +139,13 @@ export class PeerNegotiator {
 
     this.ignoreOffer = !this.isPolite() && offerCollision;
     if (this.ignoreOffer) return false;
+
+    if (description.type === "offer") {
+      // The answer and every ICE candidate generated from it belong to the
+      // offerer's transaction. Legacy peers omit the field and remain
+      // compatible, while correlated peers can reject stale recovery traffic.
+      this.activeGeneration = generation;
+    }
 
     this.settingRemoteAnswer = description.type === "answer";
     try {
@@ -100,10 +157,21 @@ export class PeerNegotiator {
     }
 
     if (description.type === "offer") {
-      this.syncTracks();
+      await this.syncTracks();
       const answer = await this.pc.createAnswer();
       await this.pc.setLocalDescription(answer);
-      this.sendAnswer(this.pc.localDescription);
+      const local = this.pc.localDescription ?? answer;
+      this.rememberLocalIceGeneration(local, generation);
+      const sent = this.sendAnswer({
+        type: local.type,
+        sdp: local.sdp,
+        ...(generation ? { generation } : {}),
+      });
+      if (sent === false) {
+        throw new Error(
+          "WebRTC answer could not be sent while signaling was offline",
+        );
+      }
     }
 
     await this.flushPendingOffer();
@@ -116,6 +184,39 @@ export class PeerNegotiator {
 
   hasPendingOffer() {
     return this.offerPending;
+  }
+
+  getActiveGeneration() {
+    return this.activeGeneration;
+  }
+
+  getGenerationForIceCandidate(candidate: RTCIceCandidateInit) {
+    const usernameFragment = candidate.usernameFragment;
+    if (
+      typeof usernameFragment === "string" &&
+      this.localIceGenerations.has(usernameFragment)
+    ) {
+      return this.localIceGenerations.get(usernameFragment) ?? null;
+    }
+    return this.activeGeneration;
+  }
+
+  private rememberLocalIceGeneration(
+    description: RTCSessionDescriptionInit,
+    generation: string | null,
+  ) {
+    const match = description.sdp?.match(/^a=ice-ufrag:([^\r\n]+)$/m);
+    const usernameFragment = match?.[1]?.trim();
+    if (!usernameFragment) return;
+    this.localIceGenerations.set(usernameFragment, generation);
+
+    // Long sessions can rotate ICE credentials many times. We only need a
+    // short overlap window to label candidates from the previous exchange.
+    while (this.localIceGenerations.size > 8) {
+      const oldest = this.localIceGenerations.keys().next().value;
+      if (typeof oldest !== "string") break;
+      this.localIceGenerations.delete(oldest);
+    }
   }
 
   /**

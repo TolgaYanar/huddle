@@ -19,6 +19,12 @@ export type IceConfig = {
   ttlSeconds: number | null;
 };
 
+export type IceAccess = {
+  roomId: string;
+  socketId: string;
+  token: string;
+};
+
 // A lookup slower than this delays the first peer connection for no gain;
 // STUN-only is better than a call that never starts.
 export const ICE_FETCH_TIMEOUT_MS = 3000;
@@ -26,7 +32,7 @@ export const ICE_FETCH_TIMEOUT_MS = 3000;
 // during a session still ends with relay credentials for the next peer.
 export const ICE_RETRY_MS = 60 * 1000;
 // Refresh before expiry so every new peer gets a credential with runway;
-// existing connections keep the one they negotiated with.
+// existing connections are reconfigured and ICE-restarted by the caller.
 export const ICE_REFRESH_FRACTION = 0.8;
 
 function isIceServer(value: unknown): value is RTCIceServer {
@@ -61,6 +67,26 @@ export function parseIceServers(
   return DEFAULT_ICE_SERVERS;
 }
 
+export function hasTurnServer(iceServers: RTCIceServer[]): boolean {
+  return iceServers.some((server) => {
+    const urls = typeof server.urls === "string" ? [server.urls] : server.urls;
+    return urls.some((url) => /^turns?:/i.test(url));
+  });
+}
+
+export function iceServerConfigurationsMatch(
+  left: RTCIceServer[],
+  right: RTCIceServer[],
+): boolean {
+  const canonical = (servers: RTCIceServer[]) =>
+    servers.map((server) => ({
+      urls: typeof server.urls === "string" ? [server.urls] : [...server.urls],
+      username: server.username ?? null,
+      credential: server.credential ?? null,
+    }));
+  return JSON.stringify(canonical(left)) === JSON.stringify(canonical(right));
+}
+
 export function parseIceConfig(value: unknown): IceConfig | null {
   if (!value || typeof value !== "object") return null;
   const { iceServers, ttlSeconds } = value as Record<string, unknown>;
@@ -93,6 +119,7 @@ export async function fetchIceConfig(
   options: {
     fetchImpl?: typeof fetch;
     timeoutMs?: number;
+    iceAccess?: IceAccess;
   } = {},
 ): Promise<IceConfig | null> {
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
@@ -103,9 +130,18 @@ export async function fetchIceConfig(
     options.timeoutMs ?? ICE_FETCH_TIMEOUT_MS,
   );
   try {
-    const res = await fetchImpl(`${getApiBaseUrl()}/api/webrtc/ice`, {
+    const query = options.iceAccess
+      ? `?${new URLSearchParams({
+          roomId: options.iceAccess.roomId,
+          socketId: options.iceAccess.socketId,
+        }).toString()}`
+      : "";
+    const res = await fetchImpl(`${getApiBaseUrl()}/api/webrtc/ice${query}`, {
       method: "GET",
       cache: "no-store",
+      headers: options.iceAccess
+        ? { "X-Huddle-Room-Token": options.iceAccess.token }
+        : undefined,
       signal: controller.signal,
     });
     if (!res.ok) return null;

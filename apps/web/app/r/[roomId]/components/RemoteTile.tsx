@@ -66,8 +66,21 @@ export function RemoteTile({
     });
   }, [stream]);
 
-  const hasVideo = stream.getVideoTracks().length > 0;
-  const hasAudio = stream.getAudioTracks().length > 0;
+  // Removing a sender does not necessarily remove its receiver track from the
+  // existing MediaStream. Browsers commonly keep that track muted with the
+  // last video frame frozen, so track count alone makes a camera that is off
+  // look live. The sender's ordered media-state signal is authoritative; the
+  // track fallback only covers the brief period before that state arrives.
+  const hasVideo = media
+    ? Boolean(media.cam || media.screen)
+    : stream
+        .getVideoTracks()
+        .some((track) => track.readyState === "live" && !track.muted);
+  const hasAudio = media
+    ? Boolean(media.mic)
+    : stream
+        .getAudioTracks()
+        .some((track) => track.readyState === "live" && !track.muted);
 
   return (
     <div
@@ -143,7 +156,10 @@ export function RemoteTile({
         autoPlay
         playsInline
         muted
-        className="w-full aspect-video object-cover"
+        aria-hidden={!hasVideo}
+        className={`w-full aspect-video object-cover ${
+          hasVideo ? "" : "opacity-0"
+        }`}
       />
 
       {/*
@@ -154,7 +170,7 @@ export function RemoteTile({
       */}
 
       {!hasVideo && (
-        <div className="absolute inset-0 flex items-center justify-center text-ink-muted text-sm">
+        <div className="absolute inset-0 flex items-center justify-center bg-sunken text-ink-muted text-sm">
           Video off
         </div>
       )}

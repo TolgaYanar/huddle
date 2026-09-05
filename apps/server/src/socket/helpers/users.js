@@ -1,3 +1,17 @@
+const crypto = require("node:crypto");
+
+function getOrCreateIceAccessToken(socket, roomId) {
+  if (!socket.data) socket.data = {};
+  if (!(socket.data.iceAccessByRoom instanceof Map)) {
+    socket.data.iceAccessByRoom = new Map();
+  }
+  const existing = socket.data.iceAccessByRoom.get(roomId);
+  if (typeof existing === "string" && existing.length >= 32) return existing;
+  const token = crypto.randomBytes(32).toString("base64url");
+  socket.data.iceAccessByRoom.set(roomId, token);
+  return token;
+}
+
 function ensureRoomHost(io, state, roomId, fallbackHostSocketId) {
   const currentHost = state.roomHost.get(roomId);
 
@@ -75,6 +89,9 @@ function emitRoomUsersSnapshotToSocket(io, state, socket, roomId) {
     usernames,
     mediaStates,
     hostId: state.roomHost.get(roomId) || null,
+    // Private membership capability: only the joining socket receives it.
+    // Never add this to getRoomUsersSnapshot/emitRoomUsersToRoom.
+    iceAccessToken: getOrCreateIceAccessToken(socket, roomId),
   });
 }
 
@@ -83,4 +100,5 @@ module.exports = {
   getRoomUsersSnapshot,
   emitRoomUsersToRoom,
   emitRoomUsersSnapshotToSocket,
+  getOrCreateIceAccessToken,
 };

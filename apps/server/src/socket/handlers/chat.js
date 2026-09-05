@@ -19,7 +19,9 @@ function attachChatHandlers(io, state, socket, deps, isSocketInRoom) {
     const pending = socket.data?.pendingJoins?.get(roomId);
     if (pending) await pending.catch(() => {});
     if (!isSocketInRoom(roomId, socket.id)) return;
-    await emitChatHistoryToSocket(deps, state, socket, roomId);
+    await emitChatHistoryToSocket(deps, state, socket, roomId, () =>
+      isSocketInRoom(roomId, socket.id),
+    );
   });
 
   async function handleChatSend(data) {

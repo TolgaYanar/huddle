@@ -4,6 +4,8 @@ import {
   DEFAULT_ICE_SERVERS,
   ICE_REFRESH_FRACTION,
   fetchIceConfig,
+  hasTurnServer,
+  iceServerConfigurationsMatch,
   parseIceConfig,
   parseIceServers,
   refreshDelayMs,
@@ -39,6 +41,30 @@ describe("parseIceServers", () => {
     );
     expect(configured).toHaveLength(2);
     expect(configured[1]).toMatchObject({ username: TURN.username });
+  });
+});
+
+describe("hasTurnServer", () => {
+  it("recognises TURN and TURNS URLs in either supported shape", () => {
+    expect(hasTurnServer([{ urls: "turn:relay.example.com" }])).toBe(true);
+    expect(
+      hasTurnServer([
+        { urls: ["stun:stun.example.com", "turns:relay.example.com"] },
+      ]),
+    ).toBe(true);
+    expect(hasTurnServer([{ urls: ["stun:stun.example.com"] }])).toBe(false);
+  });
+});
+
+describe("iceServerConfigurationsMatch", () => {
+  it("detects a rotated TURN credential even when the relay URL is unchanged", () => {
+    expect(iceServerConfigurationsMatch([TURN], [{ ...TURN }])).toBe(true);
+    expect(
+      iceServerConfigurationsMatch(
+        [TURN],
+        [{ ...TURN, username: "1700001200:def", credential: "rotated" }],
+      ),
+    ).toBe(false);
   });
 });
 
@@ -100,6 +126,30 @@ describe("fetchIceConfig", () => {
     expect(url).toMatch(/\/api\/webrtc\/ice$/);
     // A cached credential would outlive its expiry.
     expect(init.cache).toBe("no-store");
+  });
+
+  it("proves live room membership when requesting TURN credentials", async () => {
+    const fetchImpl = vi.fn(async () =>
+      response(200, { iceServers: [TURN], ttlSeconds: 600 }),
+    );
+    await fetchIceConfig({
+      fetchImpl,
+      iceAccess: {
+        roomId: "movie night/one",
+        socketId: "socket:1",
+        token: "private-capability",
+      },
+    });
+
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [
+      string,
+      RequestInit,
+    ];
+    expect(url).toContain("roomId=movie+night%2Fone");
+    expect(url).toContain("socketId=socket%3A1");
+    expect(init.headers).toEqual({
+      "X-Huddle-Room-Token": "private-capability",
+    });
   });
 
   it("returns null on a non-2xx, a malformed body, or a thrown fetch", async () => {

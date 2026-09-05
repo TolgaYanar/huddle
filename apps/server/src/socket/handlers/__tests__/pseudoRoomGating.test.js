@@ -215,6 +215,80 @@ describe("webrtc_ice payload validation", () => {
       "usernameFragment",
     ]);
   });
+
+  it("preserves a bounded signaling generation and rejects malformed ones", () => {
+    const { io, a } = setup();
+    a.handlers.get("webrtc_ice")({
+      roomId: "movie-night",
+      to: "sock-2",
+      candidate: {
+        candidate: "candidate:1",
+        generation: "rtc-current",
+        ignored: "value",
+      },
+    });
+    assert.equal(io.relayed.length, 1);
+    assert.equal(io.relayed[0].payload.candidate.generation, "rtc-current");
+    assert.equal("ignored" in io.relayed[0].payload.candidate, false);
+
+    a.handlers.get("webrtc_ice")({
+      roomId: "movie-night",
+      to: "sock-2",
+      candidate: { candidate: "candidate:2", generation: "x".repeat(65) },
+    });
+    assert.equal(io.relayed.length, 1);
+  });
+});
+
+describe("webrtc SDP generation validation", () => {
+  function setup() {
+    const io = createFakeIo();
+    const state = createSocketState();
+    const a = createFakeSocket(io, "sock-1");
+    const b = createFakeSocket(io, "sock-2");
+    attachWebRTCHandlers(io, state, a, {
+      isDbConnected: () => false,
+      getPrisma: () => null,
+    });
+    a.join("movie-night");
+    b.join("movie-night");
+    return { io, a };
+  }
+
+  it("relays only the matching SDP type with a bounded generation", () => {
+    const { io, a } = setup();
+    a.handlers.get("webrtc_offer")({
+      roomId: "movie-night",
+      to: "sock-2",
+      sdp: {
+        type: "offer",
+        sdp: "v=0",
+        generation: "rtc-current",
+        ignored: "value",
+      },
+    });
+    assert.deepEqual(io.relayed[0], {
+      target: "sock-2",
+      event: "webrtc_offer",
+      payload: {
+        roomId: "movie-night",
+        from: "sock-1",
+        sdp: { type: "offer", sdp: "v=0", generation: "rtc-current" },
+      },
+    });
+
+    a.handlers.get("webrtc_offer")({
+      roomId: "movie-night",
+      to: "sock-2",
+      sdp: { type: "answer", sdp: "wrong-event" },
+    });
+    a.handlers.get("webrtc_answer")({
+      roomId: "movie-night",
+      to: "sock-2",
+      sdp: { type: "answer", sdp: "v=0", generation: "x".repeat(65) },
+    });
+    assert.equal(io.relayed.length, 1);
+  });
 });
 
 describe("host reassignment after the grace window", () => {

@@ -1,6 +1,7 @@
 package tv.wehuddle.app.data.model
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerialName
 
 /**
  * Sync action types for video synchronization
@@ -123,7 +124,9 @@ data class RoomUsersData(
     val users: List<String>,
     val usernames: Map<String, String?>? = null,
     val mediaStates: Map<String, WebRTCMediaState>? = null,
-    val hostId: String? = null
+    val hostId: String? = null,
+    /** Present only in the joining socket's private membership snapshot. */
+    val iceAccessToken: String? = null,
 )
 
 /**
@@ -190,14 +193,31 @@ data class WebRTCMediaState(
     val screen: Boolean = false
 )
 
+/** Wire envelope used by the server for local media-state broadcasts. */
+@Serializable
+data class WebRTCMediaStateRequest(
+    val roomId: String,
+    val state: WebRTCMediaState,
+)
+
+/** Wire envelope sent by the server to everyone else in the room. */
+@Serializable
+data class WebRTCMediaStateEvent(
+    val roomId: String,
+    @SerialName("from") val fromId: String,
+    val state: WebRTCMediaState,
+)
+
 /**
  * WebRTC signaling: offer
  */
 @Serializable
 data class WebRTCOffer(
+    val roomId: String,
     val fromId: String,
     val toId: String,
-    val sdp: String
+    val sdp: String,
+    val generation: String? = null,
 )
 
 /**
@@ -205,9 +225,11 @@ data class WebRTCOffer(
  */
 @Serializable
 data class WebRTCAnswer(
+    val roomId: String,
     val fromId: String,
     val toId: String,
-    val sdp: String
+    val sdp: String,
+    val generation: String? = null,
 )
 
 /**
@@ -215,11 +237,13 @@ data class WebRTCAnswer(
  */
 @Serializable
 data class WebRTCIceCandidate(
+    val roomId: String,
     val fromId: String,
     val toId: String,
     val candidate: String,
     val sdpMid: String?,
-    val sdpMLineIndex: Int?
+    val sdpMLineIndex: Int?,
+    val generation: String? = null,
 )
 
 /**

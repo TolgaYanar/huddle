@@ -147,7 +147,15 @@ class RoomRepository @Inject constructor(
             }
             
             is SocketEvent.Disconnected -> {
-                _roomState.update { it.copy(connectionState = ConnectionState.DISCONNECTED) }
+                _participants.value = emptyList()
+                _roomState.update {
+                    it.copy(
+                        connectionState = ConnectionState.DISCONNECTED,
+                        userId = "",
+                        hostId = null,
+                        participants = emptyList(),
+                    )
+                }
             }
             
             is SocketEvent.Error -> {
@@ -155,6 +163,7 @@ class RoomRepository @Inject constructor(
             }
             
             is SocketEvent.RoomUsers -> {
+                if (event.data.roomId != _roomState.value.roomId) return
                 val currentUserId = socketClient.socketId.value ?: ""
                 val usernamesById = event.data.usernames ?: emptyMap()
                 val participantsList = event.data.users.map { id ->
@@ -173,12 +182,14 @@ class RoomRepository @Inject constructor(
                         participants = participantsList,
                         userId = currentUserId,
                         passwordRequired = false,
-                        passwordError = null
+                        passwordError = null,
+                        error = null,
                     )
                 }
             }
             
             is SocketEvent.UserJoined -> {
+                if (event.data.roomId != _roomState.value.roomId) return
                 val newParticipant = Participant(
                     id = event.data.socketId,
                     username = event.data.username
@@ -188,6 +199,7 @@ class RoomRepository @Inject constructor(
                         current + newParticipant
                     } else current
                 }
+                _roomState.update { it.copy(participants = _participants.value) }
                 addActivityLogEntry(
                     kind = ActivityLogKind.JOIN,
                     message = (event.data.username?.takeIf { it.isNotBlank() } ?: "User") + " joined",
@@ -197,9 +209,11 @@ class RoomRepository @Inject constructor(
             }
             
             is SocketEvent.UserLeft -> {
+                if (event.data.roomId != _roomState.value.roomId) return
                 _participants.update { current ->
                     current.filter { it.id != event.data.socketId }
                 }
+                _roomState.update { it.copy(participants = _participants.value) }
                 addActivityLogEntry(
                     kind = ActivityLogKind.LEAVE,
                     message = (event.data.username?.takeIf { it.isNotBlank() } ?: "User") + " left",
@@ -517,6 +531,7 @@ class RoomRepository @Inject constructor(
             }
             
             is SocketEvent.PasswordStatus -> {
+                if (event.data.roomId != _roomState.value.roomId) return
                 _roomState.update { 
                     it.copy(
                         hasRoomPassword = event.data.hasPassword,
@@ -527,10 +542,31 @@ class RoomRepository @Inject constructor(
             }
             
             is SocketEvent.PasswordRequired -> {
+                if (event.data.roomId != _roomState.value.roomId) return
+                _participants.value = emptyList()
                 _roomState.update { 
                     it.copy(
+                        userId = "",
+                        hostId = null,
+                        participants = emptyList(),
                         passwordRequired = true,
-                        passwordError = if (event.data.reason == "invalid") "Incorrect password" else null
+                        passwordError = if (event.data.reason == "invalid") "Incorrect password" else null,
+                        error = null,
+                    )
+                }
+            }
+
+            is SocketEvent.RoomBanned -> {
+                if (event.roomId != _roomState.value.roomId) return
+                _participants.value = emptyList()
+                _roomState.update {
+                    it.copy(
+                        userId = "",
+                        hostId = null,
+                        participants = emptyList(),
+                        passwordRequired = false,
+                        passwordError = null,
+                        error = "You do not have access to this room.",
                     )
                 }
             }
@@ -555,6 +591,7 @@ class RoomRepository @Inject constructor(
             }
             
             is SocketEvent.MediaStateReceived -> {
+                if (event.roomId != _roomState.value.roomId) return
                 _participants.update { current ->
                     current.map { participant ->
                         if (participant.id == event.userId) {
@@ -562,9 +599,11 @@ class RoomRepository @Inject constructor(
                         } else participant
                     }
                 }
+                _roomState.update { it.copy(participants = _participants.value) }
             }
             
             is SocketEvent.SpeakingStateReceived -> {
+                if (event.roomId != _roomState.value.roomId) return
                 _participants.update { current ->
                     current.map { participant ->
                         if (participant.id == event.userId) {
@@ -572,6 +611,7 @@ class RoomRepository @Inject constructor(
                         } else participant
                     }
                 }
+                _roomState.update { it.copy(participants = _participants.value) }
             }
             
             // WebRTC events are handled by WebRTC manager
@@ -605,7 +645,18 @@ class RoomRepository @Inject constructor(
     }
     
     fun joinRoom(roomId: String, password: String? = null) {
-        _roomState.update { it.copy(roomId = roomId, passwordRequired = false, passwordError = null) }
+        _participants.value = emptyList()
+        _roomState.update {
+            it.copy(
+                roomId = roomId,
+                userId = "",
+                hostId = null,
+                participants = emptyList(),
+                passwordRequired = false,
+                passwordError = null,
+                error = null,
+            )
+        }
         socketClient.joinRoom(roomId, password)
         
         // Record join time for sync guards
@@ -616,8 +667,9 @@ class RoomRepository @Inject constructor(
         }
     }
     
-    fun leaveRoom() {
-        socketClient.leaveRoom()
+    fun leaveRoom(roomId: String) {
+        socketClient.leaveRoom(roomId)
+        if (_roomState.value.roomId != roomId) return
         // Reset sync guard state when leaving
         hasReceivedInitialSync = false
         joinTimeMillis = 0L
@@ -1091,41 +1143,60 @@ class RoomRepository @Inject constructor(
     }
     
     // Media state
-    fun sendMediaState(state: WebRTCMediaState) {
-        val roomId = _roomState.value.roomId
-        if (roomId.isNotEmpty()) {
+    fun sendMediaState(roomId: String, state: WebRTCMediaState) {
+        if (roomId.isNotEmpty() && _roomState.value.roomId == roomId) {
             socketClient.sendMediaState(roomId, state)
             _roomState.update { it.copy(localMediaState = state) }
         }
     }
     
-    fun sendSpeakingState(speaking: Boolean) {
-        val roomId = _roomState.value.roomId
-        if (roomId.isNotEmpty()) {
+    fun sendSpeakingState(roomId: String, speaking: Boolean) {
+        if (roomId.isNotEmpty() && _roomState.value.roomId == roomId) {
             socketClient.sendSpeakingState(roomId, speaking)
             _roomState.update { it.copy(isSpeaking = speaking) }
         }
     }
+
+    /** Update local call indicators without sending into a room we did not join. */
+    fun clearLocalCallState() {
+        _roomState.update {
+            it.copy(
+                localMediaState = WebRTCMediaState(),
+                isSpeaking = false,
+            )
+        }
+    }
     
     // WebRTC signaling
-    fun sendWebRTCOffer(toId: String, sdp: String) {
-        val roomId = _roomState.value.roomId
-        if (roomId.isNotEmpty()) {
-            socketClient.sendWebRTCOffer(roomId, toId, sdp)
+    fun sendWebRTCOffer(roomId: String, toId: String, sdp: String, generation: String?) {
+        if (roomId.isNotEmpty() && _roomState.value.roomId == roomId) {
+            socketClient.sendWebRTCOffer(roomId, toId, sdp, generation)
         }
     }
     
-    fun sendWebRTCAnswer(toId: String, sdp: String) {
-        val roomId = _roomState.value.roomId
-        if (roomId.isNotEmpty()) {
-            socketClient.sendWebRTCAnswer(roomId, toId, sdp)
+    fun sendWebRTCAnswer(roomId: String, toId: String, sdp: String, generation: String?) {
+        if (roomId.isNotEmpty() && _roomState.value.roomId == roomId) {
+            socketClient.sendWebRTCAnswer(roomId, toId, sdp, generation)
         }
     }
     
-    fun sendWebRTCIce(toId: String, candidate: String, sdpMid: String?, sdpMLineIndex: Int?) {
-        val roomId = _roomState.value.roomId
-        if (roomId.isNotEmpty()) {
-            socketClient.sendWebRTCIce(roomId, toId, candidate, sdpMid, sdpMLineIndex)
+    fun sendWebRTCIce(
+        roomId: String,
+        toId: String,
+        candidate: String,
+        sdpMid: String?,
+        sdpMLineIndex: Int?,
+        generation: String?,
+    ) {
+        if (roomId.isNotEmpty() && _roomState.value.roomId == roomId) {
+            socketClient.sendWebRTCIce(
+                roomId,
+                toId,
+                candidate,
+                sdpMid,
+                sdpMLineIndex,
+                generation,
+            )
         }
     }
     

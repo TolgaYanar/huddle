@@ -24,6 +24,9 @@ function attachWebRTCHandlers(io, state, socket, deps) {
   // 30/10s leaves room for renegotiation storms (mic/cam/screen toggles)
   // while bounding egress amplification.
   const sdpLimiter = createSocketRateLimiter({ windowMs: 10000, max: 30 });
+  // Keep only the human-readable audit writes ordered. The latency-sensitive
+  // media relay below remains synchronous and never waits for this queue.
+  const mediaAuditTails = new Map();
 
   // socket.io accepts ~1MB per event by default. A session description is a
   // small text blob, so reject anything that is not a plausibly shaped SDP
@@ -42,6 +45,11 @@ function attachWebRTCHandlers(io, state, socket, deps) {
   // Without a shape check the relay forwarded any object at 200/10s, so a
   // member could push ~200MB of arbitrary JSON at another member.
   const MAX_CANDIDATE_LENGTH = 1024;
+  const validGeneration = (generation) =>
+    generation == null ||
+    (typeof generation === "string" &&
+      generation.length > 0 &&
+      generation.length <= 64);
   const isValidIceCandidate = (candidate) => {
     if (!candidate || typeof candidate !== "object") return false;
     // An end-of-candidates signal is an empty candidate string.
@@ -74,10 +82,20 @@ function attachWebRTCHandlers(io, state, socket, deps) {
     if (!roomId || typeof roomId !== "string") return;
     if (!to || typeof to !== "string") return;
     if (!isValidSdp(sdp)) return;
+    if (sdp.type !== "offer") return;
+    if (!validGeneration(sdp.generation)) return;
     if (!isSocketInRoom(roomId, socket.id) || !isSocketInRoom(roomId, to))
       return;
     if (!sdpLimiter()) return;
-    io.to(to).emit("webrtc_offer", { roomId, from: socket.id, sdp });
+    io.to(to).emit("webrtc_offer", {
+      roomId,
+      from: socket.id,
+      sdp: {
+        type: sdp.type,
+        sdp: sdp.sdp,
+        ...(sdp.generation ? { generation: sdp.generation } : {}),
+      },
+    });
   });
 
   socket.on("webrtc_answer", (data) => {
@@ -85,10 +103,20 @@ function attachWebRTCHandlers(io, state, socket, deps) {
     if (!roomId || typeof roomId !== "string") return;
     if (!to || typeof to !== "string") return;
     if (!isValidSdp(sdp)) return;
+    if (sdp.type !== "answer") return;
+    if (!validGeneration(sdp.generation)) return;
     if (!isSocketInRoom(roomId, socket.id) || !isSocketInRoom(roomId, to))
       return;
     if (!sdpLimiter()) return;
-    io.to(to).emit("webrtc_answer", { roomId, from: socket.id, sdp });
+    io.to(to).emit("webrtc_answer", {
+      roomId,
+      from: socket.id,
+      sdp: {
+        type: sdp.type,
+        sdp: sdp.sdp,
+        ...(sdp.generation ? { generation: sdp.generation } : {}),
+      },
+    });
   });
 
   socket.on("webrtc_ice", (data) => {
@@ -96,6 +124,7 @@ function attachWebRTCHandlers(io, state, socket, deps) {
     if (!roomId || typeof roomId !== "string") return;
     if (!to || typeof to !== "string") return;
     if (!isValidIceCandidate(candidate)) return;
+    if (!validGeneration(candidate.generation)) return;
     if (!isSocketInRoom(roomId, socket.id) || !isSocketInRoom(roomId, to))
       return;
     if (!iceLimiter()) return;
@@ -109,6 +138,7 @@ function attachWebRTCHandlers(io, state, socket, deps) {
         sdpMid: candidate.sdpMid ?? null,
         sdpMLineIndex: candidate.sdpMLineIndex ?? null,
         usernameFragment: candidate.usernameFragment ?? null,
+        ...(candidate.generation ? { generation: candidate.generation } : {}),
       },
     });
   });
@@ -118,9 +148,6 @@ function attachWebRTCHandlers(io, state, socket, deps) {
     if (!roomId || typeof roomId !== "string") return;
     if (!incoming || typeof incoming !== "object") return;
     if (!isSocketInRoom(roomId, socket.id)) return;
-    // Bound the per-socket rate before any DB write or chat broadcast.
-    if (!mediaStateLimiter()) return;
-
     const normalized = {
       mic: !!incoming.mic,
       cam: !!incoming.cam,
@@ -139,6 +166,22 @@ function attachWebRTCHandlers(io, state, socket, deps) {
       screen: false,
     };
     map.set(socket.id, normalized);
+
+    // Signaling state is latency-sensitive and must preserve socket arrival
+    // order. Persisting human-readable audit messages can take arbitrarily
+    // long (or fail), so never hold the actual media-state broadcast behind
+    // those writes.
+    socket.to(roomId).emit("webrtc_media_state", {
+      roomId,
+      from: socket.id,
+      state: normalized,
+    });
+
+    // Never rate-limit the authoritative state itself. In particular, an OFF
+    // event dropped after a burst leaves every listener showing a frozen
+    // camera or live microphone indefinitely. Only bound the expensive,
+    // human-readable audit amplification below; the latest state always wins.
+    if (!mediaStateLimiter()) return;
 
     // Log user media changes into chat as system messages.
     const short =
@@ -168,35 +211,42 @@ function attachWebRTCHandlers(io, state, socket, deps) {
       );
     }
 
-    for (const text of messages) {
-      try {
-        // Original behavior: best-effort persist. If prisma is unavailable this will throw.
-        const prisma = deps.getPrisma();
-        const msg = await prisma.roomMessage.create({
-          data: {
-            roomId,
-            senderId: "system",
-            text,
-          },
-        });
+    if (messages.length === 0) return;
 
-        io.to(roomId).emit("chat_message", {
-          id: msg.id,
-          roomId: msg.roomId,
-          senderId: msg.senderId,
-          text: msg.text,
-          createdAt: msg.createdAt,
-        });
-      } catch (err) {
-        console.error("Failed to persist system chat", err);
+    const previousAudit = mediaAuditTails.get(roomId) || Promise.resolve();
+    const currentAudit = previousAudit.then(async () => {
+      for (const text of messages) {
+        try {
+          // Original behavior: best-effort persist. If prisma is unavailable this will throw.
+          const prisma = deps.getPrisma();
+          const msg = await prisma.roomMessage.create({
+            data: {
+              roomId,
+              senderId: "system",
+              text,
+            },
+          });
+
+          io.to(roomId).emit("chat_message", {
+            id: msg.id,
+            roomId: msg.roomId,
+            senderId: msg.senderId,
+            text: msg.text,
+            createdAt: msg.createdAt,
+          });
+        } catch (err) {
+          console.error("Failed to persist system chat", err);
+        }
+      }
+    });
+    mediaAuditTails.set(roomId, currentAudit);
+    try {
+      await currentAudit;
+    } finally {
+      if (mediaAuditTails.get(roomId) === currentAudit) {
+        mediaAuditTails.delete(roomId);
       }
     }
-
-    socket.to(roomId).emit("webrtc_media_state", {
-      roomId,
-      from: socket.id,
-      state: normalized,
-    });
   });
 
   socket.on("webrtc_speaking", (data) => {

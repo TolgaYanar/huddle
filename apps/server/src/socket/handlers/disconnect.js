@@ -3,9 +3,15 @@ const { cleanupDisconnectFromGames } = require("../helpers/gameTimer");
 const { cleanupDisconnectFromCupGames } = require("../helpers/cupGame");
 const { anchorRoomStateOnEmpty, persistRoomState } = require("../helpers/sync");
 const { scheduleRoomCleanup } = require("../state");
+const { cancelAllPendingRoomJoins } = require("../helpers/pendingJoin");
 
 function attachDisconnectHandler(io, state, socket, joinedRooms, deps) {
   socket.on("disconnect", () => {
+    // Invalidate joins waiting on DB/password work before examining
+    // joinedRooms; otherwise a disconnected socket can join afterwards and
+    // leave a ghost adapter member that never receives another disconnect.
+    cancelAllPendingRoomJoins(socket);
+    socket.data?.iceAccessByRoom?.clear?.();
     if (typeof deps.vLog === "function")
       deps.vLog("User disconnected:", socket.id);
 

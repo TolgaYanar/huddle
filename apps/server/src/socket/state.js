@@ -57,6 +57,13 @@ function createSocketState() {
     // Grace-period room cleanup handles: Map<roomId, Timeout>
     roomCleanupTimers: new Map(),
 
+    // Async joins can still be reading persisted state or checking a password
+    // when an empty-room grace timer fires. Keep cleanup from deleting the
+    // very state that join is validating, then finish it as soon as the last
+    // in-flight join settles.
+    roomPendingJoinCounts: new Map(),
+    roomCleanupDeferred: new Set(),
+
     CHAT_HISTORY_LIMIT,
     ACTIVITY_HISTORY_LIMIT,
   };
@@ -103,6 +110,39 @@ function cancelRoomCleanup(state, roomId) {
     clearTimeout(handle);
     state.roomCleanupTimers.delete(roomId);
   }
+  state.roomCleanupDeferred.delete(roomId);
+}
+
+function beginRoomJoinLease(state, roomId) {
+  const count = state.roomPendingJoinCounts.get(roomId) ?? 0;
+  state.roomPendingJoinCounts.set(roomId, count + 1);
+}
+
+function finishRoomJoinLease(io, state, roomId) {
+  const count = state.roomPendingJoinCounts.get(roomId) ?? 0;
+  if (count > 1) {
+    state.roomPendingJoinCounts.set(roomId, count - 1);
+    return;
+  }
+  state.roomPendingJoinCounts.delete(roomId);
+
+  const room = io?.sockets?.adapter?.rooms?.get(roomId);
+  if (room && room.size > 0) {
+    state.roomCleanupDeferred.delete(roomId);
+    return;
+  }
+
+  if (state.roomCleanupDeferred.delete(roomId)) {
+    cleanupRoom(io, state, roomId);
+    return;
+  }
+
+  // A cancelled join can restore state from the database without ever
+  // becoming a member. Give that state the normal grace window instead of
+  // leaving it resident forever.
+  if (!state.roomCleanupTimers.has(roomId)) {
+    scheduleRoomCleanup(io, state, roomId);
+  }
 }
 
 // Clear any per-game turn timers tied to this room's games before we drop the
@@ -124,6 +164,12 @@ function clearRoomGameTimers(state, roomId) {
 }
 
 function cleanupRoom(io, state, roomId) {
+  if ((state.roomPendingJoinCounts.get(roomId) ?? 0) > 0) {
+    state.roomCleanupTimers.delete(roomId);
+    state.roomCleanupDeferred.add(roomId);
+    return;
+  }
+
   // Re-verify the room is still empty: a socket may have (re)joined between the
   // timer being scheduled and it firing. If so, abandon the cleanup and just
   // drop the timer entry — the rejoiner's state must survive.
@@ -138,6 +184,7 @@ function cleanupRoom(io, state, roomId) {
     state[mapName]?.delete(roomId);
   }
   state.roomCleanupTimers.delete(roomId);
+  state.roomCleanupDeferred.delete(roomId);
 }
 
 function scheduleRoomCleanup(io, state, roomId) {
@@ -155,6 +202,8 @@ module.exports = {
   createSocketState,
   getBanIdentity,
   cancelRoomCleanup,
+  beginRoomJoinLease,
+  finishRoomJoinLease,
   cleanupRoom,
   scheduleRoomCleanup,
   ROOM_EMPTY_GRACE_MS,

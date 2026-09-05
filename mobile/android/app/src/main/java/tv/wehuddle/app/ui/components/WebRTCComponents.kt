@@ -12,13 +12,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import org.webrtc.EglBase
 import org.webrtc.MediaStream
 import org.webrtc.RendererCommon
 import org.webrtc.SurfaceViewRenderer
+import org.webrtc.VideoTrack
 import tv.wehuddle.app.data.model.WebRTCMediaState
 
 /**
@@ -32,52 +32,43 @@ fun WebRTCVideoView(
     isMirrored: Boolean = false,
     scalingType: RendererCommon.ScalingType = RendererCommon.ScalingType.SCALE_ASPECT_FIT
 ) {
-    val context = LocalContext.current
-    var renderer by remember { mutableStateOf<SurfaceViewRenderer?>(null) }
-    
-    DisposableEffect(eglContext) {
-        onDispose {
-            renderer?.release()
-            renderer = null
-        }
+    if (eglContext == null) {
+        Box(modifier = modifier)
+        return
     }
-    
-    // Update stream when it changes
-    LaunchedEffect(stream) {
-        renderer?.let { r ->
-            stream?.videoTracks?.firstOrNull()?.let { track ->
-                track.addSink(r)
-            }
-        }
-    }
-    
-    AndroidView(
-        factory = { ctx ->
-            SurfaceViewRenderer(ctx).apply {
-                layoutParams = ViewGroup.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.MATCH_PARENT
-                )
-                
-                eglContext?.let { egl ->
-                    init(egl, null)
+
+    key(eglContext) {
+        var attachedTrack by remember { mutableStateOf<VideoTrack?>(null) }
+        AndroidView(
+            factory = { ctx ->
+                SurfaceViewRenderer(ctx).apply {
+                    layoutParams = ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                    )
+
+                    init(eglContext, null)
                     setScalingType(scalingType)
                     setMirror(isMirrored)
                     setEnableHardwareScaler(true)
                 }
-                
-                renderer = this
-                
-                // Add video track sink if stream is available
-                stream?.videoTracks?.firstOrNull()?.addSink(this)
+            },
+            modifier = modifier,
+            update = { view ->
+                val nextTrack = stream?.videoTracks?.firstOrNull()
+                if (nextTrack !== attachedTrack) {
+                    attachedTrack?.removeSink(view)
+                    nextTrack?.addSink(view)
+                    attachedTrack = nextTrack
+                }
+            },
+            onRelease = { view ->
+                attachedTrack?.removeSink(view)
+                attachedTrack = null
+                view.release()
             }
-        },
-        modifier = modifier,
-        onRelease = { view ->
-            stream?.videoTracks?.firstOrNull()?.removeSink(view)
-            view.release()
-        }
-    )
+        )
+    }
 }
 
 /**
@@ -91,7 +82,8 @@ fun LocalVideoTile(
     mediaState: WebRTCMediaState,
     username: String,
     onToggleMic: () -> Unit,
-    onToggleCamera: () -> Unit
+    onToggleCamera: () -> Unit,
+    showControls: Boolean = true,
 ) {
     Box(
         modifier = modifier
@@ -124,61 +116,57 @@ fun LocalVideoTile(
                         modifier = Modifier.size(32.dp),
                         tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = username,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                    )
                 }
             }
         }
         
         // Media controls overlay
-        Row(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            IconButton(
-                onClick = onToggleMic,
+        if (showControls) {
+            Row(
                 modifier = Modifier
-                    .size(36.dp)
-                    .background(
-                        color = if (mediaState.mic) 
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
-                        else 
-                            MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
-                        shape = RoundedCornerShape(18.dp)
-                    )
+                    .align(Alignment.BottomCenter)
+                    .padding(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(
-                    imageVector = if (mediaState.mic) Icons.Default.Mic else Icons.Default.MicOff,
-                    contentDescription = if (mediaState.mic) "Mute" else "Unmute",
-                    modifier = Modifier.size(18.dp),
-                    tint = Color.White
-                )
-            }
+                IconButton(
+                    onClick = onToggleMic,
+                    modifier = Modifier
+                        .size(36.dp)
+                        .background(
+                            color = if (mediaState.mic)
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+                            else
+                                MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
+                            shape = RoundedCornerShape(18.dp)
+                        )
+                ) {
+                    Icon(
+                        imageVector = if (mediaState.mic) Icons.Default.Mic else Icons.Default.MicOff,
+                        contentDescription = if (mediaState.mic) "Mute" else "Unmute",
+                        modifier = Modifier.size(18.dp),
+                        tint = Color.White
+                    )
+                }
             
-            IconButton(
-                onClick = onToggleCamera,
-                modifier = Modifier
-                    .size(36.dp)
-                    .background(
-                        color = if (mediaState.cam) 
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
-                        else 
-                            MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
-                        shape = RoundedCornerShape(18.dp)
+                IconButton(
+                    onClick = onToggleCamera,
+                    modifier = Modifier
+                        .size(36.dp)
+                        .background(
+                            color = if (mediaState.cam)
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+                            else
+                                MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
+                            shape = RoundedCornerShape(18.dp)
+                        )
+                ) {
+                    Icon(
+                        imageVector = if (mediaState.cam) Icons.Default.Videocam else Icons.Default.VideocamOff,
+                        contentDescription = if (mediaState.cam) "Turn off camera" else "Turn on camera",
+                        modifier = Modifier.size(18.dp),
+                        tint = Color.White
                     )
-            ) {
-                Icon(
-                    imageVector = if (mediaState.cam) Icons.Default.Videocam else Icons.Default.VideocamOff,
-                    contentDescription = if (mediaState.cam) "Turn off camera" else "Turn on camera",
-                    modifier = Modifier.size(18.dp),
-                    tint = Color.White
-                )
+                }
             }
         }
         
@@ -219,7 +207,7 @@ fun RemoteVideoTile(
         val hasVideo = stream?.videoTracks?.firstOrNull()?.enabled() == true &&
                        mediaState?.cam != false
         
-        if (hasVideo && stream != null) {
+        if (hasVideo) {
             WebRTCVideoView(
                 modifier = Modifier.fillMaxSize(),
                 eglContext = eglContext,
@@ -244,12 +232,6 @@ fun RemoteVideoTile(
                         contentDescription = "No video",
                         modifier = Modifier.size(48.dp),
                         tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = username,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                     )
                 }
             }

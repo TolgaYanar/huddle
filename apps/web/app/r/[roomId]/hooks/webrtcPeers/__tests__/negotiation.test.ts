@@ -49,6 +49,34 @@ function createNegotiator(pc: FakePeerConnection, polite: boolean) {
 }
 
 describe("PeerNegotiator", () => {
+  it("waits for asynchronous track replacement before creating an offer", async () => {
+    const pc = new FakePeerConnection();
+    let releaseSync = () => {};
+    const syncTracks = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          releaseSync = resolve;
+        }),
+    );
+    const sendOffer = vi.fn();
+    const negotiator = new PeerNegotiator({
+      pc: pc as unknown as RTCPeerConnection,
+      isPolite: () => false,
+      syncTracks,
+      sendOffer,
+      sendAnswer: vi.fn(),
+    });
+
+    const pending = negotiator.requestOffer();
+    await Promise.resolve();
+    expect(pc.offers).toBe(0);
+
+    releaseSync();
+    await expect(pending).resolves.toBe("sent");
+    expect(pc.offers).toBe(1);
+    expect(sendOffer).toHaveBeenCalledOnce();
+  });
+
   it("queues renegotiation while unstable and sends it after the answer", async () => {
     const pc = new FakePeerConnection();
     pc.signalingState = "have-local-offer";
@@ -118,6 +146,74 @@ describe("PeerNegotiator", () => {
     ).resolves.toBe(false);
     expect(sendAnswer).not.toHaveBeenCalled();
     expect(pc.signalingState).toBe("stable");
+  });
+
+  it("rejects a delayed answer from an older signaling generation", async () => {
+    const pc = new FakePeerConnection();
+    pc.createOffer = async () => {
+      pc.offers += 1;
+      return {
+        type: "offer" as const,
+        sdp: `v=0\r\na=ice-ufrag:local-${pc.offers}\r\n`,
+      };
+    };
+    const { negotiator, sendOffer } = createNegotiator(pc, false);
+
+    await negotiator.requestOffer();
+    const firstGeneration = sendOffer.mock.calls[0]?.[0].generation as string;
+    await negotiator.receiveDescription({
+      type: "answer",
+      sdp: "v=0\r\na=ice-ufrag:remote-1\r\n",
+      generation: firstGeneration,
+    });
+
+    await negotiator.requestOffer();
+    const secondGeneration = sendOffer.mock.calls[1]?.[0].generation as string;
+    expect(secondGeneration).not.toBe(firstGeneration);
+
+    await expect(
+      negotiator.receiveDescription({
+        type: "answer",
+        sdp: "stale-answer",
+        generation: firstGeneration,
+      }),
+    ).resolves.toBe(false);
+    expect(pc.remoteDescription?.sdp).toContain("remote-1");
+  });
+
+  it("labels late ICE with the generation of its own ICE username", async () => {
+    const pc = new FakePeerConnection();
+    pc.createOffer = async () => {
+      pc.offers += 1;
+      return {
+        type: "offer" as const,
+        sdp: `v=0\r\na=ice-ufrag:local-${pc.offers}\r\n`,
+      };
+    };
+    const { negotiator, sendOffer } = createNegotiator(pc, false);
+
+    await negotiator.requestOffer();
+    const firstGeneration = sendOffer.mock.calls[0]?.[0].generation as string;
+    await negotiator.receiveDescription({
+      type: "answer",
+      sdp: "answer-1",
+      generation: firstGeneration,
+    });
+    await negotiator.requestOffer();
+    const secondGeneration = sendOffer.mock.calls[1]?.[0].generation as string;
+
+    expect(
+      negotiator.getGenerationForIceCandidate({
+        candidate: "late-first-candidate",
+        usernameFragment: "local-1",
+      }),
+    ).toBe(firstGeneration);
+    expect(
+      negotiator.getGenerationForIceCandidate({
+        candidate: "current-candidate",
+        usernameFragment: "local-2",
+      }),
+    ).toBe(secondGeneration);
   });
 });
 

@@ -6,7 +6,9 @@ const {
   DEFAULT_TTL_SECONDS,
   MAX_TTL_SECONDS,
   MIN_TTL_SECONDS,
+  assertIceReadiness,
   buildIceResponse,
+  getIceReadiness,
   mintTurnCredential,
   readIceConfig,
 } = require("../iceConfig");
@@ -21,6 +23,44 @@ test("readIceConfig: nothing configured means STUN only, no warnings", () => {
   assert.deepEqual(config.turnUrls, []);
   assert.equal(config.ttlSeconds, DEFAULT_TTL_SECONDS);
   assert.deepEqual(config.warnings, []);
+  assert.equal(config.requireTurn, false);
+});
+
+test("TURN readiness reports degraded safely, or fails fast when required", () => {
+  const optional = readIceConfig({});
+  assert.deepEqual(getIceReadiness(optional), {
+    status: "degraded",
+    relay: "missing",
+    required: false,
+  });
+  assert.doesNotThrow(() => assertIceReadiness(optional));
+
+  const required = readIceConfig({ REQUIRE_TURN: "true" });
+  assert.equal(required.requireTurn, true);
+  assert.deepEqual(getIceReadiness(required), {
+    status: "degraded",
+    relay: "missing",
+    required: true,
+  });
+  assert.throws(() => assertIceReadiness(required), /no usable TURN relay/);
+
+  const ready = readIceConfig({
+    REQUIRE_TURN: "1",
+    TURN_URLS,
+    TURN_SECRET: "secret",
+  });
+  assert.deepEqual(assertIceReadiness(ready), {
+    status: "ready",
+    relay: "configured",
+    required: true,
+  });
+});
+
+test("readIceConfig: invalid REQUIRE_TURN values fail closed with a warning", () => {
+  const config = readIceConfig({ REQUIRE_TURN: "sometimes" });
+  assert.equal(config.requireTurn, true);
+  assert.match(config.warnings[0], /REQUIRE_TURN/);
+  assert.throws(() => assertIceReadiness(config), /no usable TURN relay/);
 });
 
 test("readIceConfig: TURN_URLS + TURN_SECRET selects the HMAC scheme", () => {
@@ -45,6 +85,33 @@ test("readIceConfig: a fixed username/credential pair is served as static", () =
   assert.equal(config.username, "user");
   assert.equal(config.credential, "pass");
   assert.equal(config.secret, null);
+});
+
+test("readIceConfig: production never exposes a static TURN password", () => {
+  const config = readIceConfig({
+    NODE_ENV: "production",
+    TURN_URLS,
+    TURN_USERNAME: "user",
+    TURN_CREDENTIAL: "pass",
+  });
+  assert.equal(config.mode, "none");
+  assert.deepEqual(config.turnUrls, []);
+  assert.ok(
+    config.warnings.some((warning) => /disabled in production/.test(warning)),
+  );
+  assert.deepEqual(buildIceResponse(config), {
+    iceServers: [{ urls: DEFAULT_STUN_URLS }],
+    ttlSeconds: null,
+  });
+
+  const required = readIceConfig({
+    NODE_ENV: "production",
+    REQUIRE_TURN: "1",
+    TURN_URLS,
+    TURN_USERNAME: "user",
+    TURN_CREDENTIAL: "pass",
+  });
+  assert.throws(() => assertIceReadiness(required), /no usable TURN relay/);
 });
 
 test("readIceConfig: the secret wins over a static pair, and says so", () => {
@@ -88,6 +155,49 @@ test("readIceConfig: entries with the wrong scheme are dropped one by one", () =
   assert.deepEqual(config.stunUrls, ["stun:custom.example.com:3478"]);
   const rejected = config.warnings.filter((w) => /ignored/.test(w));
   assert.equal(rejected.length, 4);
+});
+
+test("readIceConfig: malformed TURN URIs cannot satisfy required readiness", () => {
+  const malformed = [
+    "turn:relay.example.com:notaport",
+    "turn:////",
+    "turn:relay.example.com:70000",
+    "turn:relay.example.com:3478?transport=bogus",
+    "turn:999.999.999.999:3478",
+    "turn:2001:db8::1:3478",
+  ];
+
+  for (const url of malformed) {
+    const config = readIceConfig({
+      REQUIRE_TURN: "1",
+      TURN_URLS: url,
+      TURN_SECRET: "secret",
+    });
+    assert.equal(config.mode, "none", url);
+    assert.deepEqual(config.turnUrls, [], url);
+    assert.ok(
+      config.warnings.some((warning) => warning.includes(url)),
+      url,
+    );
+    assert.throws(() => assertIceReadiness(config), /no usable TURN relay/);
+  }
+});
+
+test("readIceConfig: accepts valid DNS, IPv4, and bracketed IPv6 TURN URIs", () => {
+  const urls = [
+    "turn:relay.example.com",
+    "turn:192.0.2.10:3478?transport=udp",
+    "turns:[2001:db8::1]:5349?transport=tcp",
+  ];
+  const config = readIceConfig({
+    REQUIRE_TURN: "1",
+    TURN_URLS: urls.join(","),
+    TURN_SECRET: "secret",
+  });
+
+  assert.equal(config.mode, "hmac");
+  assert.deepEqual(config.turnUrls, urls);
+  assert.equal(assertIceReadiness(config).status, "ready");
 });
 
 test("readIceConfig: TTL is a whole number of seconds, clamped to a sane range", () => {
@@ -170,4 +280,67 @@ test("buildIceResponse: no relay means exactly the STUN entry", () => {
     iceServers: [{ urls: DEFAULT_STUN_URLS }],
     ttlSeconds: null,
   });
+});
+
+test("readIceConfig: the Cloudflare pair selects the cloudflare mode", () => {
+  const config = readIceConfig({
+    CLOUDFLARE_TURN_KEY_ID: " key-1 ",
+    CLOUDFLARE_TURN_API_TOKEN: " token-1 ",
+  });
+  assert.equal(config.mode, "cloudflare");
+  assert.equal(config.cloudflareKeyId, "key-1");
+  assert.equal(config.cloudflareApiToken, "token-1");
+  // Shared-secret fields belong to the other modes only.
+  assert.deepEqual(config.turnUrls, []);
+  assert.equal(config.secret, null);
+  assert.deepEqual(config.warnings, []);
+});
+
+test("readIceConfig: half a Cloudflare pair is refused rather than half-used", () => {
+  for (const env of [
+    { CLOUDFLARE_TURN_KEY_ID: "key-1" },
+    { CLOUDFLARE_TURN_API_TOKEN: "token-1" },
+  ]) {
+    const config = readIceConfig(env);
+    assert.equal(config.mode, "none");
+    assert.match(config.warnings[0], /must both be set/);
+  }
+});
+
+test("readIceConfig: Cloudflare wins over shared-secret settings, and says so", () => {
+  const config = readIceConfig({
+    CLOUDFLARE_TURN_KEY_ID: "key-1",
+    CLOUDFLARE_TURN_API_TOKEN: "token-1",
+    TURN_URLS: "turn:relay.example.com:3478",
+    TURN_SECRET: "s",
+  });
+  assert.equal(config.mode, "cloudflare");
+  assert.equal(config.secret, null);
+  assert.equal(config.warnings.length, 1);
+  assert.match(config.warnings[0], /TURN_URLS\/TURN_SECRET.*are ignored/);
+});
+
+test("readIceConfig: a TTL beyond Cloudflare's 48 hour ceiling is clamped", () => {
+  const config = readIceConfig({
+    CLOUDFLARE_TURN_KEY_ID: "key-1",
+    CLOUDFLARE_TURN_API_TOKEN: "token-1",
+    TURN_TTL_SECONDS: String(5 * 24 * 60 * 60),
+  });
+  assert.equal(config.ttlSeconds, 48 * 60 * 60);
+  assert.match(config.warnings[0], /Cloudflare maximum; clamped/);
+});
+
+test("readIceConfig: Cloudflare counts as a configured relay for readiness", () => {
+  const config = readIceConfig({
+    CLOUDFLARE_TURN_KEY_ID: "key-1",
+    CLOUDFLARE_TURN_API_TOKEN: "token-1",
+    REQUIRE_TURN: "1",
+  });
+  assert.deepEqual(getIceReadiness(config), {
+    status: "ready",
+    relay: "configured",
+    required: true,
+  });
+  // Production must be allowed to boot on Cloudflare alone.
+  assert.doesNotThrow(() => assertIceReadiness(config));
 });

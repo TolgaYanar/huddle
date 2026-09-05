@@ -1,5 +1,44 @@
 import React from "react";
 
+import type {
+  MediaDeviceErrors,
+  MediaDeviceKind,
+  MediaDevicePending,
+} from "../../hooks/useMediaTracks";
+import type { SelectableMediaDevice } from "../../hooks/useMediaDevices";
+
+function DeviceSelect({
+  label,
+  value,
+  devices,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  devices: SelectableMediaDevice[];
+  onChange: (deviceId: string) => void;
+}) {
+  return (
+    <label className="grid gap-1">
+      <span className="text-[10px] font-medium uppercase tracking-wide text-ink-faint">
+        {label}
+      </span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-9 min-w-0 w-full rounded-[var(--radius-control)] border border-hairline bg-sunken px-2 text-xs text-ink outline-none focus:border-accent"
+      >
+        <option value="">System default</option>
+        {devices.map((device, index) => (
+          <option key={device.deviceId} value={device.deviceId}>
+            {device.label || `${label} ${index + 1}`}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 function MicIcon({ className }: { className?: string }) {
   return (
     <svg
@@ -101,12 +140,29 @@ export function DeviceControls(props: {
   setCamEnabled: React.Dispatch<React.SetStateAction<boolean>>;
   screenEnabled: boolean;
   setScreenEnabled: React.Dispatch<React.SetStateAction<boolean>>;
+  mediaErrors: MediaDeviceErrors;
+  mediaPending: MediaDevicePending;
+  clearMediaError: (kind: MediaDeviceKind) => void;
+  audioInputs: SelectableMediaDevice[];
+  videoInputs: SelectableMediaDevice[];
+  audioOutputs: SelectableMediaDevice[];
+  audioInputId: string;
+  setAudioInputId: (deviceId: string) => void;
+  videoInputId: string;
+  setVideoInputId: (deviceId: string) => void;
+  audioOutputId: string;
+  setAudioOutputId: (deviceId: string) => void;
+  outputSelectionSupported: boolean;
+  devicesRefreshing: boolean;
+  deviceInventoryError: string | null;
+  refreshDevices: () => Promise<SelectableMediaDevice[]>;
 
   pushToTalkEnabled: boolean;
   setPushToTalkEnabled: React.Dispatch<React.SetStateAction<boolean>>;
   pushToTalkDown: boolean;
   pushToTalkBindingLabel: string;
   stopPushToTalkTransmit: () => void;
+  closePushToTalkGate: () => void;
 
   isRebindingPushToTalkKey: boolean;
   setIsRebindingPushToTalkKey: React.Dispatch<React.SetStateAction<boolean>>;
@@ -118,11 +174,28 @@ export function DeviceControls(props: {
     setCamEnabled,
     screenEnabled,
     setScreenEnabled,
+    mediaErrors,
+    mediaPending,
+    clearMediaError,
+    audioInputs,
+    videoInputs,
+    audioOutputs,
+    audioInputId,
+    setAudioInputId,
+    videoInputId,
+    setVideoInputId,
+    audioOutputId,
+    setAudioOutputId,
+    outputSelectionSupported,
+    devicesRefreshing,
+    deviceInventoryError,
+    refreshDevices,
     pushToTalkEnabled,
     setPushToTalkEnabled,
     pushToTalkDown,
     pushToTalkBindingLabel,
     stopPushToTalkTransmit,
+    closePushToTalkGate,
     isRebindingPushToTalkKey,
     setIsRebindingPushToTalkKey,
   } = props;
@@ -133,10 +206,14 @@ export function DeviceControls(props: {
       <div className="grid grid-cols-3 gap-1.5">
         <button
           type="button"
-          onClick={() => setMicEnabled((v) => !v)}
+          onClick={() => {
+            clearMediaError("mic");
+            setMicEnabled((v) => !v);
+          }}
+          disabled={mediaPending.mic}
           aria-pressed={micEnabled ? "true" : "false"}
           aria-label={micEnabled ? "Turn off microphone" : "Turn on microphone"}
-          className={`flex flex-col items-center justify-center gap-1 py-2.5 rounded-[var(--radius-control)] border text-xs font-medium transition-colors ${
+          className={`flex flex-col items-center justify-center gap-1 py-2.5 rounded-[var(--radius-control)] border text-xs font-medium transition-colors disabled:opacity-60 disabled:cursor-wait ${
             micEnabled
               ? "bg-accent-soft border-accent text-accent"
               : "bg-sunken border-hairline text-ink-muted hover:bg-surface hover:text-ink"
@@ -148,15 +225,21 @@ export function DeviceControls(props: {
           ) : (
             <MicOffIcon className="w-4 h-4" />
           )}
-          <span>{micEnabled ? "Mic on" : "Mic"}</span>
+          <span>
+            {mediaPending.mic ? "Starting…" : micEnabled ? "Mic on" : "Mic"}
+          </span>
         </button>
 
         <button
           type="button"
-          onClick={() => setCamEnabled((v) => !v)}
+          onClick={() => {
+            clearMediaError("cam");
+            setCamEnabled((v) => !v);
+          }}
+          disabled={mediaPending.cam}
           aria-pressed={camEnabled ? "true" : "false"}
           aria-label={camEnabled ? "Turn off camera" : "Turn on camera"}
-          className={`flex flex-col items-center justify-center gap-1 py-2.5 rounded-[var(--radius-control)] border text-xs font-medium transition-colors ${
+          className={`flex flex-col items-center justify-center gap-1 py-2.5 rounded-[var(--radius-control)] border text-xs font-medium transition-colors disabled:opacity-60 disabled:cursor-wait ${
             camEnabled
               ? "bg-accent-soft border-accent text-accent"
               : "bg-sunken border-hairline text-ink-muted hover:bg-surface hover:text-ink"
@@ -168,15 +251,21 @@ export function DeviceControls(props: {
           ) : (
             <CamOffIcon className="w-4 h-4" />
           )}
-          <span>{camEnabled ? "Cam on" : "Camera"}</span>
+          <span>
+            {mediaPending.cam ? "Starting…" : camEnabled ? "Cam on" : "Camera"}
+          </span>
         </button>
 
         <button
           type="button"
-          onClick={() => setScreenEnabled((v) => !v)}
+          onClick={() => {
+            clearMediaError("screen");
+            setScreenEnabled((v) => !v);
+          }}
+          disabled={mediaPending.screen}
           aria-pressed={screenEnabled ? "true" : "false"}
           aria-label={screenEnabled ? "Stop sharing screen" : "Share screen"}
-          className={`flex flex-col items-center justify-center gap-1 py-2.5 rounded-[var(--radius-control)] border text-xs font-medium transition-colors ${
+          className={`flex flex-col items-center justify-center gap-1 py-2.5 rounded-[var(--radius-control)] border text-xs font-medium transition-colors disabled:opacity-60 disabled:cursor-wait ${
             screenEnabled
               ? "bg-negative-soft border-negative text-negative"
               : "bg-sunken border-hairline text-ink-muted hover:bg-surface hover:text-ink"
@@ -184,17 +273,84 @@ export function DeviceControls(props: {
           title={screenEnabled ? "Stop sharing screen" : "Share screen"}
         >
           <ScreenIcon className="w-4 h-4" />
-          <span>{screenEnabled ? "Sharing" : "Screen"}</span>
+          <span>
+            {mediaPending.screen
+              ? "Starting…"
+              : screenEnabled
+                ? "Sharing"
+                : "Screen"}
+          </span>
         </button>
       </div>
+
+      {Object.entries(mediaErrors).map(([kind, message]) => (
+        <div
+          key={kind}
+          role="alert"
+          className="flex items-start justify-between gap-2 rounded-[var(--radius-control)] border border-negative/40 bg-negative-soft px-3 py-2 text-xs text-negative"
+        >
+          <span>{message}</span>
+          <button
+            type="button"
+            onClick={() => clearMediaError(kind as MediaDeviceKind)}
+            className="shrink-0 font-semibold hover:brightness-110"
+            aria-label="Dismiss media error"
+          >
+            ×
+          </button>
+        </div>
+      ))}
+
+      <details className="rounded-[var(--radius-control)] border border-hairline bg-sunken px-3 py-2">
+        <summary className="cursor-pointer select-none text-xs font-medium text-ink-muted hover:text-ink">
+          Audio &amp; video devices
+        </summary>
+        <div className="mt-3 grid gap-3">
+          <DeviceSelect
+            label="Microphone"
+            value={audioInputId}
+            devices={audioInputs}
+            onChange={setAudioInputId}
+          />
+          <DeviceSelect
+            label="Camera"
+            value={videoInputId}
+            devices={videoInputs}
+            onChange={setVideoInputId}
+          />
+          {outputSelectionSupported && (
+            <DeviceSelect
+              label="Speaker"
+              value={audioOutputId}
+              devices={audioOutputs}
+              onChange={setAudioOutputId}
+            />
+          )}
+          {deviceInventoryError && (
+            <p role="status" className="text-xs leading-relaxed text-negative">
+              {deviceInventoryError}
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={() => void refreshDevices()}
+            disabled={devicesRefreshing}
+            className="h-8 justify-self-start rounded-[var(--radius-control)] border border-hairline bg-surface px-3 text-xs font-medium text-ink-muted hover:bg-raised hover:text-ink disabled:cursor-wait disabled:opacity-60"
+          >
+            {devicesRefreshing ? "Refreshing…" : "Refresh devices"}
+          </button>
+        </div>
+      </details>
 
       {/* Push-to-talk */}
       <div className="flex items-center gap-1.5">
         <button
           type="button"
+          aria-pressed={pushToTalkEnabled}
           onClick={() => {
-            setPushToTalkEnabled((v) => !v);
-            stopPushToTalkTransmit();
+            if (pushToTalkEnabled) stopPushToTalkTransmit();
+            else closePushToTalkGate();
+            setPushToTalkEnabled(!pushToTalkEnabled);
           }}
           disabled={!micEnabled}
           className={`flex-1 h-8 px-3 rounded-[var(--radius-control)] border text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
@@ -220,6 +376,7 @@ export function DeviceControls(props: {
         {pushToTalkEnabled && (
           <button
             type="button"
+            aria-pressed={isRebindingPushToTalkKey}
             onClick={() => setIsRebindingPushToTalkKey((v) => !v)}
             className={`h-8 px-2.5 rounded-[var(--radius-control)] border text-xs font-medium transition-colors ${
               isRebindingPushToTalkKey
