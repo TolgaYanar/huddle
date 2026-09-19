@@ -2,7 +2,6 @@
 
 import React from "react";
 
-import { NetflixSyncPlayer } from "../NetflixSyncPlayer";
 import type { PlatformType } from "../videoControls/platform";
 import { DailymotionEmbed } from "./mediaRenderer/DailymotionEmbed";
 import { DirectFilePlayer } from "./mediaRenderer/DirectFilePlayer";
@@ -168,11 +167,12 @@ export function PlayerMediaRenderer({
 }) {
   if (!isClient) return null;
 
-  // Tier-3 platforms (Disney+, HBO Max, Hulu, Apple TV+, Paramount+, Peacock)
-  // can't be embedded inline at all — show the install-extension CTA card
-  // instead of trying to render anything. Netflix has its own dedicated flow
-  // below; Prime keeps its existing blank-frame behaviour.
-  const showTier3Cta = isTier3 && !isNetflix && !isPrime;
+  // DRM platforms (Netflix, Prime, Disney+, HBO Max, Hulu, Apple TV+,
+  // Paramount+, Peacock) can't be embedded inline at all — show the install-
+  // extension CTA card instead of trying to render anything. Netflix and Prime
+  // (both supported by the Huddle extension) lead that card with a guided
+  // flow; the rest offer "open in a new tab" (see Tier3CtaCard).
+  const showTier3Cta = isTier3;
 
   return (
     <>
@@ -190,37 +190,6 @@ export function PlayerMediaRenderer({
             src={twitchEmbedSrc}
             fallbackKey={normalizedUrl}
             onLoad={onEmbedLoad}
-          />
-        ) : isPrime ? (
-          <div className="absolute inset-0" />
-        ) : isNetflix ? (
-          <NetflixSyncPlayer
-            ref={
-              playerRef as unknown as React.RefObject<
-                import("../netflixSyncPlayer/types").NetflixSyncPlayerRef | null
-              >
-            }
-            url={normalizedUrl}
-            isPlaying={videoState === "Playing"}
-            currentTime={currentTime}
-            volume={effectiveVolume}
-            muted={effectiveMuted}
-            playbackRate={playbackRate}
-            onPlay={handlePlay}
-            onPause={handlePause}
-            onSeek={handleUserSeek}
-            onProgress={(time, dur) => {
-              handleProgress(time);
-              if (dur > 0) handleDuration(dur);
-            }}
-            onReady={() => {
-              setPlayerReady(true);
-              setPlayerError(null);
-              clearLoadTimeout();
-            }}
-            onError={(err) => setPlayerError(err)}
-            onDuration={handleDuration}
-            className="absolute inset-0"
           />
         ) : isDailymotion && dailymotionEmbedSrc ? (
           <DailymotionEmbed

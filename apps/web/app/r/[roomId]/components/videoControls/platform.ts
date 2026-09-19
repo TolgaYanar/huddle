@@ -66,18 +66,10 @@ export const PLATFORM_CAPABILITIES: Record<PlatformType, PlatformCapabilities> =
     // Tier 3 — DRM-protected, cannot be embedded inline. The web player will
     // surface an "install extension" CTA for these instead of trying to play.
     prime: NONE,
-    netflix: {
-      // Netflix has the manual-sync popup fallback that we do drive a bit.
-      canPlay: true,
-      canPause: true,
-      canSeek: true,
-      canMute: true,
-      canChangeSpeed: true,
-      canChangeVolume: true,
-      canGetDuration: true,
-      canGetCurrentTime: true,
-      speedOptions: [0.5, 0.75, 1, 1.25, 1.5],
-    },
+    // Netflix plays through the Huddle extension/app in the user's own Netflix
+    // tab, never inside this web player — so the web control bar has nothing to
+    // drive. The player surfaces the "install the extension" CTA instead.
+    netflix: NONE,
     disney_plus: NONE,
     hbo: NONE,
     hulu: NONE,

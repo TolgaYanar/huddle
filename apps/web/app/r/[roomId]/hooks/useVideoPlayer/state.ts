@@ -3,11 +3,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getDurationFromRef, getCurrentTimeFromRef } from "../../lib/player";
 import {
   getLoadTimeoutMs,
-  getPrimeVideoMessage,
   getTimeoutErrorMessage,
-  isPrimeVideoUrl,
   normalizeVideoUrl,
 } from "../../lib/video";
+import {
+  detectPlatform,
+  isTier3Platform,
+} from "../../components/videoControls/platform";
 import type { VideoPreview } from "../../lib/video-preview";
 
 export type VideoPlayerState = ReturnType<typeof useVideoPlayerState>;
@@ -190,9 +192,16 @@ export function useVideoPlayerState({
     setPlayerReady(false);
     setPlayerError(null);
 
-    if (isPrimeVideoUrl(normalizeVideoUrl(url))) {
+    const normalized = normalizeVideoUrl(url);
+
+    // DRM platforms (Netflix, Prime, Disney+, HBO Max, Hulu, Apple TV+,
+    // Paramount+, Peacock) render a static "install the extension" CTA card,
+    // never a real player — there is nothing to load. Arming the load-timeout
+    // here would fire a bogus "Player error" over the card after 20s and dump
+    // the raw URL (a Netflix watch URL's long tracking query looked especially
+    // broken, stacked on top of the card). Mark ready and skip it.
+    if (isTier3Platform(detectPlatform(normalized))) {
       setPlayerReady(true);
-      setPlayerError(getPrimeVideoMessage());
       return;
     }
 

@@ -92,18 +92,17 @@ export function useVideoEmbedInfo(options: {
     const isBadYoutubeUrl = isProblematicYoutubeUrl(url);
     const isWebEmbed = shouldEmbedWebpage(normalizedUrl);
 
-    // canPlay: we have *some* renderer that will at least try the URL. Tier-3
-    // platforms (other than Netflix's manual-sync mode) deliberately fall
-    // through to the CTA card; we mark them as "not playable" so the rest of
-    // the player chrome stays disabled.
-    const drmTier3 = isTier3 && !isNetflix;
+    // canPlay: we have *some* renderer that will at least try the URL. DRM
+    // Tier-3 platforms (Netflix, Prime, Disney+, …) deliberately fall through
+    // to the "install the extension" CTA card; we mark them "not playable" so
+    // the player chrome (play/seek/speed) stays disabled.
+    const drmTier3 = isTier3;
 
     const canPlay =
       !drmTier3 &&
       ((!isBadYoutubeUrl && normalizedUrl.length > 0) ||
         isKick ||
         isTwitch ||
-        isNetflix ||
         isVimeo ||
         isDailymotion ||
         isSoundCloud ||
