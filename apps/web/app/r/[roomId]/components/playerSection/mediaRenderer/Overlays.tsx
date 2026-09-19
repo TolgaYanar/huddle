@@ -45,7 +45,7 @@ export function MediaOverlays({
                 : isPrime
                   ? "Prime Video"
                   : isNetflix
-                    ? "Netflix Sync"
+                    ? "Netflix"
                     : "Web embed"}
           </span>
         </div>
@@ -66,33 +66,6 @@ export function MediaOverlays({
             >
               Open site in new tab
             </a>
-          </div>
-        </div>
-      )}
-
-      {isPrime && (
-        <div className="absolute inset-0 flex items-center justify-center text-center px-6 text-white bg-black/65">
-          <div>
-            <div className="font-semibold">
-              Prime Video can&apos;t be embedded
-            </div>
-            <div className="text-sm text-ink-muted mt-1">
-              Prime Video is DRM-protected, so it won&apos;t play inside Huddle.
-              Open it in a new tab and we can still sync the link.
-            </div>
-            <div className="text-xs text-ink-muted mt-3 break-all">
-              URL: {normalizedUrl}
-            </div>
-            <div className="mt-3">
-              <a
-                href={normalizedUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="text-xs underline underline-offset-4 text-ink"
-              >
-                Open Prime Video in new tab
-              </a>
-            </div>
           </div>
         </div>
       )}
@@ -131,7 +104,7 @@ export function MediaOverlays({
         </div>
       )}
 
-      {playerError && (
+      {playerError && !isNetflix && !isPrime && (
         <div className="absolute inset-0 flex items-center justify-center text-center px-6 text-white bg-black/65">
           <div>
             <div className="font-semibold">Player error</div>
