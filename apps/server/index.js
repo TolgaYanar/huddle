@@ -48,9 +48,16 @@ initSentry();
 
 const app = express();
 
-// Required when running behind Railway/Vercel/other reverse proxies.
-// Ensures Express correctly interprets forwarded headers.
-app.set("trust proxy", 1);
+// Railway puts two proxies in front of the app: its edge, which replaces any
+// client-sent X-Forwarded-For with the address that connected to it, and an
+// internal hop that appends the edge's own address. Measured 2026-09-29: every
+// request arrives as "<connecting address>, <Railway edge>". A hop count of 1
+// made req.ip the Railway edge, so every user shared one rate-limit key.
+//
+// Through the Vercel rewrite the connecting address is Vercel's egress, not the
+// user; the user's address is only in x-vercel-forwarded-for, which a direct
+// request can forge, so it is deliberately not trusted here.
+app.set("trust proxy", 2);
 
 const allowExtensionOrigins = readBooleanEnv("ALLOW_EXTENSION_ORIGINS");
 const allowedOrigins = parseAllowedOrigins(process.env.CORS_ORIGINS);
@@ -65,24 +72,6 @@ const corsOptions = createCorsOptions({
 app.disable("x-powered-by");
 app.use(requestId());
 app.use(securityHeaders());
-
-// TEMPORARY: records the forwarded-address chain on ICE lookups so the right
-// "trust proxy" hop count can be chosen from real traffic. Remove after that.
-// warn, not info: info is dropped unless VERBOSE_LOGS is set.
-app.use("/api/webrtc/ice", (req, res, next) => {
-  req.log.warn(
-    `[xff] ${JSON.stringify({
-      xff: req.headers["x-forwarded-for"] || null,
-      xRealIp: req.headers["x-real-ip"] || null,
-      xVercelForwardedFor: req.headers["x-vercel-forwarded-for"] || null,
-      hasVercelId: Boolean(req.headers["x-vercel-id"]),
-      ip: req.ip,
-      ips: req.ips,
-      remote: req.socket.remoteAddress,
-    })}`,
-  );
-  next();
-});
 
 // Lightweight request-duration log line for non-health endpoints.
 app.use((req, res, next) => {
