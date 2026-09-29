@@ -74,20 +74,6 @@ app.disable("x-powered-by");
 app.use(requestId());
 app.use(securityHeaders());
 
-// TEMPORARY: which forwarding headers reach ICE lookups. Booleans only, no
-// addresses. warn, because info is dropped unless VERBOSE_LOGS is set.
-app.use("/api/webrtc/ice", (req, res, next) => {
-  req.log.warn(
-    `[proxy-headers] ${JSON.stringify({
-      proxied: req.headers["x-huddle-proxied"] === "1",
-      secret: Boolean(req.headers["x-huddle-proxy-secret"]),
-      clientIp: Boolean(req.headers["x-huddle-client-ip"]),
-      vercelForwardedFor: Boolean(req.headers["x-vercel-forwarded-for"]),
-    })}`,
-  );
-  next();
-});
-
 // Lightweight request-duration log line for non-health endpoints.
 app.use((req, res, next) => {
   const start = Date.now();
