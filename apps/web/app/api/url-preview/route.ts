@@ -100,16 +100,22 @@ export async function GET(req: Request) {
       );
     }
 
+    // One deadline for the whole request — DNS pre-check and every redirect
+    // hop. The only caller (video-preview.ts) gives up at 2.5 s, so work past
+    // that was wasted; this leaves margin for the round trip.
+    const deadline = Date.now() + PREVIEW_BUDGET_MS;
+
     // Friendly pre-check: resolve the first hop's hostname and 400 on private
     // ranges. The security boundary is previewAgent's connect-time lookup.
     const bareHostname = target.hostname.startsWith("[")
       ? target.hostname.slice(1, -1)
       : target.hostname;
     if (!net.isIP(bareHostname)) {
-      const addrs = await dns.promises.lookup(bareHostname, {
-        all: true,
-        verbatim: true,
-      });
+      // A stalled resolver must not hold the function open.
+      const addrs = await withTimeout(
+        dns.promises.lookup(bareHostname, { all: true, verbatim: true }),
+        deadline - Date.now(),
+      );
       if (addrs.some((a) => isPrivateIp(a.address))) {
         return NextResponse.json<UrlPreviewResponse>(
           { ok: false, error: "Blocked IP" },
@@ -119,8 +125,10 @@ export async function GET(req: Request) {
     }
 
     const controller = new AbortController();
-    // One total time budget shared by every redirect hop.
-    const timeoutId = setTimeout(() => controller.abort(), 3500);
+    const timeoutId = setTimeout(
+      () => controller.abort(),
+      Math.max(0, deadline - Date.now()),
+    );
 
     try {
       let current = target;
@@ -168,6 +176,9 @@ export async function GET(req: Request) {
         const finalUrl = current.toString();
 
         if (!res.ok) {
+          // Early returns must release the body, or the socket stays open
+          // until the upstream finishes streaming it.
+          res.body?.cancel().catch(() => {});
           return NextResponse.json<UrlPreviewResponse>(
             { ok: false, error: `Upstream status ${res.status}` },
             { status: 200 },
@@ -176,6 +187,7 @@ export async function GET(req: Request) {
 
         const contentType = res.headers.get("content-type") || "";
         if (!contentType.includes("text/html")) {
+          res.body?.cancel().catch(() => {});
           return NextResponse.json<UrlPreviewResponse>(
             { ok: true, title: null, thumbnail: null, finalUrl },
             { status: 200 },
@@ -298,6 +310,16 @@ function absolutizeUrl(baseUrl: string, maybeRelative: string): string {
   }
 }
 
+const PREVIEW_BUDGET_MS = 2200;
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error("DNS lookup timed out")), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 async function readTextWithLimit(res: UndiciResponse, limitBytes: number) {
   if (!res.body) return "";
 
@@ -310,9 +332,13 @@ async function readTextWithLimit(res: UndiciResponse, limitBytes: number) {
     if (done) break;
     if (!value) continue;
 
-    total += value.byteLength;
-    if (total > limitBytes) break;
+    if (total + value.byteLength > limitBytes) {
+      // Stop the upstream too; a bare break left the stream open.
+      reader.cancel().catch(() => {});
+      break;
+    }
 
+    total += value.byteLength;
     chunks.push(value);
   }
 

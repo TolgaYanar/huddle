@@ -96,6 +96,21 @@ describe("createRouteRateLimiter", () => {
     expect(limiter(makeReq("1.1.1.1")).allowed).toBe(true);
   });
 
+  it("keeps a limited client's bucket while an attacker rotates keys", () => {
+    const limiter = createRouteRateLimiter({
+      windowMs: 60_000,
+      max: 1,
+      maxKeys: 3,
+    });
+    expect(limiter(makeReq("9.9.9.9")).allowed).toBe(true);
+    for (let i = 0; i < 10; i += 1) {
+      // The limited client keeps retrying between the attacker's new keys.
+      expect(limiter(makeReq("9.9.9.9")).allowed).toBe(false);
+      limiter(makeReq(`10.0.0.${i}`));
+    }
+    expect(limiter(makeReq("9.9.9.9")).allowed).toBe(false);
+  });
+
   it("rejects invalid configuration", () => {
     expect(() => createRouteRateLimiter({ windowMs: 0, max: 1 })).toThrow();
     expect(() => createRouteRateLimiter({ windowMs: 1000, max: 0 })).toThrow();

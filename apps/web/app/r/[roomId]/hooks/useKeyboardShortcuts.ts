@@ -12,6 +12,22 @@ function isTyping(): boolean {
   return false;
 }
 
+// Space activates a focused button/link/checkbox natively; stealing it for
+// play/pause meant a keyboard user pressing Space on "Send" or the mic toggle
+// toggled the room video instead.
+const SPACE_OWNERS =
+  'button, a[href], summary, [role="button"], [role="checkbox"], [role="switch"], [role="menuitem"], [role="option"], [role="tab"], [role="radio"]';
+
+// Widgets that move with the arrow keys themselves.
+const ARROW_OWNERS =
+  '[role="slider"], [role="tab"], [role="menuitem"], [role="option"], [role="radio"], [role="listbox"], [role="menu"], [role="tablist"], [role="radiogroup"]';
+
+function focusedMatches(selector: string): boolean {
+  const el = document.activeElement;
+  if (!el || el === document.body) return false;
+  return el.closest(selector) !== null;
+}
+
 /**
  * Whenever a modal is open the user is interacting with it, not the video —
  * so global player shortcuts (space = play/pause, arrows = seek, etc.) need
@@ -70,8 +86,9 @@ export function useKeyboardShortcuts({
       switch (e.key) {
         case " ":
         case "k": {
-          e.preventDefault();
+          if (e.key === " " && focusedMatches(SPACE_OWNERS)) return;
           if (!canControlPlayback) return;
+          e.preventDefault();
           if (isPlaying) {
             handleUserPause();
           } else {
@@ -80,6 +97,7 @@ export function useKeyboardShortcuts({
           break;
         }
         case "ArrowLeft": {
+          if (focusedMatches(ARROW_OWNERS)) return;
           e.preventDefault();
           if (!canControlPlayback) return;
           handleSeekFromController(Math.max(0, currentTime - 10), {
@@ -88,18 +106,21 @@ export function useKeyboardShortcuts({
           break;
         }
         case "ArrowRight": {
+          if (focusedMatches(ARROW_OWNERS)) return;
           e.preventDefault();
           if (!canControlPlayback) return;
           handleSeekFromController(currentTime + 10, { force: true });
           break;
         }
         case "ArrowUp": {
+          if (focusedMatches(ARROW_OWNERS)) return;
           e.preventDefault();
           const nextVol = Math.min(1, volume + 0.1);
           handleVolumeFromController(nextVol, effectiveMuted);
           break;
         }
         case "ArrowDown": {
+          if (focusedMatches(ARROW_OWNERS)) return;
           e.preventDefault();
           const nextVol = Math.max(0, volume - 0.1);
           handleVolumeFromController(nextVol, effectiveMuted);

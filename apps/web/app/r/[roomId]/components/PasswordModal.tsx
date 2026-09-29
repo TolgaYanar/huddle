@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { memo } from "react";
 import Link from "next/link";
 
 import { Modal } from "../../../components/Modal";
@@ -13,7 +14,9 @@ interface PasswordModalProps {
   submitRoomPassword: () => void;
 }
 
-export function PasswordModal({
+// Memoised: the room view re-renders on every playback-position update
+// (~4 Hz); this component's props do not change with it.
+export const PasswordModal = memo(function PasswordModal({
   passwordRequired,
   passwordInput,
   setPasswordInput,
@@ -84,4 +87,4 @@ export function PasswordModal({
       </form>
     </Modal>
   );
-}
+});

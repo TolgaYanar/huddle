@@ -57,6 +57,9 @@ export function useYouTubeBackgroundEvents({
 
     let cancelled = false;
     let attachTimer: number | null = null;
+    // Set by whichever attempt actually attaches. A retry from the timer
+    // cannot return its teardown to the effect, so it records it here.
+    let detach: (() => void) | undefined;
 
     const tryAttach = () => {
       if (cancelled) return;
@@ -269,7 +272,7 @@ export function useYouTubeBackgroundEvents({
       };
       startPoll();
 
-      return () => {
+      detach = () => {
         if (pollTimer) {
           window.clearInterval(pollTimer);
           pollTimer = null;
@@ -285,12 +288,12 @@ export function useYouTubeBackgroundEvents({
       };
     };
 
-    const detach = tryAttach();
+    tryAttach();
 
     return () => {
       cancelled = true;
       if (attachTimer) window.clearTimeout(attachTimer);
-      if (typeof detach === "function") detach();
+      detach?.();
     };
   }, [
     isClient,

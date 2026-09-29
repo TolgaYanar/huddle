@@ -100,7 +100,13 @@ export function createRouteRateLimiter({
     const raw = store.get(ip) ?? [];
     const hits = raw.filter((t) => now - t < windowMs);
 
+    // Re-insert on every hit, blocked or not, so Map order is recency order
+    // and eviction below drops the least recently seen bucket. Evicting by
+    // first insertion let an attacker who rotated through maxKeys addresses
+    // reset the bucket of a client that was rate limited at that moment.
+    store.delete(ip);
     if (hits.length >= max) {
+      store.set(ip, hits);
       const oldest = hits[0] ?? now;
       const retryAfter = Math.max(
         1,
@@ -118,9 +124,9 @@ export function createRouteRateLimiter({
     }
 
     hits.push(now);
-    if (!store.has(ip) && store.size >= maxKeys) {
-      // Evict the oldest-inserted bucket so the store stays bounded even
-      // under key-rotation attacks.
+    if (store.size >= maxKeys) {
+      // Evict the least recently seen bucket so the store stays bounded
+      // even under key-rotation attacks.
       const oldestKey = store.keys().next().value;
       if (oldestKey !== undefined) store.delete(oldestKey);
     }

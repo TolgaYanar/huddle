@@ -8,11 +8,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 import { apiLogin } from "../lib/api";
 import { PasswordToggleButton } from "../components/PasswordToggleButton";
+import { safeNextPath } from "../lib/safeRedirect";
 
 function LoginPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const next = searchParams.get("next") || "/";
+  const next = safeNextPath(searchParams.get("next"));
 
   const [username, setUsername] = React.useState("");
   const [password, setPassword] = React.useState("");
@@ -173,7 +174,10 @@ function LoginPageInner() {
               </div>
 
               {error && (
-                <div className="text-sm text-negative bg-rose-500/8 border border-rose-500/20 rounded-[var(--radius-control)] px-4 py-3 flex items-start gap-2.5">
+                <div
+                  role="alert"
+                  className="text-sm text-negative bg-rose-500/8 border border-rose-500/20 rounded-[var(--radius-control)] px-4 py-3 flex items-start gap-2.5"
+                >
                   <svg
                     className="w-4 h-4 mt-0.5 shrink-0 text-negative"
                     fill="none"

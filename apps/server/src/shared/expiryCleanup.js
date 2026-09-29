@@ -1,5 +1,7 @@
 /**
- * Periodic sweeper for any model with an indexed `expiresAt` column.
+ * Periodic sweeper for any model with an indexed timestamp column. Rows whose
+ * `field` (default `expiresAt`) is at or before `cutoff()` (default now) are
+ * deleted; retention sweeps pass `createdAt` and a cutoff in the past.
  *
  * Extracted so the session and telemetry sweepers share one implementation.
  * The subtle part is releasing the in-flight slot: a `finally` inside the
@@ -22,6 +24,8 @@ function createExpiryCleanup({
   clearIntervalFn = clearInterval,
   initialDelayMs,
   intervalMs,
+  field = "expiresAt",
+  cutoff = now,
 }) {
   let activeCleanup = null;
   let initialTimer = null;
@@ -38,7 +42,7 @@ function createExpiryCleanup({
     const run = (async () => {
       try {
         const result = await model.deleteMany({
-          where: { expiresAt: { lte: now() } },
+          where: { [field]: { lte: cutoff() } },
         });
         const deleted = Number.isFinite(result?.count) ? result.count : 0;
         if (deleted > 0 && typeof vLog === "function") {

@@ -47,7 +47,10 @@ const GAME_EMOJIS: Record<string, string> = {
   "cup-spider": "🥤",
 };
 
-export function GameModal({
+// Memoised: the room view model re-renders twice a second during playback
+// (currentTime), and without this every open GamePanel/CupGamePanel re-rendered
+// with it. Its props are all memoised or stable at the call site.
+export const GameModal = React.memo(function GameModal({
   openGameId,
   onClose,
   gameProps,
@@ -113,4 +116,4 @@ export function GameModal({
       </div>
     </Modal>
   );
-}
+});

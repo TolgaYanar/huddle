@@ -3,11 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createInitialState } from "../state";
 
 const socketMock = vi.hoisted(() => {
-  const handlers = new Map<string, (...args: any[]) => void>();
+  const handlers = new Map<string, (...args: unknown[]) => void>();
   const socket = {
     id: "socket-1",
     connected: true,
-    on: vi.fn((event: string, handler: (...args: any[]) => void) => {
+    on: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
       handlers.set(event, handler);
       return socket;
     }),

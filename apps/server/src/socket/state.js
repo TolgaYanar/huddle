@@ -28,6 +28,8 @@ function createSocketState() {
     // runs per connection, so a per-handler counter cannot order two different
     // hosts' updates against each other.
     roomPasswordUpdateGeneration: new Map(),
+    // Recent wrong-password timestamps per room (helpers/passwordAttempts).
+    roomPasswordFailures: new Map(),
     roomName: new Map(),
 
     // Wheel
@@ -95,6 +97,7 @@ const PER_ROOM_MAPS = [
   "roomBans",
   "roomPasswordHash",
   "roomPasswordUpdateGeneration",
+  "roomPasswordFailures",
   "roomWheel",
   "roomGames",
   "roomCupGames",

@@ -160,19 +160,15 @@ export function ensureOverlay(
     chatList,
     chatInput,
     chatSend,
+    dot,
   };
 
   state.overlayEls = els;
-
-  // Keep dot as a closure-local element.
-  (state.overlayShadow as any).__huddleDot = dot;
 }
 
 export function updateOverlay(state: ContentState) {
   if (!state.overlayShadow || !state.overlayEls) return;
-  const dot = (state.overlayShadow as any).__huddleDot as
-    | HTMLSpanElement
-    | undefined;
+  const dot = state.overlayEls.dot;
 
   const connected = Boolean(state.socket && state.socket.connected);
   const roomId = state.currentRoomId || "(none)";

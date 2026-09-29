@@ -2,6 +2,8 @@
 
 import React from "react";
 
+import { toSafeExternalHref } from "../../../lib/video";
+
 export function MediaOverlays({
   isKick,
   isTwitch,
@@ -33,6 +35,7 @@ export function MediaOverlays({
   isBuffering: boolean;
   normalizedUrl: string;
 }) {
+  const safeHref = toSafeExternalHref(normalizedUrl);
   return (
     <>
       {(isKick || isTwitch || isPrime || isNetflix || isWebEmbed) && (
@@ -58,14 +61,16 @@ export function MediaOverlays({
             can&apos;t sync play/pause/seek for most sites.
           </div>
           <div className="mt-1">
-            <a
-              href={normalizedUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="text-xs underline underline-offset-4 text-ink"
-            >
-              Open site in new tab
-            </a>
+            {safeHref && (
+              <a
+                href={safeHref}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs underline underline-offset-4 text-ink"
+              >
+                Open site in new tab
+              </a>
+            )}
           </div>
         </div>
       )}
@@ -115,14 +120,16 @@ export function MediaOverlays({
               URL: {normalizedUrl}
             </div>
             <div className="mt-3">
-              <a
-                href={normalizedUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="text-xs underline underline-offset-4 text-ink"
-              >
-                Open URL in new tab
-              </a>
+              {safeHref && (
+                <a
+                  href={safeHref}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs underline underline-offset-4 text-ink"
+                >
+                  Open URL in new tab
+                </a>
+              )}
             </div>
           </div>
         </div>

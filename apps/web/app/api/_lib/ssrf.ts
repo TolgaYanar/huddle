@@ -107,6 +107,17 @@ export function isPrivateIp(ip: string): boolean {
   }
   if ((h0 & 0xfe00) === 0xfc00) return true; // fc00::/7 unique local
   if ((h0 & 0xffc0) === 0xfe80) return true; // fe80::/10 link-local
+  if ((h0 & 0xffc0) === 0xfec0) return true; // fec0::/10 site-local (deprecated)
+  if ((h0 & 0xff00) === 0xff00) return true; // ff00::/8 multicast
+  if (h0 === 0x0100 && h1 === 0 && h2 === 0 && h3 === 0) return true; // 100::/64 discard
+  if (h0 === 0x2001 && h1 === 0) return true; // 2001::/32 Teredo (hides the IPv4 peer)
+  if (h0 === 0x2001 && h1 === 0x0db8) return true; // 2001:db8::/32 documentation
+  if (h0 === 0x64 && h1 === 0xff9b && h2 === 1) return true; // 64:ff9b:1::/48 local NAT64
+  if (h0 === 0x2002) {
+    // 2002::/16 6to4 carries an IPv4 address in bits 16-47, so
+    // 2002:a9fe:a9fe:: reaches 169.254.169.254 through a relay.
+    return isPrivateIpv4([h1 >> 8, h1 & 0xff, h2 >> 8, h2 & 0xff]);
+  }
 
   const embeddedV4 = (): [number, number, number, number] => [
     h6 >> 8,

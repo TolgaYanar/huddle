@@ -74,9 +74,9 @@ export const metadata: Metadata = {
       { url: "/icon-192", type: "image/png", sizes: "192x192" },
     ],
   },
-  alternates: {
-    canonical: "/",
-  },
+  // No default canonical: a layout value is inherited by every page that
+  // doesn't override it, which made /terms, /login, /register and 404s declare
+  // themselves duplicates of the home page. Indexable pages set their own.
   openGraph: {
     title: "WeHuddle",
     description: "Create or join a room and watch together in sync.",

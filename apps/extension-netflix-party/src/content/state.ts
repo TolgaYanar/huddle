@@ -13,6 +13,7 @@ export type OverlayElements = {
   chatList: HTMLDivElement;
   chatInput: HTMLTextAreaElement;
   chatSend: HTMLButtonElement;
+  dot: HTMLSpanElement;
 };
 
 export type ContentIdMismatch = { expected: string; actual: string };

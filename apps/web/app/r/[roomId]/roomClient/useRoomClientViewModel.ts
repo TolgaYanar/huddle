@@ -23,6 +23,7 @@ import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
 import { useTimer } from "../hooks/useTimer";
 import { writeRoomHistory } from "../../../lib/roomHistory";
 import { useSyncTelemetry } from "../hooks/useSyncTelemetry";
+import { useStableCallback } from "../lib/useStableCallback";
 
 const capitalize = (value: string) =>
   value.charAt(0).toUpperCase() + value.slice(1);
@@ -268,6 +269,46 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
     onToggleTheatreMode: toggleTheatreMode,
   });
 
+  // Stable identities for handlers passed to memoised panels. This view model
+  // re-renders on every playback-position update, and these were rebuilt each
+  // time (or come unstable from upstream hooks), so every panel re-rendered
+  // with it. See lib/useStableCallback.ts; all of these are event handlers.
+  const kickUser = useStableCallback(roomState.kickUser);
+  const setRoomName = useStableCallback(roomState.setRoomName);
+  const transferHost = useStableCallback(roomState.transferHost);
+  const submitRoomPassword = useStableCallback(roomState.submitRoomPassword);
+  const retryFailedPeers = useStableCallback(rtc.retryFailedPeers);
+  const openWheel = useStableCallback(() =>
+    playback.wheel.setIsWheelOpen(true),
+  );
+  const closeWheel = useStableCallback(() =>
+    playback.wheel.setIsWheelOpen(false),
+  );
+  const togglePlaylistPanel = useStableCallback(() =>
+    playback.playlist.setIsPlaylistPanelOpen(
+      !playback.playlist.isPlaylistPanelOpen,
+    ),
+  );
+  const openRoomSettings = useCallback(() => setIsRoomSettingsOpen(true), []);
+  const closeRoomSettings = useCallback(() => setIsRoomSettingsOpen(false), []);
+  const openTimer = useCallback(() => setIsTimerOpen(true), []);
+  const closeTimer = useCallback(() => setIsTimerOpen(false), []);
+  const closeAddVideosModal = useCallback(
+    () => setIsAddVideosModalOpen(false),
+    [],
+  );
+  const addWheelEntry = useStableCallback((text: string) =>
+    room.addWheelEntry?.(text),
+  );
+  const removeWheelEntry = useStableCallback((index: number) =>
+    room.removeWheelEntry?.(index),
+  );
+  const clearWheelEntries = useStableCallback(() => room.clearWheelEntries?.());
+  const spinWheel = useStableCallback(() => room.spinWheel?.());
+  const setRoomPassword = useStableCallback((pw: string) =>
+    room.setRoomPassword?.(pw),
+  );
+
   const playlistPanelProps = buildPlaylistPanelProps({
     playlist: playback.playlist,
     currentVideoUrl: playback.video.url,
@@ -289,7 +330,7 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
   const callSidebarProps = buildCallSidebarProps({
     userId,
     hostId: roomState.hostId,
-    onKickUser: roomState.kickUser,
+    onKickUser: kickUser,
     participants: roomState.participants,
     usernamesById: roomState.usernamesById,
     hasRoomPassword: roomState.hasRoomPassword,
@@ -341,7 +382,7 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
     remoteSpeaking: rtc.remoteSpeaking,
     remoteMedia: rtc.remoteMedia,
     peerConnectionStates: rtc.peerConnectionStates,
-    retryFailedPeers: rtc.retryFailedPeers,
+    retryFailedPeers,
     setIsDraggingTile: stagePinning.setIsDraggingTile,
     setIsStageDragOver: stagePinning.setIsStageDragOver,
     onPinTile: stagePinning.setPinnedStage,
@@ -358,16 +399,16 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
 
   const addVideosToPlaylistModalProps = {
     isOpen: isAddVideosModalOpen,
-    onClose: () => setIsAddVideosModalOpen(false),
+    onClose: closeAddVideosModal,
     playlists: playback.playlist.playlists,
     onAddToPlaylist: playback.playlist.addItem,
     onCreatePlaylist: playback.playlist.createPlaylist,
   };
 
-  const timerWidgetProps = {
-    timer,
-    onClick: () => setIsTimerOpen(true),
-  };
+  const timerWidgetProps = useMemo(
+    () => ({ timer, onClick: openTimer }),
+    [timer, openTimer],
+  );
 
   const headerProps =
     isClient && !roomState.passwordRequired
@@ -379,17 +420,14 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
           inviteLink,
           copied,
           onCopyInvite: copyInvite,
-          onOpenWheel: () => playback.wheel.setIsWheelOpen(true),
-          onOpenPlaylist: () =>
-            playback.playlist.setIsPlaylistPanelOpen(
-              !playback.playlist.isPlaylistPanelOpen,
-            ),
+          onOpenWheel: openWheel,
+          onOpenPlaylist: togglePlaylistPanel,
           isPlaylistOpen: playback.playlist.isPlaylistPanelOpen,
           roomName: roomState.roomName,
           isHost: roomState.hostId === userId,
-          onSetRoomName: roomState.setRoomName,
-          onOpenSettings: () => setIsRoomSettingsOpen(true),
-          onOpenTimer: () => setIsTimerOpen(true),
+          onSetRoomName: setRoomName,
+          onOpenSettings: openRoomSettings,
+          onOpenTimer: openTimer,
           isChatOnlyMode,
           onToggleChatOnlyMode: toggleChatOnlyMode,
           timerWidgetProps,
@@ -403,19 +441,19 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
     passwordInput: roomState.passwordInput,
     setPasswordInput: roomState.setPasswordInput,
     passwordError: roomState.passwordError,
-    submitRoomPassword: roomState.submitRoomPassword,
+    submitRoomPassword,
   };
 
   const wheelPickerModalProps = {
     open: playback.wheel.isWheelOpen && !roomState.passwordRequired,
-    onClose: () => playback.wheel.setIsWheelOpen(false),
+    onClose: closeWheel,
     isConnected: room.isConnected,
     entries: playback.wheel.wheelEntries,
     lastSpin: playback.wheel.wheelLastSpin,
-    onAddEntry: (text: string) => room.addWheelEntry?.(text),
-    onRemoveEntry: (index: number) => room.removeWheelEntry?.(index),
-    onClear: () => room.clearWheelEntries?.(),
-    onSpin: () => room.spinWheel?.(),
+    onAddEntry: addWheelEntry,
+    onRemoveEntry: removeWheelEntry,
+    onClear: clearWheelEntries,
+    onSpin: spinWheel,
   };
 
   const game = useGame({
@@ -547,9 +585,12 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
     onOpenGame: setOpenGameId,
   };
 
+  // Stable so the memoised GameModal skips the 2 Hz currentTime re-renders
+  // of this view model while a game panel is open.
+  const closeGameModal = useCallback(() => setOpenGameId(null), []);
   const gameModalProps = {
     openGameId,
-    onClose: () => setOpenGameId(null),
+    onClose: closeGameModal,
     gameProps,
     cupGameProps,
   };
@@ -563,7 +604,7 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
 
   const timerModalProps = {
     open: isTimerOpen,
-    onClose: () => setIsTimerOpen(false),
+    onClose: closeTimer,
     timer,
     onSetDuration: room.timerSetDuration,
     onStart: room.timerStart,
@@ -574,17 +615,17 @@ export function useRoomClientViewModel(roomId: string): RoomClientViewProps {
 
   const roomSettingsPanelProps = {
     isOpen: isRoomSettingsOpen,
-    onClose: () => setIsRoomSettingsOpen(false),
+    onClose: closeRoomSettings,
     roomName: roomState.roomName,
-    onSetRoomName: roomState.setRoomName,
+    onSetRoomName: setRoomName,
     hasRoomPassword: roomState.hasRoomPassword,
-    onSetRoomPassword: (pw: string) => room.setRoomPassword?.(pw),
+    onSetRoomPassword: setRoomPassword,
     participants: roomState.participants,
     usernamesById: roomState.usernamesById,
     userId,
     hostId: roomState.hostId,
-    onKickUser: roomState.kickUser,
-    onTransferHost: roomState.transferHost,
+    onKickUser: kickUser,
+    onTransferHost: transferHost,
   };
 
   return {

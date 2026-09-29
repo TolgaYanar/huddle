@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { memo } from "react";
 
 import { Modal } from "../../../components/Modal";
 
@@ -45,7 +46,9 @@ function buildWheelGradient(count: number) {
   return `conic-gradient(${stops.join(", ")})`;
 }
 
-export function WheelPickerModal(props: {
+// Memoised: the room view re-renders on every playback-position update
+// (~4 Hz); this component's props do not change with it.
+export const WheelPickerModal = memo(function WheelPickerModal(props: {
   open: boolean;
   onClose: () => void;
   isConnected: boolean;
@@ -351,4 +354,4 @@ export function WheelPickerModal(props: {
       <style>{`.wheel-rotator{background:${wheelBackground};transform:rotate(${wheelRotation}deg);transition:transform ${SPIN_MS}ms cubic-bezier(0.15, 0.9, 0.15, 1);will-change:transform;}`}</style>
     </Modal>
   );
-}
+});

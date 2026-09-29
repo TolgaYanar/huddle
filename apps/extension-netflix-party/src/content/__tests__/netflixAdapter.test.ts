@@ -75,34 +75,46 @@ describe("Netflix platform adapter", () => {
     expect(commandMocks.setPlaying).toHaveBeenCalledWith(true);
   });
 
-  it("reports SPA navigation as a possible identity change and cleans up", () => {
-    const listeners = new Map<string, () => void>();
-    const originalPush = vi.fn();
-    const originalReplace = vi.fn();
-    const fakeHistory = {
-      pushState: originalPush,
-      replaceState: originalReplace,
-    };
-    vi.stubGlobal("history", fakeHistory);
-    vi.stubGlobal("window", {
-      addEventListener: vi.fn((name: string, listener: () => void) => {
-        listeners.set(name, listener);
-      }),
-      removeEventListener: vi.fn((name: string) => listeners.delete(name)),
-    });
+  it("reports a page-driven URL change it could not intercept", () => {
+    vi.useFakeTimers();
+    try {
+      const listeners = new Map<string, () => void>();
+      const loc = { href: "https://www.netflix.com/watch/1" };
+      vi.stubGlobal("location", loc);
+      vi.stubGlobal("window", {
+        addEventListener: vi.fn((name: string, listener: () => void) => {
+          listeners.set(name, listener);
+        }),
+        removeEventListener: vi.fn((name: string) => listeners.delete(name)),
+      });
 
-    const onPotentialChange = vi.fn();
-    const unsubscribe =
-      netflixAdapter.subscribeToPotentialContentChanges(onPotentialChange);
+      const onPotentialChange = vi.fn();
+      const unsubscribe =
+        netflixAdapter.subscribeToPotentialContentChanges(onPotentialChange);
 
-    fakeHistory.pushState({}, "", "/watch/2");
-    fakeHistory.replaceState({}, "", "/watch/3");
-    listeners.get("popstate")?.();
-    expect(onPotentialChange).toHaveBeenCalledTimes(3);
+      // Netflix's own pushState runs in the page world; all the content
+      // script can observe is the URL changing under it.
+      vi.advanceTimersByTime(1000);
+      expect(onPotentialChange).not.toHaveBeenCalled();
+      loc.href = "https://www.netflix.com/watch/2";
+      vi.advanceTimersByTime(1000);
+      expect(onPotentialChange).toHaveBeenCalledTimes(1);
+      vi.advanceTimersByTime(3000);
+      expect(onPotentialChange).toHaveBeenCalledTimes(1);
 
-    unsubscribe();
-    expect(fakeHistory.pushState).toBe(originalPush);
-    expect(fakeHistory.replaceState).toBe(originalReplace);
-    expect(listeners.has("popstate")).toBe(false);
+      // Back/forward is reported immediately, and not again by the poll.
+      loc.href = "https://www.netflix.com/watch/1";
+      listeners.get("popstate")?.();
+      vi.advanceTimersByTime(1000);
+      expect(onPotentialChange).toHaveBeenCalledTimes(2);
+
+      unsubscribe();
+      loc.href = "https://www.netflix.com/watch/3";
+      vi.advanceTimersByTime(5000);
+      expect(onPotentialChange).toHaveBeenCalledTimes(2);
+      expect(listeners.has("popstate")).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

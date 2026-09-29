@@ -23,6 +23,7 @@ const { attachCupGameHandlers } = require("./handlers/cupGame");
 const { attachUsernameHandlers } = require("./handlers/username");
 const { attachReactionHandlers } = require("./handlers/reactions");
 const { isSocketIdInRoom } = require("./helpers/membership");
+const { attachEventBudget } = require("./helpers/eventBudget");
 
 function registerSocket(io, deps) {
   const state = createSocketState();
@@ -42,6 +43,9 @@ function registerSocket(io, deps) {
       deps.vLog("User connected:", socket.id);
 
     const joinedRooms = new Set();
+
+    // Must run before any handler is attached so it sees every packet.
+    attachEventBudget(socket);
 
     attachJoinRoomHandler(io, state, socket, joinedRooms, deps);
     attachLeaveRoomHandler(io, state, socket, joinedRooms, deps);

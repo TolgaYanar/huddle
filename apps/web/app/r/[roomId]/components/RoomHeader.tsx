@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { memo } from "react";
 import Link from "next/link";
 
 import {
@@ -38,7 +39,9 @@ interface RoomHeaderProps {
   onAuthUserChange: (user: AuthUser | null) => void;
 }
 
-export function RoomHeader({
+// Memoised: the room view re-renders on every playback-position update
+// (~4 Hz); this component's props do not change with it.
+export const RoomHeader = memo(function RoomHeader({
   roomId,
   isConnected,
   reconnectAttempt,
@@ -493,4 +496,4 @@ export function RoomHeader({
       </div>
     </header>
   );
-}
+});

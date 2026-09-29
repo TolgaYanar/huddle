@@ -49,13 +49,25 @@ export function useYouTubePlayerSync({
   usedStartTimeForVideoRef: React.MutableRefObject<string | null>;
   setResetNonce: React.Dispatch<React.SetStateAction<number>>;
 }) {
+  // Wedge recovery for a video switch (the no-startSeconds reload at 4.5 s and
+  // the player recreation at 10 s). These must survive the effect below
+  // re-running for volume/mute/rate/play changes: the switch branch only runs
+  // once per video, so clearing them per run meant touching the volume within
+  // 10 s of a switch silently disabled recovery. Each callback re-checks that
+  // its video is still the target, so outliving a re-run is safe; they are
+  // cleared on the next switch and on unmount.
+  const recoveryTimersRef = React.useRef<number[]>([]);
+  const clearRecoveryTimers = React.useCallback(() => {
+    for (const t of recoveryTimersRef.current) window.clearTimeout(t);
+    recoveryTimersRef.current = [];
+  }, []);
+  React.useEffect(() => clearRecoveryTimers, [clearRecoveryTimers]);
+
   // Keep props synced.
   React.useEffect(() => {
     const player = playerRef.current;
     if (!player) return;
 
-    let startFallbackTimer: number | null = null;
-    let hardResetTimer: number | null = null;
     let ensureStartSeekTimer: number | null = null;
 
     const maybeSeekToStartTime = () => {
@@ -122,6 +134,7 @@ export function useYouTubePlayerSync({
       // stale id for a short period. If we treat that as "not loaded yet",
       // we'll spam loadVideoById on every render and wedge the player.
       if (desired && desired !== lastRequestedVideoIdRef.current) {
+        clearRecoveryTimers();
         lastRequestedVideoIdRef.current = desired;
         lastVideoSwitchAtRef.current = Date.now();
         kickVideoIdRef.current = desired;
@@ -180,7 +193,7 @@ export function useYouTubePlayerSync({
           // videos/embeds), retry once without startSeconds.
           if (effectiveStartSeconds > 0) {
             startTimeFallbackTriedForVideoRef.current = null;
-            startFallbackTimer = window.setTimeout(() => {
+            const startFallbackTimer = window.setTimeout(() => {
               try {
                 if (!latest.current.playing) return;
                 if (kickVideoIdRef.current !== desired) return;
@@ -209,11 +222,12 @@ export function useYouTubePlayerSync({
                 // ignore
               }
             }, 4500);
+            recoveryTimersRef.current.push(startFallbackTimer);
           }
 
           // Last-resort: if the player never reaches PLAYING after a switch,
           // recreate the IFrame API player once per target video id.
-          hardResetTimer = window.setTimeout(() => {
+          const hardResetTimer = window.setTimeout(() => {
             try {
               if (!latest.current.playing) return;
               if (kickVideoIdRef.current !== desired) return;
@@ -229,6 +243,7 @@ export function useYouTubePlayerSync({
               // ignore
             }
           }, 10000);
+          recoveryTimersRef.current.push(hardResetTimer);
         } else {
           player.cueVideoById({
             videoId: desired,
@@ -282,8 +297,6 @@ export function useYouTubePlayerSync({
     }
 
     return () => {
-      if (startFallbackTimer) window.clearTimeout(startFallbackTimer);
-      if (hardResetTimer) window.clearTimeout(hardResetTimer);
       if (ensureStartSeekTimer) window.clearTimeout(ensureStartSeekTimer);
     };
   }, [
@@ -308,5 +321,6 @@ export function useYouTubePlayerSync({
     lastHardResetVideoIdRef,
     usedStartTimeForVideoRef,
     setResetNonce,
+    clearRecoveryTimers,
   ]);
 }

@@ -3,6 +3,7 @@
 import React from "react";
 
 import YouTubeIFramePlayer from "../../YouTubeIFramePlayer";
+import { syncDebug } from "../../../lib/syncDebug";
 
 export function YouTubeIFrameApiPlayer({
   playerRef,
@@ -196,7 +197,7 @@ export function YouTubeIFrameApiPlayer({
         const minJump = isPlaying ? expectedDelta + 0.6 : 0.25;
 
         if (Math.abs(delta) >= minJump) {
-          console.log(
+          syncDebug(
             `[YT-SEEK] Detected seek: delta=${delta.toFixed(2)}s, expected=${expectedDelta.toFixed(2)}s, minJump=${minJump.toFixed(2)}s, time=${time.toFixed(2)}s`,
           );
           lastManualSeekRef.current = Date.now();

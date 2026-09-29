@@ -8,7 +8,6 @@ const VERBOSE_LOGS =
 
 function vLog(...args) {
   if (!VERBOSE_LOGS) return;
-  // eslint-disable-next-line no-console
   console.log(...args);
 }
 
@@ -31,15 +30,12 @@ function requestId() {
     req.log = {
       info: (...args) => {
         if (!VERBOSE_LOGS) return;
-        // eslint-disable-next-line no-console
         console.log(`[${id}]`, ...args);
       },
       warn: (...args) => {
-        // eslint-disable-next-line no-console
         console.warn(`[${id}]`, ...args);
       },
       error: (...args) => {
-        // eslint-disable-next-line no-console
         console.error(`[${id}]`, ...args);
       },
     };

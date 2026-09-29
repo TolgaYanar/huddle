@@ -33,7 +33,19 @@ function isSocketIdInRoom(io, roomId, socketId) {
   }
 }
 
+// True when roomId names a connected socket's own id-room rather than a real
+// room. join_room must refuse these.
+function isSocketIdRoom(io, roomId) {
+  if (typeof roomId !== "string" || !roomId) return false;
+  try {
+    return Boolean(io?.sockets?.sockets?.has?.(roomId));
+  } catch {
+    return false;
+  }
+}
+
 module.exports = {
   isRoomMember,
   isSocketIdInRoom,
+  isSocketIdRoom,
 };

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback } from "react";
+import React, { useCallback, memo } from "react";
 
 import { Modal } from "../../../../components/Modal";
 import { CloseIcon, PlusIcon, PlaylistIcon, SearchIcon } from "./icons";
@@ -9,7 +9,11 @@ import { VideosToAddPreview } from "./VideosToAddPreview";
 import type { AddVideosToPlaylistModalProps, YouTubeSearchItem } from "./types";
 import { useAddVideosToPlaylistModalState } from "./useAddVideosToPlaylistModalState";
 
-export function AddVideosToPlaylistModal(props: AddVideosToPlaylistModalProps) {
+// Memoised: the room view re-renders on every playback-position update
+// (~4 Hz); this component's props do not change with it.
+export const AddVideosToPlaylistModal = memo(function AddVideosToPlaylistModal(
+  props: AddVideosToPlaylistModalProps,
+) {
   const { isOpen, onClose, playlists } = props;
 
   const state = useAddVideosToPlaylistModalState({
@@ -258,4 +262,4 @@ export function AddVideosToPlaylistModal(props: AddVideosToPlaylistModalProps) {
       </div>
     </Modal>
   );
-}
+});

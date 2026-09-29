@@ -275,6 +275,17 @@ export const useRoom = (roomId: string, userId: string) => {
       pendingSyncEventsRef.current = [];
     };
 
+    let pendingFlush: {
+      timer: ReturnType<typeof setTimeout>;
+      onceRoomState: () => void;
+    } | null = null;
+    const cancelPendingFlush = () => {
+      if (!pendingFlush) return;
+      clearTimeout(pendingFlush.timer);
+      socket.off("room_state", pendingFlush.onceRoomState);
+      pendingFlush = null;
+    };
+
     socket.on("connect", () => {
       setIsConnected(true);
       setReconnectAttempt(0);
@@ -303,22 +314,27 @@ export const useRoom = (roomId: string, userId: string) => {
       // join_room handler awaits a DB load before calling socket.join(), so
       // emitting sync_video immediately here used to race that and the server
       // silently dropped the events because socket.rooms.has(roomId) was false.
+      // A reconnect inside the window would otherwise leave the previous
+      // attempt's timer and listener behind to flush a second time.
+      cancelPendingFlush();
       const onceRoomState = () => {
-        if (window.clearTimeout) window.clearTimeout(flushFallbackTimer);
+        cancelPendingFlush();
         flushPendingSyncEvents();
       };
       socket.once("room_state", onceRoomState);
       // Safety net: if room_state somehow doesn't arrive (e.g. password gate),
       // try after 1.5s anyway. Worst case the server drops them again.
-      const flushFallbackTimer = setTimeout(() => {
-        socket.off("room_state", onceRoomState);
+      const timer = setTimeout(() => {
+        cancelPendingFlush();
         flushPendingSyncEvents();
       }, 1500);
+      pendingFlush = { timer, onceRoomState };
     });
 
     socket.connect();
 
     return () => {
+      cancelPendingFlush();
       socket.off("room_state", handleRoomState);
       socket.off("chat_history", handleChatHistory);
       socket.off("activity_history", handleActivityHistory);

@@ -16,6 +16,10 @@ import { applyActivityEvent, applyActivityHistory } from "./activityLog";
 import { handleSyncEvent } from "./syncLog";
 import { applyRoomState } from "./roomState";
 import { useSyncTelemetry } from "../useSyncTelemetry";
+import {
+  holdRemoteSyncGuard,
+  releaseRemoteSyncGuard,
+} from "../../lib/remoteSyncGuard";
 
 export function useActivityLogSubscriptions({
   roomId,
@@ -49,23 +53,15 @@ export function useActivityLogSubscriptions({
   setLogs: React.Dispatch<React.SetStateAction<LogEntry[]>>;
 }) {
   const telemetry = useSyncTelemetry();
-  const remoteSyncResetTimeoutRef = useRef<number | null>(null);
   const lastAppliedRoomRevRef = useRef<number>(0);
   const lastLoggedRevRef = useRef<number>(0);
   const lastResyncRequestAtRef = useRef<number>(0);
 
   const markApplyingRemoteSync = useCallback(
     (durationMs = 200) => {
-      applyingRemoteSyncRef.current = true;
-      if (remoteSyncResetTimeoutRef.current) {
-        window.clearTimeout(remoteSyncResetTimeoutRef.current);
-      }
       // Give embedded players a moment to emit their own callbacks (onPlay/onSeek/etc)
       // so receivers don't re-broadcast.
-      remoteSyncResetTimeoutRef.current = window.setTimeout(() => {
-        applyingRemoteSyncRef.current = false;
-        remoteSyncResetTimeoutRef.current = null;
-      }, durationMs);
+      holdRemoteSyncGuard(applyingRemoteSyncRef, durationMs);
     },
     [applyingRemoteSyncRef],
   );
@@ -169,11 +165,7 @@ export function useActivityLogSubscriptions({
       cleanupActivityHistory?.();
       cleanupActivityEvent?.();
 
-      if (remoteSyncResetTimeoutRef.current) {
-        window.clearTimeout(remoteSyncResetTimeoutRef.current);
-        remoteSyncResetTimeoutRef.current = null;
-      }
-      applyingRemoteSyncRef.current = false;
+      releaseRemoteSyncGuard(applyingRemoteSyncRef);
       void setPlayerReady;
       void setPlayerError;
     };

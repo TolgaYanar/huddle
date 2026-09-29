@@ -34,8 +34,8 @@ Run from the repo root unless noted.
 npm run dev            # turbo run dev — web on :3002, server on :4000
 npm run build          # turbo run build (web: next build, server: prisma generate)
 npm run check-types    # turbo run check-types — only web + extension define this task
-npm run test           # turbo run test — web + extension (vitest), server (node:test)
-npm run lint           # turbo run lint — only web defines this task
+npm run test           # turbo run test — web, extension, shared-logic (vitest), server (node:test)
+npm run lint           # turbo run lint — web, server, extension
 npm run format         # prettier --write (ts/tsx/js/json/css/md/yml)
 npm run format:check   # the same set, verified in CI
 npm run check-duplicates  # rejects macOS "name 2.ext" copies
@@ -61,16 +61,22 @@ Per package:
 npm test --workspace web            # vitest run (jsdom, Testing Library)
 npm test --workspace server         # node --test over src/**/__tests__/*.test.js
 npm test --workspace huddle-netflix-party-extension   # vitest run (node env)
+npm test --workspace shared-logic   # vitest run (node env)
 npm run db:migrate --workspace server   # prisma migrate dev
 npm run db:deploy  --workspace server   # prisma migrate deploy
-npm run build      --workspace extension-netflix-party  # vite build
+npm run build      --workspace huddle-netflix-party-extension  # vite build
 ```
 
 Note: `server` and the shared packages have no `check-types` task, so
 `npm run check-types` reports 2 successful tasks (web, extension) — that is the
 expected full result, not a partial run. Server code is plain CommonJS JavaScript;
-type errors there are only caught by its `node --test` suites. Likewise only `web`
-defines `lint`, so `npm run lint` reports 1 task.
+type errors there are only caught by its `node --test` suites; ESLint (Node
+globals, CommonJS) catches undefined and unused names. `npm run lint` reports 3
+tasks. The server and extension ESLint configs resolve `eslint`, `globals` and
+`@repo/eslint-config` from the root install on purpose: the server must not
+declare a workspace-only devDependency, in case Railway installs `apps/server`
+on its own. The extension allows `any` only in `src/background.ts`, which
+drives Netflix's untyped in-page player.
 
 Server tests do not need a database, and almost none need a generated Prisma
 client: handlers take `prisma` by injection and only `src/prisma.js` imports
@@ -204,7 +210,11 @@ relay target) or when only `io` is in scope. Never use a raw
 Socket.IO keeps every socket in a room named after its own id, so both raw
 checks pass when a client sends its own socket id as `roomId`. That bypassed
 every per-room gate and wrote state into a pseudo-room that leave/disconnect
-cleanup never visits.
+cleanup never visits. For the same reason `join_room` refuses any room id that
+names a live socket (`isSocketIdRoom`): joining another socket's id-room would
+receive its private WebRTC relays and pin state no cleanup reaches. Host-only
+handlers check membership as well as `roomHost`, because `roomHost` outlives
+the host's membership through the grace window.
 
 An emptied room is torn down by `scheduleRoomCleanup` after
 `ROOM_EMPTY_GRACE_MS`, not inline. Do not delete per-room maps in `leaveRoom` /
@@ -366,7 +376,9 @@ hashed tokens, HttpOnly cookie), `password.js`, `validators.js`, `middleware.js`
 every call site must `await` them so CPU work stays off the event loop. Socket
 auth is attached in `socket/attachAuth.js`. Expired database sessions are
 removed by the unref'ed scheduler in `auth/sessionCleanup.js`; keep the
-`Session.expiresAt` index if its query changes.
+`Session.expiresAt` index if its query changes. Chat messages and activity rows
+are kept for 90 days: `src/shared/historyCleanup.js` sweeps them on the same
+`expiryCleanup` driver, keyed on the `createdAt` indexes added for it.
 
 **Party games.** Game creation, questioner counts and embedded clue images have
 hard server-side limits in `socket/handlers/game.js` and `cupGame.js`; keep those
@@ -398,7 +410,7 @@ functional, not keywords, and are fine.
 
 ## Conventions
 
-- Prettier for formatting; ESLint with `--max-warnings 0` on web.
+- Prettier for formatting; ESLint with `--max-warnings 0` on every package that lints.
 - AI `Co-authored-by` trailers are opt-in: never add one unless the user
   explicitly requests it in the current conversation, and never bypass the
   commit hook or apply the `allow-ai-coauthor` PR label without that request.

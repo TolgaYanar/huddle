@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 import { createRouteRateLimiter } from "../_lib/rateLimit";
+import { upstreamSignal } from "../_lib/upstream";
 
 /**
  * Free image search aimed at "find the canonical picture of a known thing":
@@ -66,6 +67,7 @@ async function searchWikipedia(
     const res = await fetch(opensearchUrl, {
       headers: FETCH_HEADERS,
       cache: "no-store",
+      signal: upstreamSignal(),
     });
     if (!res.ok) {
       errors.push(`wikipedia/opensearch:HTTP_${res.status}`);
@@ -92,6 +94,7 @@ async function searchWikipedia(
         const res = await fetch(url, {
           headers: FETCH_HEADERS,
           cache: "no-store",
+          signal: upstreamSignal(),
         });
         if (!res.ok) {
           errors.push(`wikipedia/summary:${title}:HTTP_${res.status}`);
@@ -143,6 +146,7 @@ async function searchWikimediaCommons(
       {
         headers: FETCH_HEADERS,
         cache: "no-store",
+        signal: upstreamSignal(),
       },
     );
     if (!res.ok) {

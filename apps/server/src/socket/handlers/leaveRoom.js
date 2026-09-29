@@ -3,6 +3,8 @@ const { anchorRoomStateOnEmpty, persistRoomState } = require("../helpers/sync");
 const { scheduleRoomCleanup } = require("../state");
 const { isRoomMember } = require("../helpers/membership");
 const { cancelPendingRoomJoin } = require("../helpers/pendingJoin");
+const { cleanupDisconnectFromGames } = require("../helpers/gameTimer");
+const { cleanupDisconnectFromCupGames } = require("../helpers/cupGame");
 
 function attachLeaveRoomHandler(io, state, socket, joinedRooms, deps) {
   socket.on("leave_room", async (payload) => {
@@ -32,6 +34,20 @@ function attachLeaveRoomHandler(io, state, socket, joinedRooms, deps) {
     if (map) {
       map.delete(socket.id);
       if (map.size === 0) state.roomMediaState.delete(roomId);
+    }
+
+    // The client emits leave_room and then disconnects, and joinedRooms no
+    // longer lists this room by then, so the disconnect handler never cleans
+    // it. Drop the leaver from games here or a Cup Spider turn stays stuck.
+    try {
+      cleanupDisconnectFromGames(io, state, roomId, socket.id);
+    } catch (err) {
+      console.error("Failed to clean up games on leave:", err.message);
+    }
+    try {
+      cleanupDisconnectFromCupGames(io, state, roomId, socket.id);
+    } catch (err) {
+      console.error("Failed to clean up cup games on leave:", err.message);
     }
 
     // Notify peers for WebRTC cleanup.

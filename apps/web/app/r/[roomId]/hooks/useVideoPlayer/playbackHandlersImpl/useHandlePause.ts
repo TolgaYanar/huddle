@@ -3,6 +3,7 @@ import { useCallback } from "react";
 import { getCurrentTimeFromRef } from "../../../lib/player";
 
 import type { PlaybackHandlersArgs } from "./types";
+import { syncDebug } from "../../../lib/syncDebug";
 
 export function useHandlePause(args: PlaybackHandlersArgs) {
   const {
@@ -47,7 +48,7 @@ export function useHandlePause(args: PlaybackHandlersArgs) {
     }
 
     if (Date.now() < suppressPauseBroadcastUntilRef.current) {
-      console.log(`[PAUSE] Suppressed: recent user seek`);
+      syncDebug(`[PAUSE] Suppressed: recent user seek`);
       // Still treat as local pause; just don't broadcast.
       cancelPendingPause();
       return;

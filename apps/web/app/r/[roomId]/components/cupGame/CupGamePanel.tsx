@@ -103,6 +103,16 @@ type PeekResult = {
   ownerSocketId: string | null;
 };
 
+// Effect timers overlap (a second card can be drawn before the first card's
+// 10 s overlay ends). Clearing unconditionally cut the newer effect short, so
+// each timer clears only the value it was scheduled for.
+function clearIfSame<T>(
+  set: React.Dispatch<React.SetStateAction<T | null>>,
+  value: T,
+) {
+  set((current) => (current === value ? null : current));
+}
+
 export function CupGamePanel(props: CupGamePanelProps) {
   const { cupGameState } = props;
 
@@ -177,27 +187,34 @@ function CupGameInner(
             // visual since both signal "the flipper is unharmed"). The hit
             // animation lands on the spider's owner, not the flipper.
             setShieldedFlippedCup(evt.cupIndex);
-            setTimeout(() => setShieldedFlippedCup(null), 700);
+            setTimeout(
+              () => clearIfSame(setShieldedFlippedCup, evt.cupIndex),
+              700,
+            );
             setTimeout(() => playSound("shielded"), 110);
             setTimeout(() => playSound("hurt"), 320);
             if (evt.mirroredTo === mySocketId) {
               setPanelShakeKey((k) => k + 1);
             }
-            setHeartPopOnSocket(evt.mirroredTo);
-            setTimeout(() => setHeartPopOnSocket(null), 720);
+            const mirroredTo = evt.mirroredTo;
+            setHeartPopOnSocket(mirroredTo);
+            setTimeout(() => clearIfSame(setHeartPopOnSocket, mirroredTo), 720);
           } else if (evt.hit) {
             setHitFlippedCup(evt.cupIndex);
-            setTimeout(() => setHitFlippedCup(null), 480);
+            setTimeout(() => clearIfSame(setHitFlippedCup, evt.cupIndex), 480);
             setTimeout(() => playSound("hurt"), 220);
             if (evt.flipperSocketId === mySocketId) {
               setPanelShakeKey((k) => k + 1);
             }
             setHeartPopOnSocket(evt.flipperSocketId);
-            setTimeout(() => setHeartPopOnSocket(null), 720);
+            setTimeout(
+              () => clearIfSame(setHeartPopOnSocket, evt.flipperSocketId),
+              720,
+            );
           }
         }
         setRecentFlippedCup(evt.cupIndex);
-        setTimeout(() => setRecentFlippedCup(null), 420);
+        setTimeout(() => clearIfSame(setRecentFlippedCup, evt.cupIndex), 420);
         break;
       }
       case "draw": {
@@ -205,7 +222,10 @@ function CupGameInner(
         const card = { kind: evt.cardKind, category: evt.category, key: seq };
         setDrawnCard(card);
         setBigCard(card);
-        setTimeout(() => setBigCard(null), 10000);
+        setTimeout(
+          () => setBigCard((c) => (c?.key === card.key ? null : c)),
+          10000,
+        );
         setTimeout(
           () => playSound(evt.category === "good" ? "good" : "bad"),
           320,
@@ -249,9 +269,10 @@ function CupGameInner(
     const handler = (e: Event) => {
       const ce = e as CustomEvent<PeekResult>;
       if (!ce.detail) return;
-      setPeekResult(ce.detail);
-      // Auto-dismiss after 5s
-      setTimeout(() => setPeekResult(null), 5000);
+      const result = ce.detail;
+      setPeekResult(result);
+      // Auto-dismiss after 5s, unless a newer peek replaced it meanwhile.
+      setTimeout(() => clearIfSame(setPeekResult, result), 5000);
     };
     window.addEventListener("cup-game-peek-result", handler);
     return () => window.removeEventListener("cup-game-peek-result", handler);

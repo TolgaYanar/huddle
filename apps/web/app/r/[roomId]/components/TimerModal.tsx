@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { memo } from "react";
 
 import { Modal } from "../../../components/Modal";
 import { formatTimer, type TimerState } from "../hooks/useTimer";
@@ -25,7 +26,9 @@ export type TimerModalProps = {
   isConnected: boolean;
 };
 
-export function TimerModal({
+// Memoised: the room view re-renders on every playback-position update
+// (~4 Hz); this component's props do not change with it.
+export const TimerModal = memo(function TimerModal({
   open,
   onClose,
   timer,
@@ -221,4 +224,4 @@ export function TimerModal({
       </div>
     </Modal>
   );
-}
+});

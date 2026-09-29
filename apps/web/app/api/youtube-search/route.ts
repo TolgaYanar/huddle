@@ -1,13 +1,24 @@
 import { NextResponse } from "next/server";
 
 import { createRouteRateLimiter } from "../_lib/rateLimit";
+import { createTtlCache } from "../_lib/ttlCache";
+import { clampIntParam, upstreamSignal } from "../_lib/upstream";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Each request hits the YouTube Data API (search.list = 100 units of quota).
-// 30/min keeps a single bad client from draining the daily quota.
-const limiter = createRouteRateLimiter({ windowMs: 60_000, max: 30 });
+// Each request hits the YouTube Data API (search.list = 100 units of quota,
+// against a default 10,000/day). At 30/min one client could drain the day in
+// a few minutes. Searches run on submit, never per keystroke, so 10/min is
+// still well above what a person types.
+const limiter = createRouteRateLimiter({ windowMs: 60_000, max: 10 });
+
+// Repeated searches (same query, region and language) are served from memory
+// for 10 minutes instead of spending another 100 units.
+const resultCache = createTtlCache<YouTubeSearchItem[]>({
+  max: 500,
+  ttlMs: 10 * 60_000,
+});
 
 const MAX_QUERY_LENGTH = 200;
 
@@ -95,10 +106,7 @@ export async function GET(req: Request) {
   }
 
   const maxResultsRaw = searchParams.get("maxResults");
-  const maxResults = Math.min(
-    25,
-    Math.max(1, maxResultsRaw ? Number(maxResultsRaw) : 12),
-  );
+  const maxResults = clampIntParam(maxResultsRaw, 12, 1, 25);
 
   try {
     const endpoint = new URL("https://www.googleapis.com/youtube/v3/search");
@@ -119,9 +127,21 @@ export async function GET(req: Request) {
     const lang = parsePrimaryLanguage(req.headers.get("accept-language"));
     if (lang) endpoint.searchParams.set("relevanceLanguage", lang);
 
+    const cacheKey = [q.toLowerCase(), maxResults, country, lang].join("|");
+    const cached = resultCache.get(cacheKey);
+    if (cached) {
+      return NextResponse.json<YouTubeSearchResponse>({
+        ok: true,
+        items: cached,
+      });
+    }
+
     endpoint.searchParams.set("key", apiKey);
 
-    const res = await fetch(endpoint.toString(), { cache: "no-store" });
+    const res = await fetch(endpoint.toString(), {
+      cache: "no-store",
+      signal: upstreamSignal(),
+    });
     const body: unknown = await res.json().catch(() => null);
 
     if (!res.ok) {
@@ -183,6 +203,7 @@ export async function GET(req: Request) {
       items.push({ videoId, title, channelTitle, thumbnail });
     }
 
+    resultCache.set(cacheKey, items);
     return NextResponse.json<YouTubeSearchResponse>({ ok: true, items });
   } catch {
     return NextResponse.json<YouTubeSearchResponse>(

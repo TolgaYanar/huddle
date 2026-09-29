@@ -11,8 +11,8 @@ export async function safeNetflixSeekViaBackground(
       ok: false,
       error: resp?.error || resp?.result?.error || "seek_failed",
     };
-  } catch (e: any) {
-    return { ok: false, error: String(e?.message || e) };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
 }
 
@@ -29,7 +29,7 @@ export async function safeNetflixSetPlayingViaBackground(
       ok: false,
       error: resp?.error || resp?.result?.error || "set_playing_failed",
     };
-  } catch (e: any) {
-    return { ok: false, error: String(e?.message || e) };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
 }

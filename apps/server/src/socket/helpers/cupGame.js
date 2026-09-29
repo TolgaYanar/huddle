@@ -260,7 +260,7 @@ function pushEvent(game, event) {
   game.lastEvent = event;
 }
 
-function drawCard(game) {
+function drawCard() {
   const idx = Math.floor(Math.random() * CARDS.length);
   return CARDS[idx];
 }
