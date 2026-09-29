@@ -148,19 +148,33 @@ describe("createRateLimiter", () => {
   });
 
   describe("fallback IP extraction", () => {
-    it("uses x-forwarded-for when req.ip is absent", () => {
+    it("ignores a raw x-forwarded-for, which the client chooses", () => {
+      const limiter = createRateLimiter({ windowMs: 60_000, max: 1 });
+      const makeSpoofed = (xff) => ({
+        ip: "7.7.7.7",
+        headers: { "x-forwarded-for": xff },
+        socket: {},
+      });
+
+      limiter(makeSpoofed("5.5.5.5"), makeRes(), () => {});
+
+      const res = makeRes();
+      limiter(makeSpoofed("6.6.6.6"), res, () => {});
+      assert.equal(res._status, 429);
+    });
+
+    it("uses the socket address when req.ip is absent", () => {
       const limiter = createRateLimiter({ windowMs: 60_000, max: 1 });
       const req = {
         ip: undefined,
-        headers: { "x-forwarded-for": "5.5.5.5, 6.6.6.6" },
-        connection: {},
+        headers: {},
+        socket: { remoteAddress: "8.8.8.8" },
       };
-      const next = () => {};
 
-      limiter(req, makeRes(), next); // consume slot for 5.5.5.5
+      limiter(req, makeRes(), () => {});
 
       const res = makeRes();
-      limiter(req, res, next);
+      limiter(req, res, () => {});
       assert.equal(res._status, 429);
     });
   });

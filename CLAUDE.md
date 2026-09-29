@@ -120,7 +120,8 @@ return "YouTube browsing is not configured". `apps/web/.gitignore` ignores
 must contain only a version or SHA token, never a secret.
 
 The server reads exactly: `DATABASE_URL`, `PORT`, `CORS_ORIGINS`, `NODE_ENV`,
-`ALLOW_EXTENSION_ORIGINS`, `COOKIE_DOMAIN`, `VERBOSE_LOGS`, `SENTRY_DSN`, and
+`ALLOW_EXTENSION_ORIGINS`, `COOKIE_DOMAIN`, `VERBOSE_LOGS`, `SENTRY_DSN`,
+`PROXY_SHARED_SECRET`, and
 the TURN relay set `CLOUDFLARE_TURN_KEY_ID`, `CLOUDFLARE_TURN_API_TOKEN`,
 `TURN_URLS`, `TURN_SECRET`, `TURN_USERNAME`, `TURN_CREDENTIAL`,
 `TURN_TTL_SECONDS`, `STUN_URLS`, `REQUIRE_TURN`. Anything else in
@@ -193,6 +194,21 @@ and `/api/saved-rooms*` to
 `API_PROXY_TARGET`. Everything else under `/api` is a real Next route handler in
 `apps/web/app/api/` (url-preview, video-info, youtube-search, image-search,
 image-generate, ...) — do not add a blanket `/api/:path*` rewrite or those break.
+`apps/web/proxy.ts` runs before those rewrites on `/api/auth/*`,
+`/api/webrtc/*` and `/api/telemetry/*` only (never `/socket.io`).
+
+**Client addresses.** Railway fronts the server with two proxies — an edge
+that replaces any client-sent `X-Forwarded-For`, then an internal hop — so
+`trust proxy` is 2, measured, not guessed; 1 made `req.ip` a Railway edge
+address and put every user in one rate-limit bucket. Through the Vercel
+rewrite, `req.ip` is Vercel's egress, and the user's address exists only in
+`x-vercel-forwarded-for`, which a request sent straight to Railway can forge.
+So `proxy.ts` forwards it as `x-huddle-client-ip` with `PROXY_SHARED_SECRET`
+(same value on Vercel and Railway), and `src/auth/clientIp.js` trusts it only
+when the secret matches, falling back to `req.ip`. Rate limiters key on
+`getClientIp`; never read `X-Forwarded-For` directly — its leftmost entry is
+client-chosen off Railway.
+
 `skipTrailingSlashRedirect: true` is required because a 308 kills the Engine.IO
 websocket upgrade. Security headers set in `next.config.js` do not apply to the
 proxied routes; those come from `apps/server/src/security.js`.
