@@ -66,6 +66,23 @@ app.disable("x-powered-by");
 app.use(requestId());
 app.use(securityHeaders());
 
+// TEMPORARY: records the forwarded-address chain on ICE lookups so the right
+// "trust proxy" hop count can be chosen from real traffic. Remove after that.
+app.use("/api/webrtc/ice", (req, res, next) => {
+  req.log.info(
+    `[xff] ${JSON.stringify({
+      xff: req.headers["x-forwarded-for"] || null,
+      xRealIp: req.headers["x-real-ip"] || null,
+      xVercelForwardedFor: req.headers["x-vercel-forwarded-for"] || null,
+      hasVercelId: Boolean(req.headers["x-vercel-id"]),
+      ip: req.ip,
+      ips: req.ips,
+      remote: req.socket.remoteAddress,
+    })}`,
+  );
+  next();
+});
+
 // Lightweight request-duration log line for non-health endpoints.
 app.use((req, res, next) => {
   const start = Date.now();
