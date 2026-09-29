@@ -68,8 +68,9 @@ app.use(securityHeaders());
 
 // TEMPORARY: records the forwarded-address chain on ICE lookups so the right
 // "trust proxy" hop count can be chosen from real traffic. Remove after that.
+// warn, not info: info is dropped unless VERBOSE_LOGS is set.
 app.use("/api/webrtc/ice", (req, res, next) => {
-  req.log.info(
+  req.log.warn(
     `[xff] ${JSON.stringify({
       xff: req.headers["x-forwarded-for"] || null,
       xRealIp: req.headers["x-real-ip"] || null,
