@@ -34,6 +34,7 @@ const {
 const { createRequireAuth } = require("./src/auth/middleware");
 const { createSessionCleanup } = require("./src/auth/sessionCleanup");
 const { createTelemetryCleanup } = require("./src/telemetry/telemetryCleanup");
+const { createHistoryCleanups } = require("./src/shared/historyCleanup");
 
 const { registerRoutes } = require("./src/routes");
 const { assertIceReadiness, readIceConfig } = require("./src/webrtc/iceConfig");
@@ -141,6 +142,13 @@ const telemetryCleanup = createTelemetryCleanup({
   vLog,
 });
 telemetryCleanup.start();
+
+const historyCleanup = createHistoryCleanups({
+  getPrisma,
+  isDbConnected,
+  vLog,
+});
+historyCleanup.start();
 
 let io;
 
@@ -269,6 +277,7 @@ async function shutdown() {
   shuttingDown = true;
   sessionCleanup.stop();
   telemetryCleanup.stop();
+  historyCleanup.stop();
   try {
     const prisma = getPrisma();
     if (prisma) await prisma.$disconnect();

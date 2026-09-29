@@ -1,6 +1,7 @@
 const {
   emitPlaylistStateTo,
   emitPlaylistStateToRoom,
+  MAX_PLAYLISTS_PER_ROOM,
 } = require("../helpers/playlists");
 const { isRoomMember } = require("../helpers/membership");
 
@@ -31,6 +32,11 @@ function attachPlaylistCrudHandlers(io, state, socket, deps) {
       null;
 
     try {
+      const existing = await deps
+        .getPrisma()
+        .roomPlaylist.count({ where: { roomId } });
+      if (existing >= MAX_PLAYLISTS_PER_ROOM) return;
+
       await deps.getPrisma().roomPlaylist.create({
         data: {
           roomId,
@@ -39,9 +45,13 @@ function attachPlaylistCrudHandlers(io, state, socket, deps) {
             typeof description === "string" ? description.slice(0, 500) : null,
           createdBy: socket.id,
           createdByUsername: senderUsername,
-          loop: settings?.loop ?? false,
-          shuffle: settings?.shuffle ?? false,
-          autoPlay: settings?.autoPlay ?? true,
+          // Same type checks as playlist_update: a non-boolean reached Prisma
+          // verbatim and failed the create silently instead of defaulting.
+          loop: typeof settings?.loop === "boolean" ? settings.loop : false,
+          shuffle:
+            typeof settings?.shuffle === "boolean" ? settings.shuffle : false,
+          autoPlay:
+            typeof settings?.autoPlay === "boolean" ? settings.autoPlay : true,
         },
       });
 
@@ -60,7 +70,8 @@ function attachPlaylistCrudHandlers(io, state, socket, deps) {
 
     try {
       const updateData = {};
-      if (typeof name === "string") {
+      // A blank name is ignored, as playlist_create refuses one.
+      if (typeof name === "string" && name.trim()) {
         updateData.name = name.trim().slice(0, 100);
       }
       if (typeof description === "string") {

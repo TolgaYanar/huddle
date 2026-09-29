@@ -110,6 +110,7 @@ function attachPlaylistPlaybackHandlers(io, state, socket, deps) {
       }
 
       const item = playlist.items[nextIndex];
+      if (!item) return;
 
       // Guard against concurrent playlist_next from multiple clients (e.g. video-ended
       // fires on every client simultaneously). If another handler already advanced the
@@ -163,7 +164,10 @@ function attachPlaylistPlaybackHandlers(io, state, socket, deps) {
 
       if (!playlist || playlist.items.length === 0) return;
 
-      let prevIndex = activeState.currentItemIndex - 1;
+      // Clamp first: a stale index past the end made items[prevIndex]
+      // undefined, and the throw on item.id was swallowed below.
+      let prevIndex =
+        Math.min(activeState.currentItemIndex, playlist.items.length) - 1;
 
       if (prevIndex < 0) {
         if (playlist.loop) {

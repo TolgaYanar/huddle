@@ -1,4 +1,5 @@
 const { getBanIdentity } = require("../state");
+const { isRoomMember, isSocketIdInRoom } = require("../helpers/membership");
 
 function attachModerationHandlers(io, state, socket, deps) {
   // Host-only: set or clear room password.
@@ -6,6 +7,9 @@ function attachModerationHandlers(io, state, socket, deps) {
     const { roomId, password } = data || {};
     if (!roomId || typeof roomId !== "string") return;
     if (state.roomHost.get(roomId) !== socket.id) return;
+    // roomHost outlives membership through the empty-room grace window, so
+    // an ex-host who already left must not keep host powers.
+    if (!isRoomMember(socket, roomId)) return;
 
     // Shared across sockets on purpose: attachModerationHandlers runs once per
     // connection, so a handler-local counter could not order an update from a
@@ -39,6 +43,7 @@ function attachModerationHandlers(io, state, socket, deps) {
       return;
     }
     if (state.roomHost.get(roomId) !== socket.id) return;
+    if (!isRoomMember(socket, roomId)) return;
 
     state.roomPasswordHash.set(roomId, passwordHash);
     io.to(roomId).emit("room_password_status", {
@@ -84,6 +89,7 @@ function attachModerationHandlers(io, state, socket, deps) {
     if (!roomId || typeof roomId !== "string") return;
     if (!targetId || typeof targetId !== "string") return;
     if (state.roomHost.get(roomId) !== socket.id) return;
+    if (!isRoomMember(socket, roomId)) return;
 
     // Resolve the target socket so we can ban a STABLE identity rather than the
     // raw socket.id (which changes on every reconnect). Authenticated targets
@@ -133,7 +139,10 @@ function attachModerationHandlers(io, state, socket, deps) {
       console.error("Failed to persist kick activity:", err.message);
     }
 
-    // Notify + disconnect the target.
+    // Notify + disconnect the target only when it is in THIS room. The ban
+    // above is scoped to the host's own room, but a disconnect is not: without
+    // this check any host could drop any socket on the server by id.
+    if (!isSocketIdInRoom(io, roomId, targetId)) return;
     io.to(targetId).emit("room_banned", { roomId });
     if (targetSocket) {
       try {
@@ -150,10 +159,10 @@ function attachModerationHandlers(io, state, socket, deps) {
     if (!roomId || typeof roomId !== "string") return;
     if (!targetId || typeof targetId !== "string") return;
     if (state.roomHost.get(roomId) !== socket.id) return;
+    if (!isRoomMember(socket, roomId)) return;
 
     // Target must still be in the room.
-    const roomSockets = io.sockets.adapter.rooms.get(roomId);
-    if (!roomSockets || !roomSockets.has(targetId)) return;
+    if (!isSocketIdInRoom(io, roomId, targetId)) return;
 
     state.roomHost.set(roomId, targetId);
     io.to(roomId).emit("room_host", { roomId, hostId: targetId });

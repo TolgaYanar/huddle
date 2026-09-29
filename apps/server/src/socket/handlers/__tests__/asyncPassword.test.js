@@ -27,6 +27,8 @@ function attachHost(io, state, hashPassword, socketId = "host") {
   const handlers = new Map();
   const socket = {
     id: socketId,
+    // Host-only handlers also require live membership of the room.
+    rooms: new Set([socketId, "room"]),
     data: {},
     on(event, handler) {
       handlers.set(event, handler);

@@ -1,4 +1,5 @@
 const { persistRoomState } = require("../helpers/sync");
+const { isRoomMember } = require("../helpers/membership");
 
 const MAX_ROOM_NAME_LENGTH = 40;
 
@@ -8,6 +9,7 @@ function attachRoomSettingsHandlers(io, state, socket, deps) {
     const { roomId, name } = data || {};
     if (!roomId || typeof roomId !== "string") return;
     if (state.roomHost.get(roomId) !== socket.id) return;
+    if (!isRoomMember(socket, roomId)) return;
 
     const trimmed =
       typeof name === "string"

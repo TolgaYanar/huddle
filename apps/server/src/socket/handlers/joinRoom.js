@@ -26,6 +26,11 @@ const {
 const { isRoomMember } = require("../helpers/membership");
 const { createSocketRateLimiter } = require("../helpers/socketRateLimit");
 const { validateRoomId } = require("../../auth/validators");
+const { isSocketIdRoom } = require("../helpers/membership");
+const {
+  isPasswordThrottled,
+  recordPasswordFailure,
+} = require("../helpers/passwordAttempts");
 const {
   beginPendingRoomJoin,
   isPendingRoomJoinCurrent,
@@ -68,9 +73,17 @@ function attachJoinRoomHandler(io, state, socket, joinedRooms, deps) {
 
     const storedHash = state.roomPasswordHash.get(roomId);
     if (storedHash) {
+      // Checked before scrypt so a throttled room costs no CPU per guess.
+      if (isPasswordThrottled(state, roomId)) {
+        socket.emit("room_requires_password", { roomId, reason: "throttled" });
+        return;
+      }
       const ok = await deps.verifyPassword(password, storedHash);
       if (!isCurrent()) return;
       if (!ok) {
+        // An empty password is the "this room is locked" probe every visitor
+        // sends first; only real guesses count toward the throttle.
+        if (password) recordPasswordFailure(state, roomId);
         socket.emit("room_requires_password", {
           roomId,
           reason: password ? "invalid" : "required",
@@ -300,6 +313,11 @@ function attachJoinRoomHandler(io, state, socket, joinedRooms, deps) {
     // created a permanent adapter room per emit.
     const roomId = validateRoomId(rawRoomId);
     if (!roomId) return;
+    // Every socket owns an adapter room named after its id, and ids match the
+    // room-id alphabet. Joining one would receive that socket's private
+    // relays (WebRTC offers/ICE) and pin per-room state that no cleanup path
+    // visits, since the owner never lists its own id in joinedRooms.
+    if (isSocketIdRoom(io, roomId)) return;
 
     if (!joinLimiter()) return;
 

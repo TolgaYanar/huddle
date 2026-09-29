@@ -2,7 +2,6 @@ const {
   newGame,
   getOrCreateRoomCupGames,
   getPlayer,
-  ensurePlayer,
   buildTurnOrder,
   getCurrentTurnSocketId,
   advanceTurn,

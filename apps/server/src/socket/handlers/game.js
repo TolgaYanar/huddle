@@ -511,6 +511,9 @@ function attachGameHandlers(io, state, socket) {
 
     if (!Array.isArray(game.session.observers)) game.session.observers = [];
     const observers = game.session.observers;
+    // Toggling to the state you are already in changes nothing, and the
+    // broadcast below can carry several MB of clue images to every member.
+    if (observers.includes(socket.id) === observer) return;
 
     if (observer) {
       // Active questioner can't go observer-only mid-round.

@@ -83,7 +83,15 @@ async function emitPlaylistStateToRoom(deps, state, io, roomId) {
   });
 }
 
+// A playlist import adds at most 500 videos, so these only bite on abuse:
+// each write re-broadcasts every playlist with every item to the room, so an
+// unbounded room made every later write (and every join) slower without end.
+const MAX_PLAYLISTS_PER_ROOM = 25;
+const MAX_ITEMS_PER_PLAYLIST = 1000;
+
 module.exports = {
+  MAX_PLAYLISTS_PER_ROOM,
+  MAX_ITEMS_PER_PLAYLIST,
   getPlaylistsForRoom,
   emitPlaylistStateTo,
   emitPlaylistStateToRoom,

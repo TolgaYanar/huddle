@@ -1,5 +1,7 @@
 const {
   getRoomTimer,
+  scheduleTimerFinish,
+  clearTimerFinish,
   emitTimerStateTo,
   emitTimerStateToRoom,
   MAX_DURATION_MS,
@@ -22,6 +24,7 @@ function attachTimerHandlers(io, state, socket) {
     if (ms <= 0 || ms > MAX_DURATION_MS) return;
 
     const timer = getRoomTimer(state, roomId);
+    clearTimerFinish(timer);
     timer.durationMs = ms;
     timer.remainingMs = ms;
     timer.endsAt = null;
@@ -41,6 +44,7 @@ function attachTimerHandlers(io, state, socket) {
     const now = Date.now();
     timer.endsAt = now + timer.remainingMs;
     timer.status = "running";
+    scheduleTimerFinish(io, state, roomId, timer);
     emitTimerStateToRoom(io, state, roomId);
   });
 
@@ -53,6 +57,7 @@ function attachTimerHandlers(io, state, socket) {
     if (timer.status !== "running") return;
 
     const now = Date.now();
+    clearTimerFinish(timer);
     timer.remainingMs = Math.max(0, timer.endsAt - now);
     timer.endsAt = null;
     timer.status = "paused";
@@ -65,6 +70,7 @@ function attachTimerHandlers(io, state, socket) {
     if (!isRoomMember(socket, roomId)) return;
 
     const timer = getRoomTimer(state, roomId);
+    clearTimerFinish(timer);
     timer.remainingMs = timer.durationMs;
     timer.endsAt = null;
     timer.status = "idle";

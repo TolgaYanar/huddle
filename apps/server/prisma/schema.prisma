@@ -50,6 +50,8 @@ model RoomMessage {
   createdAt      DateTime @default(now())
 
   @@index([roomId, createdAt])
+  // Retention sweep (src/shared/historyCleanup.js) deletes by createdAt alone.
+  @@index([createdAt])
 }
 
 model RoomActivity {
@@ -64,6 +66,8 @@ model RoomActivity {
   createdAt      DateTime @default(now())
 
   @@index([roomId, createdAt])
+  // Retention sweep (src/shared/historyCleanup.js) deletes by createdAt alone.
+  @@index([createdAt])
 }
 
 model RoomState {

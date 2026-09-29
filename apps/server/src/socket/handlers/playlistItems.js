@@ -1,4 +1,7 @@
-const { emitPlaylistStateToRoom } = require("../helpers/playlists");
+const {
+  emitPlaylistStateToRoom,
+  MAX_ITEMS_PER_PLAYLIST,
+} = require("../helpers/playlists");
 const { isRoomMember } = require("../helpers/membership");
 
 function attachPlaylistItemHandlers(io, state, socket, deps) {
@@ -25,6 +28,11 @@ function attachPlaylistItemHandlers(io, state, socket, deps) {
         select: { id: true },
       });
       if (!playlistCheck) return;
+
+      const itemCount = await deps
+        .getPrisma()
+        .roomPlaylistItem.count({ where: { playlistId } });
+      if (itemCount >= MAX_ITEMS_PER_PLAYLIST) return;
 
       // Get the highest position in the playlist
       const lastItem = await deps.getPrisma().roomPlaylistItem.findFirst({
@@ -64,10 +72,41 @@ function attachPlaylistItemHandlers(io, state, socket, deps) {
     if (!deps.isDbConnected() || !deps.getPrisma()) return;
 
     try {
-      // deleteMany with a relation filter ensures the item belongs to this room.
-      await deps.getPrisma().roomPlaylistItem.deleteMany({
-        where: { id: itemId, playlist: { roomId } },
+      // Where the removed item sits relative to the playing one, so the
+      // active index can follow it. Without this, removing an earlier item
+      // left the index one past the playing item (or past the end, which
+      // broke playlist_previous).
+      const activeState = state.roomPlaylistActive.get(roomId);
+      let removedIndex = -1;
+      if (activeState && activeState.activePlaylistId === playlistId) {
+        const playlist = await deps.getPrisma().roomPlaylist.findUnique({
+          where: { id: playlistId },
+          include: { items: { orderBy: { position: "asc" } } },
+        });
+        if (playlist && playlist.roomId === roomId) {
+          removedIndex = playlist.items.findIndex((i) => i.id === itemId);
+        }
+      }
+
+      // The relation filter keeps the delete inside this room; playlistId
+      // keeps it inside the named playlist.
+      const { count } = await deps.getPrisma().roomPlaylistItem.deleteMany({
+        where: { id: itemId, playlistId, playlist: { roomId } },
       });
+
+      const current = state.roomPlaylistActive.get(roomId);
+      if (
+        count > 0 &&
+        removedIndex !== -1 &&
+        current &&
+        current.activePlaylistId === playlistId &&
+        removedIndex < current.currentItemIndex
+      ) {
+        state.roomPlaylistActive.set(roomId, {
+          ...current,
+          currentItemIndex: current.currentItemIndex - 1,
+        });
+      }
 
       await emitPlaylistStateToRoom(deps, state, io, roomId);
     } catch (err) {
@@ -116,7 +155,7 @@ function attachPlaylistItemHandlers(io, state, socket, deps) {
       await deps.getPrisma().$transaction(
         itemIds.map((id, index) =>
           deps.getPrisma().roomPlaylistItem.updateMany({
-            where: { id, playlist: { roomId } },
+            where: { id, playlistId, playlist: { roomId } },
             data: { position: index },
           }),
         ),
