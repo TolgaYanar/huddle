@@ -131,7 +131,7 @@ export function applyRoomStateToVideo(
   // the partial one — and with it the only correct isPlaying/timestamp we
   // get. room_state is authoritative and rare, so it is never throttled.
   const now = Date.now();
-  if (opts?.source !== "room_state" && now - state.lastRemoteApplyAt < 250) {
+  if (shouldThrottleApply(opts?.source, now, state.lastRemoteApplyAt)) {
     return;
   }
 
@@ -518,6 +518,8 @@ export function attachVideoListeners(
   return true;
 }
 
+const VIDEO_RECHECK_MS = 150;
+
 export function ensureVideoListeners(
   state: ContentState,
   {
@@ -537,8 +539,18 @@ export function ensureVideoListeners(
   // listeners bound to a detached node and sync silently stopped. The
   // observer is cheap because attachVideoListeners is idempotent: it
   // short-circuits when the current element matches state.listenersAttachedTo.
+  //
+  // Coalesced: Netflix mutates the DOM constantly (subtitles, the control
+  // bar), and each re-check runs getBestVideo — querySelectorAll plus
+  // getBoundingClientRect/getComputedStyle per <video>, i.e. forced layout.
+  // A replaced <video> is a one-off event, so 150 ms of latency is invisible.
+  let recheckTimer: ReturnType<typeof setTimeout> | null = null;
   const obs = new MutationObserver(() => {
-    attachVideoListeners(state, { emitSync, shouldEmitLocalSync });
+    if (recheckTimer !== null) return;
+    recheckTimer = setTimeout(() => {
+      recheckTimer = null;
+      attachVideoListeners(state, { emitSync, shouldEmitLocalSync });
+    }, VIDEO_RECHECK_MS);
   });
   obs.observe(document.documentElement, { childList: true, subtree: true });
 
@@ -547,14 +559,21 @@ export function ensureVideoListeners(
   // the host could move to /watch/<next> and every other member would stay
   // stuck on the previous episode. Throttled per-URL so Netflix's hash
   // changes during a single watch don't spam emits.
-  let lastEmittedContentKey: string | null = null;
+  //
+  // Keyed on content identity, not the raw URL: Netflix rewrites the query
+  // string (e.g. trackId) on the same title, and a change_url emits timestamp
+  // 0, so treating that as a new title would restart the room. Seeded with
+  // the title this page loaded on, which the join path already reports.
+  const currentContentKey = () =>
+    adapter.getCurrentContentId() ?? location.href.split(/[?#]/)[0];
+  let lastEmittedContentKey: string | null = currentContentKey();
   const maybeBroadcastContentChange = () => {
     if (!shouldEmitLocalSync()) return;
     const url = location.href;
     if (!adapter.isPlaybackUrl(url)) return;
     const contentId = adapter.getCurrentContentId();
     if (adapter.requiresVerifiedContentIdentity && !contentId) return;
-    const contentKey = `${url}|${contentId ?? ""}`;
+    const contentKey = currentContentKey();
     if (contentKey === lastEmittedContentKey) return;
     lastEmittedContentKey = contentKey;
     // Stamp the local emit so applyRoomStateToVideo treats the echo as our

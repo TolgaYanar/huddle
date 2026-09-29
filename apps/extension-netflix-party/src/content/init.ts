@@ -41,11 +41,15 @@ export function initContentScript() {
   };
 
   chrome.runtime.onMessage.addListener(
-    (msg: any, _sender: any, sendResponse: any) => {
+    (
+      msg: { type?: unknown; roomId?: unknown } | null | undefined,
+      _sender: chrome.runtime.MessageSender,
+      sendResponse: (response?: unknown) => void,
+    ) => {
       if (msg?.type === "HUDDLE_CONNECT") {
         const cfg: ExtensionConfig = {
           serverUrl: FIXED_SERVER_URL,
-          roomId: msg.roomId,
+          roomId: typeof msg.roomId === "string" ? msg.roomId : "",
         };
         chrome.storage.local.set({ [STORAGE_KEYS.roomId]: cfg.roomId });
         connect(state, cfg, {
@@ -57,6 +61,10 @@ export function initContentScript() {
       }
 
       if (msg?.type === "HUDDLE_DISCONNECT") {
+        // An explicit Disconnect ends membership. Leaving the room id stored
+        // made the next watch page rejoin silently and, with no room state
+        // applied yet, push that page's title onto everyone still there.
+        chrome.storage.local.remove([STORAGE_KEYS.roomId]);
         disconnect(state, { updateOverlay: updateOverlayBound });
         sendResponse({ ok: true });
         return true;

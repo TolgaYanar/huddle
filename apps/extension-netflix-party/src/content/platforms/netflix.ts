@@ -37,28 +37,35 @@ function getCurrentContentId(): string | null {
   return getContentIdFromUrl(location.href);
 }
 
+// Content scripts run in an isolated JavaScript world. Netflix's own
+// history.pushState calls go through the page's copy, so wrapping `history`
+// here only ever saw our own calls — never an in-page navigation such as
+// "Next episode". That left the host's episode change unbroadcast while their
+// next play/pause carried the old content id back, which pulled the host to
+// the previous episode. Watch the URL itself instead; the comparison is a
+// string check once a second.
+const HREF_POLL_MS = 1000;
+
 function subscribeToPotentialContentChanges(
   onPotentialChange: () => void,
 ): () => void {
-  const originalPush = history.pushState;
-  const originalReplace = history.replaceState;
-  const onPopState = () => onPotentialChange();
+  let lastHref = location.href;
+  const check = () => {
+    const href = location.href;
+    if (href === lastHref) return;
+    lastHref = href;
+    onPotentialChange();
+  };
+  const onPopState = () => {
+    lastHref = location.href;
+    onPotentialChange();
+  };
 
-  history.pushState = (...args: Parameters<typeof history.pushState>) => {
-    const result = originalPush.apply(history, args);
-    onPotentialChange();
-    return result;
-  };
-  history.replaceState = (...args: Parameters<typeof history.replaceState>) => {
-    const result = originalReplace.apply(history, args);
-    onPotentialChange();
-    return result;
-  };
+  const timer = setInterval(check, HREF_POLL_MS);
   window.addEventListener("popstate", onPopState);
 
   return () => {
-    history.pushState = originalPush;
-    history.replaceState = originalReplace;
+    clearInterval(timer);
     window.removeEventListener("popstate", onPopState);
   };
 }

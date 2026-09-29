@@ -1,9 +1,9 @@
-import { io, type Socket } from "socket.io-client";
+import { io } from "socket.io-client";
 
 import { LEGACY_SERVER_URL_KEY } from "./constants";
 import { debugLog } from "./log";
 import type { ContentState } from "./state";
-import type { ExtensionConfig, RoomState } from "./types";
+import type { ChatMessage, ExtensionConfig, RoomState } from "./types";
 import { normalizeServerUrl } from "./config";
 import {
   applyRoomStateToVideo,
@@ -15,6 +15,20 @@ import {
 } from "./playerSync";
 import { receiveSyncCarriesPosition } from "./syncUtils";
 import { getActivePlatformAdapter } from "./platforms";
+// Server payloads are untrusted shapes; fields are re-checked on use.
+type ChatHistoryPayload = {
+  roomId?: string;
+  messages?: Array<ChatMessage | null>;
+};
+
+// The overlay shows this to the viewer; raw transport errors ("websocket
+// error", "timeout") say nothing about what to do next.
+export function describeConnectError(raw: string): string {
+  if (/websocket|timeout|xhr|transport/i.test(raw)) {
+    return "Can't reach the Huddle server. A firewall, VPN or network filter may be blocking it.";
+  }
+  return raw;
+}
 
 export function shouldEmitLocalSync(state: ContentState) {
   return Boolean(state.socket && state.socket.connected && state.currentRoomId);
@@ -105,7 +119,12 @@ export function connect(
   updateOverlay();
 
   state.socket = io(serverUrl, {
-    transports: ["websocket", "polling"],
+    // WebSocket only. A content script's HTTP requests carry the streaming
+    // site's origin, which the server's CORS allowlist does not include, so
+    // long-polling could not work from here; and without tryAllTransports the
+    // client never fell back to it anyway. Listing it only hid the real cause
+    // behind a generic error.
+    transports: ["websocket"],
     autoConnect: true,
     withCredentials: true,
     path: "/socket.io/",
@@ -157,9 +176,10 @@ export function connect(
     updateOverlay();
   });
 
-  socket.on("connect_error", (err: any) => {
-    state.lastConnectionError = String(err?.message || err || "connect_error");
-    debugLog("connect_error", state.lastConnectionError);
+  socket.on("connect_error", (err: Error) => {
+    const raw = String(err?.message || err || "connect_error");
+    debugLog("connect_error", raw);
+    state.lastConnectionError = describeConnectError(raw);
     updateOverlay();
   });
 
@@ -301,12 +321,12 @@ export function connect(
     },
   );
 
-  socket.on("chat_history", (payload: any) => {
+  socket.on("chat_history", (payload: ChatHistoryPayload | null) => {
     if (!payload || payload.roomId !== state.currentRoomId) return;
     const msgs = Array.isArray(payload.messages) ? payload.messages : [];
     state.chatMessages = msgs
-      .filter((m: any) => m && typeof m.text === "string")
-      .map((m: any) => ({
+      .filter((m): m is ChatMessage => !!m && typeof m.text === "string")
+      .map((m) => ({
         id: m.id,
         roomId: m.roomId,
         senderId: m.senderId,
@@ -318,7 +338,7 @@ export function connect(
     updateOverlay();
   });
 
-  socket.on("chat_message", (m: any) => {
+  socket.on("chat_message", (m: ChatMessage | null) => {
     if (!m || m.roomId !== state.currentRoomId || typeof m.text !== "string")
       return;
     state.chatMessages = [

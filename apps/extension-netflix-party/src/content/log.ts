@@ -1,7 +1,6 @@
 import { DEBUG_LOGS } from "./constants";
 
-export function debugLog(...args: any[]) {
+export function debugLog(...args: unknown[]) {
   if (!DEBUG_LOGS) return;
-  // eslint-disable-next-line no-console
   console.log("[HuddleNetflix]", ...args);
 }
