@@ -2,6 +2,8 @@
 
 import React from "react";
 
+import { toSafeExternalHref } from "../../../lib/video";
+
 import {
   platformDisplayName,
   type PlatformType,
@@ -37,6 +39,7 @@ export function Tier3CtaCard({
   platform: PlatformType;
   url: string;
 }) {
+  const safeHref = toSafeExternalHref(url);
   const name = platformDisplayName(platform);
   const isNetflix = platform === "netflix";
   const isPrime = platform === "prime";
@@ -169,25 +172,27 @@ export function Tier3CtaCard({
           </a>
         )}
 
-        <a
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="h-10 rounded-[var(--radius-control)] border border-hairline bg-surface hover:bg-raised text-ink text-sm font-medium inline-flex items-center justify-center gap-2 transition-colors"
-        >
-          Open {name} in a new tab
-          <svg
-            className="w-3.5 h-3.5"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={1.75}
-            strokeLinecap="round"
-            strokeLinejoin="round"
+        {safeHref && (
+          <a
+            href={safeHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="h-10 rounded-[var(--radius-control)] border border-hairline bg-surface hover:bg-raised text-ink text-sm font-medium inline-flex items-center justify-center gap-2 transition-colors"
           >
-            <path d="M14 3h7v7M21 3l-9 9M5 5h6M5 19h14a2 2 0 002-2v-6" />
-          </svg>
-        </a>
+            Open {name} in a new tab
+            <svg
+              className="w-3.5 h-3.5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.75}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M14 3h7v7M21 3l-9 9M5 5h6M5 19h14a2 2 0 002-2v-6" />
+            </svg>
+          </a>
+        )}
 
         <div className="text-[11px] text-ink-faint leading-relaxed">
           {isNetflix ? (

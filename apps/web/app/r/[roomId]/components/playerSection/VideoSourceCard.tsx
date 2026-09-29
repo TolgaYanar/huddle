@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { memo } from "react";
 
 type YouTubeSearchItem = {
   videoId: string;
@@ -21,7 +22,9 @@ type YouTubeSearchResponse =
         | "network";
     };
 
-export function VideoSourceCard({
+// Memoised: the room view re-renders on every playback-position update
+// (~4 Hz); this component's props do not change with it.
+export const VideoSourceCard = memo(function VideoSourceCard({
   inputUrl,
   setInputUrl,
   handleUrlChange,
@@ -275,4 +278,4 @@ export function VideoSourceCard({
       </div>
     </div>
   );
-}
+});

@@ -7,6 +7,7 @@ import {
 } from "../../lib/player";
 import { USER_PAUSE_INTENT_WINDOW_MS } from "../../hooks/useVideoPlayer/constants";
 import { useSyncTelemetry } from "../../hooks/useSyncTelemetry";
+import { holdRemoteSyncGuard } from "../../lib/remoteSyncGuard";
 
 // Max retry attempts before giving up on a pending catchup.
 // YouTube iframes can take 5–8 seconds to become seekable on slow connections,
@@ -87,9 +88,17 @@ export function useRoomCatchup({
   const pendingRoomCatchupRef = React.useRef<PendingRoomCatchup | null>(null);
   const resumeCatchupAfterPauseTimeoutRef = React.useRef<number | null>(null);
   const resumeSyncAfterPauseTimeoutRef = React.useRef<number | null>(null);
+  const catchupRetryTimeoutRef = React.useRef<number | null>(null);
 
   React.useEffect(() => {
     return () => {
+      // A late-joiner catch-up retries every 350 ms for up to ~10 s; without
+      // this it kept seeking the player after the hook was gone.
+      pendingRoomCatchupRef.current = null;
+      if (catchupRetryTimeoutRef.current) {
+        window.clearTimeout(catchupRetryTimeoutRef.current);
+        catchupRetryTimeoutRef.current = null;
+      }
       if (resumeCatchupAfterPauseTimeoutRef.current) {
         window.clearTimeout(resumeCatchupAfterPauseTimeoutRef.current);
         resumeCatchupAfterPauseTimeoutRef.current = null;
@@ -119,7 +128,13 @@ export function useRoomCatchup({
     const exhausted =
       Date.now() > pending.until || pending.attempts >= CATCHUP_MAX_ATTEMPTS;
     if (exhausted || pending.url !== anchor?.url) {
-      if (exhausted) telemetry.record("catchupExhausted");
+      // A catch-up dropped because the user paused during it was respected,
+      // not failed: the 12 s pause window always outlasts the retry window.
+      const startedAt = pending.until - CATCHUP_RETRY_WINDOW_MS;
+      const userPausedDuringCatchup = lastUserPauseAtRef.current >= startedAt;
+      if (exhausted && !userPausedDuringCatchup) {
+        telemetry.record("catchupExhausted");
+      }
       pendingRoomCatchupRef.current = null;
       return;
     }
@@ -152,12 +167,12 @@ export function useRoomCatchup({
       return;
     }
 
+    // Count the catch-up once, on its first real seek. Counting when it was
+    // scheduled included catch-ups that landed in range without seeking.
+    if (pending.attempts === 0) telemetry.record("hardSeeks");
     pending.attempts += 1;
 
-    applyingRemoteSyncRef.current = true;
-    window.setTimeout(() => {
-      applyingRemoteSyncRef.current = false;
-    }, 350);
+    holdRemoteSyncGuard(applyingRemoteSyncRef, 350);
 
     suppressNextSeekBroadcast(3000);
     seekToFromRef(playerRef, pending.target);
@@ -189,7 +204,11 @@ export function useRoomCatchup({
     }
 
     // Retry shortly; this covers the period where the iframe exists but isn't seekable yet.
-    window.setTimeout(() => {
+    if (catchupRetryTimeoutRef.current) {
+      window.clearTimeout(catchupRetryTimeoutRef.current);
+    }
+    catchupRetryTimeoutRef.current = window.setTimeout(() => {
+      catchupRetryTimeoutRef.current = null;
       tryApplyPendingRoomCatchup();
     }, 350);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -262,7 +281,6 @@ export function useRoomCatchup({
         until: Date.now() + CATCHUP_RETRY_WINDOW_MS,
         attempts: 0,
       };
-      telemetry.record("hardSeeks");
       tryApplyPendingRoomCatchup();
       return;
     }
@@ -278,10 +296,7 @@ export function useRoomCatchup({
     )
       return;
 
-    applyingRemoteSyncRef.current = true;
-    window.setTimeout(() => {
-      applyingRemoteSyncRef.current = false;
-    }, 350);
+    holdRemoteSyncGuard(applyingRemoteSyncRef, 350);
 
     lastRoomSyncAtRef.current = Date.now();
     telemetry.record("hardSeeks");

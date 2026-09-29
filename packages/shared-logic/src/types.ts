@@ -104,7 +104,7 @@ export interface RoomPasswordStatusData {
 
 export interface RoomPasswordRequiredData {
   roomId: string;
-  reason?: "required" | "invalid";
+  reason?: "required" | "invalid" | "throttled";
 }
 
 export type UserPresenceData =

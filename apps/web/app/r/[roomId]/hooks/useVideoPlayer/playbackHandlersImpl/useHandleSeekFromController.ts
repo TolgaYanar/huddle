@@ -9,6 +9,7 @@ import {
 import { USER_PAUSE_INTENT_WINDOW_MS } from "../constants";
 
 import type { PlaybackHandlersArgs, SeekToOpts } from "./types";
+import { syncDebug } from "../../../lib/syncDebug";
 
 export function useHandleSeekFromController(args: PlaybackHandlersArgs) {
   const {
@@ -42,7 +43,7 @@ export function useHandleSeekFromController(args: PlaybackHandlersArgs) {
     (time: number, opts?: SeekToOpts) => {
       const force = opts?.force === true;
       if (hasInitialSyncRef && !hasInitialSyncRef.current) {
-        console.log(`[SEEK] Blocked: initial sync not complete`);
+        syncDebug(`[SEEK] Blocked: initial sync not complete`);
         const newTime = Math.max(0, Math.min(time, duration || Infinity));
         seekToFromRef(playerRef, newTime);
         setCurrentTime(newTime);
@@ -74,7 +75,7 @@ export function useHandleSeekFromController(args: PlaybackHandlersArgs) {
       }
 
       if (applyingRemoteSyncRef.current) {
-        console.log(`[SEEK] Blocked: applying remote sync`);
+        syncDebug(`[SEEK] Blocked: applying remote sync`);
         return;
       }
 
@@ -83,7 +84,7 @@ export function useHandleSeekFromController(args: PlaybackHandlersArgs) {
       const isPlaying = latestVideoStateRef.current === "Playing";
       const approxNow = latestCurrentTimeRef.current;
       if (!force && isPlaying && Math.abs(approxNow - newTime) < 6) {
-        console.log(`[SEEK] Blocked: small delta without force flag`);
+        syncDebug(`[SEEK] Blocked: small delta without force flag`);
         return;
       }
 
@@ -93,13 +94,13 @@ export function useHandleSeekFromController(args: PlaybackHandlersArgs) {
         Date.now() - last.at < 800 &&
         Math.abs(last.time - newTime) < 0.5
       ) {
-        console.log(
+        syncDebug(
           `[SEEK] Blocked: duplicate seek (within 800ms and <0.5s delta)`,
         );
         return;
       }
 
-      console.log(`[SEEK] Broadcasting seek to ${newTime.toFixed(2)}s`);
+      syncDebug(`[SEEK] Broadcasting seek to ${newTime.toFixed(2)}s`);
 
       const emitSeek = (t: number) => {
         cancelPendingPause();

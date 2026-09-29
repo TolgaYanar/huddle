@@ -1,4 +1,5 @@
 import React from "react";
+import { memo } from "react";
 
 import type {
   MediaDeviceErrors,
@@ -133,7 +134,9 @@ function ScreenIcon({ className }: { className?: string }) {
   );
 }
 
-export function DeviceControls(props: {
+// Memoised: the room view re-renders on every playback-position update
+// (~4 Hz); this component's props do not change with it.
+export const DeviceControls = memo(function DeviceControls(props: {
   micEnabled: boolean;
   setMicEnabled: React.Dispatch<React.SetStateAction<boolean>>;
   camEnabled: boolean;
@@ -395,4 +398,4 @@ export function DeviceControls(props: {
       </div>
     </div>
   );
-}
+});

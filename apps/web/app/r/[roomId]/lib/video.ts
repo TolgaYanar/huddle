@@ -404,3 +404,20 @@ export function getKickEmbedSrc(rawUrl: string): string | null {
     return null;
   }
 }
+
+/**
+ * Returns `rawUrl` when it is safe to render as a link, otherwise null.
+ * Room URLs come from any member and the server only bounds their length, so
+ * a `javascript:`, `data:` or custom-scheme value could otherwise reach an
+ * `<a href>`. React 19 happens to neutralise `javascript:` today; this does not
+ * rely on that and rejects every scheme except http(s).
+ */
+export function toSafeExternalHref(rawUrl: string | null | undefined) {
+  if (typeof rawUrl !== "string" || !rawUrl) return null;
+  try {
+    const { protocol } = new URL(rawUrl);
+    return protocol === "http:" || protocol === "https:" ? rawUrl : null;
+  } catch {
+    return null;
+  }
+}

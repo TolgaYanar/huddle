@@ -121,27 +121,39 @@ export function ImageEditor({ src, onClose, onSave }: ImageEditorProps) {
     setDraftRect(null);
     setTainted(false);
 
+    // The CORS-fallback image is created inside onerror, out of reach of the
+    // cleanup below, so a slow fallback for a previous src could land after
+    // the next one loaded and replace it. Every handler checks this first.
+    let cancelled = false;
+
     const img = new Image();
     if (!src.startsWith("data:")) img.crossOrigin = "anonymous";
     img.onload = () => {
+      if (cancelled) return;
       imageRef.current = img;
       setImgState("ready");
     };
     img.onerror = () => {
+      if (cancelled) return;
       // If CORS blocked anonymous load, retry without — we can still render
       // it for visual editing, but toDataURL will be tainted.
       const img2 = new Image();
       img2.onload = () => {
+        if (cancelled) return;
         imageRef.current = img2;
         setTainted(true);
         setImgState("ready");
       };
-      img2.onerror = () => setImgState("error");
+      img2.onerror = () => {
+        if (cancelled) return;
+        setImgState("error");
+      };
       img2.src = src;
     };
     img.src = src;
 
     return () => {
+      cancelled = true;
       img.onload = null;
       img.onerror = null;
     };

@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { memo } from "react";
 import Image from "next/image";
 
 import { Modal } from "../../../components/Modal";
@@ -15,7 +16,9 @@ interface VideoPreviewModalProps {
   onClose: () => void;
 }
 
-export function VideoPreviewModal({
+// Memoised: the room view re-renders on every playback-position update
+// (~4 Hz); this component's props do not change with it.
+export const VideoPreviewModal = memo(function VideoPreviewModal({
   showPreviewModal,
   videoPreview,
   isPreviewLoading,
@@ -109,4 +112,4 @@ export function VideoPreviewModal({
       </div>
     </Modal>
   );
-}
+});

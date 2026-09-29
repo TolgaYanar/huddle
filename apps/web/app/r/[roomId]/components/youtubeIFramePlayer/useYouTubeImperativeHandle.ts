@@ -1,6 +1,7 @@
 import React from "react";
 
 import type { YTPlayer, YouTubeIFramePlayerHandle } from "./types";
+import { syncDebug } from "../../lib/syncDebug";
 
 export function useYouTubeImperativeHandle(
   ref: React.ForwardedRef<YouTubeIFramePlayerHandle>,
@@ -26,7 +27,7 @@ export function useYouTubeImperativeHandle(
       seekTo: (seconds: number) => {
         const player = playerRef.current;
         if (!player || typeof player.seekTo !== "function") {
-          console.log(`[YT-IFRAME] seekTo skipped - player not ready`);
+          syncDebug(`[YT-IFRAME] seekTo skipped - player not ready`);
           return;
         }
         try {

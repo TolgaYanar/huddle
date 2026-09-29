@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { syncDebug } from "../lib/syncDebug";
 
 export function SilentAudio() {
   useEffect(() => {
@@ -8,8 +9,12 @@ export function SilentAudio() {
     let osc: OscillatorNode | null = null;
     let gain: GainNode | null = null;
     let resumeTimer: number | null = null;
+    // Set on unmount. osc.stop() in the cleanup can fire onended, which would
+    // otherwise rebuild the context, listeners and interval after unmount.
+    let disposed = false;
 
     const keepAlive = () => {
+      if (disposed) return;
       if (!ctx || ctx.state === "closed") {
         // Recreate if the context was closed by the browser while hidden.
         ctx = null;
@@ -27,7 +32,7 @@ export function SilentAudio() {
     };
 
     const startAudio = () => {
-      if (ctx) return;
+      if (disposed || ctx) return;
 
       try {
         const win = window as Window & {
@@ -54,12 +59,13 @@ export function SilentAudio() {
         gain.gain.value = 0.001;
 
         osc.start();
-        console.log(
-          "🔊 Audio Context Started (Background Throttling Disabled)",
-        );
+        syncDebug("🔊 Audio Context Started (Background Throttling Disabled)");
 
         // If the browser suspends/ends the oscillator, try to rebuild.
         osc.onended = () => {
+          // Close the old context before rebuilding: browsers cap how many a
+          // page may hold, and a leaked one keeps its audio thread alive.
+          ctx?.close().catch(() => {});
           ctx = null;
           osc = null;
           gain = null;
@@ -82,7 +88,7 @@ export function SilentAudio() {
 
     const unlock = () => {
       startAudio();
-      if (ctx && ctx.state === "suspended") ctx.resume();
+      if (ctx && ctx.state === "suspended") ctx.resume().catch(() => {});
       // We don't remove listeners immediately in case the first click fails
     };
 
@@ -97,9 +103,13 @@ export function SilentAudio() {
       document.removeEventListener("visibilitychange", keepAlive);
       window.removeEventListener("pageshow", keepAlive);
       window.removeEventListener("focus", keepAlive);
+      disposed = true;
       if (resumeTimer) window.clearInterval(resumeTimer);
-      if (osc) osc.stop();
-      if (ctx) ctx.close();
+      if (osc) {
+        osc.onended = null;
+        osc.stop();
+      }
+      if (ctx) ctx.close().catch(() => {});
     };
   }, []);
 

@@ -134,6 +134,40 @@ export const SoundCloudEmbed = forwardRef<
   const suppressNextPauseRef = useRef(false);
   const suppressNextSeekRef = useRef(false);
 
+  // The widget binding lives for the whole track, but READY fires seconds
+  // after mount. Reading props through this ref (instead of the [src]
+  // effect's closure) means a play, volume or mute change that arrived while
+  // the widget was loading is applied on READY rather than lost, and the
+  // event callbacks are never stale.
+  const latestRef = useRef({
+    isPlaying,
+    currentTime,
+    volume,
+    muted,
+    onPlay,
+    onPause,
+    onSeek,
+    onProgress,
+    onDuration,
+    onReady,
+    onError,
+  });
+  useEffect(() => {
+    latestRef.current = {
+      isPlaying,
+      currentTime,
+      volume,
+      muted,
+      onPlay,
+      onPause,
+      onSeek,
+      onProgress,
+      onDuration,
+      onReady,
+      onError,
+    };
+  });
+
   useImperativeHandle(
     ref,
     () => ({
@@ -169,26 +203,27 @@ export const SoundCloudEmbed = forwardRef<
 
         widget.bind(window.SC.Widget.Events.READY, () => {
           isReadyRef.current = true;
+          const latest = latestRef.current;
           // Pull initial duration; SC sets it after the track metadata loads.
           widget.getDuration((ms) => {
             const sec = ms / 1000;
             if (Number.isFinite(sec) && sec > 0) {
               lastDurationSecRef.current = sec;
-              onDuration(sec);
+              latestRef.current.onDuration(sec);
             }
           });
           // SoundCloud volume is 0..100; the room uses 0..1.
           widget.setVolume(
-            muted ? 0 : Math.max(0, Math.min(100, volume * 100)),
+            latest.muted ? 0 : Math.max(0, Math.min(100, latest.volume * 100)),
           );
-          onReady();
-          if (isPlaying) {
+          latest.onReady();
+          if (latest.isPlaying) {
             suppressNextPlayRef.current = true;
             widget.play();
           }
-          if (currentTime > 0.5) {
+          if (latest.currentTime > 0.5) {
             suppressNextSeekRef.current = true;
-            widget.seekTo(currentTime * 1000);
+            widget.seekTo(latest.currentTime * 1000);
           }
         });
 
@@ -198,7 +233,7 @@ export const SoundCloudEmbed = forwardRef<
             return;
           }
           if (applyingRemoteSyncRef.current) return;
-          onPlay();
+          latestRef.current.onPlay();
         });
 
         widget.bind(window.SC.Widget.Events.PAUSE, () => {
@@ -207,7 +242,7 @@ export const SoundCloudEmbed = forwardRef<
             return;
           }
           if (applyingRemoteSyncRef.current) return;
-          onPause();
+          latestRef.current.onPause();
         });
 
         widget.bind(window.SC.Widget.Events.SEEK, (data) => {
@@ -221,7 +256,7 @@ export const SoundCloudEmbed = forwardRef<
               ? (data as { currentPosition?: number }).currentPosition
               : undefined;
           if (typeof positionMs === "number" && Number.isFinite(positionMs)) {
-            onSeek?.(positionMs / 1000);
+            latestRef.current.onSeek?.(positionMs / 1000);
           }
         });
 
@@ -233,15 +268,15 @@ export const SoundCloudEmbed = forwardRef<
           if (typeof positionMs === "number" && Number.isFinite(positionMs)) {
             const sec = positionMs / 1000;
             lastPositionSecRef.current = sec;
-            onProgress(sec);
+            latestRef.current.onProgress(sec);
           }
         });
 
         widget.bind(window.SC.Widget.Events.ERROR, (err) => {
-          onError(err);
+          latestRef.current.onError(err);
         });
       })
-      .catch(onError);
+      .catch((err) => latestRef.current.onError(err));
 
     return () => {
       cancelled = true;
@@ -261,8 +296,7 @@ export const SoundCloudEmbed = forwardRef<
       widgetRef.current = null;
       isReadyRef.current = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [src]);
+  }, [src, applyingRemoteSyncRef]);
 
   // Push room state -> widget.
   useEffect(() => {

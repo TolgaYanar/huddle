@@ -125,7 +125,9 @@ export function useRoomState({
       setPasswordError(
         data.reason === "invalid"
           ? "Wrong password. Try again."
-          : "This room requires a password.",
+          : data.reason === "throttled"
+            ? "Too many wrong passwords for this room. Wait a minute and try again."
+            : "This room requires a password.",
       );
 
       if (data.reason === "invalid") {
