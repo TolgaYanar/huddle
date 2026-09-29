@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { createRouteRateLimiter } from "../_lib/rateLimit";
+import { upstreamSignal } from "../_lib/upstream";
 import { extractYouTubeVideoId } from "../_lib/youtube";
 
 export const runtime = "nodejs";
@@ -98,7 +99,10 @@ async function getYouTubeVideoInfo(
     // Fallback: Use oEmbed API (doesn't require API key)
     try {
       const oembedUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`;
-      const res = await fetch(oembedUrl, { cache: "no-store" });
+      const res = await fetch(oembedUrl, {
+        cache: "no-store",
+        signal: upstreamSignal(),
+      });
 
       if (res.ok) {
         const data = await res.json();
@@ -134,7 +138,10 @@ async function getYouTubeVideoInfo(
     endpoint.searchParams.set("id", videoId);
     endpoint.searchParams.set("key", apiKey);
 
-    const res = await fetch(endpoint.toString(), { cache: "no-store" });
+    const res = await fetch(endpoint.toString(), {
+      cache: "no-store",
+      signal: upstreamSignal(),
+    });
     const body: unknown = await res.json().catch(() => null);
 
     if (!res.ok || !isRecord(body)) {
@@ -265,6 +272,7 @@ async function getKickInfo(channel: string): Promise<VideoInfoResponse> {
   try {
     const res = await fetch(`https://kick.com/api/v1/channels/${channel}`, {
       cache: "no-store",
+      signal: upstreamSignal(),
       headers: {
         Accept: "application/json",
       },

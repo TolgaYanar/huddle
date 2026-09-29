@@ -30,13 +30,28 @@ describe("isPrivateIp", () => {
     "fd00::1",
     "fc00::1",
     "64:ff9b::7f00:1", // NAT64-embedded 127.0.0.1
+    "64:ff9b:1::1", // local-use NAT64
+    "2002:a9fe:a9fe::", // 6to4-embedded 169.254.169.254
+    "2002:7f00:1::1", // 6to4-embedded 127.0.0.1
+    "2001:0:4136:e378::1", // Teredo
+    "2001:db8::1", // documentation
+    "100::1", // discard-only
+    "fec0::1", // site-local
+    "ff02::1", // multicast
   ];
 
   it.each(blocked)("blocks %s", (ip) => {
     expect(isPrivateIp(ip)).toBe(true);
   });
 
-  const allowed = ["8.8.8.8", "1.1.1.1", "93.184.216.34", "2606:4700::1111"];
+  const allowed = [
+    "8.8.8.8",
+    "1.1.1.1",
+    "93.184.216.34",
+    "2606:4700::1111",
+    "2002:808:808::1", // 6to4-embedded 8.8.8.8 is public
+    "2001:4860:4860::8888", // 2001:: outside Teredo and documentation
+  ];
 
   it.each(allowed)("allows %s", (ip) => {
     expect(isPrivateIp(ip)).toBe(false);

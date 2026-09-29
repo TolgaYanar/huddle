@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { createRouteRateLimiter } from "../_lib/rateLimit";
+import { clampIntParam, upstreamSignal } from "../_lib/upstream";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -118,10 +119,7 @@ export async function GET(req: Request) {
   }
 
   const maxResultsRaw = searchParams.get("maxResults");
-  const maxResults = Math.min(
-    50,
-    Math.max(1, maxResultsRaw ? Number(maxResultsRaw) : 50),
-  );
+  const maxResults = clampIntParam(maxResultsRaw, 50, 1, 50);
 
   try {
     // First, get playlist info
@@ -134,6 +132,7 @@ export async function GET(req: Request) {
 
     const playlistRes = await fetch(playlistEndpoint.toString(), {
       cache: "no-store",
+      signal: upstreamSignal(),
     });
     const playlistBody: unknown = await playlistRes.json().catch(() => null);
 
@@ -170,7 +169,10 @@ export async function GET(req: Request) {
         endpoint.searchParams.set("pageToken", nextPageToken);
       }
 
-      const res = await fetch(endpoint.toString(), { cache: "no-store" });
+      const res = await fetch(endpoint.toString(), {
+        cache: "no-store",
+        signal: upstreamSignal(),
+      });
       const body: unknown = await res.json().catch(() => null);
 
       if (!res.ok) {

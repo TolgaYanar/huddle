@@ -1,12 +1,29 @@
 import { NextResponse } from "next/server";
 
 import { createRouteRateLimiter } from "../_lib/rateLimit";
+import { createTtlCache } from "../_lib/ttlCache";
+import { upstreamSignal } from "../_lib/upstream";
 import { extractYouTubeVideoId } from "../_lib/youtube";
 
 export const runtime = "nodejs";
 
 const limiter = createRouteRateLimiter({ windowMs: 60_000, max: 60 });
 const MAX_URL_LENGTH = 2048;
+
+type PreviewOk = {
+  ok: true;
+  videoId: string;
+  title: string;
+  thumbnail: string | null;
+  durationSeconds: number | null;
+};
+
+// A video's title and duration don't change between previews, and the same
+// links get pasted repeatedly. Cache successes by id to save quota.
+const previewCache = createTtlCache<PreviewOk>({
+  max: 1000,
+  ttlMs: 6 * 60 * 60_000,
+});
 
 function parseIso8601DurationToSeconds(iso: string): number | null {
   // e.g. PT1H2M3S, PT4M, PT50S
@@ -44,6 +61,9 @@ export async function GET(req: Request) {
     );
   }
 
+  const cached = previewCache.get(videoId);
+  if (cached) return NextResponse.json(cached, { status: 200 });
+
   try {
     const endpoint = new URL("https://www.googleapis.com/youtube/v3/videos");
     endpoint.searchParams.set("part", "snippet,contentDetails");
@@ -53,6 +73,7 @@ export async function GET(req: Request) {
     const res = await fetch(endpoint.toString(), {
       // Best effort: avoid caching quota errors.
       cache: "no-store",
+      signal: upstreamSignal(),
     });
 
     const body = await res.json().catch(() => null);
@@ -71,7 +92,12 @@ export async function GET(req: Request) {
         );
       }
 
-      return NextResponse.json({ ok: false, reason }, { status: 200 });
+      // Google's raw reason (keyInvalid, API_KEY_HTTP_REFERRER_BLOCKED, ...)
+      // describes our key's configuration; don't hand it to anonymous callers.
+      return NextResponse.json(
+        { ok: false, reason: "youtube_api_error" },
+        { status: 200 },
+      );
     }
 
     const item = body?.items?.[0];
@@ -99,16 +125,15 @@ export async function GET(req: Request) {
         ? parseIso8601DurationToSeconds(durationIso)
         : null;
 
-    return NextResponse.json(
-      {
-        ok: true,
-        videoId,
-        title,
-        thumbnail: thumbnailUrl,
-        durationSeconds,
-      },
-      { status: 200 },
-    );
+    const preview: PreviewOk = {
+      ok: true,
+      videoId,
+      title,
+      thumbnail: thumbnailUrl,
+      durationSeconds,
+    };
+    previewCache.set(videoId, preview);
+    return NextResponse.json(preview, { status: 200 });
   } catch {
     return NextResponse.json({ ok: false, reason: "network" }, { status: 200 });
   }

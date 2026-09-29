@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { createRouteRateLimiter } from "../_lib/rateLimit";
+import { readBytesWithLimit } from "../_lib/upstream";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -158,14 +159,16 @@ export async function GET(req: Request) {
         "The image service took too long. Try again.",
       );
     }
-    const msg =
-      lastError instanceof Error ? lastError.message : String(lastError);
+    // The raw error (DNS/undici text) describes our network, not the
+    // user's request; log it and keep the hint generic.
+    console.error("[image-generate] upstream fetch failed:", lastError);
     return jsonError(
       "network",
-      `Couldn't reach the image service: ${msg}. Try again in a moment.`,
+      "Couldn't reach the image service. Try again in a moment.",
     );
   }
 
+  if (!res.ok) res.body?.cancel().catch(() => {});
   if (res.status === 429 || res.status === 503) {
     return jsonError(
       "upstream_busy",
@@ -179,24 +182,27 @@ export async function GET(req: Request) {
     );
   }
 
-  const arrayBuffer = await res.arrayBuffer();
-  if (arrayBuffer.byteLength > MAX_BYTES) {
-    return jsonError(
-      "image_too_large",
-      "Generated image is bigger than allowed. Try a simpler prompt.",
-    );
-  }
-
   const contentType =
     res.headers.get("content-type")?.split(";")[0]?.trim() || "image/jpeg";
   if (!contentType.startsWith("image/")) {
+    res.body?.cancel().catch(() => {});
     return jsonError(
       "bad_response",
       "The image service returned something that wasn't an image.",
     );
   }
 
-  const base64 = Buffer.from(arrayBuffer).toString("base64");
+  // Bounded read: arrayBuffer() buffered the whole body before the size
+  // check, so an oversized or endless response was held in memory in full.
+  const bytes = await readBytesWithLimit(res, MAX_BYTES);
+  if (!bytes) {
+    return jsonError(
+      "image_too_large",
+      "Generated image is bigger than allowed. Try a simpler prompt.",
+    );
+  }
+
+  const base64 = Buffer.from(bytes).toString("base64");
   const dataUrl = `data:${contentType};base64,${base64}`;
 
   cacheSet(cacheKey, dataUrl);
