@@ -56,7 +56,8 @@ const app = express();
 //
 // Through the Vercel rewrite the connecting address is Vercel's egress, not the
 // user; the user's address is only in x-vercel-forwarded-for, which a direct
-// request can forge, so it is deliberately not trusted here.
+// request can forge, so it is not trusted here. src/auth/clientIp.js accepts
+// the web proxy's copy of it only alongside PROXY_SHARED_SECRET.
 app.set("trust proxy", 2);
 
 const allowExtensionOrigins = readBooleanEnv("ALLOW_EXTENSION_ORIGINS");

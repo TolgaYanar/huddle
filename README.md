@@ -108,6 +108,8 @@ CLOUDFLARE_TURN_KEY_ID=<turn key id>
 CLOUDFLARE_TURN_API_TOKEN=<turn key api token>
 # Refuse to start rather than silently ship calls that fail on strict NAT.
 REQUIRE_TURN=1
+# Same value as on Vercel; lets rate limits see the user, not Vercel.
+PROXY_SHARED_SECRET=<openssl rand -hex 32>
 NODE_ENV=production
 ```
 
@@ -116,6 +118,8 @@ NODE_ENV=production
 ```env
 API_PROXY_TARGET=https://your-backend.railway.app
 YOUTUBE_API_KEY=<your-youtube-data-api-v3-key>
+# Same value as on Railway. Server-only: never prefix it with NEXT_PUBLIC_.
+PROXY_SHARED_SECRET=<openssl rand -hex 32>
 # Optional override; otherwise VERCEL_GIT_COMMIT_SHA is used automatically.
 NEXT_PUBLIC_APP_RELEASE=<git-sha-or-version>
 ```
@@ -130,6 +134,13 @@ parent domain with the web app **and** `COOKIE_DOMAIN` is set on the server to
 that shared domain. On a plain `*.vercel.app` + `*.railway.app` pair the two are
 cross-site, the session cookie is not sent, and the socket connects
 unauthenticated.
+
+`PROXY_SHARED_SECRET` must hold the same value on both sides. Behind the
+Vercel rewrite the backend only sees Vercel's egress address, so without it
+every visitor shares the backend's login and ICE rate limits with whoever else
+Vercel routed through the same address. A missing or mismatched value degrades
+to that behaviour rather than breaking anything; a mismatch logs
+`[client-ip] proxy secret mismatch` on Railway.
 
 🔴 **Important:** Redeploy Vercel after setting environment variables!
 

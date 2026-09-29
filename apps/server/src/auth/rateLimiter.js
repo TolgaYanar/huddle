@@ -1,3 +1,5 @@
+const { getClientIp } = require("./clientIp");
+
 /**
  * Simple in-memory sliding-window rate limiter (no external dependencies).
  * Periodically cleans up stale entries to avoid unbounded memory growth.
@@ -27,12 +29,10 @@ function createRateLimiter({
   if (cleanupInterval.unref) cleanupInterval.unref();
 
   return function rateLimiterMiddleware(req, res, next) {
-    const ip =
-      req.ip ||
-      (req.headers["x-forwarded-for"] || "").split(",")[0].trim() ||
-      req.connection?.remoteAddress ||
-      "unknown";
-    const key = typeof keyGenerator === "function" ? keyGenerator(req) : ip;
+    // Never read X-Forwarded-For directly here: req.ip already applies the
+    // trusted hop count, and the raw header's leftmost entry is client-chosen.
+    const key =
+      typeof keyGenerator === "function" ? keyGenerator(req) : getClientIp(req);
 
     const now = Date.now();
     const raw = store.get(key) || [];

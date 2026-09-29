@@ -11,7 +11,8 @@
     "SENTRY_DSN",
     "SENTRY_AUTH_TOKEN",
     "SENTRY_ORG",
-    "SENTRY_PROJECT"
+    "SENTRY_PROJECT",
+    "PROXY_SHARED_SECRET"
   ],
   "tasks": {
     "build": {
