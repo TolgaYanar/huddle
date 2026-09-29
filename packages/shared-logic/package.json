@@ -1,6 +1,10 @@
 {
   "name": "shared-logic",
   "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "test": "vitest run"
+  },
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
@@ -13,7 +17,8 @@
     "react": "*"
   },
   "devDependencies": {
+    "@types/react": "19.2.2",
     "typescript": "^5.0.0",
-    "@types/react": "^18.0.0"
+    "vitest": "^4.1.0"
   }
 }

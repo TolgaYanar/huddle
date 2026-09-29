@@ -81,7 +81,7 @@ npm run dev
 npm run format:check  # Prettier
 npm run lint          # ESLint (web)
 npm run check-types   # tsc (web + extension)
-npm run test          # vitest (web + extension) + node:test (server)
+npm run test          # vitest (web + extension + shared-logic) + node:test (server)
 npm run build         # next build + prisma generate + extension bundle
 ```
 
@@ -106,7 +106,6 @@ CORS_ORIGINS=https://yourdomain.com
 # TURN relay so calls work across symmetric NAT (see apps/server/.env.example)
 CLOUDFLARE_TURN_KEY_ID=<turn key id>
 CLOUDFLARE_TURN_API_TOKEN=<turn key api token>
-REQUIRE_TURN=1
 # Refuse to start rather than silently ship calls that fail on strict NAT.
 REQUIRE_TURN=1
 NODE_ENV=production
