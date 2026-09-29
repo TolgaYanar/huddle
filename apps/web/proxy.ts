@@ -7,14 +7,15 @@ import { buildUpstreamHeaders } from "./app/lib/forwardedClient";
 // /socket.io: nothing there needs it, and it would put a function in front of
 // every websocket upgrade.
 export function proxy(request: NextRequest) {
-  return NextResponse.next({
-    request: {
-      headers: buildUpstreamHeaders(
-        request.headers,
-        process.env.PROXY_SHARED_SECRET,
-      ),
-    },
-  });
+  const headers = buildUpstreamHeaders(
+    request.headers,
+    process.env.PROXY_SHARED_SECRET,
+  );
+  // TEMPORARY: marks requests that passed through this proxy so the backend
+  // can tell a dropped header from a missing secret. Remove with the log in
+  // apps/server/index.js.
+  headers.set("x-huddle-proxied", "1");
+  return NextResponse.next({ request: { headers } });
 }
 
 export const config = {
