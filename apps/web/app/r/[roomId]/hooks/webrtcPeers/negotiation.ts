@@ -183,10 +183,38 @@ export class PeerNegotiator {
           "WebRTC answer could not be sent while signaling was offline",
         );
       }
+      // Nothing else would ever offer a track this answer could not carry:
+      // this side is not the pair's deterministic initiator, and the
+      // browser's negotiationneeded has no listener. Offer it once stable.
+      if (this.hasUnnegotiatedLocalTrack()) this.offerPending = true;
     }
 
     await this.flushPendingOffer();
     return true;
+  }
+
+  /**
+   * A live local track that no negotiated m-line carries yet.
+   *
+   * The remote offer decides which media kinds an answer may include, so a
+   * track syncTracks() attached for a kind that offer lacked is left on a
+   * transceiver with no mid. When the pair's initiator had no camera, the
+   * answerer's camera never reached it; when it had only a camera, the
+   * answerer's microphone never did. Measured in rooms of three to six, a
+   * participant who turned on only their camera heard nobody whose socket id
+   * sorted above theirs, and one with only a microphone saw none of those
+   * participants' cameras. Only an unassociated transceiver counts: our next
+   * offer gives it a mid, so this cannot trigger a second round.
+   */
+  private hasUnnegotiatedLocalTrack() {
+    return this.pc
+      .getTransceivers()
+      .some(
+        (transceiver) =>
+          transceiver.mid === null &&
+          transceiver.currentDirection !== "stopped" &&
+          transceiver.sender.track?.readyState === "live",
+      );
   }
 
   shouldIgnoreIceError() {

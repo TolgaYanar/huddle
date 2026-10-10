@@ -9,6 +9,15 @@ class FakePeerConnection {
   offers = 0;
   answers = 0;
   offerGate: Promise<void> | null = null;
+  transceivers: Array<{
+    mid: string | null;
+    currentDirection: RTCRtpTransceiverDirection | null;
+    sender: { track: { readyState: MediaStreamTrackState } | null };
+  }> = [];
+
+  getTransceivers() {
+    return this.transceivers;
+  }
 
   async createOffer() {
     await this.offerGate;
@@ -323,5 +332,69 @@ describe("PeerNegotiator rolled-back offers", () => {
     expect(accepted).toBe(false);
     expect(sendAnswer).not.toHaveBeenCalled();
     expect(sendOffer).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("PeerNegotiator tracks an answer cannot carry", () => {
+  it("offers a local track the remote offer had no m-line for", async () => {
+    // Measured in three- to six-person rooms: the pair's initiator joined
+    // with only a camera, so its offer had no audio section and the answerer's
+    // microphone sat on a transceiver with no mid. That initiator never heard
+    // the answerer, for as long as both stayed in the room.
+    const pc = new FakePeerConnection();
+    const { negotiator, sendOffer, sendAnswer, syncTracks } = createNegotiator(
+      pc,
+      false,
+    );
+    syncTracks.mockImplementation(() => {
+      pc.transceivers = [
+        {
+          mid: "0",
+          currentDirection: "sendrecv",
+          sender: { track: { readyState: "live" } },
+        },
+        {
+          mid: null,
+          currentDirection: null,
+          sender: { track: { readyState: "live" } },
+        },
+      ];
+    });
+
+    await expect(
+      negotiator.receiveDescription({ type: "offer", sdp: "video-only-offer" }),
+    ).resolves.toBe(true);
+
+    expect(sendAnswer).toHaveBeenCalledTimes(1);
+    expect(sendOffer).toHaveBeenCalledTimes(1);
+    expect(sendAnswer.mock.invocationCallOrder[0]).toBeLessThan(
+      sendOffer.mock.invocationCallOrder[0] ?? 0,
+    );
+    expect(pc.signalingState).toBe("have-local-offer");
+  });
+
+  it("does not re-offer when the answer carried every local track", async () => {
+    const pc = new FakePeerConnection();
+    pc.transceivers = [
+      {
+        mid: "0",
+        currentDirection: "sendrecv",
+        sender: { track: { readyState: "live" } },
+      },
+      // A sender whose track already ended needs no negotiation.
+      {
+        mid: null,
+        currentDirection: null,
+        sender: { track: { readyState: "ended" } },
+      },
+      { mid: null, currentDirection: null, sender: { track: null } },
+    ];
+    const { negotiator, sendOffer, sendAnswer } = createNegotiator(pc, false);
+
+    await negotiator.receiveDescription({ type: "offer", sdp: "remote-offer" });
+
+    expect(sendAnswer).toHaveBeenCalledTimes(1);
+    expect(sendOffer).not.toHaveBeenCalled();
+    expect(pc.signalingState).toBe("stable");
   });
 });
