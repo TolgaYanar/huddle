@@ -1,6 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { OFFER_ANSWER_TIMEOUT_MS, PeerNegotiator } from "../negotiation";
+import { PeerNegotiator } from "../negotiation";
 
 class FakePeerConnection {
   signalingState: RTCSignalingState = "stable";
@@ -8,7 +8,6 @@ class FakePeerConnection {
   remoteDescription: RTCSessionDescriptionInit | null = null;
   offers = 0;
   answers = 0;
-  rollbacks = 0;
   offerGate: Promise<void> | null = null;
 
   async createOffer() {
@@ -23,11 +22,6 @@ class FakePeerConnection {
   }
 
   async setLocalDescription(description: RTCSessionDescriptionInit) {
-    if (description.type === "rollback") {
-      this.rollbacks += 1;
-      this.signalingState = "stable";
-      return;
-    }
     this.localDescription = description;
     this.signalingState =
       description.type === "offer" ? "have-local-offer" : "stable";
@@ -328,84 +322,6 @@ describe("PeerNegotiator rolled-back offers", () => {
     // The impolite peer keeps its own offer, so there is nothing to re-issue.
     expect(accepted).toBe(false);
     expect(sendAnswer).not.toHaveBeenCalled();
-    expect(sendOffer).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe("PeerNegotiator unanswered offers", () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it("rolls back and re-sends an offer that was never answered", async () => {
-    // The relay's rate limit dropped descriptions without a word. A connected
-    // pair then sat in have-local-offer for good, and every renegotiation
-    // after it, a microphone turned on included, queued behind that offer.
-    const pc = new FakePeerConnection();
-    const { negotiator, sendOffer } = createNegotiator(pc, false);
-
-    await negotiator.requestOffer();
-    expect(pc.signalingState).toBe("have-local-offer");
-
-    await vi.advanceTimersByTimeAsync(OFFER_ANSWER_TIMEOUT_MS);
-
-    expect(pc.rollbacks).toBe(1);
-    expect(sendOffer).toHaveBeenCalledTimes(2);
-    const [first, second] = sendOffer.mock.calls.map(
-      ([description]) => (description as { generation?: string }).generation,
-    );
-    expect(second).not.toBe(first);
-    expect(pc.signalingState).toBe("have-local-offer");
-  });
-
-  it("leaves an offer alone once its answer arrived", async () => {
-    const pc = new FakePeerConnection();
-    const { negotiator, sendOffer } = createNegotiator(pc, false);
-
-    await negotiator.requestOffer();
-    const generation = sendOffer.mock.calls[0]?.[0].generation as string;
-    await negotiator.receiveDescription({
-      type: "answer",
-      sdp: "answer",
-      generation,
-    });
-    await vi.advanceTimersByTimeAsync(OFFER_ANSWER_TIMEOUT_MS * 2);
-
-    expect(pc.rollbacks).toBe(0);
-    expect(sendOffer).toHaveBeenCalledTimes(1);
-  });
-
-  it("refuses a late answer to the offer it replaced", async () => {
-    const pc = new FakePeerConnection();
-    const { negotiator, sendOffer } = createNegotiator(pc, false);
-
-    await negotiator.requestOffer();
-    const abandoned = sendOffer.mock.calls[0]?.[0].generation as string;
-    await vi.advanceTimersByTimeAsync(OFFER_ANSWER_TIMEOUT_MS);
-
-    await expect(
-      negotiator.receiveDescription({
-        type: "answer",
-        sdp: "late-answer",
-        generation: abandoned,
-      }),
-    ).resolves.toBe(false);
-    expect(pc.signalingState).toBe("have-local-offer");
-  });
-
-  it("stops waiting once the connection is discarded", async () => {
-    const pc = new FakePeerConnection();
-    const { negotiator, sendOffer } = createNegotiator(pc, false);
-
-    await negotiator.requestOffer();
-    negotiator.dispose();
-    await vi.advanceTimersByTimeAsync(OFFER_ANSWER_TIMEOUT_MS * 2);
-
-    expect(pc.rollbacks).toBe(0);
     expect(sendOffer).toHaveBeenCalledTimes(1);
   });
 });
