@@ -288,6 +288,19 @@ only. A remote track being `live` does not mean media is flowing — verify with
 `getStats()` (`outbound-rtp.packetsSent`, `inbound-rtp.packetsReceived` and
 `totalAudioEnergy`), never with `track.readyState`.
 
+An answer can only carry the media sections the remote offer contained. When
+a pair's deterministic initiator has no microphone or no camera, its offer has
+no section of that kind, and a track the answerer attaches while answering is
+left on a transceiver with no `mid`. The browser fires `negotiationneeded` for
+it, which nothing listens to, and the answerer never initiates for that pair.
+`receiveDescription` therefore arms `offerPending` after answering whenever a
+live local track is still unassociated, so the answerer offers it once stable.
+Without it, in rooms of three to six, a participant who turned on only their
+camera heard nobody whose socket id sorted above theirs, and one with only a
+microphone saw none of those participants' cameras. Do not replace this with an
+`onnegotiationneeded` handler: the higher-id side would then offer at peer
+creation and make glare the norm on every pair.
+
 A sender can also finish a renegotiation holding a live, enabled track on a
 `sendrecv` transceiver, with both descriptions agreeing, while its encoder was
 never started. Nothing reports a fault: `outbound-rtp` exists and says
