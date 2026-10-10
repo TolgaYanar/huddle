@@ -302,6 +302,14 @@ connects and, if it is still zero, detaches and re-attaches the track
 touches neither the description nor ICE, so a call that is already working
 cannot be disturbed, and the check is bounded to `SENDER_STALL_ATTEMPTS`.
 
+Cameras stall the same way — in six-person rooms on a TURN relay two to four
+video senders per run never encoded a frame — so the check covers every
+sender, skipping a muted camera, which legitimately has nothing to encode. It
+is also re-armed whenever an exchange settles to `stable` on a connected peer,
+and it waits for `stable`: a microphone or camera turned on mid-call used to
+get no check at all, and judging a sender while the offer that attached it is
+unanswered only reports the expected zero.
+
 Treat each
 `room_users` payload as authoritative: peers absent from its `users` list must
 be closed even if a preceding `user_left` event was missed during reconnect.

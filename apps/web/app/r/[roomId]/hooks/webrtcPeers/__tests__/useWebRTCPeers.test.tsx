@@ -17,6 +17,28 @@ type RoomUsersListener = (
 type PresenceListener = (peer: string) => void | Promise<void>;
 type OfferListener = (data: WebRTCOfferPayload) => void | Promise<void>;
 
+type FakeTrack = {
+  kind: string;
+  enabled: boolean;
+  readyState: string;
+  muted: boolean;
+};
+
+type FakeSender = {
+  track: FakeTrack | null;
+  replaceTrack: ReturnType<typeof vi.fn>;
+};
+
+function createFakeSender(kind: string, muted = false): FakeSender {
+  const sender: FakeSender = {
+    track: { kind, enabled: true, readyState: "live", muted },
+    replaceTrack: vi.fn(async (next: FakeTrack | null) => {
+      sender.track = next;
+    }),
+  };
+  return sender;
+}
+
 class FakePeerConnection {
   static configs: RTCConfiguration[] = [];
   static instances: FakePeerConnection[] = [];
@@ -66,34 +88,46 @@ class FakePeerConnection {
     FakePeerConnection.instances.push(this);
   }
 
-  // Optional audio sender, for the stalled-encoder watchdog. Left unset the
-  // fake behaves exactly as before for every other test.
-  audioSender: {
-    track: { kind: string; enabled: boolean; readyState: string } | null;
-    replaceTrack: ReturnType<typeof vi.fn>;
-  } | null = null;
+  // Optional audio and video senders, for the stalled-encoder watchdog. Left
+  // unset the fake behaves exactly as before for every other test.
+  audioSender: FakeSender | null = null;
+  videoSender: FakeSender | null = null;
   packetsSent = 0;
+  videoPacketsSent = 0;
 
   attachAudioSender() {
-    const track = { kind: "audio", enabled: true, readyState: "live" };
-    this.audioSender = {
-      track,
-      replaceTrack: vi.fn(async (next: typeof track | null) => {
-        this.audioSender!.track = next;
-      }),
-    };
+    this.audioSender = createFakeSender("audio");
     return this.audioSender;
   }
 
-  getStats = vi.fn(async () => {
-    const rows = this.audioSender
-      ? [{ type: "outbound-rtp", kind: "audio", packetsSent: this.packetsSent }]
-      : [];
+  attachVideoSender(muted = false) {
+    this.videoSender = createFakeSender("video", muted);
+    return this.videoSender;
+  }
+
+  getStats = vi.fn(async (selector?: { kind?: string } | null) => {
+    const rows: unknown[] = [];
+    if (this.audioSender && (!selector || selector.kind === "audio")) {
+      rows.push({
+        type: "outbound-rtp",
+        kind: "audio",
+        packetsSent: this.packetsSent,
+      });
+    }
+    if (this.videoSender && (!selector || selector.kind === "video")) {
+      rows.push({
+        type: "outbound-rtp",
+        kind: "video",
+        packetsSent: this.videoPacketsSent,
+      });
+    }
     return { forEach: (fn: (row: unknown) => void) => rows.forEach(fn) };
   });
 
   getSenders() {
-    return this.audioSender ? [this.audioSender] : [];
+    return [this.audioSender, this.videoSender].filter(
+      (sender): sender is FakeSender => sender !== null,
+    );
   }
 
   getTransceivers() {
@@ -625,7 +659,7 @@ describe("useWebRTCPeers connection recovery", () => {
   });
 });
 
-describe("useWebRTCPeers stalled audio encoder", () => {
+describe("useWebRTCPeers stalled encoders", () => {
   beforeEach(() => {
     FakePeerConnection.configs = [];
     FakePeerConnection.instances = [];
@@ -675,6 +709,98 @@ describe("useWebRTCPeers stalled audio encoder", () => {
     });
 
     expect(sender.replaceTrack).not.toHaveBeenCalled();
+    harness.unmount();
+  });
+
+  it("re-attaches a camera whose encoder never sent a packet", async () => {
+    // Six-person rooms on a TURN relay left two to four cameras per run that
+    // never encoded a frame, while their audio was revived.
+    vi.useFakeTimers();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(iceResponse([TURN], 600)));
+
+    const harness = renderPeers(MEMBERSHIP_TOKEN);
+    const peer = await announcePeer(harness);
+    const audio = peer.attachAudioSender();
+    const video = peer.attachVideoSender();
+    const camera = video.track;
+    peer.packetsSent = 42;
+    peer.videoPacketsSent = 0;
+
+    await setConnectionState(peer, "connected", SENDER_STALL_CHECK_MS);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(video.replaceTrack).toHaveBeenNthCalledWith(1, null);
+    expect(video.replaceTrack).toHaveBeenNthCalledWith(2, camera);
+    expect(audio.replaceTrack).not.toHaveBeenCalled();
+    harness.unmount();
+  });
+
+  it("leaves a camera that is delivering no frames alone", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(iceResponse([TURN], 600)));
+
+    const harness = renderPeers(MEMBERSHIP_TOKEN);
+    const peer = await announcePeer(harness);
+    const video = peer.attachVideoSender(true);
+    peer.videoPacketsSent = 0;
+
+    await setConnectionState(peer, "connected", SENDER_STALL_CHECK_MS * 3);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(video.replaceTrack).not.toHaveBeenCalled();
+    harness.unmount();
+  });
+
+  it("checks a microphone turned on after the peer connected", async () => {
+    // The connect-time check found no microphone and never ran again, so a
+    // sender attached by a later renegotiation had no stall protection.
+    vi.useFakeTimers();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(iceResponse([TURN], 600)));
+
+    const harness = renderPeers(MEMBERSHIP_TOKEN);
+    const peer = await announcePeer(harness);
+    await setConnectionState(peer, "connected", SENDER_STALL_CHECK_MS * 3);
+
+    const sender = peer.attachAudioSender();
+    const track = sender.track;
+    peer.packetsSent = 0;
+    await act(async () => {
+      peer.signalingState = "stable";
+      peer.onsignalingstatechange?.();
+      await vi.advanceTimersByTimeAsync(SENDER_STALL_CHECK_MS);
+    });
+
+    expect(sender.replaceTrack).toHaveBeenNthCalledWith(1, null);
+    expect(sender.replaceTrack).toHaveBeenNthCalledWith(2, track);
+    harness.unmount();
+  });
+
+  it("waits for an exchange in flight before judging a sender", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(iceResponse([TURN], 600)));
+
+    const harness = renderPeers(MEMBERSHIP_TOKEN);
+    const peer = await announcePeer(harness);
+    const sender = peer.attachAudioSender();
+    peer.packetsSent = 0;
+    peer.signalingState = "have-local-offer";
+
+    await setConnectionState(peer, "connected", SENDER_STALL_CHECK_MS * 3);
+    // The offer that attached the track has not been answered: no packets
+    // yet is expected, not a stall.
+    expect(sender.replaceTrack).not.toHaveBeenCalled();
+
+    await act(async () => {
+      peer.signalingState = "stable";
+      peer.onsignalingstatechange?.();
+      await vi.advanceTimersByTimeAsync(SENDER_STALL_CHECK_MS);
+    });
+
+    expect(sender.replaceTrack).toHaveBeenCalledTimes(2);
     harness.unmount();
   });
 });
