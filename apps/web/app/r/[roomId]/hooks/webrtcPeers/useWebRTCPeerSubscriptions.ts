@@ -140,6 +140,11 @@ export function useWebRTCPeerSubscriptions<MediaState>(args: {
 
         for (const peerId of activePeerIds) {
           if (!latestRef.current.isPeerActive(peerId)) continue;
+          // A pair that already has a connection is negotiating or connected,
+          // and a snapshot changes nothing for it. Re-offering every existing
+          // pair on each join and leave renegotiated the whole mesh for every
+          // arrival, most of the signaling a crowded room produced.
+          if (latestRef.current.getExistingPeer(peerId)) continue;
           // Deterministic initiator to reduce offer glare.
           if (currentUserId < peerId) {
             try {

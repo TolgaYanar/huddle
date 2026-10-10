@@ -52,6 +52,7 @@ function createHarness(
   const activePeerIds = new Set<string>();
   const setRemoteMedia = vi.fn();
   const recoverPeer = vi.fn();
+  const sendOfferToPeer = vi.fn().mockResolvedValue(undefined);
 
   let openIceGate: () => void = () => {};
   const iceReady = new Promise<void>((resolve) => {
@@ -69,7 +70,7 @@ function createHarness(
       getExistingPeer,
       getExistingNegotiator,
       getPeerNegotiator: vi.fn(() => negotiator),
-      sendOfferToPeer: vi.fn().mockResolvedValue(undefined),
+      sendOfferToPeer,
       recoverPeer,
       closePeer: vi.fn(),
       syncTracksToPeer: vi.fn(),
@@ -139,9 +140,34 @@ function createHarness(
     getUserLeftListener: () => userLeftListener,
     setRemoteMedia,
     recoverPeer,
+    sendOfferToPeer,
     openIceGate: () => openIceGate(),
   };
 }
+
+describe("useWebRTCPeerSubscriptions room snapshots", () => {
+  it("does not renegotiate a pair that already has a connection", async () => {
+    // Every join and leave delivers a snapshot to everyone. Re-offering each
+    // existing pair on each one renegotiated the whole mesh for every arrival.
+    const harness = createHarness({
+      holdIceGate: true,
+      authoritativePeers: ["zzz-connected", "zzz-new"],
+    });
+    harness.getExistingPeer.mockImplementation((peerId?: string) =>
+      peerId === "zzz-connected" ? harness.peer : undefined,
+    );
+
+    await act(async () => {
+      harness.openIceGate();
+    });
+
+    // "self" sorts below both ids, so it is the initiator for both pairs.
+    await vi.waitFor(() =>
+      expect(harness.sendOfferToPeer).toHaveBeenCalledWith("zzz-new"),
+    );
+    expect(harness.sendOfferToPeer).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe("useWebRTCPeerSubscriptions signaling races", () => {
   it("forces recovery when applying an offer leaves signaling half-finished", async () => {

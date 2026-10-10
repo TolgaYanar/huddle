@@ -305,6 +305,20 @@ cannot be disturbed, and the check is bounded to `SENDER_STALL_ATTEMPTS`.
 Treat each
 `room_users` payload as authoritative: peers absent from its `users` list must
 be closed even if a preceding `user_left` event was missed during reconnect.
+A snapshot only starts negotiation for peers that have no connection yet; it
+used to re-offer every existing pair on every join and leave, which
+renegotiated the whole mesh for each arrival.
+
+Descriptions are a mesh-wide cost: each member negotiates with every other
+one, so `socket/handlers/webrtc.js` budgets offers and answers per recipient
+(30 per 10 s) under a per-socket total (120). A single 30 shared by all peers
+was exceeded by six people turning on their microphones together, and the
+relay drops over-budget descriptions without telling anyone. A dropped offer
+or answer used to strand a connected pair in `have-local-offer` for good —
+nothing else notices on a live transport, and every later renegotiation
+queued behind it — so `PeerNegotiator` rolls back an offer still unanswered
+after `OFFER_ANSWER_TIMEOUT_MS` (10 s) and sends a fresh one; the late answer
+to the abandoned offer is refused by its generation.
 Media permission promises cannot be cancelled by the browser, so
 `useMediaTracks` invalidates pending mic/camera/screen requests by generation
 and stops tracks from stale results. Keep the local preview on the callback ref:

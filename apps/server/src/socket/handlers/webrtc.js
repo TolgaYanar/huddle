@@ -20,10 +20,39 @@ function attachWebRTCHandlers(io, state, socket, deps) {
   // (up to 3 roomMessage rows per call) a flood would otherwise cause.
   const mediaStateLimiter = createSocketRateLimiter({ windowMs: 1000, max: 5 });
   // Offer/answer are relayed 1:1 and carry the largest payload in the
-  // signaling set. A normal session negotiates a handful of times per peer;
-  // 30/10s leaves room for renegotiation storms (mic/cam/screen toggles)
-  // while bounding egress amplification.
-  const sdpLimiter = createSocketRateLimiter({ windowMs: 10000, max: 30 });
+  // signaling set. A normal session negotiates a handful of times per peer,
+  // but a mesh call negotiates with every other member, so one budget shared
+  // by all of them starved crowded rooms: six people turning on their
+  // microphones together put 31-36 descriptions per 10 s on one socket, the
+  // excess was dropped without a word, and those pairs were left holding an
+  // offer nobody answered. Budget per recipient instead, so what any single
+  // peer can be sent stays at 30/10s, under a total cap that still bounds the
+  // egress one member can cause.
+  const SDP_WINDOW_MS = 10000;
+  const SDP_PER_PEER_MAX = 30;
+  const SDP_TOTAL_MAX = 120;
+  const MAX_SDP_PEER_BUDGETS = 64;
+  const sdpTotalLimiter = createSocketRateLimiter({
+    windowMs: SDP_WINDOW_MS,
+    max: SDP_TOTAL_MAX,
+  });
+  const sdpPeerLimiters = new Map();
+  const allowSdpTo = (to) => {
+    let limiter = sdpPeerLimiters.get(to);
+    if (!limiter) {
+      // Only current room members reach this point, so the map tracks real
+      // peers; bound it anyway for a socket that outlives many of them.
+      if (sdpPeerLimiters.size >= MAX_SDP_PEER_BUDGETS) {
+        sdpPeerLimiters.delete(sdpPeerLimiters.keys().next().value);
+      }
+      limiter = createSocketRateLimiter({
+        windowMs: SDP_WINDOW_MS,
+        max: SDP_PER_PEER_MAX,
+      });
+      sdpPeerLimiters.set(to, limiter);
+    }
+    return limiter() && sdpTotalLimiter();
+  };
   // Keep only the human-readable audit writes ordered. The latency-sensitive
   // media relay below remains synchronous and never waits for this queue.
   const mediaAuditTails = new Map();
@@ -86,7 +115,7 @@ function attachWebRTCHandlers(io, state, socket, deps) {
     if (!validGeneration(sdp.generation)) return;
     if (!isSocketInRoom(roomId, socket.id) || !isSocketInRoom(roomId, to))
       return;
-    if (!sdpLimiter()) return;
+    if (!allowSdpTo(to)) return;
     io.to(to).emit("webrtc_offer", {
       roomId,
       from: socket.id,
@@ -107,7 +136,7 @@ function attachWebRTCHandlers(io, state, socket, deps) {
     if (!validGeneration(sdp.generation)) return;
     if (!isSocketInRoom(roomId, socket.id) || !isSocketInRoom(roomId, to))
       return;
-    if (!sdpLimiter()) return;
+    if (!allowSdpTo(to)) return;
     io.to(to).emit("webrtc_answer", {
       roomId,
       from: socket.id,
