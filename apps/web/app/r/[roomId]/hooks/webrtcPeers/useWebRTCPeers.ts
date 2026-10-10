@@ -116,6 +116,17 @@ export function useWebRTCPeers<MediaState>(
     [],
   );
 
+  const scheduleSenderCheck = useCallback(
+    (peerId: string, pc: RTCPeerConnection) => {
+      clearPeerTimer(senderCheckTimersRef.current, peerId);
+      const timer = setTimeout(() => {
+        void reviveStalledSenderRef.current(peerId, pc, 0);
+      }, SENDER_STALL_CHECK_MS);
+      senderCheckTimersRef.current.set(peerId, timer);
+    },
+    [clearPeerTimer],
+  );
+
   const cancelPeerRecovery = useCallback(
     (peerId: string, resetAttempts = true) => {
       clearPeerTimer(recoveryTimersRef.current, peerId);
@@ -424,6 +435,10 @@ export function useWebRTCPeers<MediaState>(
         // an in-flight offer could be dropped for the rest of the session.
         if (pc.signalingState !== "stable") return;
         void negotiatorsRef.current.get(peerId)?.flushPendingOffer();
+        // The connect-time stall check runs once. Without this, a microphone
+        // or camera turned on mid-call, or a sender that went through a
+        // polite rollback afterwards, was never checked at all.
+        if (pc.connectionState === "connected") scheduleSenderCheck(peerId, pc);
       };
 
       pc.onconnectionstatechange = () => {
@@ -455,6 +470,7 @@ export function useWebRTCPeers<MediaState>(
     [
       peersRef,
       remoteStreamsRef,
+      scheduleSenderCheck,
       sendWebRTCIce,
       setPeerConnectionStatus,
       syncTracksToPeer,
@@ -576,43 +592,58 @@ export function useWebRTCPeers<MediaState>(
   // audio from it that the healthy side was sending. Detaching and
   // re-attaching the track rebuilds the encoder without touching the
   // description or ICE, so a call that is already working cannot be disturbed.
+  // Cameras stall the same way: in six-person rooms on a TURN relay, two to
+  // four video senders per run never encoded a frame while only audio was
+  // being checked. So every sender is checked.
   const reviveStalledSender = useCallback(
     async (peerId: string, pc: RTCPeerConnection, attempt: number) => {
       senderCheckTimersRef.current.delete(peerId);
       if (peersRef.current.get(peerId) !== pc) return;
       if (pc.connectionState !== "connected") return;
+      // A track attached by an exchange still in flight has not been able to
+      // send yet; the return to stable schedules this check again.
+      if (pc.signalingState !== "stable") return;
 
-      const sender = pc.getSenders().find((s) => s.track?.kind === "audio");
-      const track = sender?.track;
-      if (!sender || !track) return;
-      if (track.readyState !== "live" || !track.enabled) return;
+      const stalled: Array<{ sender: RTCRtpSender; track: MediaStreamTrack }> =
+        [];
+      for (const sender of pc.getSenders()) {
+        const track = sender.track;
+        if (!track || track.readyState !== "live" || !track.enabled) continue;
+        // A camera that is delivering no frames has nothing to encode.
+        if (track.kind === "video" && track.muted) continue;
 
-      let stalled = false;
-      try {
-        const report = await pc.getStats(track);
-        report.forEach((entry) => {
-          const stat = entry as {
-            type?: string;
-            kind?: string;
-            packetsSent?: number;
-          };
-          if (stat.type === "outbound-rtp" && stat.kind === "audio") {
-            stalled = (stat.packetsSent ?? 0) === 0;
-          }
-        });
-      } catch {
-        return;
+        let reported = false;
+        let packetsSent = 0;
+        try {
+          const report = await pc.getStats(track);
+          report.forEach((entry) => {
+            const stat = entry as {
+              type?: string;
+              kind?: string;
+              packetsSent?: number;
+            };
+            if (stat.type === "outbound-rtp" && stat.kind === track.kind) {
+              reported = true;
+              packetsSent += stat.packetsSent ?? 0;
+            }
+          });
+        } catch {
+          continue;
+        }
+        if (reported && packetsSent === 0) stalled.push({ sender, track });
       }
 
       if (peersRef.current.get(peerId) !== pc) return;
-      if (!stalled) return;
+      if (stalled.length === 0) return;
 
-      try {
-        await sender.replaceTrack(null);
-        await sender.replaceTrack(track);
-      } catch {
-        // An engine that refuses the swap keeps the stalled sender; the next
-        // attempt, or ordinary recovery, is the remaining path.
+      for (const { sender, track } of stalled) {
+        try {
+          await sender.replaceTrack(null);
+          await sender.replaceTrack(track);
+        } catch {
+          // An engine that refuses the swap keeps the stalled sender; the
+          // next attempt, or ordinary recovery, is the remaining path.
+        }
       }
 
       if (attempt + 1 >= SENDER_STALL_ATTEMPTS) return;
@@ -632,11 +663,7 @@ export function useWebRTCPeers<MediaState>(
     if (state === "connected") {
       cancelPeerRecovery(peerId);
       setPeerConnectionStatus(peerId, "connected");
-      clearPeerTimer(senderCheckTimersRef.current, peerId);
-      const senderCheck = setTimeout(() => {
-        void reviveStalledSenderRef.current(peerId, pc, 0);
-      }, SENDER_STALL_CHECK_MS);
-      senderCheckTimersRef.current.set(peerId, senderCheck);
+      scheduleSenderCheck(peerId, pc);
       return;
     }
 
