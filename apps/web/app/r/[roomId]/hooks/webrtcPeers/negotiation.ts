@@ -38,6 +38,11 @@ function parseDescription(value: unknown): {
   };
 }
 
+// How long an offer may go unanswered before it is rolled back and sent again.
+// A healthy answer arrives well within a second; the longest legitimate delay
+// on the answering side is its ICE-config gate, bounded at 3 s.
+export const OFFER_ANSWER_TIMEOUT_MS = 10_000;
+
 let nextGeneration = 0;
 function createGeneration() {
   nextGeneration += 1;
@@ -64,6 +69,7 @@ export class PeerNegotiator {
   private offerPending = false;
   private ignoreOffer = false;
   private activeGeneration: string | null = null;
+  private answerTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly localIceGenerations = new Map<string, string | null>();
 
   constructor(options: PeerNegotiatorOptions) {
@@ -113,10 +119,45 @@ export class PeerNegotiator {
           "WebRTC offer could not be sent while signaling was offline",
         );
       }
+      this.armAnswerTimeout(generation);
       return "sent";
     } finally {
       this.makingOffer = false;
     }
+  }
+
+  /** Stop the unanswered-offer timer; call when the connection is discarded. */
+  dispose() {
+    if (this.answerTimer) clearTimeout(this.answerTimer);
+    this.answerTimer = null;
+  }
+
+  private armAnswerTimeout(generation: string) {
+    this.dispose();
+    this.answerTimer = setTimeout(() => {
+      this.answerTimer = null;
+      void this.reissueUnansweredOffer(generation).catch(() => {
+        // The connection's own recovery remains the fallback.
+      });
+    }, OFFER_ANSWER_TIMEOUT_MS);
+  }
+
+  /**
+   * An offer whose answer never arrives leaves this side in have-local-offer
+   * for good. The relay can drop one without a word — its rate limit does —
+   * and a connected transport has no watchdog that would notice, so every
+   * later renegotiation queued behind it and a microphone turned on afterwards
+   * never reached that peer. Roll the offer back and send a fresh one; a late
+   * answer to the abandoned offer is then refused by its generation.
+   */
+  private async reissueUnansweredOffer(generation: string) {
+    if (this.pc.signalingState !== "have-local-offer") return;
+    if (this.activeGeneration !== generation) return;
+    if (this.makingOffer || this.settingRemoteAnswer) return;
+    this.activeGeneration = null;
+    await this.pc.setLocalDescription({ type: "rollback" });
+    this.offerPending = true;
+    await this.flushPendingOffer();
   }
 
   async receiveDescription(value: unknown): Promise<boolean> {

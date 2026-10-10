@@ -321,6 +321,7 @@ export function useWebRTCPeers<MediaState>(
       }
       clearPeerTimer(senderCheckTimersRef.current, peerId);
       peersRef.current.delete(peerId);
+      negotiatorsRef.current.get(peerId)?.dispose();
       negotiatorsRef.current.delete(peerId);
       remoteStreamsRef.current.delete(peerId);
 
